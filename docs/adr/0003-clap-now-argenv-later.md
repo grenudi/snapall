@@ -1,6 +1,6 @@
 # 3. Argument parsing: clap now, argenv later
 
-Status: accepted, revisit (see backlog)
+Status: superseded by [ADR 5](0005-argenv-as-the-invocation-contract.md)
 
 ## Context
 The intent is to use `argenv` (a typed, machine-readable contract for a program's argv and env) as the invocation layer. Its API was not yet studied for this project.
