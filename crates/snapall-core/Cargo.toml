@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 authors.workspace = true
+license.workspace = true
 
 [features]
 # In-memory backend and the backend contract test, for adapter crates' tests.

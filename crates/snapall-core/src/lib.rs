@@ -4,6 +4,7 @@
 //! snapshot is taken. It has no I/O and must not depend on a CLI parser, a serializer
 //! or an adapter; `crates/snapall/tests/architecture.rs` enforces that.
 
+pub mod doctor;
 pub mod domain;
 pub mod plan;
 pub mod port;
