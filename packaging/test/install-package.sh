@@ -7,9 +7,12 @@
 # Run INSIDE a fresh distro container (as root), repo mounted at /w, packages in /w/dist.
 # Installs the real package the way a user would and checks that the dependency on snapper
 # was honoured (it pulled snapper in) and that the program runs.
-#   usage: install-package.sh deb|rpm-dnf|rpm-zypper|arch
+#   usage: install-package.sh deb|rpm-dnf|rpm-zypper|arch|arch-release
+#   arch builds the in-repo PKGBUILD from this checkout; arch-release builds the PKGBUILD that
+#   was published with a release, from the release tag's real source tarball.
+#   Set EXPECT_VERSION to also assert that the installed program reports that version.
 set -eu
-kind="${1:?usage: $0 deb|rpm-dnf|rpm-zypper|arch}"
+kind="${1:?usage: $0 deb|rpm-dnf|rpm-zypper|arch|arch-release}"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 # shellcheck source=/dev/null
 . /etc/os-release
@@ -42,11 +45,28 @@ case "$kind" in
     pacman -U --noconfirm /home/builder/pkg/snapall-*.pkg.tar.*
     pacman -Qi snapall | grep -E '^Depends On.*snapper' || fail "the package does not depend on snapper"
     ;;
+  arch-release)
+    pacman -Syu --noconfirm --needed base-devel git sudo >/dev/null
+    useradd -m builder
+    echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+    mkdir -p /home/builder/pkg
+    cp /w/dist/PKGBUILD /home/builder/pkg/
+    chown -R builder /home/builder/pkg
+    # Exactly what a user does: makepkg downloads the tag's source and checks it against the
+    # sha256 the release published.
+    su builder -c 'cd ~/pkg && makepkg -s --noconfirm --nocheck'
+    pacman -U --noconfirm /home/builder/pkg/snapall-*.pkg.tar.*
+    pacman -Qi snapall | grep -E '^Depends On.*snapper' || fail "the package does not depend on snapper"
+    ;;
   *) fail "unknown kind $kind" ;;
 esac
 
 command -v snapper >/dev/null 2>&1 || fail "installing snapall did not pull in snapper"
-snapall --version
+version="$(snapall --version)"
+echo "$version"
+if [ -n "${EXPECT_VERSION:-}" ] && [ "$version" != "snapall $EXPECT_VERSION" ]; then
+  fail "expected snapall $EXPECT_VERSION, got: $version"
+fi
 snapall --no-dbus doctor | tee /tmp/doctor.txt
 grep -q '^ok    snapper' /tmp/doctor.txt || fail "doctor does not see snapper"
 # Ask the package manager what the package contains: container images strip documentation
@@ -54,7 +74,7 @@ grep -q '^ok    snapper' /tmp/doctor.txt || fail "doctor does not see snapper"
 case "$kind" in
   deb) files="$(dpkg -L snapall)" ;;
   rpm-dnf | rpm-zypper) files="$(rpm -ql snapall)" ;;
-  arch) files="$(pacman -Ql snapall)" ;;
+  arch | arch-release) files="$(pacman -Ql snapall)" ;;
 esac
 echo "$files" | grep -q '/usr/bin/snapall$' || fail "the package does not contain /usr/bin/snapall"
 echo "$files" | grep -q 'README.md' || fail "the package does not contain the README"

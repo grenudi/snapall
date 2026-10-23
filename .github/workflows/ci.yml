@@ -193,23 +193,31 @@ jobs:
         run: argenv usage snapall.argenv.json
 
   static-binary:
-    name: static binary and packages
-    runs-on: ubuntu-latest
+    name: static binary and packages (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    # Both architectures are built and tested natively: a package that ships for aarch64 is
+    # installed on an aarch64 container, not assumed to work because the x86_64 one did.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl }
+          - { arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-musl
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
 
       - name: Install the package builders
         run: cargo install --locked cargo-deb cargo-generate-rpm
 
       - name: Build the static binary
-        run: cargo build --release --locked --target x86_64-unknown-linux-musl -p snapall
+        run: cargo build --release --locked --target ${{ matrix.target }} -p snapall
 
       - name: Build the .deb and .rpm
-        run: packaging/build-packages.sh x86_64-unknown-linux-musl
+        run: packaging/build-packages.sh ${{ matrix.target }}
 
       - name: The published checksums verify (every line names a file that exists)
         run: cd dist && sha256sum --check SHA256SUMS
@@ -219,31 +227,37 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-${{ matrix.arch }}
           path: dist/
           if-no-files-found: error
 
   distros:
-    name: ${{ matrix.name }}, on a fresh container
+    name: ${{ matrix.name }} ${{ matrix.arch }}, on a fresh container
     needs: static-binary
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     # The promise is "works on every major distro", so each one is checked for real: a
-    # container with no snapper, the actual package manager, the actual package.
+    # container with no snapper, the actual package manager, the actual package. Arch has no
+    # official aarch64 image, so it is x86_64 only.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: Debian,   image: "debian:stable",               package: deb }
-          - { name: Ubuntu,   image: "ubuntu:24.04",                package: deb }
-          - { name: Fedora,   image: "fedora:latest",               package: rpm-dnf }
-          - { name: openSUSE, image: "opensuse/tumbleweed:latest",  package: rpm-zypper }
-          - { name: Arch,     image: "archlinux:latest",            package: arch }
-          - { name: Alpine,   image: "alpine:edge",                 package: none }
+          - { name: Debian,   arch: x86_64,  runner: ubuntu-latest,    image: "debian:stable",              package: deb }
+          - { name: Ubuntu,   arch: x86_64,  runner: ubuntu-latest,    image: "ubuntu:24.04",               package: deb }
+          - { name: Fedora,   arch: x86_64,  runner: ubuntu-latest,    image: "fedora:latest",              package: rpm-dnf }
+          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,    image: "opensuse/tumbleweed:latest", package: rpm-zypper }
+          - { name: Arch,     arch: x86_64,  runner: ubuntu-latest,    image: "archlinux:latest",           package: arch }
+          - { name: Alpine,   arch: x86_64,  runner: ubuntu-latest,    image: "alpine:edge",                package: none }
+          - { name: Debian,   arch: aarch64, runner: ubuntu-24.04-arm, image: "debian:stable",              package: deb }
+          - { name: Ubuntu,   arch: aarch64, runner: ubuntu-24.04-arm, image: "ubuntu:24.04",               package: deb }
+          - { name: Fedora,   arch: aarch64, runner: ubuntu-24.04-arm, image: "fedora:latest",              package: rpm-dnf }
+          - { name: openSUSE, arch: aarch64, runner: ubuntu-24.04-arm, image: "opensuse/tumbleweed:latest", package: rpm-zypper }
+          - { name: Alpine,   arch: aarch64, runner: ubuntu-24.04-arm, image: "alpine:edge",                package: none }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: dist-${{ matrix.arch }}
           path: dist
 
       - name: "snapall doctor --install"

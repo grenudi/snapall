@@ -1,0 +1,128 @@
+name: Verify release
+
+# CI proves that what we *built* works. This proves that what we *published* works: it
+# downloads the assets from the GitHub release, checks them against the checksums published
+# beside them, and installs them the way a user would, on a fresh container of each
+# distribution and each architecture, including building the PKGBUILD that was attached to the
+# release from the tag's real source tarball. Anything uploaded wrongly (a missing file, a stale
+# checksum, a package for the wrong architecture, a version that does not match the tag) fails
+# here instead of in a user's terminal.
+#
+# It runs after every Release workflow and does nothing unless that run cut a release tag. It
+# can also be run by hand for an existing tag.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify, for example snapall-v0.3.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: which release?
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Find the release tag, if this run cut one
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch --tags --force
+          if [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$(git tag --points-at "$HEAD_SHA" | grep -E '^snapall-v[0-9]' | head -n1 || true)"
+          fi
+          case "$tag" in
+            '' | snapall-v[0-9]*) ;;
+            *) echo "not a snapall release tag: $tag" >&2; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release tag: ${tag:-none}"
+
+  verify:
+    name: ${{ matrix.name }} ${{ matrix.arch }}
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Debian,   arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "debian:stable",              package: deb,         asset: "*_amd64.deb" }
+          - { name: Ubuntu,   arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "ubuntu:24.04",               package: deb,         asset: "*_amd64.deb" }
+          - { name: Fedora,   arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "fedora:latest",              package: rpm-dnf,     asset: "*.x86_64.rpm" }
+          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "opensuse/tumbleweed:latest", package: rpm-zypper,  asset: "*.x86_64.rpm" }
+          - { name: Arch,     arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "archlinux:latest",           package: arch-release, asset: "PKGBUILD" }
+          - { name: Alpine,   arch: x86_64,  runner: ubuntu-latest,    target: x86_64-unknown-linux-musl,  image: "alpine:edge",                package: none,        asset: "" }
+          - { name: Debian,   arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, image: "debian:stable",              package: deb,         asset: "*_arm64.deb" }
+          - { name: Ubuntu,   arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, image: "ubuntu:24.04",               package: deb,         asset: "*_arm64.deb" }
+          - { name: Fedora,   arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, image: "fedora:latest",              package: rpm-dnf,     asset: "*.aarch64.rpm" }
+          - { name: openSUSE, arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, image: "opensuse/tumbleweed:latest", package: rpm-zypper,  asset: "*.aarch64.rpm" }
+          - { name: Alpine,   arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, image: "alpine:edge",                package: none,        asset: "" }
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      TARGET: ${{ matrix.target }}
+      PACKAGE: ${{ matrix.package }}
+    steps:
+      # The test scripts come from the current commit: they are the harness, not the product.
+      - uses: actions/checkout@v7
+
+      - name: Download the published assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern "*-${TARGET}.tar.gz" --pattern "*-${TARGET}.sha256" --pattern "SHA256SUMS-${TARGET}"
+          if [ -n "$ASSET" ]; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist --pattern "$ASSET"
+          fi
+          echo "EXPECT_VERSION=${TAG#snapall-v}" >> "$GITHUB_ENV"
+          ls -l dist
+
+      - name: The published checksums verify
+        run: |
+          cd dist
+          sha256sum --check "snapall-${TAG#snapall-}-${TARGET}.sha256"
+          case "$PACKAGE" in
+            deb | rpm-dnf | rpm-zypper)
+              # --ignore-missing: SHA256SUMS lists the deb and the rpm, we fetched one. Insist
+              # that at least one line really was checked, so an empty check cannot pass.
+              sha256sum --check --ignore-missing "SHA256SUMS-${TARGET}" | tee /dev/stderr | grep -q ': OK'
+              ;;
+          esac
+
+      - name: The tarball carries the program, the license and the third-party notices
+        run: |
+          scratch="$(mktemp -d)"
+          tar xzf "dist/snapall-${TAG#snapall-}-${TARGET}.tar.gz" -C "$scratch"
+          for file in snapall LICENSE README.md THIRD-PARTY-LICENSES.md; do
+            test -f "$scratch/$file" || { echo "the tarball lacks $file" >&2; exit 1; }
+          done
+          head -n 3 "$scratch/LICENSE" | grep -q 'GNU GENERAL PUBLIC LICENSE'
+          # The doctor test below runs the very binary users download.
+          cp "$scratch/snapall" "dist/snapall-${TARGET}"
+
+      - name: snapall doctor --install, with the published binary
+        run: docker run --rm -e EXPECT_VERSION -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/doctor-install.sh
+
+      - name: Install the published package
+        if: matrix.package != 'none'
+        run: docker run --rm -e EXPECT_VERSION -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/install-package.sh "${{ matrix.package }}"

@@ -9,13 +9,16 @@
 # `snapall doctor` notices a missing snapper, names the right fix, installs it with the real
 # package manager, and sees it afterwards.
 set -eu
+fail() { echo "FAIL: $*" >&2; exit 1; }
 # Artifacts lose the executable bit; use a private copy.
 for candidate in /w/dist/snapall-*-linux-musl; do
   cp "$candidate" /tmp/snapall
 done
 chmod +x /tmp/snapall
 snapall=/tmp/snapall
-fail() { echo "FAIL: $*" >&2; exit 1; }
+if [ -n "${EXPECT_VERSION:-}" ]; then
+  [ "$("$snapall" --version)" = "snapall $EXPECT_VERSION" ] || fail "expected snapall $EXPECT_VERSION, got: $("$snapall" --version)"
+fi
 
 # shellcheck source=/dev/null
 . /etc/os-release
