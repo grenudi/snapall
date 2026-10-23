@@ -72,7 +72,7 @@ One setting, two doors: each of these is the same input as its flag, and an expl
 | `SNAPALL_LOG=text\|json` | `--log text\|json` |
 | `SNAPALL_LOG_FILE=/var/log/snapall.jsonl` | `--log-file /var/log/snapall.jsonl` |
 
-A misspelled `SNAPALL_*` variable produces a warning with a suggestion instead of being ignored in silence.
+A misspelled `SNAPALL_*` variable is an **error** with a suggestion (`SNAPALL_NO_DBU` stops the run and says it meant `SNAPALL_NO_DBUS`), not a setting that is silently not applied.
 
 ### Logging and the audit trail
 

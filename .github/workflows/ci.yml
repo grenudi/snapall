@@ -158,7 +158,7 @@ jobs:
       - run: cargo build -p snapall --locked
 
       - name: Install the argenv CLI (pinned)
-        run: cargo install --locked --git https://github.com/argenv-opencommons/argenv --rev 8b6c6c9 argenv-cli
+        run: cargo install --locked --git https://github.com/argenv-opencommons/argenv --tag argenv-v0.3.0 argenv-cli
 
       - name: The committed contract is what the code emits
         run: |
@@ -167,12 +167,12 @@ jobs:
           jq 'del(.generated, .source)' "$RUNNER_TEMP/contract.json" > "$RUNNER_TEMP/produced.json"
           diff -u "$RUNNER_TEMP/committed.json" "$RUNNER_TEMP/produced.json"
 
-      # NOTE: `argenv check` is not run yet. At the pinned revision it rejects the
-      # `subcommands` field that argenv itself emits (KNOWN_FIELDS in argenv-cli omits it).
-      # See docs/backlog.md; add the step once that is fixed upstream.
+      - name: The contract is a valid argenv document
+        run: argenv check snapall.argenv.json
+
       - name: Valid invocations satisfy the contract
         run: |
-          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "doctor --install" "--log json list" "--log-file /tmp/x.log tui" "tui"; do
+          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "doctor --install --yes" "--log json list" "--log-file /tmp/x.log tui" "tui"; do
             echo "argenv lint: $invocation"
             # shellcheck disable=SC2086  # the invocation is meant to split into arguments
             argenv lint snapall.argenv.json -- $invocation
@@ -181,13 +181,20 @@ jobs:
       - name: An invalid invocation is rejected
         run: |
           # `! cmd` would not fail the step under `bash -e`; check the status explicitly.
-          for invocation in "delete home notanumber" "create --json=yes" "doctor --install=yes" "--log xml list"; do
+          for invocation in "delete home notanumber" "delete home" "delete" "create --json=yes" "doctor --install=yes" "--log xml list" "list --dry-run" "delete home 3 --dry-run" "--dry-ru" "tui --json"; do
             echo "argenv lint must reject: $invocation"
             status=0
             # shellcheck disable=SC2086  # the invocation is meant to split into arguments
             argenv lint snapall.argenv.json -- $invocation >/dev/null 2>&1 || status=$?
             if [ "$status" -eq 0 ]; then echo "argenv accepted an invalid invocation: $invocation"; exit 1; fi
           done
+
+      - name: A project can be lenient about typos, and only about typos
+        run: |
+          argenv lint --lenient snapall.argenv.json -- --dry-ru
+          status=0
+          argenv lint --lenient snapall.argenv.json -- delete home notanumber >/dev/null 2>&1 || status=$?
+          if [ "$status" -eq 0 ]; then echo "a bad value must stay an error under --lenient"; exit 1; fi
 
       - name: Help text the contract implies
         run: argenv usage snapall.argenv.json

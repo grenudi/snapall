@@ -11,8 +11,8 @@
 use std::fmt;
 
 use argenv_resolve::{
-    lint, EnvSource, Finding, Input, InputResolveDefaultExt, InputResolveExt, Invocation, Record,
-    Resolution, Source,
+    lint, EnvSource, Finding, Input, InputResolveDefaultExt, InputResolveExt, Invocation,
+    LintPolicy, Record, Resolution, Severity, Source,
 };
 use snapall_core::{ConfigName, Description, SnapshotId};
 
@@ -214,41 +214,37 @@ fn applies_to(record: &Record, command: Command) -> bool {
     record.subcommands.is_empty() || record.subcommands.iter().any(|s| s == command.token())
 }
 
-/// Apply snapall's policy to argenv's findings. Returns (errors, warnings).
+/// Apply the policy to argenv's findings. Returns (errors, warnings).
 ///
-/// argenv treats an unknown flag as a warning and has no notion of a flag that is valid for
-/// one subcommand only. A tool that deletes things cannot be that forgiving: a misspelled
-/// flag, or `--dry-run` on a command that does not honour it, is an error.
+/// argenv's default policy is the right one for a tool that changes the system: a misspelled
+/// flag or variable, and a flag given to a subcommand it does not belong to (`delete
+/// --dry-run`), are errors, because carrying on would do something other than what was asked.
+/// snapall used to enforce that itself; since argenv 0.3 it is the library's default, so this
+/// only chooses the wording and sorts by severity.
 fn check(
     records: &[Record],
     resolution: &Resolution,
     command: Command,
 ) -> (Vec<String>, Vec<String>) {
+    let policy = LintPolicy::default();
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
     for finding in lint(records, resolution) {
-        match &finding {
-            Finding::UnknownEnv { .. } | Finding::Deprecated { .. } => {
-                warnings.push(finding.to_string());
-            }
-            _ => errors.push(finding.to_string()),
-        }
-    }
-
-    // A flag given for a command it does not belong to.
-    for record in records {
-        let is_flag = record.arg.as_ref().is_some_and(|a| a.position.is_none());
-        if is_flag
-            && !applies_to(record, command)
-            && resolution.source(&record.key) == Some(Source::Arg)
-        {
-            errors.push(format!(
-                "{} does not apply to `{}` (it applies to: {})",
-                record.usage(),
-                command.token(),
-                record.subcommands.join(", ")
-            ));
+        let message = match &finding {
+            // A missing positional reads better as the argument the user should add.
+            Finding::MissingRequired { key, .. } => records
+                .iter()
+                .find(|r| &r.key == key && r.arg.as_ref().is_some_and(|a| a.position.is_some()))
+                .map_or_else(
+                    || finding.to_string(),
+                    |r| format!("missing required argument {}", r.usage()),
+                ),
+            _ => finding.to_string(),
+        };
+        match policy.severity(&finding) {
+            Severity::Error => errors.push(message),
+            Severity::Warning => warnings.push(message),
         }
     }
 
@@ -474,20 +470,15 @@ mod tests {
     }
 
     #[test]
-    fn a_misspelled_snapall_variable_is_a_warning_with_a_suggestion() {
-        let parsed = run(&["list"], &[("SNAPALL_NO_DBU", "1")]).unwrap();
-        assert_eq!(parsed.request, Request::List);
+    fn a_misspelled_snapall_variable_is_an_error_with_a_suggestion() {
+        // argenv's default: a near-miss of a declared variable is a typo, and a typo that is
+        // ignored means the setting the user asked for is not applied.
+        let message = run(&["list"], &[("SNAPALL_NO_DBU", "1")])
+            .expect_err("a misspelled variable must be refused")
+            .to_string();
         assert!(
-            !parsed.no_dbus,
-            "the misspelled variable must not take effect"
-        );
-        assert!(
-            parsed
-                .warnings
-                .iter()
-                .any(|w| w.contains("did you mean SNAPALL_NO_DBUS")),
-            "{:?}",
-            parsed.warnings
+            message.contains("did you mean SNAPALL_NO_DBUS"),
+            "{message}"
         );
     }
 
@@ -544,10 +535,12 @@ mod tests {
     }
 
     #[test]
-    fn delete_arguments_are_not_demanded_of_other_commands() {
+    fn delete_arguments_are_required_by_delete_and_demanded_of_nothing_else() {
+        // `required: true` on a scoped input: argenv demands it only when its own command runs.
         assert!(run(&["list"], &[]).is_ok());
         assert!(run(&["create"], &[]).is_ok());
         assert!(run(&["snapshots"], &[]).is_ok());
+        assert!(run(&["delete", "home", "12"], &[]).is_ok());
     }
 
     // ---- refusing what would be silently ignored ----------------------------------
@@ -772,60 +765,77 @@ mod tests {
         assert!(err(&["contract", "--log", "json"]).contains("does not apply to `contract`"));
     }
 
-    // ---- characterization: argenv behaviours snapall works around -------------------
+    fn lint_args(argv: &[&str]) -> Vec<Finding> {
+        let args: Vec<String> = argv.iter().map(|s| (*s).to_owned()).collect();
+        let env: BTreeMap<String, String> = BTreeMap::new();
+        let records = Contract::records();
+        let resolution = Invocation {
+            args: &args,
+            env: &env,
+        }
+        .resolve(&records);
+        lint(&records, &resolution)
+    }
+
+    // ---- characterization: the argenv behaviour snapall relies on -------------------
     //
     // These pin what argenv 0.2 does today. If one fails after an argenv upgrade, the
     // upstream behaviour changed and the matching workaround in `check` can be simplified.
 
     #[test]
-    fn argenv_lint_ignores_subcommand_scope_for_required_inputs() {
-        // This is why the contract declares no `required` input: one scoped to `delete` would
-        // make `argenv lint` reject every other command.
-        use argenv_resolve::{Arg, Input, Type};
-        let scoped: Input<String, Command> = Input {
-            key: "needed",
-            ty: Type::String,
-            required: true,
-            subcommands: &[Command::Delete],
-            arg: Some(Arg::positional(0)),
-            ..Input::EMPTY
-        };
-        let records = vec![scoped.to_record()];
-        let args = vec!["list".to_owned()];
-        let env: BTreeMap<String, String> = BTreeMap::new();
-        let resolution = Invocation {
-            args: &args,
-            env: &env,
-        }
-        .resolve(&records);
+    fn argenv_demands_a_scoped_required_input_only_for_its_own_command() {
+        // snapall declares `delete`'s arguments `required: true` and relies on this: before
+        // argenv 0.3 a scoped required input made lint reject every other command.
+        let records = Contract::records();
         assert!(
-            lint(&records, &resolution)
+            records
+                .iter()
+                .any(|r| r.required && !r.subcommands.is_empty()),
+            "the contract uses a scoped required input"
+        );
+        for command in ["list", "create", "snapshots", "tui", "doctor"] {
+            let findings = lint_args(&[command]);
+            assert!(
+                !findings
+                    .iter()
+                    .any(|f| matches!(f, Finding::MissingRequired { .. })),
+                "{command}: {findings:?}"
+            );
+        }
+        let findings = lint_args(&["delete"]);
+        assert!(
+            findings
                 .iter()
                 .any(|f| matches!(f, Finding::MissingRequired { .. })),
-            "argenv now scopes `required`; the contract may declare `required` on delete's inputs"
+            "delete without its arguments is reported: {findings:?}"
         );
     }
 
     #[test]
-    fn the_contract_declares_no_required_input_so_argenv_lint_works_for_everyone() {
-        assert!(Contract::records().iter().all(|r| !r.required));
+    fn the_published_contract_says_what_delete_needs() {
+        let required: Vec<String> = Contract::records()
+            .into_iter()
+            .filter(|r| r.required)
+            .map(|r| r.key)
+            .collect();
+        assert_eq!(required, ["delete_config", "snapshot_id"]);
     }
 
     #[test]
-    fn argenv_reports_an_unknown_flag_only_as_a_warning() {
-        let records = Contract::records();
-        let args = vec!["list".to_owned(), "--evil".to_owned()];
-        let env: BTreeMap<String, String> = BTreeMap::new();
-        let resolution = Invocation {
-            args: &args,
-            env: &env,
+    fn argenv_takes_unknown_flags_and_out_of_place_flags_as_errors_by_default() {
+        for argv in [
+            &["list", "--evil"][..],
+            &["delete", "home", "3", "--dry-run"],
+        ] {
+            let findings = lint_args(argv);
+            assert!(
+                findings
+                    .iter()
+                    .any(|f| LintPolicy::default().severity(f) == Severity::Error
+                        && matches!(f, Finding::UnknownArg { .. } | Finding::OutOfScope { .. })),
+                "{argv:?}: {findings:?}"
+            );
         }
-        .resolve(&records);
-        let finding = lint(&records, &resolution)
-            .into_iter()
-            .find(|f| matches!(f, Finding::UnknownArg { .. }))
-            .expect("unknown flag is reported");
-        assert_eq!(finding.severity(), argenv_resolve::Severity::Warning);
     }
 
     #[test]

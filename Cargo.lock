@@ -10,9 +10,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "argenv"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5890cd08fd9993d8de245ba4730b2ef1ad246f8032ba972a794abdb987286ad9"
+checksum = "f575bb82295f755228bebe4036b2d9dd550afc76832fc43f49d8f86a87c4df0b"
 dependencies = [
  "serde",
  "serde_json",
@@ -20,9 +20,9 @@ dependencies = [
 
 [[package]]
 name = "argenv-resolve"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ae233b1d1797e4dfd69386af9c995e27b7314fe20dcb78e5af7a25a4aceb046"
+checksum = "852acf1479da4da01c472cecc0c3180cdbd98e2cf4230a741c1016da07c73f36"
 dependencies = [
  "argenv",
  "serde",

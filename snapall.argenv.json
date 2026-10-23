@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-23T08:33:26Z",
+  "generated": "2026-10-23T19:21:58Z",
   "inputs": [
     {
       "allowed": [],
@@ -233,7 +233,7 @@
       },
       "group": "delete",
       "key": "delete_config",
-      "required": false,
+      "required": true,
       "stability": "unknown",
       "subcommands": [
         "delete"
@@ -253,7 +253,7 @@
       "example": "snapall delete home 12",
       "group": "delete",
       "key": "snapshot_id",
-      "required": false,
+      "required": true,
       "stability": "unknown",
       "subcommands": [
         "delete"
@@ -307,5 +307,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.2.0"
+  "source": "snapall@0.3.0"
 }

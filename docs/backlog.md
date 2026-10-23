@@ -18,14 +18,15 @@ Every known gap lives here, not in a prose TODO.
 | 9 | Confirm snapper's allowed config-name characters; `ConfigName` is currently stricter than necessary | open |
 | 10 | Branch protection on `main` requiring the CI checks | open |
 
-## Upstream: argenv (not changed from here)
+## Upstream: argenv
 | # | Item | Status |
 |---|---|---|
-| A | `argenv check` rejects `subcommands`: `KNOWN_FIELDS` in `crates/argenv-cli/src/main.rs` omits it. Adding the line makes snapall's contract pass and argenv-cli's tests still pass. Then add `argenv check` to the CI `contract` job | open |
-| B | `lint` ignores subcommand scope for `required` (`check_resolution` in `lint.rs`) | open (worked around, pinned by a test) |
-| C | `Type::List` needs a non-empty `allowed`, so a runtime-determined list cannot be declared | open (worked around, pinned by a test) |
-| D | `UnknownArg` is only a warning; flags are parsed globally regardless of subcommand scope | open (worked around, pinned by a test) |
-| E | argenv README still says `argenv = "0.1"` and omits the `argenv-resolve` crate; the crate is 0.2.0 | open |
+| A | `argenv check` rejected `subcommands` (argenv#21) | **fixed in 0.3.0**; CI now runs `argenv check` |
+| B | `lint` ignored subcommand scope for `required` (argenv#22) | **fixed in 0.3.0**; `delete`'s arguments are `required: true` again |
+| C | `Type::List` needs a closed `allowed` set, so a runtime-determined list cannot be declared (argenv#25) | open upstream (worked around: `--only` is a string, pinned by a test) |
+| D | Misspelled flags/variables were warnings and out-of-place flags were accepted (argenv#26, #30, #31) | **fixed in 0.3.0**; snapall's own checks deleted |
+| E | argenv README stale (0.1, no `argenv-resolve`) (argenv#24) | **fixed** |
+| F | Migrate argenv to schemars 1.x (argenv#28) | open upstream; no effect on snapall |
 
 ## Dependencies
 | # | Item | Status |

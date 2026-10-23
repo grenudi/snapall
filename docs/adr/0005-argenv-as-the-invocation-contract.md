@@ -8,16 +8,18 @@ Status: accepted. Supersedes [ADR 3](0003-clap-now-argenv-later.md).
 ## Decision
 The whole invocation surface lives in `crates/snapall/src/contract.rs`. `clap` is removed. Parsing, `--help`, validation and the published `snapall contract` document all derive from that file.
 
-snapall adds a thin policy layer (`cli.rs`) on top of argenv, because a tool that deletes things needs stricter rules than argenv's defaults:
+Since argenv 0.3 almost all of the policy a tool that changes the system needs is argenv's own default, so snapall's layer (`cli.rs`) is thin:
 
-- **Normalise first.** `snapall "text"` is rewritten to `snapall create "text"` before resolving, so subcommand-scoped rules (environment variables, positionals) behave identically for both spellings.
-- **Reject out-of-scope flags.** argenv parses flags globally, whatever subcommand they are scoped to. snapall rejects a flag whose contract record does not list the active command, so `delete ... --dry-run` is an error, not a silent real delete.
-- **Unknown flags are errors.** argenv reports them as warnings.
-- **Own the exit.** `lint` is called directly instead of `handle_problems`, which calls `process::exit`.
-- **No `required` inputs in the contract.** argenv's lint ignores subcommand scope, so a `required` input of `delete` would make `argenv lint` reject every other command. `delete`'s arguments are enforced by snapall instead.
-- **`--only` is a string.** argenv lists need a non-empty closed `allowed` set; config names are only known at runtime.
+- **Normalise first.** `snapall "text"` is rewritten to `snapall create "text"` before resolving, so subcommand-scoped rules (environment variables, positionals, applicable flags) behave identically for both spellings, and a one-word typo of a command is refused instead of becoming a description.
+- **argenv's default policy.** A misspelled flag, a misspelled variable, and a flag given to a subcommand it does not belong to (`delete --dry-run`) are errors. snapall used to implement those itself because argenv 0.2 treated them as warnings or accepted them silently; the decisions and the code moved upstream (argenv#30, #31) and snapall's copies were deleted.
+- **`required` works per command.** `delete`'s arguments are declared `required: true`, and argenv demands them only when `delete` runs (argenv#22), so the published contract says what `delete` needs and `argenv lint` accepts every other command.
+- **Own the exit.** `lint` is called directly instead of `handle_problems`, which calls `process::exit`, so the exit status is snapall's (0, 1, 2).
+- **`--only` is a string.** argenv lists need a non-empty closed `allowed` set; config names are only known at runtime (argenv#25 is open). snapall splits and validates it itself.
+- **Extra positionals** are counted from the contract (argenv does not report them).
 
-Each of these workarounds is pinned by a characterization test that fails if argenv changes, so the workaround can then be removed.
+A project that wanted to be more forgiving would pass `LintPolicy::lenient()`; snapall deliberately does not, because a destructive tool should not carry on past a typo.
+
+The argenv behaviour snapall *relies on* is pinned by tests that fail if it changes (`cli.rs`): scoped `required`, unknown and out-of-place flags as errors, and the closed-list rule behind `--only`.
 
 ## Consequences
-The contract is checked in CI by argenv's own CLI (`argenv lint`). `argenv check` is not run yet: at the pinned revision it rejects the `subcommands` field that argenv itself emits (`KNOWN_FIELDS` in `argenv-cli`). The upstream items are in `docs/backlog.md`.
+The contract is checked in CI by argenv's own CLI, pinned to a release tag: `argenv check` (the document is valid), `argenv lint` accepting valid invocations and rejecting invalid ones, and `--lenient` staying lenient only about typos. The one open upstream item is argenv#25.

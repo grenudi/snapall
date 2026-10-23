@@ -248,12 +248,11 @@ contract! {
 
     // ---- delete ----------------------------------------------------------------------
 
-    /// The config to delete from. Required by `delete`, but not declared `required`: argenv's
-    /// lint ignores subcommand scope, so a `required` here would make `argenv lint` reject
-    /// every *other* command. snapall enforces it itself (see the characterization tests).
+    /// The config to delete from. Required by `delete`; argenv demands it only when `delete` runs.
     DELETE_CONFIG: String, Command = Input {
         key:         "delete_config",
         ty:          Type::String,
+        required:    true,
         subcommands: &[Command::Delete],
         arg:         Some(Arg { value_name: "CONFIG", ..Arg::positional(0) }),
         group:       "delete",
@@ -265,6 +264,7 @@ contract! {
     SNAPSHOT_ID: u64, Command = Input {
         key:         "snapshot_id",
         ty:          Type::Uint,
+        required:    true,
         subcommands: &[Command::Delete],
         arg:         Some(Arg { value_name: "ID", ..Arg::positional(1) }),
         group:       "delete",
