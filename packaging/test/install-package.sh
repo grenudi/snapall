@@ -44,5 +44,14 @@ command -v snapper >/dev/null 2>&1 || fail "installing snapall did not pull in s
 snapall --version
 snapall --no-dbus doctor | tee /tmp/doctor.txt
 grep -q '^ok    snapper' /tmp/doctor.txt || fail "doctor does not see snapper"
-test -f /usr/share/doc/snapall/README.md || test -f /usr/share/doc/snapall/README.md.gz || fail "README missing"
+# Ask the package manager what the package contains: container images strip documentation
+# from the filesystem on purpose, so looking for README on disk proves nothing.
+case "$kind" in
+  deb) files="$(dpkg -L snapall)" ;;
+  rpm-dnf | rpm-zypper) files="$(rpm -ql snapall)" ;;
+  arch) files="$(pacman -Ql snapall)" ;;
+esac
+echo "$files" | grep -q '/usr/bin/snapall$' || fail "the package does not contain /usr/bin/snapall"
+echo "$files" | grep -q 'README.md' || fail "the package does not contain the README"
+echo "$files" | grep -q 'LICENSE-MIT' || fail "the package does not contain the license"
 echo "PASS: $kind on $ID"

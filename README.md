@@ -31,9 +31,9 @@ snapall drives [snapper](http://snapper.io/), so every package below **depends o
 | openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
 | Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` |
 | Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
-| Anything else (Alpine, Void, Gentoo, ...) | the static `snapall-<version>-<arch>-unknown-linux-musl.tar.gz`, then `sudo ./snapall doctor --install` |
+| Alpine edge, Void, Gentoo, anything else | the static `snapall-<version>-<arch>-unknown-linux-musl.tar.gz`, then `sudo ./snapall doctor --install` |
 
-`snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`, `xbps-install`, `emerge`). Where a command would be wrong it says so instead of running anything: RHEL and its rebuilds only have snapper in EPEL; NixOS is declarative; Fedora Atomic, MicroOS and SteamOS have a read-only root.
+`snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`, `xbps-install`, `emerge`). Where a command would be wrong it says so instead of running anything: RHEL and its rebuilds only have snapper in EPEL, and Alpine only in `edge`'s `testing` repository; NixOS is declarative; Fedora Atomic, MicroOS and SteamOS have a read-only root.
 
 ## Commands
 

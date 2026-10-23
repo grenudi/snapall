@@ -11,7 +11,8 @@ The goal is "install snapall on every major distribution". Distributions package
 - **One script builds the packages** (`packaging/build-packages.sh`) and both CI and the release workflow call it: what is tested is what ships.
 - **Test on the real thing.** For Debian, Ubuntu, Fedora, openSUSE Tumbleweed, Arch and Alpine, CI starts a fresh container that has no snapper, and (1) runs `snapall doctor --install --yes` with the real package manager, (2) installs the real package and checks that snapper was pulled in. A `nix build` job checks the flake.
 - **`doctor --install` is the fallback**, for systems with no package (Alpine, Void, Gentoo): it installs the dependency, not snapall itself.
-- **Do not run a command that would be wrong.** RHEL and its rebuilds (snapper is only in EPEL), NixOS, and immutable systems get an explanation instead of a command. Arch never runs a bare `pacman -Sy`.
+- **Do not run a command that would be wrong.** RHEL and its rebuilds (snapper is only in EPEL), NixOS, immutable systems, and stable Alpine (snapper is only in the `testing` repository of `edge`) get an explanation instead of a command. Arch never runs a bare `pacman -Sy`.
+- **The tests found what the research missed.** The first CI run showed that `apk add snapper` fails on Alpine edge: Repology lists the package, but it lives in `testing`. That is why the plan is verified in a real container instead of trusted.
 
 ## Considered
 - Native packages built per distribution inside distribution containers: more faithful to each policy, but a build matrix to maintain for a single static binary with one dependency.
