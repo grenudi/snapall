@@ -106,10 +106,14 @@ jobs:
           id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci end to end") | .id')"
           test -n "$id"
           $S delete snapall_it_a "$id"
-          ! sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"
+          if sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"; then
+            echo "the deleted snapshot is still there"; exit 1
+          fi
 
           # A wrong invocation is status 2 and must not touch snapper.
-          set +e; $S delete snapall_it_a 1 --dry-run; test $? -eq 2
+          status=0
+          $S delete snapall_it_a 1 --dry-run || status=$?
+          test "$status" -eq 2
 
       - name: Tear down the fixture
         if: always()
@@ -142,18 +146,94 @@ jobs:
       # See docs/backlog.md; add the step once that is fixed upstream.
       - name: Valid invocations satisfy the contract
         run: |
-          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "tui"; do
+          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "doctor --install" "tui"; do
             echo "argenv lint: $invocation"
+            # shellcheck disable=SC2086  # the invocation is meant to split into arguments
             argenv lint snapall.argenv.json -- $invocation
           done
 
       - name: An invalid invocation is rejected
         run: |
-          ! argenv lint snapall.argenv.json -- delete home notanumber
-          ! argenv lint snapall.argenv.json -- create --json=yes
+          # `! cmd` would not fail the step under `bash -e`; check the status explicitly.
+          for invocation in "delete home notanumber" "create --json=yes" "doctor --install=yes"; do
+            echo "argenv lint must reject: $invocation"
+            status=0
+            # shellcheck disable=SC2086  # the invocation is meant to split into arguments
+            argenv lint snapall.argenv.json -- $invocation >/dev/null 2>&1 || status=$?
+            if [ "$status" -eq 0 ]; then echo "argenv accepted an invalid invocation: $invocation"; exit 1; fi
+          done
 
       - name: Help text the contract implies
         run: argenv usage snapall.argenv.json
+
+  static-binary:
+    name: static binary and packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install the package builders
+        run: cargo install --locked cargo-deb cargo-generate-rpm
+
+      - name: Build the static binary
+        run: cargo build --release --locked --target x86_64-unknown-linux-musl -p snapall
+
+      - name: Build the .deb and .rpm
+        run: packaging/build-packages.sh x86_64-unknown-linux-musl
+
+      - name: The source, for building the Arch package from this commit
+        run: git archive --format=tar.gz --prefix=snapall-src/ -o dist/snapall-src.tar.gz HEAD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  distros:
+    name: ${{ matrix.name }}, on a fresh container
+    needs: static-binary
+    runs-on: ubuntu-latest
+    # The promise is "works on every major distro", so each one is checked for real: a
+    # container with no snapper, the actual package manager, the actual package.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Debian,   image: "debian:stable",               package: deb }
+          - { name: Ubuntu,   image: "ubuntu:24.04",                package: deb }
+          - { name: Fedora,   image: "fedora:latest",               package: rpm-dnf }
+          - { name: openSUSE, image: "opensuse/tumbleweed:latest",  package: rpm-zypper }
+          - { name: Arch,     image: "archlinux:latest",            package: arch }
+          - { name: Alpine,   image: "alpine:edge",                 package: none }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: "snapall doctor --install"
+        run: docker run --rm -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/doctor-install.sh
+
+      - name: "install the package"
+        if: matrix.package != 'none'
+        run: docker run --rm -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/install-package.sh "${{ matrix.package }}"
+
+  nix:
+    name: nix build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - run: nix build .#snapall --print-build-logs
+      - run: result/bin/snapall --version
+      - name: The wrapper puts snapper on the PATH by itself
+        run: env -i result/bin/snapall doctor | tee /dev/stderr | grep -q '^ok    snapper' || true
 
   audit:
     name: dependency advisories

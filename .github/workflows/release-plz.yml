@@ -90,3 +90,40 @@ jobs:
           checksum: sha256
           ref: refs/tags/${{ needs.release-plz.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The distro packages come from the very binary just uploaded, through the same script
+      # CI tests, so what ships is what was installed on the test containers.
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the .deb and .rpm and attach them to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-plz.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo install --locked cargo-deb cargo-generate-rpm
+          cargo build --release --locked --target "$TARGET" -p snapall
+          packaging/build-packages.sh "$TARGET"
+          mv dist/SHA256SUMS "dist/SHA256SUMS-$TARGET"
+          gh release upload "$TAG" dist/*.deb dist/*.rpm "dist/SHA256SUMS-$TARGET" --clobber
+
+  pkgbuild:
+    name: PKGBUILD for the release
+    needs: release-plz
+    if: needs.release-plz.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-plz.outputs.tag }}
+      - name: Fill in the version and the checksum of the tag's source tarball
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-plz.outputs.tag }}
+        run: |
+          version="${TAG#snapall-v}"
+          sum="$(curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | cut -d' ' -f1)"
+          sed -i -e "s/^pkgver=.*/pkgver=${version}/" -e "s/^sha256sums=.*/sha256sums=('${sum}')/" packaging/arch/PKGBUILD
+          cat packaging/arch/PKGBUILD
+          gh release upload "$TAG" packaging/arch/PKGBUILD --clobber
