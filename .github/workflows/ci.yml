@@ -225,7 +225,7 @@ jobs:
       - name: The source, for building the Arch package from this commit
         run: git archive --format=tar.gz --prefix=snapall-src/ -o dist/snapall-src.tar.gz HEAD
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.arch }}
           path: dist/
