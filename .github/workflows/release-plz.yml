@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  # Rebuild and re-upload the binaries of an existing release tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to (re)build binaries for, e.g. snapall-v0.1.0
+        required: true
 
 permissions:
   contents: write
@@ -26,6 +32,7 @@ jobs:
       # Keeps one release PR (version bump + changelog) up to date on every push to main;
       # merging it tags the release and creates the GitHub release.
       - uses: MarcoIeni/release-plz-action@v0.5
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -34,9 +41,15 @@ jobs:
       # commit we just pushed".
       - name: Find the release tag, if this push cut one
         id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           git fetch --tags --force
-          tag="$(git tag --points-at "$GITHUB_SHA" | grep -E '^snapall-v[0-9]' | head -n1 || true)"
+          if [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$(git tag --points-at "$GITHUB_SHA" | grep -E '^snapall-v[0-9]' | head -n1 || true)"
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release tag: ${tag:-none}"
 
@@ -67,7 +80,12 @@ jobs:
         with:
           bin: snapall
           target: ${{ matrix.target }}
-          archive: $bin-$tag-$target
+          # The tag already starts with `snapall-`, so `$tag-$target` gives
+          # snapall-v0.1.0-x86_64-unknown-linux-musl (not snapall-snapall-v0.1.0-...).
+          archive: $tag-$target
+          # The arm64 runner is natively aarch64; without this the action decides a musl
+          # target is a cross-compile and tries to install `cross`.
+          build-tool: cargo
           tar: unix
           checksum: sha256
           ref: refs/tags/${{ needs.release-plz.outputs.tag }}
