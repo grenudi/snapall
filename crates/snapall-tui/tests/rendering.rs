@@ -4,6 +4,8 @@
 
 //! What ends up on screen, rendered into ratatui's in-memory test terminal.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;

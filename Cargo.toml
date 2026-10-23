@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/snapall-core",
+    "crates/snapall-observe",
     "crates/snapall-snapper",
     "crates/snapall-tui",
     "crates/snapall",
@@ -17,6 +18,7 @@ license = "GPL-3.0-or-later"
 
 [workspace.dependencies]
 snapall-core = { path = "crates/snapall-core", version = "0.2.0" }
+snapall-observe = { path = "crates/snapall-observe", version = "0.2.0" }
 snapall-snapper = { path = "crates/snapall-snapper", version = "0.2.0" }
 snapall-tui = { path = "crates/snapall-tui", version = "0.2.0" }
 thiserror = "2"
@@ -27,9 +29,16 @@ argenv-resolve = "0.2"
 # Cargo.lock also pins `instability` (ratatui's dependency) to 0.3.10: 0.3.11 and later need
 # Rust 1.88 although ratatui 0.29 only asks for ^0.3. Do not `cargo update` it past 0.3.10.
 ratatui = "0.29"
+# Same major as crossterm (via ratatui) uses, so the tree holds one copy, not two.
+signal-hook = "0.3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+# Total functions (canon: "Total functions and explicit errors"): production code returns an
+# error instead of panicking. Tests may unwrap; see the `cfg_attr(test, ...)` in each crate.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

@@ -6,6 +6,8 @@
 //! surface and its published contract. Behaviour against a real snapper is tested by the
 //! CI `integration` job.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
@@ -155,4 +157,84 @@ fn a_reader_that_goes_away_is_not_an_error() {
         stderr(&output)
     );
     assert!(output.status.success(), "{:?}", output.status);
+}
+
+/// A snapall run whose `snapper` cannot be found (an empty PATH): deterministic, and it still
+/// reaches the backend, so there is an operation to observe.
+fn snapall_without_snapper(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_snapall"))
+        .args(args)
+        .env_clear()
+        .env("PATH", "/nonexistent")
+        .output()
+        .expect("run snapall")
+}
+
+#[test]
+fn logging_to_stderr_reports_the_failed_operation_as_one_json_line() {
+    let output = snapall_without_snapper(&["--log", "json", "list"]);
+    assert_eq!(output.status.code(), Some(1));
+    let log: Vec<Value> = stderr(&output)
+        .lines()
+        .filter(|l| l.starts_with('{'))
+        .map(|l| serde_json::from_str(l).expect("every log line is JSON"))
+        .collect();
+    assert_eq!(log.len(), 1, "{}", stderr(&output));
+    assert_eq!(log[0]["event"], "configs_listed");
+    assert_eq!(log[0]["level"], "error");
+    assert!(log[0]["error"]
+        .as_str()
+        .is_some_and(|e| e.contains("snapper")));
+    assert!(log[0]["time"].as_str().is_some_and(|t| t.ends_with('Z')));
+}
+
+#[test]
+fn a_log_file_is_private_appended_to_and_kept_out_of_stderr() {
+    use std::os::unix::fs::PermissionsExt;
+    let path = std::env::temp_dir().join(format!("snapall-log-test-{}.jsonl", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let file = path.to_str().expect("utf-8 temp path");
+
+    for _ in 0..2 {
+        let output = snapall_without_snapper(&["--log-file", file, "list"]);
+        assert!(
+            !stderr(&output).contains("configs_listed"),
+            "events must go to the file, not stderr: {}",
+            stderr(&output)
+        );
+    }
+    let text = std::fs::read_to_string(&path).expect("the log file exists");
+    assert_eq!(text.lines().count(), 2, "the second run appended: {text}");
+    for line in text.lines() {
+        let value: Value = serde_json::from_str(line).expect("JSON line");
+        assert_eq!(value["event"], "configs_listed");
+    }
+    let mode = std::fs::metadata(&path)
+        .expect("metadata")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o600, "a log of privileged actions is private");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn without_logging_nothing_extra_is_written() {
+    let output = snapall_without_snapper(&["list"]);
+    assert!(
+        !stderr(&output).contains("configs_listed"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn a_log_file_that_cannot_be_opened_is_a_clear_error_not_a_silent_loss() {
+    let output = snapall_without_snapper(&["--log-file", "/nonexistent-dir/x.log", "list"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stderr(&output).contains("cannot open the log file"),
+        "{}",
+        stderr(&output)
+    );
 }

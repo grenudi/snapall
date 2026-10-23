@@ -5,6 +5,10 @@
 //! Test support: an in-memory adapter and the contract every backend must satisfy.
 //! Compiled for this crate's own tests and for adapter crates via the `testing` feature.
 
+// Test support: a failed assertion is a panic by design, and a poisoned test mutex is a bug in
+// the test. The deny on `unwrap`/`expect`/`panic` is for production code, not for this.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 

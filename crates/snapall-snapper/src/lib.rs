@@ -7,6 +7,8 @@
 //! The process boundary is itself a small port (`CommandRunner`) so the exact command
 //! lines and the output parsing are unit-tested without a real snapper.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 use std::collections::BTreeMap;
 use std::io;
 use std::process::Command;

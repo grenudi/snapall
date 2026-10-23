@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-23T05:33:13Z",
+  "generated": "2026-10-23T08:33:26Z",
   "inputs": [
     {
       "allowed": [],
@@ -54,6 +54,67 @@
       "stability": "unknown",
       "summary": "Talk to libsnapper directly instead of through snapperd (root only; for containers and CI).",
       "type": "bool"
+    },
+    {
+      "allowed": [
+        "off",
+        "text",
+        "json"
+      ],
+      "arg": {
+        "arity": 1,
+        "long": "log",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "FORMAT"
+      },
+      "default": "off",
+      "env": {
+        "name": "SNAPALL_LOG"
+      },
+      "example": "snapall --log json create",
+      "group": "logging",
+      "key": "log",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots",
+        "delete",
+        "doctor",
+        "tui"
+      ],
+      "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
+      "type": "enum"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "log-file",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "PATH"
+      },
+      "env": {
+        "name": "SNAPALL_LOG_FILE"
+      },
+      "example": "sudo snapall --log-file /var/log/snapall.jsonl create",
+      "group": "logging",
+      "key": "log_file",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots",
+        "delete",
+        "doctor",
+        "tui"
+      ],
+      "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
+      "type": "path"
     },
     {
       "allowed": [],
@@ -246,5 +307,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.1.0"
+  "source": "snapall@0.2.0"
 }

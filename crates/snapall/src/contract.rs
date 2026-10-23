@@ -65,6 +65,50 @@ impl Command {
     }
 }
 
+/// How events are written. `Off` is the default: a command-line tool is quiet unless asked.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    Off,
+    Text,
+    Json,
+}
+
+impl LogFormat {
+    pub const TOKENS: &'static [&'static str] = &["off", "text", "json"];
+}
+
+impl std::fmt::Display for LogFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            LogFormat::Off => "off",
+            LogFormat::Text => "text",
+            LogFormat::Json => "json",
+        })
+    }
+}
+
+impl FromRaw for LogFormat {
+    fn from_raw(raw: &str) -> Option<LogFormat> {
+        Some(match raw.trim() {
+            "off" | "none" => LogFormat::Off,
+            "text" => LogFormat::Text,
+            "json" => LogFormat::Json,
+            _ => return None,
+        })
+    }
+}
+
+/// The commands that do something observable (everything but `contract`).
+const OBSERVED: &[Command] = &[
+    Command::Create,
+    Command::List,
+    Command::Snapshots,
+    Command::Delete,
+    Command::Doctor,
+    Command::Tui,
+];
+
 contract! {
     // ---- general ---------------------------------------------------------------------
 
@@ -99,6 +143,36 @@ contract! {
         arg:     Some(Arg::long("no-dbus")),
         group:   "general",
         summary: "Talk to libsnapper directly instead of through snapperd (root only; for containers and CI).",
+        ..Input::EMPTY
+    };
+
+    // ---- logging ---------------------------------------------------------------------
+
+    /// What to log.
+    LOG: LogFormat, Command = Input {
+        key:         "log",
+        ty:          Type::Enum,
+        default:     Some(LogFormat::Off),
+        allowed:     LogFormat::TOKENS,
+        subcommands: OBSERVED,
+        env:         Some(Env::new("SNAPALL_LOG")),
+        arg:         Some(Arg { value_name: "FORMAT", ..Arg::long("log") }),
+        group:       "logging",
+        example:     "snapall --log json create",
+        summary:     "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
+        ..Input::EMPTY
+    };
+
+    /// Where to log.
+    LOG_FILE: std::path::PathBuf, Command = Input {
+        key:         "log_file",
+        ty:          Type::Path,
+        subcommands: OBSERVED,
+        env:         Some(Env::new("SNAPALL_LOG_FILE")),
+        arg:         Some(Arg { value_name: "PATH", ..Arg::long("log-file") }),
+        group:       "logging",
+        example:     "sudo snapall --log-file /var/log/snapall.jsonl create",
+        summary:     "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
         ..Input::EMPTY
     };
 

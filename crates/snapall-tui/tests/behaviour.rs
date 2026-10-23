@@ -5,6 +5,8 @@
 //! The UI's behaviour, driven the way a user drives it: key presses against an in-memory
 //! backend. No terminal is involved, so every flow is a plain test.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use snapall_core::testing::InMemoryBackend;
 use snapall_core::{ConfigName, Description, SnapshotBackend};
 use snapall_tui::model::{Key, Load, Modal, Notice, Pane};

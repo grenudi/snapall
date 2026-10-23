@@ -7,6 +7,8 @@
 //!
 //! Exit status: 0 done; 1 a snapshot or snapper call failed; 2 the invocation is wrong.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 mod cli;
 mod contract;
 mod doctor;
@@ -14,18 +16,23 @@ mod help;
 mod render;
 
 use std::error::Error;
+use std::fs::{File, OpenOptions};
 use std::io::{self, IsTerminal, Write};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 use std::process::ExitCode;
 
 use argenv_resolve::ProcessEnv;
 use serde_json::Value;
 use snapall_core::{
-    all_snapshots, delete_snapshot, plan_snapshots, run_plan, snapshots_of, SnapshotBackend,
+    all_snapshots, delete_snapshot, plan_snapshots, run_plan, snapshots_of, Observer, Silent,
+    SnapshotBackend,
 };
+use snapall_observe::{Format, Lines, Observed};
 use snapall_snapper::SnapperCli;
 
-use crate::cli::{Parsed, Request};
-use crate::contract::Contract;
+use crate::cli::{Logging, Parsed, Request};
+use crate::contract::{Contract, LogFormat};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -73,14 +80,41 @@ fn emit_json(value: &Value) -> Result<(), Box<dyn Error>> {
     emit(&text)
 }
 
+/// A log file is appended to and created private (0600): it records what was done to the system.
+fn open_log_file(path: &Path) -> Result<File, Box<dyn Error>> {
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .open(path)
+        .map_err(|e| format!("cannot open the log file {}: {e}", path.display()).into())
+}
+
+/// Where events go: nowhere, stderr (an event stream the environment routes), or a file.
+fn build_observer(logging: &Logging) -> Result<Box<dyn Observer>, Box<dyn Error>> {
+    let format = match logging.format {
+        LogFormat::Off => return Ok(Box::new(Silent)),
+        LogFormat::Text => Format::Text,
+        LogFormat::Json => Format::Json,
+    };
+    Ok(match &logging.file {
+        Some(path) => Box::new(Lines::new(open_log_file(path)?, format)),
+        None => Box::new(Lines::new(io::stderr(), format)),
+    })
+}
+
 fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
     let Parsed {
         request,
         no_dbus,
         json,
+        logging,
         ..
     } = parsed;
-    let backend = SnapperCli::system().with_no_dbus(no_dbus);
+    // Everything that touches snapper goes through the observed backend, so every operation is
+    // reported without any use case knowing about logging.
+    let observer = build_observer(&logging)?;
+    let backend = Observed::new(SnapperCli::system().with_no_dbus(no_dbus), &observer);
 
     match request {
         Request::Help => {
@@ -141,12 +175,20 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
                 return Ok(ExitCode::FAILURE);
             }
         }
-        Request::Doctor { install, yes } => return doctor::run(&backend, install, yes, json),
+        Request::Doctor { install, yes } => {
+            return doctor::run(&backend, &observer, install, yes, json);
+        }
         Request::Tui => {
             if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
                 return Err("`snapall tui` needs an interactive terminal".into());
             }
-            snapall_tui::run(&backend)?;
+            match snapall_tui::run(&backend)? {
+                snapall_tui::Exit::Quit => {}
+                // Exit as a signalled process would, once the terminal is back to normal.
+                snapall_tui::Exit::Signal(signal) => {
+                    return Ok(ExitCode::from(u8::try_from(128 + signal).unwrap_or(1)));
+                }
+            }
         }
     }
     Ok(ExitCode::SUCCESS)

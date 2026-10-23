@@ -16,7 +16,9 @@ use argenv_resolve::{
 };
 use snapall_core::{ConfigName, Description, SnapshotId};
 
-use crate::contract::{self, Command, Contract};
+use std::path::PathBuf;
+
+use crate::contract::{self, Command, Contract, LogFormat};
 
 /// What the user asked for, fully parsed.
 #[derive(Debug, PartialEq, Eq)]
@@ -44,11 +46,28 @@ pub enum Request {
     Contract,
 }
 
+/// Where and how events are written. Resolved from `--log`, `--log-file` and their variables.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Logging {
+    pub format: LogFormat,
+    pub file: Option<PathBuf>,
+}
+
+impl Default for Logging {
+    fn default() -> Self {
+        Self {
+            format: LogFormat::Off,
+            file: None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Parsed {
     pub request: Request,
     pub no_dbus: bool,
     pub json: bool,
+    pub logging: Logging,
     /// Problems worth showing that do not stop the run (for example a misspelled
     /// `SNAPALL_*` variable).
     pub warnings: Vec<String>,
@@ -78,14 +97,8 @@ pub fn parse(args: &[String], env: &dyn EnvSource) -> Result<Parsed, UsageError>
     // explicit *before* resolving, so every subcommand-scoped rule (environment variables,
     // positionals, applicable flags) works the same for both spellings.
     let first_pass = Invocation { args, env }.resolve(&records);
-    let args = with_explicit_command(args, first_pass.positionals())?;
+    let (args, command) = with_explicit_command(args, first_pass.positionals())?;
     let resolution = Invocation { args: &args, env }.resolve(&records);
-
-    let command = resolution
-        .positionals()
-        .first()
-        .and_then(|token| Command::from_token(token))
-        .expect("with_explicit_command guarantees a command token");
 
     let (errors, warnings) = check(&records, &resolution, command);
     if !errors.is_empty() {
@@ -99,12 +112,46 @@ pub fn parse(args: &[String], env: &dyn EnvSource) -> Result<Parsed, UsageError>
     } else {
         build_request(command, &resolution, flag(&Contract::DRY_RUN, &resolution))?
     };
+    let logging = logging(&resolution, command)?;
     Ok(Parsed {
         request,
         no_dbus: flag(&Contract::NO_DBUS, &resolution),
         json: flag(&Contract::JSON, &resolution),
+        logging,
         warnings,
     })
+}
+
+/// Combine `--log` and `--log-file`. A log file on its own means JSON (an audit trail is for
+/// machines); a log on its own goes to stderr; and the TUI, which owns the terminal, can only
+/// log to a file.
+fn logging(resolution: &Resolution, command: Command) -> Result<Logging, UsageError> {
+    // `get_from` also returns the declared default, so ask where the value came from: only an
+    // argument or a variable counts as the user having chosen a format.
+    let chosen = matches!(
+        resolution.source(Contract::LOG.key),
+        Some(Source::Arg | Source::Env)
+    );
+    let explicit = if chosen {
+        Contract::LOG.get_from(resolution)
+    } else {
+        None
+    };
+    let file = Contract::LOG_FILE.get_from(resolution);
+    let format = match (explicit, &file) {
+        (Some(format), _) => format,
+        (None, Some(_)) => LogFormat::Json,
+        (None, None) => LogFormat::Off,
+    };
+    if format == LogFormat::Off && file.is_some() {
+        return Err(usage_error("--log-file has no effect with --log off"));
+    }
+    if command == Command::Tui && format != LogFormat::Off && file.is_none() {
+        return Err(usage_error(
+            "`tui` draws on the terminal, so it cannot also log to it; add --log-file PATH",
+        ));
+    }
+    Ok(Logging { format, file })
 }
 
 /// A boolean input: what was given, else its declared default, else off.
@@ -112,27 +159,29 @@ fn flag<C: 'static>(input: &Input<bool, C>, resolution: &Resolution) -> bool {
     input.get_from_or_default(resolution).unwrap_or(false)
 }
 
-/// Ensure the first positional is a command token, inserting `create` when it is not.
+/// The arguments with the command made explicit, and that command: `create` is inserted when the
+/// first positional is not a command token. Returning the command spares the caller from
+/// re-deriving (and unwrapping) it.
 fn with_explicit_command(
     args: &[String],
     positionals: &[String],
-) -> Result<Vec<String>, UsageError> {
-    let mut explicit = args.to_vec();
-    match positionals.first() {
-        Some(token) if Command::from_token(token).is_some() => {}
-        Some(token) => {
-            // A one-word typo of a command must not silently become a snapshot description.
-            if let Some(near) = nearest_command(token) {
-                return Err(usage_error(format!(
-                    "`{token}` is not a command; did you mean `{near}`? \
-                     (to use it as a description, write `snapall create {token}`)"
-                )));
-            }
-            explicit.insert(0, Command::Create.token().to_owned());
-        }
-        None => explicit.insert(0, Command::Create.token().to_owned()),
+) -> Result<(Vec<String>, Command), UsageError> {
+    if let Some(command) = positionals.first().and_then(|t| Command::from_token(t)) {
+        return Ok((args.to_vec(), command));
     }
-    Ok(explicit)
+    // Not a command (or nothing at all): the invocation is `create`, with this as its
+    // description. A one-word typo of a command must not silently become a description.
+    if let Some(token) = positionals.first() {
+        if let Some(near) = nearest_command(token) {
+            return Err(usage_error(format!(
+                "`{token}` is not a command; did you mean `{near}`? \
+                 (to use it as a description, write `snapall create {token}`)"
+            )));
+        }
+    }
+    let mut explicit = args.to_vec();
+    explicit.insert(0, Command::Create.token().to_owned());
+    Ok((explicit, Command::Create))
 }
 
 fn nearest_command(word: &str) -> Option<&'static str> {
@@ -471,6 +520,7 @@ mod tests {
                 },
                 no_dbus: false,
                 json: true,
+                logging: Logging::default(),
                 warnings: vec![],
             }
         );
@@ -625,6 +675,101 @@ mod tests {
         assert_eq!(edit_distance("lst", "list"), 1);
         assert_eq!(edit_distance("kitten", "sitting"), 3);
         assert_eq!(edit_distance("abc", "abc"), 0);
+    }
+
+    // ---- logging ------------------------------------------------------------------
+
+    fn logging_of(args: &[&str], env: &[(&str, &str)]) -> Logging {
+        run(args, env).unwrap().logging
+    }
+
+    #[test]
+    fn logging_is_off_unless_asked_for() {
+        assert_eq!(logging_of(&["list"], &[]), Logging::default());
+    }
+
+    #[test]
+    fn log_goes_to_stderr_in_the_chosen_format() {
+        assert_eq!(
+            logging_of(&["--log", "json", "create"], &[]),
+            Logging {
+                format: LogFormat::Json,
+                file: None
+            }
+        );
+        assert_eq!(
+            logging_of(&["list", "--log", "text"], &[]).format,
+            LogFormat::Text
+        );
+    }
+
+    #[test]
+    fn a_log_file_alone_means_json_and_an_explicit_format_wins() {
+        let file = Some(PathBuf::from("/var/log/snapall.jsonl"));
+        assert_eq!(
+            logging_of(&["--log-file", "/var/log/snapall.jsonl", "create"], &[]),
+            Logging {
+                format: LogFormat::Json,
+                file: file.clone()
+            }
+        );
+        assert_eq!(
+            logging_of(
+                &[
+                    "--log",
+                    "text",
+                    "--log-file",
+                    "/var/log/snapall.jsonl",
+                    "create"
+                ],
+                &[]
+            ),
+            Logging {
+                format: LogFormat::Text,
+                file
+            }
+        );
+    }
+
+    #[test]
+    fn logging_can_come_from_the_environment_and_the_flag_wins() {
+        assert_eq!(
+            logging_of(&["list"], &[("SNAPALL_LOG", "text")]).format,
+            LogFormat::Text
+        );
+        assert_eq!(
+            logging_of(&["list", "--log", "json"], &[("SNAPALL_LOG", "text")]).format,
+            LogFormat::Json
+        );
+        let from_env = logging_of(&["list"], &[("SNAPALL_LOG_FILE", "/tmp/x.log")]);
+        assert_eq!(from_env.file, Some(PathBuf::from("/tmp/x.log")));
+        assert_eq!(from_env.format, LogFormat::Json);
+    }
+
+    #[test]
+    fn a_log_file_with_logging_switched_off_is_a_contradiction() {
+        assert!(err(&["--log", "off", "--log-file", "/tmp/x", "list"])
+            .contains("--log-file has no effect with --log off"));
+    }
+
+    #[test]
+    fn the_tui_can_only_log_to_a_file_because_it_owns_the_terminal() {
+        let message = err(&["tui", "--log", "text"]);
+        assert!(
+            message.contains("cannot also log to it") && message.contains("--log-file"),
+            "{message}"
+        );
+        assert_eq!(
+            logging_of(&["tui", "--log-file", "/tmp/x.log"], &[]).file,
+            Some(PathBuf::from("/tmp/x.log"))
+        );
+        assert!(run(&["tui"], &[]).is_ok(), "no logging at all is fine");
+    }
+
+    #[test]
+    fn an_unknown_log_format_and_logging_on_contract_are_refused() {
+        assert!(!err(&["--log", "xml", "list"]).is_empty());
+        assert!(err(&["contract", "--log", "json"]).contains("does not apply to `contract`"));
     }
 
     // ---- characterization: argenv behaviours snapall works around -------------------

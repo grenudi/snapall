@@ -474,6 +474,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snapall-core",
+ "snapall-observe",
  "snapall-snapper",
  "snapall-tui",
 ]
@@ -483,6 +484,14 @@ name = "snapall-core"
 version = "0.2.0"
 dependencies = [
  "thiserror",
+]
+
+[[package]]
+name = "snapall-observe"
+version = "0.2.0"
+dependencies = [
+ "serde_json",
+ "snapall-core",
 ]
 
 [[package]]
@@ -499,6 +508,7 @@ name = "snapall-tui"
 version = "0.2.0"
 dependencies = [
  "ratatui",
+ "signal-hook",
  "snapall-core",
 ]
 

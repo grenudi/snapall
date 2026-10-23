@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 snapall-core.workspace = true
 ratatui.workspace = true
+signal-hook.workspace = true
 
 [dev-dependencies]
 snapall-core = { workspace = true, features = ["testing"] }

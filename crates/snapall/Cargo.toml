@@ -13,6 +13,7 @@ license.workspace = true
 
 [dependencies]
 snapall-core.workspace = true
+snapall-observe.workspace = true
 snapall-snapper.workspace = true
 snapall-tui.workspace = true
 argenv-resolve.workspace = true

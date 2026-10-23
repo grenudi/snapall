@@ -5,29 +5,69 @@
 //! The terminal: setup and restore, key translation, and the event loop.
 
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
+use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+use signal_hook::flag;
 use snapall_core::SnapshotBackend;
 
 use crate::model::Key;
 use crate::session::Session;
 use crate::view;
 
-/// Run the UI until the user quits. The terminal is restored on every exit path, including
-/// panics (ratatui installs a panic hook that restores it first).
-pub fn run(backend: &dyn SnapshotBackend) -> io::Result<()> {
+/// How the UI ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Exit {
+    /// The user quit (`q`, Ctrl-C).
+    Quit,
+    /// A termination signal arrived (SIGINT, SIGTERM or SIGHUP) and the terminal was restored
+    /// before returning. The caller should exit as a signalled process would: `128 + signal`.
+    Signal(i32),
+}
+
+/// How long to wait for a key before checking whether a signal arrived.
+const TICK: Duration = Duration::from_millis(100);
+
+/// Run the UI until the user quits or the process is asked to stop. The terminal is restored on
+/// every exit path: quitting, a signal, an error, and a panic (ratatui installs a hook).
+///
+/// Twelve-factor disposability: a process must stop gracefully on SIGTERM. Without this, systemd
+/// stopping a unit or an ssh session dropping would leave the user's terminal in raw mode on the
+/// alternate screen.
+pub fn run(backend: &dyn SnapshotBackend) -> io::Result<Exit> {
+    // Registered before the terminal is touched, so there is no window where a signal kills a
+    // process that has already changed the terminal.
+    let received = Arc::new(AtomicUsize::new(0));
+    for signal in [SIGINT, SIGTERM, SIGHUP] {
+        flag::register_usize(signal, Arc::clone(&received), signal as usize)?;
+    }
     let mut terminal = ratatui::try_init()?;
-    let result = event_loop(&mut terminal, Session::new(backend));
+    let result = event_loop(&mut terminal, Session::new(backend), &received);
     ratatui::restore();
     result
 }
 
-fn event_loop(terminal: &mut DefaultTerminal, mut session: Session<'_>) -> io::Result<()> {
+fn event_loop(
+    terminal: &mut DefaultTerminal,
+    mut session: Session<'_>,
+    received: &AtomicUsize,
+) -> io::Result<Exit> {
+    terminal.draw(|frame| view::render(&session.state, frame))?;
     loop {
-        terminal.draw(|frame| view::render(&session.state, frame))?;
         if session.state.quit {
-            return Ok(());
+            return Ok(Exit::Quit);
+        }
+        if let Ok(signal) = i32::try_from(received.load(Ordering::Relaxed)) {
+            if signal != 0 {
+                return Ok(Exit::Signal(signal));
+            }
+        }
+        if !event::poll(TICK)? {
+            continue;
         }
         // Resize and other events simply fall through to a redraw.
         if let Event::Key(key) = event::read()? {
@@ -37,6 +77,7 @@ fn event_loop(terminal: &mut DefaultTerminal, mut session: Session<'_>) -> io::R
                 }
             }
         }
+        terminal.draw(|frame| view::render(&session.state, frame))?;
     }
 }
 

@@ -8,8 +8,11 @@
 //! snapshot is taken. It has no I/O and must not depend on a CLI parser, a serializer
 //! or an adapter; `crates/snapall/tests/architecture.rs` enforces that.
 
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 pub mod doctor;
 pub mod domain;
+pub mod observe;
 pub mod plan;
 pub mod port;
 pub mod usecase;
@@ -18,6 +21,7 @@ pub mod usecase;
 pub mod testing;
 
 pub use domain::{ConfigName, Description, ParseError, SnapshotId, SnapshotInfo, SnapshotKind};
+pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{

@@ -5,6 +5,8 @@
 //! Fitness functions: the dependency rule, checked against `cargo metadata` on every test
 //! run. Documentation alone does not keep boundaries; this does.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::Command;
@@ -62,10 +64,21 @@ fn the_snapper_adapter_depends_on_the_core_and_serialization_only() {
 }
 
 #[test]
+fn the_observability_adapter_depends_on_the_core_and_serialization_only() {
+    // It times operations and writes lines; it must not know any other adapter or any driver.
+    let deps = normal_deps("snapall-observe");
+    assert!(
+        deps.is_subset(&set(&["snapall-core", "serde_json"])),
+        "unexpected dependencies: {deps:?}"
+    );
+    assert!(deps.contains("snapall-core"));
+}
+
+#[test]
 fn the_tui_depends_on_the_core_and_the_terminal_library_only() {
     let deps = normal_deps("snapall-tui");
     assert!(
-        deps.is_subset(&set(&["snapall-core", "ratatui"])),
+        deps.is_subset(&set(&["snapall-core", "ratatui", "signal-hook"])),
         "unexpected dependencies: {deps:?}"
     );
     assert!(deps.contains("snapall-core"));
@@ -75,9 +88,19 @@ fn the_tui_depends_on_the_core_and_the_terminal_library_only() {
 fn drivers_and_adapters_never_know_each_other() {
     // The two driving adapters (CLI, TUI) and the driven adapter (snapper) meet only in the
     // composition root.
-    for library in ["snapall-core", "snapall-snapper", "snapall-tui"] {
+    for library in [
+        "snapall-core",
+        "snapall-snapper",
+        "snapall-tui",
+        "snapall-observe",
+    ] {
         let deps = normal_deps(library);
-        for forbidden in ["snapall", "snapall-tui", "snapall-snapper"] {
+        for forbidden in [
+            "snapall",
+            "snapall-tui",
+            "snapall-snapper",
+            "snapall-observe",
+        ] {
             if forbidden != library {
                 assert!(
                     !deps.contains(forbidden),
@@ -90,7 +113,12 @@ fn drivers_and_adapters_never_know_each_other() {
 
 #[test]
 fn only_the_binary_may_know_argenv() {
-    for library in ["snapall-core", "snapall-snapper", "snapall-tui"] {
+    for library in [
+        "snapall-core",
+        "snapall-snapper",
+        "snapall-tui",
+        "snapall-observe",
+    ] {
         let deps = normal_deps(library);
         assert!(
             !deps.contains("argenv") && !deps.contains("argenv-resolve"),
@@ -102,7 +130,13 @@ fn only_the_binary_may_know_argenv() {
 
 #[test]
 fn nobody_depends_on_a_cli_parser_other_than_argenv() {
-    for package in ["snapall-core", "snapall-snapper", "snapall-tui", "snapall"] {
+    for package in [
+        "snapall-core",
+        "snapall-snapper",
+        "snapall-tui",
+        "snapall-observe",
+        "snapall",
+    ] {
         assert!(
             !normal_deps(package).contains("clap"),
             "{package} must not depend on clap: the invocation surface is declared with argenv"

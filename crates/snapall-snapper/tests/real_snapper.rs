@@ -7,6 +7,8 @@
 //! Skipped unless `SNAPALL_IT=1`. CI sets it up with `dev/btrfs-fixture.sh up` (root,
 //! loop devices, snapper and btrfs-progs required).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use snapall_core::testing::backend_contract;
 use snapall_core::{snapshot_all, ConfigName, Description};
 use snapall_snapper::SnapperCli;

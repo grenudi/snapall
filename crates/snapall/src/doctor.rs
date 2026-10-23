@@ -10,9 +10,12 @@
 use std::error::Error;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::process::{Command, ExitCode};
+use std::time::Instant;
 
-use snapall_core::doctor::{diagnose, install_plan, worst, InstallPlan, OsRelease, Probe, Status};
-use snapall_core::SnapshotBackend;
+use snapall_core::doctor::{
+    diagnose, install_plan, worst, InstallPlan, OsRelease, Probe, Status, Step,
+};
+use snapall_core::{Event, Observer, SnapshotBackend};
 
 use crate::{emit, emit_json, render};
 
@@ -89,8 +92,45 @@ fn confirm() -> Result<bool, Box<dyn Error>> {
     ))
 }
 
-/// Run the install plan. `Ok(false)` means "did not install, and said why".
-fn install(probe: &Probe, yes: bool) -> Result<bool, Box<dyn Error>> {
+/// Install steps the user agreed to. The only way to obtain one is [`approve`], so running steps
+/// nobody approved is not a state this program can be in (the canon's typestate).
+struct Approved(Vec<Step>);
+
+/// Show the steps and get consent: `--yes`, or an answer on the terminal. `Ok(None)` is a "no".
+fn approve(steps: Vec<Step>, yes: bool) -> Result<Option<Approved>, Box<dyn Error>> {
+    eprintln!("snapall will run, as root:");
+    for step in &steps {
+        eprintln!("  {}", step.display());
+    }
+    if !yes && !confirm()? {
+        eprintln!("snapall: not installing");
+        return Ok(None);
+    }
+    Ok(Some(Approved(steps)))
+}
+
+/// Run approved steps in order, reporting each one (they change the system as root, so each is
+/// worth an audit line), and stop at the first failure.
+fn execute(approved: Approved, observer: &dyn Observer) -> Result<(), Box<dyn Error>> {
+    for step in &approved.0 {
+        let started = Instant::now();
+        let result = match Command::new(step.program).args(&step.args).status() {
+            Ok(status) if status.success() => Ok(()),
+            Ok(status) => Err(format!("exited with {status}")),
+            Err(e) => Err(format!("could not run `{}`: {e}", step.program)),
+        };
+        observer.observe(&Event::InstallStepRun {
+            command: step.display(),
+            result: result.clone(),
+            took: started.elapsed(),
+        });
+        result.map_err(|why| format!("`{}` failed ({why})", step.display()))?;
+    }
+    Ok(())
+}
+
+/// Install what is missing. `Ok(false)` means "did not install, and said why".
+fn install(probe: &Probe, yes: bool, observer: &dyn Observer) -> Result<bool, Box<dyn Error>> {
     match install_plan(&probe.os) {
         InstallPlan::Manual(text) => {
             eprintln!("snapall: {text}");
@@ -102,24 +142,13 @@ fn install(probe: &Probe, yes: bool) -> Result<bool, Box<dyn Error>> {
                     "installing packages needs root; run `sudo snapall doctor --install`".into(),
                 );
             }
-            eprintln!("snapall will run, as root:");
-            for step in &steps {
-                eprintln!("  {}", step.display());
-            }
-            if !yes && !confirm()? {
-                eprintln!("snapall: not installing");
-                return Ok(false);
-            }
-            for step in &steps {
-                let status = Command::new(step.program)
-                    .args(&step.args)
-                    .status()
-                    .map_err(|e| format!("could not run `{}`: {e}", step.program))?;
-                if !status.success() {
-                    return Err(format!("`{}` failed ({status})", step.display()).into());
+            match approve(steps, yes)? {
+                Some(approved) => {
+                    execute(approved, observer)?;
+                    Ok(true)
                 }
+                None => Ok(false),
             }
-            Ok(true)
         }
     }
 }
@@ -127,6 +156,7 @@ fn install(probe: &Probe, yes: bool) -> Result<bool, Box<dyn Error>> {
 /// `snapall doctor [--install [--yes]] [--json]`.
 pub fn run(
     backend: &dyn SnapshotBackend,
+    observer: &dyn Observer,
     install_missing: bool,
     yes: bool,
     json: bool,
@@ -135,7 +165,7 @@ pub fn run(
     if install_missing {
         if probe.snapper.is_ok() {
             eprintln!("snapall: snapper is already installed; nothing to install");
-        } else if install(&probe, yes)? {
+        } else if install(&probe, yes, observer)? {
             // Judge the result by looking again, not by trusting the exit status.
             probe = self::probe(backend);
         } else {
