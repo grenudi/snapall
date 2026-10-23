@@ -2,6 +2,7 @@
 //! everything downstream receives a value that cannot be invalid.
 
 use std::fmt;
+use std::num::NonZeroU64;
 
 use thiserror::Error;
 
@@ -110,23 +111,29 @@ impl fmt::Display for Description {
 }
 
 /// A snapshot number as reported by the backend.
+///
+/// Never zero: snapper uses 0 for "the current system", which is not a snapshot and must
+/// never be handed to `delete`. Making 0 unrepresentable removes that whole class of
+/// mistake (snapper itself prints an error for `delete 0` yet exits successfully).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SnapshotId(u64);
+pub struct SnapshotId(NonZeroU64);
 
 impl SnapshotId {
-    pub fn new(number: u64) -> Self {
-        Self(number)
+    /// `None` for 0, which is not a snapshot.
+    pub fn new(number: u64) -> Option<Self> {
+        NonZeroU64::new(number).map(Self)
     }
 
     pub fn get(self) -> u64 {
-        self.0
+        self.0.get()
     }
 
     pub fn parse(input: &str) -> Result<Self, ParseError> {
         let text = input.trim();
         text.parse::<u64>()
-            .map(Self)
-            .map_err(|_| ParseError::InvalidSnapshotId(text.to_owned()))
+            .ok()
+            .and_then(Self::new)
+            .ok_or_else(|| ParseError::InvalidSnapshotId(text.to_owned()))
     }
 }
 
@@ -134,6 +141,29 @@ impl fmt::Display for SnapshotId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+/// How a snapshot relates to others. A `Post` always knows its `Pre`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotKind {
+    Single,
+    Pre,
+    Post { pre: SnapshotId },
+}
+
+/// One existing snapshot, as the backend reports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotInfo {
+    pub id: SnapshotId,
+    pub kind: SnapshotKind,
+    /// When it was taken, in the backend's own format (for snapper `2026-10-23 01:26:30`).
+    pub date: Option<String>,
+    pub user: String,
+    /// The cleanup algorithm that may prune it (`number`, `timeline`, ...), if any.
+    pub cleanup: Option<String>,
+    /// Free text stored with the snapshot. Not a `Description`: it may have been written by
+    /// anything, so it is shown, never trusted.
+    pub description: String,
 }
 
 #[cfg(test)]
@@ -188,5 +218,12 @@ mod tests {
         assert!(SnapshotId::parse("").is_err());
         assert!(SnapshotId::parse("-1").is_err());
         assert!(SnapshotId::parse("4x").is_err());
+    }
+
+    #[test]
+    fn zero_is_the_current_system_not_a_snapshot() {
+        assert!(SnapshotId::new(0).is_none());
+        assert!(SnapshotId::parse("0").is_err());
+        assert_eq!(SnapshotId::new(1).unwrap().get(), 1);
     }
 }

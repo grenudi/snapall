@@ -3,11 +3,14 @@
 //! The process boundary is itself a small port (`CommandRunner`) so the exact command
 //! lines and the output parsing are unit-tested without a real snapper.
 
+use std::collections::BTreeMap;
 use std::io;
 use std::process::Command;
 
 use serde::Deserialize;
-use snapall_core::{BackendError, ConfigName, Description, SnapshotBackend, SnapshotId};
+use snapall_core::{
+    BackendError, ConfigName, Description, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
+};
 
 const PROGRAM: &str = "snapper";
 
@@ -113,6 +116,67 @@ struct ConfigRow {
     config: String,
 }
 
+/// One row of `snapper --jsonout -c <config> list`. Fields we do not use are ignored, so a
+/// newer snapper that adds columns keeps working.
+#[derive(Deserialize)]
+struct SnapshotRow {
+    number: u64,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(rename = "pre-number", default)]
+    pre_number: Option<u64>,
+    #[serde(default)]
+    date: String,
+    #[serde(default)]
+    user: String,
+    #[serde(default)]
+    cleanup: String,
+    #[serde(default)]
+    description: String,
+}
+
+fn non_empty(text: String) -> Option<String> {
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
+fn snapshot_from_row(row: SnapshotRow) -> Result<Option<SnapshotInfo>, BackendError> {
+    // Number 0 is "the current system", not a snapshot.
+    let Some(id) = SnapshotId::new(row.number) else {
+        return Ok(None);
+    };
+    let kind = match (row.kind.as_str(), row.pre_number) {
+        ("single", _) => SnapshotKind::Single,
+        ("pre", _) => SnapshotKind::Pre,
+        ("post", Some(pre)) => SnapshotKind::Post {
+            pre: SnapshotId::new(pre).ok_or_else(|| {
+                unexpected(format!("snapshot {id}: post-snapshot points at pre 0"))
+            })?,
+        },
+        ("post", None) => {
+            return Err(unexpected(format!(
+                "snapshot {id} is a post snapshot without a pre-number"
+            )))
+        }
+        (other, _) => {
+            return Err(unexpected(format!(
+                "snapshot {id} has unknown type `{other}`"
+            )))
+        }
+    };
+    Ok(Some(SnapshotInfo {
+        id,
+        kind,
+        date: non_empty(row.date),
+        user: row.user,
+        cleanup: non_empty(row.cleanup),
+        description: row.description,
+    }))
+}
+
 fn unexpected(detail: impl Into<String>) -> BackendError {
     BackendError::UnexpectedOutput {
         program: PROGRAM.to_owned(),
@@ -158,6 +222,27 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
                 output.stdout.trim()
             ))
         })
+    }
+
+    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {
+        let output = self.run(self.args(&["--jsonout", "-c", config.as_str(), "list"]))?;
+        let mut document: BTreeMap<String, Vec<SnapshotRow>> = serde_json::from_str(&output.stdout)
+            .map_err(|e| unexpected(format!("list is not the expected JSON: {e}")))?;
+        let rows = document
+            .remove(config.as_str())
+            .ok_or_else(|| unexpected(format!("list has no entry for config `{config}`")))?;
+        let mut snapshots = rows
+            .into_iter()
+            .filter_map(|row| snapshot_from_row(row).transpose())
+            .collect::<Result<Vec<_>, _>>()?;
+        snapshots.sort_by_key(|s| s.id);
+        Ok(snapshots)
+    }
+
+    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError> {
+        let number = id.to_string();
+        self.run(self.args(&["-c", config.as_str(), "delete", number.as_str()]))
+            .map(|_| ())
     }
 }
 
@@ -320,5 +405,103 @@ mod tests {
             SnapperCli::new(&script).list_configs(),
             Err(BackendError::UnexpectedOutput { .. })
         ));
+    }
+
+    /// Captured from a real snapper 0.10.6 on a Btrfs volume (config `snapall_it_a`).
+    const REAL_LIST: &str = r#"{
+      "snapall_it_a": [
+        {"subvolume": "/x", "number": 0, "default": false, "active": false, "type": "single",
+         "pre-number": null, "date": "", "user": "root", "used-space": null, "cleanup": "",
+         "description": "current", "userdata": null},
+        {"subvolume": "/x", "number": 3, "default": false, "active": false, "type": "pre",
+         "pre-number": null, "date": "2026-10-23 02:36:05", "user": "root", "used-space": null,
+         "cleanup": "", "description": "pre/post pair", "userdata": null},
+        {"subvolume": "/x", "number": 1, "default": false, "active": false, "type": "single",
+         "pre-number": null, "date": "2026-10-23 02:36:05", "user": "root", "used-space": null,
+         "cleanup": "number", "description": "first one", "userdata": {"important": "yes"}},
+        {"subvolume": "/x", "number": 4, "default": false, "active": false, "type": "post",
+         "pre-number": 3, "date": "2026-10-23 02:36:06", "user": "root", "used-space": null,
+         "cleanup": "", "description": "pre/post pair", "userdata": null}
+      ]
+    }"#;
+
+    #[test]
+    fn lists_snapshots_oldest_first_without_the_current_system() {
+        let script = Scripted::new(vec![ok(REAL_LIST)]);
+        let snapshots = SnapperCli::new(&script)
+            .list_snapshots(&name("snapall_it_a"))
+            .unwrap();
+        assert_eq!(
+            script.calls.borrow()[0],
+            ["--jsonout", "-c", "snapall_it_a", "list"]
+        );
+        let ids: Vec<u64> = snapshots.iter().map(|s| s.id.get()).collect();
+        assert_eq!(ids, [1, 3, 4]);
+
+        let first = &snapshots[0];
+        assert_eq!(first.kind, SnapshotKind::Single);
+        assert_eq!(first.cleanup.as_deref(), Some("number"));
+        assert_eq!(first.date.as_deref(), Some("2026-10-23 02:36:05"));
+        assert_eq!(first.description, "first one");
+
+        assert_eq!(snapshots[1].kind, SnapshotKind::Pre);
+        assert_eq!(snapshots[1].cleanup, None);
+        assert_eq!(
+            snapshots[2].kind,
+            SnapshotKind::Post {
+                pre: SnapshotId::new(3).unwrap()
+            }
+        );
+    }
+
+    #[test]
+    fn a_config_with_only_the_current_system_has_no_snapshots() {
+        let json = r#"{"home":[{"number":0,"type":"single","pre-number":null,"date":"","user":"root","cleanup":"","description":"current"}]}"#;
+        let script = Scripted::new(vec![ok(json)]);
+        assert!(SnapperCli::new(&script)
+            .list_snapshots(&name("home"))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn malformed_snapshot_listings_are_errors_not_guesses() {
+        let post_without_pre = r#"{"home":[{"number":2,"type":"post","pre-number":null,"date":"","user":"","cleanup":"","description":""}]}"#;
+        let weird_type = r#"{"home":[{"number":2,"type":"hologram","pre-number":null,"date":"","user":"","cleanup":"","description":""}]}"#;
+        let other_config = r#"{"root":[]}"#;
+        for json in [post_without_pre, weird_type, other_config, "[]", "nope"] {
+            let script = Scripted::new(vec![ok(json)]);
+            assert!(
+                matches!(
+                    SnapperCli::new(&script).list_snapshots(&name("home")),
+                    Err(BackendError::UnexpectedOutput { .. })
+                ),
+                "{json}"
+            );
+        }
+    }
+
+    #[test]
+    fn delete_passes_the_id_as_its_own_argument() {
+        let script = Scripted::new(vec![ok("")]);
+        SnapperCli::new(&script)
+            .with_no_dbus(true)
+            .delete_snapshot(&name("home"), SnapshotId::new(12).unwrap())
+            .unwrap();
+        assert_eq!(
+            script.calls.borrow()[0],
+            ["--no-dbus", "-c", "home", "delete", "12"]
+        );
+    }
+
+    #[test]
+    fn a_failed_delete_reports_snappers_message() {
+        let script = Scripted::new(vec![failed("Snapshot '999' not found.\n")]);
+        let err = SnapperCli::new(&script)
+            .delete_snapshot(&name("home"), SnapshotId::new(999).unwrap())
+            .unwrap_err();
+        assert!(
+            matches!(err, BackendError::CommandFailed { ref stderr, .. } if stderr == "Snapshot '999' not found.")
+        );
     }
 }

@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::domain::{ConfigName, Description, SnapshotId};
+use crate::domain::{ConfigName, Description, SnapshotId, SnapshotInfo};
 use crate::plan::{plan, Plan, PlanError};
 use crate::port::{BackendError, SnapshotBackend};
 
@@ -69,6 +69,51 @@ pub fn snapshot_all(
     Ok(run_plan(backend, &plan, description))
 }
 
+/// Fail fast, with our own message, when `config` is not one the backend manages.
+fn ensure_config(backend: &dyn SnapshotBackend, config: &ConfigName) -> Result<(), SnapshotError> {
+    if backend.list_configs()?.contains(config) {
+        Ok(())
+    } else {
+        Err(PlanError::UnknownConfigs(vec![config.clone()]).into())
+    }
+}
+
+/// The snapshots of one config, oldest first.
+pub fn snapshots_of(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+) -> Result<Vec<SnapshotInfo>, SnapshotError> {
+    ensure_config(backend, config)?;
+    Ok(backend.list_snapshots(config)?)
+}
+
+/// The snapshots of every config, configs sorted by name. A failure for any config is an
+/// error: a partial listing would look complete.
+pub fn all_snapshots(
+    backend: &dyn SnapshotBackend,
+) -> Result<Vec<(ConfigName, Vec<SnapshotInfo>)>, SnapshotError> {
+    let mut configs = backend.list_configs()?;
+    configs.sort();
+    configs.dedup();
+    configs
+        .into_iter()
+        .map(|config| {
+            let snapshots = backend.list_snapshots(&config)?;
+            Ok((config, snapshots))
+        })
+        .collect()
+}
+
+/// Delete one snapshot of an existing config.
+pub fn delete_snapshot(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    id: SnapshotId,
+) -> Result<(), SnapshotError> {
+    ensure_config(backend, config)?;
+    Ok(backend.delete_snapshot(config, id)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +165,40 @@ mod tests {
         assert!(matches!(
             snapshot_all(&backend, None, &desc()),
             Err(SnapshotError::Plan(PlanError::NoConfigs))
+        ));
+    }
+
+    #[test]
+    fn listing_and_deleting_go_through_the_use_cases() {
+        let backend = InMemoryBackend::with_configs(&["root", "home"]);
+        snapshot_all(&backend, None, &desc()).unwrap();
+        let root = ConfigName::parse("root").unwrap();
+
+        let listed = snapshots_of(&backend, &root).unwrap();
+        assert_eq!(listed.len(), 1);
+        delete_snapshot(&backend, &root, listed[0].id).unwrap();
+        assert!(snapshots_of(&backend, &root).unwrap().is_empty());
+
+        let all = all_snapshots(&backend).unwrap();
+        assert_eq!(
+            all.iter()
+                .map(|(c, s)| (c.as_str(), s.len()))
+                .collect::<Vec<_>>(),
+            [("home", 1), ("root", 0)]
+        );
+    }
+
+    #[test]
+    fn an_unknown_config_is_our_error_not_the_backends() {
+        let backend = InMemoryBackend::with_configs(&["root"]);
+        let nope = ConfigName::parse("nope").unwrap();
+        assert!(matches!(
+            snapshots_of(&backend, &nope),
+            Err(SnapshotError::Plan(PlanError::UnknownConfigs(_)))
+        ));
+        assert!(matches!(
+            delete_snapshot(&backend, &nope, SnapshotId::new(1).unwrap()),
+            Err(SnapshotError::Plan(PlanError::UnknownConfigs(_)))
         ));
     }
 }

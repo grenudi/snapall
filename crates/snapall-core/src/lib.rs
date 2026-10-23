@@ -12,7 +12,10 @@ pub mod usecase;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-pub use domain::{ConfigName, Description, ParseError, SnapshotId};
+pub use domain::{ConfigName, Description, ParseError, SnapshotId, SnapshotInfo, SnapshotKind};
 pub use plan::{plan, Plan, PlanError};
 pub use port::{BackendError, SnapshotBackend};
-pub use usecase::{plan_snapshots, run_plan, snapshot_all, Outcome, Report, SnapshotError};
+pub use usecase::{
+    all_snapshots, delete_snapshot, plan_snapshots, run_plan, snapshot_all, snapshots_of, Outcome,
+    Report, SnapshotError,
+};

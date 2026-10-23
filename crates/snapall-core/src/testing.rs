@@ -4,14 +4,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
-use crate::domain::{ConfigName, Description, SnapshotId};
+use crate::domain::{ConfigName, Description, SnapshotId, SnapshotInfo, SnapshotKind};
 use crate::port::{BackendError, SnapshotBackend};
 
 #[derive(Default)]
+struct ConfigState {
+    next_id: u64,
+    snapshots: Vec<SnapshotInfo>,
+}
+
+#[derive(Default)]
 struct State {
-    next_id: BTreeMap<ConfigName, u64>,
+    configs: BTreeMap<ConfigName, ConfigState>,
     failing: BTreeSet<ConfigName>,
-    taken: Vec<(ConfigName, SnapshotId, String)>,
 }
 
 /// A backend that keeps everything in memory. Fast core tests need nothing else.
@@ -27,7 +32,13 @@ impl InMemoryBackend {
             let mut state = backend.lock();
             for name in names {
                 let name = ConfigName::parse(name).expect("valid test config name");
-                state.next_id.insert(name, 1);
+                state.configs.insert(
+                    name,
+                    ConfigState {
+                        next_id: 1,
+                        snapshots: Vec::new(),
+                    },
+                );
             }
         }
         backend
@@ -42,7 +53,16 @@ impl InMemoryBackend {
 
     /// Every snapshot taken so far: (config, id, description).
     pub fn snapshots(&self) -> Vec<(ConfigName, SnapshotId, String)> {
-        self.lock().taken.clone()
+        self.lock()
+            .configs
+            .iter()
+            .flat_map(|(config, state)| {
+                state
+                    .snapshots
+                    .iter()
+                    .map(move |s| (config.clone(), s.id, s.description.clone()))
+            })
+            .collect()
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
@@ -52,7 +72,7 @@ impl InMemoryBackend {
 
 impl SnapshotBackend for InMemoryBackend {
     fn list_configs(&self) -> Result<Vec<ConfigName>, BackendError> {
-        Ok(self.lock().next_id.keys().cloned().collect())
+        Ok(self.lock().configs.keys().cloned().collect())
     }
 
     fn create_snapshot(
@@ -68,16 +88,47 @@ impl SnapshotBackend for InMemoryBackend {
                 stderr: format!("snapshot of {config} refused"),
             });
         }
-        let next = state
-            .next_id
+        let entry = state
+            .configs
             .get_mut(config)
             .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
-        let id = SnapshotId::new(*next);
-        *next += 1;
-        state
-            .taken
-            .push((config.clone(), id, description.as_str().to_owned()));
+        let id = SnapshotId::new(entry.next_id).expect("ids start at 1");
+        entry.next_id += 1;
+        entry.snapshots.push(SnapshotInfo {
+            id,
+            kind: SnapshotKind::Single,
+            date: Some(format!("2026-01-01 00:00:{:02}", id.get() % 60)),
+            user: "root".into(),
+            cleanup: Some("number".into()),
+            description: description.as_str().to_owned(),
+        });
         Ok(id)
+    }
+
+    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {
+        self.lock()
+            .configs
+            .get(config)
+            .map(|entry| entry.snapshots.clone())
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))
+    }
+
+    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError> {
+        let mut state = self.lock();
+        let entry = state
+            .configs
+            .get_mut(config)
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+        let before = entry.snapshots.len();
+        entry.snapshots.retain(|s| s.id != id);
+        if entry.snapshots.len() == before {
+            return Err(BackendError::CommandFailed {
+                program: "in-memory".into(),
+                status: "not found".into(),
+                stderr: format!("snapshot {id} of {config} not found"),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -90,6 +141,7 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
         "list_configs should include `{existing}`, got {configs:?}"
     );
 
+    // Creating
     let description = Description::parse("snapall contract").expect("valid description");
     let first = backend
         .create_snapshot(existing, &description)
@@ -103,6 +155,45 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
     assert!(
         backend.create_snapshot(&missing, &description).is_err(),
         "a snapshot of a missing config must be an error"
+    );
+
+    // Listing: oldest first, and what we created is there, as we described it.
+    let listed = backend
+        .list_snapshots(existing)
+        .expect("list_snapshots succeeds");
+    assert!(
+        listed.windows(2).all(|pair| pair[0].id < pair[1].id),
+        "snapshots must be listed oldest first: {listed:?}"
+    );
+    let created = listed
+        .iter()
+        .find(|s| s.id == second)
+        .unwrap_or_else(|| panic!("snapshot {second} should be listed: {listed:?}"));
+    assert_eq!(created.description, "snapall contract");
+    assert_eq!(created.kind, SnapshotKind::Single);
+    assert!(
+        backend.list_snapshots(&missing).is_err(),
+        "listing a missing config must be an error"
+    );
+
+    // Deleting: gone afterwards, and deleting again is an error, not a silent success.
+    backend
+        .delete_snapshot(existing, first)
+        .expect("deleting an existing snapshot succeeds");
+    let after = backend
+        .list_snapshots(existing)
+        .expect("list_snapshots succeeds");
+    assert!(
+        !after.iter().any(|s| s.id == first),
+        "snapshot {first} should be gone: {after:?}"
+    );
+    assert!(
+        after.iter().any(|s| s.id == second),
+        "other snapshots must survive a delete"
+    );
+    assert!(
+        backend.delete_snapshot(existing, first).is_err(),
+        "deleting a snapshot twice must be an error"
     );
 }
 

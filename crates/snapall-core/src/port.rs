@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::domain::{ConfigName, Description, SnapshotId};
+use crate::domain::{ConfigName, Description, SnapshotId, SnapshotInfo};
 
 pub trait SnapshotBackend {
     /// Every config the backend manages.
@@ -14,6 +14,13 @@ pub trait SnapshotBackend {
         config: &ConfigName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError>;
+
+    /// The snapshots of `config`, oldest first (ascending id). The "current system"
+    /// pseudo-snapshot is not a snapshot and is never included.
+    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError>;
+
+    /// Delete one snapshot of `config`. Deleting one that does not exist is an error.
+    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError>;
 }
 
 #[derive(Debug, Error)]
