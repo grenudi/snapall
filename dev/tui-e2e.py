@@ -19,10 +19,12 @@ through a terminal emulator, so this checks what a user would actually see.
 import fcntl
 import os
 import select
+import shutil
 import signal
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
 
@@ -57,10 +59,11 @@ def listing(config):
 
 
 class Tui:
-    def __init__(self):
+    def __init__(self, extra_path=None):
         master, slave = os.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
-        env = {"PATH": os.environ["PATH"], "TERM": "xterm-256color", "HOME": "/root"}
+        path = os.environ["PATH"] if not extra_path else f"{extra_path}:{os.environ['PATH']}"
+        env = {"PATH": path, "TERM": "xterm-256color", "HOME": "/root"}
         self.process = subprocess.Popen(
             [BINARY, "--no-dbus", "tui"],
             stdin=slave,
@@ -99,6 +102,14 @@ class Tui:
             if needle in self.text():
                 return
         raise AssertionError(f"timed out waiting for {needle!r}; screen:\n{self.text()}")
+
+    def wait_gone(self, needle, timeout=6.0):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.pump(0.1)
+            if needle not in self.text():
+                return
+        raise AssertionError(f"{needle!r} never went away; screen:\n{self.text()}")
 
     def send(self, *keys):
         for key in keys:
@@ -160,6 +171,9 @@ def main():
     tui.send("enter")
     tui.wait_for("created snapall_it_a #")
     check("made in the tui" in listing("snapall_it_a").values(), "snapper really has the new snapshot")
+    # The list is refreshed in the background after the create, so the row appears a moment
+    # after the notice; wait for it rather than assuming it is already there.
+    tui.wait_for("made in the tui")
     check("made in the tui" in tui.text(), "the new snapshot appears on screen")
 
     # --- mark the two seeds and delete them ---------------------------------------------
@@ -196,6 +210,61 @@ def main():
         check(code == status, f"{name} exits with status {status} (128 + signal), got {code}")
         check(b"\x1b[?1049l" in tui.raw, f"{name}: the alternate screen was left")
         check(b"\x1b[?25h" in tui.raw, f"{name}: the cursor was shown again")
+
+    # --- a slow snapper must not freeze the screen -------------------------------------
+    # A shim in front of the real snapper makes every create and delete take two seconds.
+    shim = tempfile.mkdtemp(prefix="slow-snapper-")
+    real = shutil.which("snapper")
+    with open(f"{shim}/snapper", "w") as handle:
+        handle.write(
+            "#!/bin/sh\n"
+            'case " $* " in *" create "*|*" delete "*) sleep 2;; esac\n'
+            f'exec {real} "$@"\n'
+        )
+    os.chmod(f"{shim}/snapper", 0o755)
+
+    tui = Tui(extra_path=shim)
+    tui.wait_for("Snapshots of snapall_it_a")
+    started = time.time()
+    tui.send("c")
+    tui.type("slow one")
+    tui.send("enter")
+    tui.wait_for("working", timeout=1.5)
+    check(True, "the header says working while snapper runs")
+
+    # The operation takes two seconds. The screen must answer within a fraction of that.
+    asked = time.time()
+    tui.send("?")
+    tui.wait_for("Keys", timeout=1.0)
+    check(time.time() - asked < 1.5 and tui.process.poll() is None, "the UI answers a key while snapper is busy (help opened)")
+    tui.send("x")  # any key closes help
+
+    tui.send("c")
+    tui.wait_for("busy: wait for the current operation")
+    check(True, "starting more work is refused while busy, with a reason")
+    check("slow one" not in listing("snapall_it_a").values(), "the slow operation had not finished yet")
+
+    tui.wait_for("created snapall_it_a #", timeout=8)
+    check(time.time() - started >= 2, "the operation really took its two seconds")
+    check("slow one" in listing("snapall_it_a").values(), "and it did complete")
+    tui.wait_gone("working", timeout=3)  # the list refresh after the create also counts as work
+    check("working" not in tui.text(), "the indicator is gone when the work is done")
+
+    # Quitting while work is in flight waits for it instead of abandoning a half-finished call.
+    tui.send("c")
+    tui.type("quit during work")
+    tui.send("enter")
+    tui.wait_for("working", timeout=1.5)
+    tui.send("q")
+    tui.wait_for("finishing", timeout=1.5)
+    tui.pump(0.5)
+    check(tui.process.poll() is None, "q while busy does not exit at once")
+    deadline = time.time() + 8
+    while tui.process.poll() is None and time.time() < deadline:
+        tui.pump(0.1)
+    check(tui.process.poll() == 0, "it exits cleanly once the work is done")
+    check("quit during work" in listing("snapall_it_a").values(), "and the operation was not abandoned half way")
+    shutil.rmtree(shim, ignore_errors=True)
 
     print("\nTUI end-to-end: all checks passed")
 

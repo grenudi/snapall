@@ -164,3 +164,32 @@ fn preview() {
     session.press(Key::Char('d'));
     println!("{}", screen(&session, 90, 16));
 }
+
+#[test]
+fn the_header_says_so_while_work_is_in_flight_and_stays_quiet_otherwise() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    assert!(
+        !screen(&session, 100, 12).contains("working"),
+        "idle: no indicator"
+    );
+
+    session.state.pending = 1;
+    let first = screen(&session, 100, 12);
+    assert!(first.contains("working"), "{first}");
+
+    // The indicator moves, so a frozen-looking screen is distinguishable from a working one.
+    session.state.spinner += 1;
+    let second = screen(&session, 100, 12);
+    assert_ne!(
+        first.lines().next(),
+        second.lines().next(),
+        "the spinner advanced"
+    );
+
+    session.state.quit = true;
+    assert!(
+        screen(&session, 100, 12).contains("finishing"),
+        "quitting waits for the work"
+    );
+}

@@ -20,5 +20,5 @@ pub mod session;
 pub mod term;
 pub mod view;
 
-pub use session::Session;
+pub use session::{Executor, Session};
 pub use term::{run, Exit};

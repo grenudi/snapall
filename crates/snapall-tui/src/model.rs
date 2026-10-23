@@ -87,6 +87,12 @@ pub struct State {
     pub modal: Option<Modal>,
     pub notice: Option<Notice>,
     pub quit: bool,
+    /// Effects handed to the shell whose results have not come back. While it is above zero the
+    /// screen says "working" and the keys that would start more work are refused. A shell that
+    /// runs effects instantly (the tests) never sees it above zero between messages.
+    pub pending: usize,
+    /// Advances on every `Tick`, to animate the working indicator.
+    pub spinner: usize,
 }
 
 impl Default for State {
@@ -100,6 +106,8 @@ impl Default for State {
             modal: None,
             notice: None,
             quit: false,
+            pending: 0,
+            spinner: 0,
         }
     }
 }
@@ -159,6 +167,10 @@ pub enum Effect {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
+    /// The UI has opened: load the configs.
+    Start,
+    /// Time passed while work is in flight; animates the indicator.
+    Tick,
     Key(Key),
     ConfigsLoaded(Result<Vec<ConfigName>, String>),
     SnapshotsLoaded {
@@ -173,19 +185,54 @@ pub enum Msg {
 }
 
 /// Apply one message. Pure: the only output besides the mutation is the effect list.
+///
+/// Every effect returned counts as pending until its result message arrives; every result
+/// message settles one. That bookkeeping lives here, not in the shell, so it is tested like
+/// everything else.
 pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
-    match msg {
+    let effects = match msg {
+        Msg::Start => vec![Effect::LoadConfigs],
+        Msg::Tick => {
+            state.spinner = state.spinner.wrapping_add(1);
+            Vec::new()
+        }
         Msg::Key(key) => on_key(state, key),
-        Msg::ConfigsLoaded(result) => on_configs_loaded(state, result),
-        Msg::SnapshotsLoaded { config, result } => on_snapshots_loaded(state, &config, result),
-        Msg::Created(results) => on_created(state, results),
-        Msg::Deleted { config, results } => on_deleted(state, &config, results),
-    }
+        Msg::ConfigsLoaded(result) => {
+            settle(state);
+            on_configs_loaded(state, result)
+        }
+        Msg::SnapshotsLoaded { config, result } => {
+            settle(state);
+            on_snapshots_loaded(state, &config, result)
+        }
+        Msg::Created(results) => {
+            settle(state);
+            on_created(state, results)
+        }
+        Msg::Deleted { config, results } => {
+            settle(state);
+            on_deleted(state, &config, results)
+        }
+    };
+    state.pending += effects.len();
+    effects
+}
+
+/// One result came back. A result nobody asked for does not push the count below zero.
+fn settle(state: &mut State) {
+    state.pending = state.pending.saturating_sub(1);
 }
 
 fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
     if state.modal.is_some() {
         return on_modal_key(state, key);
+    }
+    // Moving around and reading stay available while snapper works; starting more work does not.
+    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd')) {
+        state.notice = Some(Notice::Info(
+            "busy: wait for the current operation to finish".into(),
+        ));
+        return Vec::new();
     }
     match key {
         Key::CtrlC | Key::Char('q') => {

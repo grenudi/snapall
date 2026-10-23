@@ -91,7 +91,8 @@ fn open_log_file(path: &Path) -> Result<File, Box<dyn Error>> {
 }
 
 /// Where events go: nowhere, stderr (an event stream the environment routes), or a file.
-fn build_observer(logging: &Logging) -> Result<Box<dyn Observer>, Box<dyn Error>> {
+/// `Send + Sync` so the observed backend can serve the TUI's worker thread.
+fn build_observer(logging: &Logging) -> Result<Box<dyn Observer + Send + Sync>, Box<dyn Error>> {
     let format = match logging.format {
         LogFormat::Off => return Ok(Box::new(Silent)),
         LogFormat::Text => Format::Text,

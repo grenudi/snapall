@@ -28,6 +28,14 @@ The words snapall uses, and what each one means here. The code, the CLI, the doc
 | **contract** (backend) | The behaviour every backend must have (`backend_contract`), run against the in-memory backend and against real snapper. |
 | **snapperd / D-Bus** | How snapper normally answers. `--no-dbus` makes snapall talk to libsnapper directly (root only), for containers and CI. |
 
+## The terminal UI
+
+| Term | Meaning |
+|---|---|
+| **effect** | Something the UI asks the shell to do (load, create, delete). The model returns effects; it never performs them. |
+| **pending** | How many effects are in flight. Above zero the header says *working*, and keys that would start more work are refused. |
+| **executor** | The one place that performs an effect against the backend, on a worker thread in the terminal and inline in the tests. |
+
 ## Observability
 
 | Term | Meaning |

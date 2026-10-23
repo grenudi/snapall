@@ -27,7 +27,7 @@ pub fn render(state: &State, frame: &mut Frame) {
     ])
     .areas(frame.area());
 
-    render_header(frame, header);
+    render_header(state, frame, header);
     let [configs, snapshots] =
         Layout::horizontal([Constraint::Length(28), Constraint::Min(20)]).areas(body);
     render_configs(state, frame, configs);
@@ -39,12 +39,21 @@ pub fn render(state: &State, frame: &mut Frame) {
     }
 }
 
-fn render_header(frame: &mut Frame, area: Rect) {
-    let line = Line::from(vec![
+fn render_header(state: &State, frame: &mut Frame, area: Rect) {
+    let mut spans = vec![
         Span::styled(" snapall ", Style::new().fg(Color::Black).bg(ACCENT).bold()),
         Span::styled("  snapper snapshots", Style::new().fg(DIM)),
-    ]);
-    frame.render_widget(Paragraph::new(line), area);
+    ];
+    if state.pending > 0 {
+        // Work is in flight on the worker thread: say so, and keep the screen moving.
+        const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
+        let word = if state.quit { "finishing" } else { "working" };
+        spans.push(Span::styled(
+            format!("   {} {word}", FRAMES[state.spinner % FRAMES.len()]),
+            Style::new().fg(Color::Yellow).bold(),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn pane_block(title: String, focused: bool) -> Block<'static> {

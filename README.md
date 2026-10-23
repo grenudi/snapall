@@ -105,6 +105,8 @@ Configs on the left, the selected config's snapshots on the right, newest first.
 | `r` | reload from snapper |
 | `?` / `q` | help / quit |
 
+Snapper calls run in the background: the header shows *working* while one is in flight, the screen stays responsive, and keys that would start more work are refused until it finishes. Quitting while work is in flight waits for it to complete.
+
 > Snapshots live on the same disk. They are not backups.
 
 ## Status

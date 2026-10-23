@@ -2,8 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The imperative shell around the pure model: runs effects against a backend and feeds
-//! the results back in as messages until nothing is left to do.
+//! The imperative shell around the pure model.
+//!
+//! [`Executor`] performs one effect against a backend and answers with the message that
+//! describes the outcome. [`Session`] drives the model with an executor *synchronously*: every
+//! effect runs at once and its result is fed back before the next key. That is what the tests
+//! use, and it makes each key sequence deterministic. The real terminal (`term.rs`) uses the
+//! same executor on a worker thread instead, so that a slow snapper call does not freeze the
+//! screen.
 
 use std::collections::VecDeque;
 
@@ -13,54 +19,35 @@ use snapall_core::{
 
 use crate::model::{update, Effect, Key, Msg, State};
 
-pub struct Session<'a> {
-    pub state: State,
-    backend: &'a dyn SnapshotBackend,
+/// Performs effects. `Sync` is required of the backend so one executor can serve a worker thread.
+#[derive(Clone, Copy)]
+pub struct Executor<'a> {
+    backend: &'a (dyn SnapshotBackend + Sync),
 }
 
-impl<'a> Session<'a> {
-    /// Start a session and load the configs.
-    pub fn new(backend: &'a dyn SnapshotBackend) -> Self {
-        let mut session = Self {
-            state: State::default(),
-            backend,
-        };
-        let reply = session.execute(Effect::LoadConfigs);
-        session.dispatch(reply);
-        session
-    }
-
-    pub fn press(&mut self, key: Key) {
-        self.dispatch(Msg::Key(key));
-    }
-
-    /// Process a message and every follow-up it causes.
-    pub fn dispatch(&mut self, msg: Msg) {
-        let mut queue = VecDeque::from([msg]);
-        while let Some(msg) = queue.pop_front() {
-            for effect in update(&mut self.state, msg) {
-                queue.push_back(self.execute(effect));
-            }
-        }
+impl<'a> Executor<'a> {
+    pub fn new(backend: &'a (dyn SnapshotBackend + Sync)) -> Self {
+        Self { backend }
     }
 
     /// Perform one effect. Always answers with exactly one message.
-    fn execute(&self, effect: Effect) -> Msg {
+    pub fn execute(&self, effect: Effect) -> Msg {
+        let backend: &dyn SnapshotBackend = self.backend;
         match effect {
             Effect::LoadConfigs => {
-                Msg::ConfigsLoaded(self.backend.list_configs().map_err(|e| e.to_string()))
+                Msg::ConfigsLoaded(backend.list_configs().map_err(|e| e.to_string()))
             }
             Effect::LoadSnapshots(config) => {
-                let result = snapshots_of(self.backend, &config).map_err(|e| e.to_string());
+                let result = snapshots_of(backend, &config).map_err(|e| e.to_string());
                 Msg::SnapshotsLoaded { config, result }
             }
             Effect::Create {
                 targets,
                 description,
             } => {
-                let planned = plan_snapshots(self.backend, Some(&targets));
+                let planned = plan_snapshots(backend, Some(&targets));
                 Msg::Created(match planned {
-                    Ok(plan) => run_plan(self.backend, &plan, &description)
+                    Ok(plan) => run_plan(backend, &plan, &description)
                         .outcomes
                         .into_iter()
                         .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
@@ -79,7 +66,7 @@ impl<'a> Session<'a> {
                     .into_iter()
                     .map(|id| {
                         let result =
-                            delete_snapshot(self.backend, &config, id).map_err(|e| describe(&e));
+                            delete_snapshot(backend, &config, id).map_err(|e| describe(&e));
                         (id, result)
                     })
                     .collect();
@@ -91,4 +78,36 @@ impl<'a> Session<'a> {
 
 fn describe(error: &SnapshotError) -> String {
     error.to_string()
+}
+
+/// The model plus an executor, run synchronously. Used by the tests.
+pub struct Session<'a> {
+    pub state: State,
+    executor: Executor<'a>,
+}
+
+impl<'a> Session<'a> {
+    /// Start a session and load the configs.
+    pub fn new(backend: &'a (dyn SnapshotBackend + Sync)) -> Self {
+        let mut session = Self {
+            state: State::default(),
+            executor: Executor::new(backend),
+        };
+        session.dispatch(Msg::Start);
+        session
+    }
+
+    pub fn press(&mut self, key: Key) {
+        self.dispatch(Msg::Key(key));
+    }
+
+    /// Process a message and every follow-up it causes, to completion.
+    pub fn dispatch(&mut self, msg: Msg) {
+        let mut queue = VecDeque::from([msg]);
+        while let Some(msg) = queue.pop_front() {
+            for effect in update(&mut self.state, msg) {
+                queue.push_back(self.executor.execute(effect));
+            }
+        }
+    }
 }
