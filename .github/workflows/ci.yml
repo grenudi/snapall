@@ -59,20 +59,25 @@ jobs:
   integration:
     name: real snapper on Btrfs
     runs-on: ubuntu-latest
-    # The port contract, run against a real snapper on a loopback Btrfs volume, plus the
-    # real binary end to end. Unit tests prove the command lines; this proves snapper
-    # accepts them.
+    # The port contract, the real binary and the real TUI, against a real snapper on a
+    # loopback Btrfs volume. Unit tests prove the command lines; this proves snapper accepts
+    # them and that a user sees and gets what the UI says.
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install snapper and btrfs-progs
+      - name: Install snapper, btrfs-progs and jq
         run: |
           sudo apt-get update
           sudo apt-get install -y snapper btrfs-progs jq
 
-      - name: Build test binary and the CLI as the normal user
+      - name: Python with a terminal emulator, for the TUI test
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyte
+
+      - name: Build as the normal user
         run: |
           cargo build -p snapall --locked
           cargo test -p snapall-snapper --test real_snapper --no-run --locked \
@@ -82,20 +87,73 @@ jobs:
       - name: Create the Btrfs fixture
         run: sudo ./dev/btrfs-fixture.sh up
 
+      # First, on the fresh fixture: it asserts exact snapshot counts.
+      - name: TUI end to end, in a pseudo-terminal
+        run: sudo "$RUNNER_TEMP/venv/bin/python" dev/tui-e2e.py target/debug/snapall
+
       - name: Port contract against real snapper
         run: sudo SNAPALL_IT=1 "$(cat "$RUNNER_TEMP/it-bin")" --nocapture
 
-      - name: snapall end to end
+      - name: snapall CLI end to end
         run: |
-          sudo target/debug/snapall --no-dbus list | tee /dev/stderr | grep -qx snapall_it_a
-          sudo target/debug/snapall --no-dbus create --dry-run "ci dry run"
-          sudo target/debug/snapall --no-dbus create "ci end to end"
+          S="sudo target/debug/snapall --no-dbus"
+          $S list | grep -qx snapall_it_a
+          $S create --dry-run "ci dry run"
+          $S "ci end to end"                       # the shorthand for `create`
           sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"
           sudo snapper --no-dbus -c snapall_it_b list | grep -q "ci end to end"
+
+          id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci end to end") | .id')"
+          test -n "$id"
+          $S delete snapall_it_a "$id"
+          ! sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"
+
+          # A wrong invocation is status 2 and must not touch snapper.
+          set +e; $S delete snapall_it_a 1 --dry-run; test $? -eq 2
 
       - name: Tear down the fixture
         if: always()
         run: sudo ./dev/btrfs-fixture.sh down
+
+  contract:
+    name: published contract (argenv)
+    runs-on: ubuntu-latest
+    # snapall's invocation surface is declared with argenv. Check it with argenv's own CLI,
+    # so the contract is judged by the tool that defines the format, not only by our tests.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo build -p snapall --locked
+
+      - name: Install the argenv CLI (pinned)
+        run: cargo install --locked --git https://github.com/argenv-opencommons/argenv --rev 8b6c6c9 argenv-cli
+
+      - name: The committed contract is what the code emits
+        run: |
+          target/debug/snapall contract > "$RUNNER_TEMP/contract.json"
+          jq 'del(.generated, .source)' snapall.argenv.json > "$RUNNER_TEMP/committed.json"
+          jq 'del(.generated, .source)' "$RUNNER_TEMP/contract.json" > "$RUNNER_TEMP/produced.json"
+          diff -u "$RUNNER_TEMP/committed.json" "$RUNNER_TEMP/produced.json"
+
+      # NOTE: `argenv check` is not run yet. At the pinned revision it rejects the
+      # `subcommands` field that argenv itself emits (KNOWN_FIELDS in argenv-cli omits it).
+      # See docs/backlog.md; add the step once that is fixed upstream.
+      - name: Valid invocations satisfy the contract
+        run: |
+          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "tui"; do
+            echo "argenv lint: $invocation"
+            argenv lint snapall.argenv.json -- $invocation
+          done
+
+      - name: An invalid invocation is rejected
+        run: |
+          ! argenv lint snapall.argenv.json -- delete home notanumber
+          ! argenv lint snapall.argenv.json -- create --json=yes
+
+      - name: Help text the contract implies
+        run: argenv usage snapall.argenv.json
 
   audit:
     name: dependency advisories

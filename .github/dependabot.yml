@@ -6,6 +6,11 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # ratatui 0.30 needs Rust 1.86+, but snapall's MSRV is 1.85 (docs/adr/0006). Moving the
+      # MSRV is a decision, not a bot's job.
+      - dependency-name: "ratatui"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
