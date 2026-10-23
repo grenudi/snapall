@@ -1,0 +1,20 @@
+[package]
+name = "snapall"
+description = "Snapshot every snapper config in one command."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+snapall-core.workspace = true
+snapall-snapper.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+snapall-core = { workspace = true, features = ["testing"] }
+serde_json.workspace = true
+
+[lints]
+workspace = true

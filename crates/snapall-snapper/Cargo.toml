@@ -1,0 +1,19 @@
+[package]
+name = "snapall-snapper"
+description = "snapall adapter: implements the snapshot port by running the snapper CLI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+snapall-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+snapall-core = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true
