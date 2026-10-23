@@ -21,7 +21,7 @@ snapall-tui = { path = "crates/snapall-tui", version = "0.1.0" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-clap = { version = "4", features = ["derive"] }
+argenv-resolve = "0.2"
 # 0.29, not 0.30: 0.30 needs Rust 1.86+, and snapall keeps MSRV 1.85 for distro packagers.
 # Cargo.lock also pins `instability` (ratatui's dependency) to 0.3.10: 0.3.11 and later need
 # Rust 1.88 although ratatui 0.29 only asks for ^0.3. Do not `cargo update` it past 0.3.10.

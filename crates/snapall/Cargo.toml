@@ -1,6 +1,6 @@
 [package]
 name = "snapall"
-description = "Snapshot every snapper config in one command."
+description = "Snapshot every snapper config in one command, from the command line or a terminal UI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,11 +10,13 @@ authors.workspace = true
 [dependencies]
 snapall-core.workspace = true
 snapall-snapper.workspace = true
-clap.workspace = true
+snapall-tui.workspace = true
+argenv-resolve.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 snapall-core = { workspace = true, features = ["testing"] }
-serde_json.workspace = true
 
 [lints]
 workspace = true

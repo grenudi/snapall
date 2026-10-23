@@ -58,14 +58,50 @@ fn the_snapper_adapter_depends_on_the_core_and_serialization_only() {
 }
 
 #[test]
-fn only_the_binary_may_know_the_cli_parser_or_both_adapters() {
-    for library in ["snapall-core", "snapall-snapper"] {
+fn the_tui_depends_on_the_core_and_the_terminal_library_only() {
+    let deps = normal_deps("snapall-tui");
+    assert!(
+        deps.is_subset(&set(&["snapall-core", "ratatui"])),
+        "unexpected dependencies: {deps:?}"
+    );
+    assert!(deps.contains("snapall-core"));
+}
+
+#[test]
+fn drivers_and_adapters_never_know_each_other() {
+    // The two driving adapters (CLI, TUI) and the driven adapter (snapper) meet only in the
+    // composition root.
+    for library in ["snapall-core", "snapall-snapper", "snapall-tui"] {
         let deps = normal_deps(library);
-        assert!(!deps.contains("clap"), "{library} must not depend on clap");
+        for forbidden in ["snapall", "snapall-tui", "snapall-snapper"] {
+            if forbidden != library {
+                assert!(
+                    !deps.contains(forbidden),
+                    "{library} must not depend on {forbidden}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn only_the_binary_may_know_argenv() {
+    for library in ["snapall-core", "snapall-snapper", "snapall-tui"] {
+        let deps = normal_deps(library);
         assert!(
-            !deps.contains("snapall"),
-            "{library} must not depend on the binary"
+            !deps.contains("argenv") && !deps.contains("argenv-resolve"),
+            "{library} must not depend on argenv"
         );
     }
-    assert!(!normal_deps("snapall-core").contains("snapall-snapper"));
+    assert!(normal_deps("snapall").contains("argenv-resolve"));
+}
+
+#[test]
+fn nobody_depends_on_a_cli_parser_other_than_argenv() {
+    for package in ["snapall-core", "snapall-snapper", "snapall-tui", "snapall"] {
+        assert!(
+            !normal_deps(package).contains("clap"),
+            "{package} must not depend on clap: the invocation surface is declared with argenv"
+        );
+    }
 }

@@ -1,0 +1,209 @@
+{
+  "contract_version": 1,
+  "generated": "2026-10-23T02:51:56Z",
+  "inputs": [
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "help",
+        "negatable": false,
+        "repeatable": false,
+        "short": "h"
+      },
+      "default": false,
+      "group": "general",
+      "key": "help",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Show this help and exit.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "version",
+        "negatable": false,
+        "repeatable": false,
+        "short": "V"
+      },
+      "default": false,
+      "group": "general",
+      "key": "version",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Print the version and exit.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "no-dbus",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "env": {
+        "name": "SNAPALL_NO_DBUS"
+      },
+      "group": "general",
+      "key": "no_dbus",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Talk to libsnapper directly instead of through snapperd (root only; for containers and CI).",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "DESCRIPTION"
+      },
+      "example": "snapall create \"before theming\"",
+      "group": "create",
+      "key": "description",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Text stored with each snapshot (default: snapall). `snapall <DESCRIPTION>` is shorthand for `snapall create <DESCRIPTION>`.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "only",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "CONFIGS"
+      },
+      "env": {
+        "name": "SNAPALL_ONLY"
+      },
+      "example": "snapall create --only root,home",
+      "group": "create",
+      "key": "only",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Comma-separated configs to snapshot (default: every config). A name snapper does not know is an error.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "dry-run",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "group": "create",
+      "key": "dry_run",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Show what would be snapshotted without creating anything.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "json",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "env": {
+        "name": "SNAPALL_JSON"
+      },
+      "group": "output",
+      "key": "json",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots"
+      ],
+      "summary": "Print JSON instead of text.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CONFIG"
+      },
+      "group": "snapshots",
+      "key": "snapshots_config",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "snapshots"
+      ],
+      "summary": "List only this config's snapshots (default: every config).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CONFIG"
+      },
+      "group": "delete",
+      "key": "delete_config",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "delete"
+      ],
+      "summary": "The config the snapshot belongs to (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 1,
+        "repeatable": false,
+        "value_name": "ID"
+      },
+      "example": "snapall delete home 12",
+      "group": "delete",
+      "key": "snapshot_id",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "delete"
+      ],
+      "summary": "The snapshot number to delete (required). 0 is the current system and is refused.",
+      "type": "uint"
+    }
+  ],
+  "precedence": [
+    "arg",
+    "env",
+    "default"
+  ],
+  "source": "snapall@0.1.0"
+}
