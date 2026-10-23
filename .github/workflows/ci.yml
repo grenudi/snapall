@@ -284,7 +284,7 @@ jobs:
     # snapall is GPL-3.0-or-later: every file says so, and no dependency may be incompatible.
     steps:
       - uses: actions/checkout@v7
-      - uses: fsfe/reuse-action@v5
+      - uses: fsfe/reuse-action@v6
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check licenses bans sources
