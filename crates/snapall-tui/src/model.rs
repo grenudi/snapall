@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The pure core of the UI: state, messages, effects and `update`.
 //!
 //! Nothing here touches a terminal or a backend. `update` mutates the state and returns

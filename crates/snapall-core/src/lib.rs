@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Domain, planning and ports for snapall.
 //!
 //! This crate is the hexagon: it knows *what* snapall does and nothing about *how* a

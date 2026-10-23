@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Rendering: `render(state, frame)` draws, and does nothing else.
 
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};

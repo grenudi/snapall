@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Composition root and imperative shell: wires the argenv-driven CLI, the TUI and the
 //! snapper adapter to the core, performs the I/O, and maps outcomes to exit codes.
 //!

@@ -1,0 +1,15 @@
+version = 1
+SPDX-PackageName = "snapall"
+SPDX-PackageSupplier = "grenudi"
+SPDX-PackageDownloadLocation = "https://github.com/grenudi/snapall"
+
+# Source files (.rs, .sh, .py) carry their own SPDX header. Everything else (documentation,
+# manifests, workflows, generated files) is covered here.
+[[annotations]]
+path = [
+  "**/*.md", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.nix",
+  "Cargo.lock", "PKGBUILD", "**/PKGBUILD", ".gitignore", "LICENSE",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 grenudi"
+SPDX-License-Identifier = "GPL-3.0-or-later"

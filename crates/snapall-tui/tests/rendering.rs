@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What ends up on screen, rendered into ratatui's in-memory test terminal.
 
 use ratatui::backend::TestBackend;

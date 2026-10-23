@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! snapall's invocation surface, declared once with argenv.
 //!
 //! This file is the single source of truth for flags, positionals and environment

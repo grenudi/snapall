@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Validated domain types. Untrusted text is parsed into these once, at the boundary;
 //! everything downstream receives a value that cannot be invalid.
 

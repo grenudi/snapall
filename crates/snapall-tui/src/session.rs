@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The imperative shell around the pure model: runs effects against a backend and feeds
 //! the results back in as messages until nothing is left to do.
 

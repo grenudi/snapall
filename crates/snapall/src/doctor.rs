@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The imperative shell for `snapall doctor`: probe the machine, run the install steps.
 //!
 //! All decisions (what is wrong, what to install, with which command) are pure functions in

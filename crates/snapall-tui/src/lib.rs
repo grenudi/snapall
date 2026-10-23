@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A terminal UI for snapall: a second *driving adapter* over the same port as the CLI.
 //!
 //! Structured as the canon's functional core and imperative shell:

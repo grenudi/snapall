@@ -17,7 +17,17 @@ The PR title is linted against [Conventional Commits](https://www.conventionalco
 
 A breaking change adds `!` (`feat(cli)!: ...`) or a `BREAKING CHANGE:` footer.
 
-Scopes: `core`, `snapper`, `tui`, `cli`, `ci`, `deps`, `release`, `docs`, `adr`, `dev`. Scope is encouraged, not required.
+Scopes: `license`, `core`, `snapper`, `tui`, `cli`, `ci`, `deps`, `release`, `docs`, `adr`, `dev`. Scope is encouraged, not required.
 
 ## Before opening a PR
 `cargo fmt --all`, `cargo clippy --workspace --all-features --all-targets -- -D warnings` and `cargo test --workspace --all-features` must pass. See [AGENTS.md](AGENTS.md) for the rules the architecture depends on.
+
+## Licensing of contributions
+
+snapall is GPL-3.0-or-later. By submitting a contribution you license it under the same terms (inbound = outbound); there is no CLA. Every source file carries an SPDX header, and CI runs `reuse lint`: add one to any new file with
+
+```
+reuse annotate --copyright "Your Name" --license GPL-3.0-or-later --skip-unrecognised path/to/file
+```
+
+Other files (documentation, manifests, workflows) are covered by `REUSE.toml`. Dependencies must be GPL-3.0-compatible; `cargo deny check licenses` enforces it.

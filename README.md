@@ -90,7 +90,7 @@ Configs on the left, the selected config's snapshots on the right, newest first.
 
 ## Status
 
-Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Shell completions and man pages (both derivable from the contract), repository hosting and signing for the packages, and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). Licensed under MIT OR Apache-2.0, at your option.
+Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Shell completions and man pages (both derivable from the contract), repository hosting and signing for the packages, and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). Licensed under the GNU General Public License, version 3 or (at your option) any later version.
 
 ## Architecture
 
@@ -131,3 +131,9 @@ cargo run -q -p snapall -- contract > snapall.argenv.json
 ## Releases
 
 Pull requests are squash-merged and the **PR title** must be a [Conventional Commit](CONTRIBUTING.md); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum.
+
+## License
+
+snapall is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It comes with **no warranty**. See [docs/adr/0008-license-gpl-3-or-later.md](docs/adr/0008-license-gpl-3-or-later.md) for why, and `THIRD-PARTY-LICENSES.md` (in every package and release) for the licenses of the libraries it contains.
+
+Releases up to and including v0.2.0 were published under MIT OR Apache-2.0; recipients of those versions keep those rights. Versions after v0.2.0 are GPL-3.0-or-later.

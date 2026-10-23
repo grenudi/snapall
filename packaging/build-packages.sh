@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Build the .deb and .rpm from an already-built static release binary.
 #
 #   cargo build --release --locked --target x86_64-unknown-linux-musl -p snapall
 #   packaging/build-packages.sh x86_64-unknown-linux-musl
 #
-# Needs: cargo-deb, cargo-generate-rpm, jq. Output goes to dist/. CI and the release
+# Needs: cargo-deb, cargo-generate-rpm, python3. Output goes to dist/. CI and the release
 # workflow both call this, so the packages that are tested are the packages that ship.
 set -euo pipefail
 
@@ -19,6 +24,8 @@ if [ ! -x "$binary" ]; then
 fi
 
 mkdir -p dist
+# The binary contains MIT/Apache/... libraries whose notices must travel with it.
+python3 packaging/third-party-licenses.py "$target"
 cargo deb --no-build --package snapall --target "$target" --output dist/
 cargo generate-rpm --package crates/snapall --target "$target" --output dist/
 

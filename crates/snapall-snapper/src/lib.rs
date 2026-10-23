@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Adapter: the `SnapshotBackend` port, implemented by running the `snapper` CLI.
 //!
 //! The process boundary is itself a small port (`CommandRunner`) so the exact command

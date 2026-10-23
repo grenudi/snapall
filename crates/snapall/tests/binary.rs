@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The real binary, run as a subprocess. Kept to what needs no snapper: the invocation
 //! surface and its published contract. Behaviour against a real snapper is tested by the
 //! CI `integration` job.

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end test of `snapall tui`: the real binary, in a real pseudo-terminal, against a
 real snapper on the Btrfs fixture.
 

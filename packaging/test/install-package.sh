@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Run INSIDE a fresh distro container (as root), repo mounted at /w, packages in /w/dist.
 # Installs the real package the way a user would and checks that the dependency on snapper
 # was honoured (it pulled snapper in) and that the program runs.
@@ -53,5 +58,6 @@ case "$kind" in
 esac
 echo "$files" | grep -q '/usr/bin/snapall$' || fail "the package does not contain /usr/bin/snapall"
 echo "$files" | grep -q 'README.md' || fail "the package does not contain the README"
-echo "$files" | grep -q 'LICENSE-MIT' || fail "the package does not contain the license"
+echo "$files" | grep -q '/LICENSE$' || fail "the package does not contain the license"
+echo "$files" | grep -q 'THIRD-PARTY-LICENSES.md' || fail "the package does not contain the third-party notices"
 echo "PASS: $kind on $ID"

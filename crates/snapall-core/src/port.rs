@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The outbound port: everything snapall needs from "something that takes snapshots".
 
 use thiserror::Error;

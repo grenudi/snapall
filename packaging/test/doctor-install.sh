@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Run INSIDE a fresh distro container (as root), with the repo mounted at /w and the static
 # binary at /w/dist/snapall-<target>. Proves, on a real distribution, that
 # `snapall doctor` notices a missing snapper, names the right fix, installs it with the real

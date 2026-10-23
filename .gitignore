@@ -1,3 +1,4 @@
 /target
 *.img
 /dist
+/THIRD-PARTY-LICENSES.md

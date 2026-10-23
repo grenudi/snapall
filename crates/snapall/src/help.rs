@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `--help`, generated from the contract so it can never disagree with what is accepted.
 
 use argenv_resolve::Record;

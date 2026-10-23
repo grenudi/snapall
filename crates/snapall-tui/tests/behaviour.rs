@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The UI's behaviour, driven the way a user drives it: key presses against an in-memory
 //! backend. No terminal is involved, so every flow is a plain test.
 

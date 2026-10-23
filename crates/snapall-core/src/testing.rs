@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Test support: an in-memory adapter and the contract every backend must satisfy.
 //! Compiled for this crate's own tests and for adapter crates via the `testing` feature.
 

@@ -28,7 +28,7 @@
           meta = {
             description = "Snapshot every snapper config in one command, from the CLI or a terminal UI";
             homepage = "https://github.com/grenudi/snapall";
-            license = with pkgs.lib.licenses; [ mit asl20 ];
+            license = pkgs.lib.licenses.gpl3Plus;
             mainProgram = "snapall";
             platforms = pkgs.lib.platforms.linux;
           };

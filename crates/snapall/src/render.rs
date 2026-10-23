@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Presentation: pure functions from domain values to text or JSON.
 
 use serde_json::{json, Value};

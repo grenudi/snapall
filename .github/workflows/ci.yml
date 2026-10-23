@@ -235,6 +235,17 @@ jobs:
       - name: The wrapper puts snapper on the PATH by itself
         run: env -i result/bin/snapall doctor | tee /dev/stderr | grep -q '^ok    snapper' || true
 
+  licenses:
+    name: licenses (reuse, cargo-deny)
+    runs-on: ubuntu-latest
+    # snapall is GPL-3.0-or-later: every file says so, and no dependency may be incompatible.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: fsfe/reuse-action@v5
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses bans sources
+
   audit:
     name: dependency advisories
     runs-on: ubuntu-latest

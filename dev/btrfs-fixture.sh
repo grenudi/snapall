@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Throw-away Btrfs loopback volume with two snapper configs, for the real-snapper tests.
 # Needs root, loop devices, btrfs-progs and snapper.   usage: dev/btrfs-fixture.sh up|down
 set -euo pipefail

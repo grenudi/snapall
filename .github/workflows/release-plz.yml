@@ -76,8 +76,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # The binary contains MIT/Apache libraries; their notices go into the archive.
+      - name: Third-party license notices
+        run: |
+          cargo fetch --locked
+          python3 packaging/third-party-licenses.py "${{ matrix.target }}"
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
+          include: LICENSE,README.md,THIRD-PARTY-LICENSES.md
           bin: snapall
           target: ${{ matrix.target }}
           # The tag already starts with `snapall-`, so `$tag-$target` gives

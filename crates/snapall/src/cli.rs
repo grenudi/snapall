@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
 //!
 //! Everything here is a pure function of its inputs (no process state), so every rule is a

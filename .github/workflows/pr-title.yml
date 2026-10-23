@@ -42,6 +42,7 @@ jobs:
             release
             docs
             adr
+            license
             dev
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$

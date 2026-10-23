@@ -10,9 +10,9 @@ pkgrel=1
 pkgdesc='Snapshot every snapper config in one command, from the CLI or a terminal UI'
 arch=('x86_64' 'aarch64')
 url='https://github.com/grenudi/snapall'
-license=('MIT' 'Apache-2.0')
+license=('GPL-3.0-or-later')
 depends=('snapper')
-makedepends=('cargo')
+makedepends=('cargo' 'python')
 _dir="${_dir:-$pkgname-$pkgname-v$pkgver}"
 source=("${_source:-$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$pkgname-v$pkgver.tar.gz}")
 sha256sums=('SKIP')
@@ -38,6 +38,8 @@ check() {
 package() {
   cd "$_dir"
   install -Dm755 target/release/snapall -t "$pkgdir/usr/bin/"
-  install -Dm644 LICENSE-MIT LICENSE-APACHE -t "$pkgdir/usr/share/licenses/$pkgname/"
+  # The binary contains MIT/Apache libraries; their notices travel with it.
+  python packaging/third-party-licenses.py "$(rustc -vV | sed -n 's/host: //p')"
+  install -Dm644 LICENSE THIRD-PARTY-LICENSES.md -t "$pkgdir/usr/share/licenses/$pkgname/"
   install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
 }

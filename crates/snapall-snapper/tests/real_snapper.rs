@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The port contract, run against a real snapper on a real Btrfs volume.
 //!
 //! Skipped unless `SNAPALL_IT=1`. CI sets it up with `dev/btrfs-fixture.sh up` (root,

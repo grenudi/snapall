@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 grenudi
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Fitness functions: the dependency rule, checked against `cargo metadata` on every test
 //! run. Documentation alone does not keep boundaries; this does.
 
