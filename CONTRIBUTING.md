@@ -17,7 +17,7 @@ The PR title is linted against [Conventional Commits](https://www.conventionalco
 
 A breaking change adds `!` (`feat(cli)!: ...`) or a `BREAKING CHANGE:` footer.
 
-Scopes: `license`, `core`, `snapper`, `tui`, `cli`, `ci`, `deps`, `release`, `docs`, `adr`, `dev`. Scope is encouraged, not required.
+Scopes: `observe`, `license`, `core`, `snapper`, `tui`, `cli`, `ci`, `deps`, `release`, `docs`, `adr`, `dev`. Scope is encouraged, not required.
 
 ## Before opening a PR
 `cargo fmt --all`, `cargo clippy --workspace --all-features --all-targets -- -D warnings` and `cargo test --workspace --all-features` must pass. See [AGENTS.md](AGENTS.md) for the rules the architecture depends on.

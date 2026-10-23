@@ -55,6 +55,7 @@ Nothing is assumed: an unknown config name is an error, never a silent skip; one
 |---|---|
 | `0` | done |
 | `1` | a snapshot or snapper call failed (or there is no terminal for `tui`) |
+| `128 + n` | `tui` was stopped by signal `n` (143 for SIGTERM); the terminal is restored first |
 | `2` | the invocation is wrong (unknown flag, a flag that does not apply to the command, a bad value) |
 
 A flag given to a command it does not belong to is **rejected**, not ignored, so `snapall delete home 3 --dry-run` can never delete for real while you believe it is a preview. A one-word typo of a command (`snapall lst`) is refused rather than becoming a snapshot named "lst"; write `snapall create lst` if you mean it.
@@ -68,8 +69,26 @@ One setting, two doors: each of these is the same input as its flag, and an expl
 | `SNAPALL_ONLY=root,home` | `--only root,home` |
 | `SNAPALL_NO_DBUS=1` | `--no-dbus` |
 | `SNAPALL_JSON=1` | `--json` |
+| `SNAPALL_LOG=text\|json` | `--log text\|json` |
+| `SNAPALL_LOG_FILE=/var/log/snapall.jsonl` | `--log-file /var/log/snapall.jsonl` |
 
 A misspelled `SNAPALL_*` variable produces a warning with a suggestion instead of being ignored in silence.
+
+### Logging and the audit trail
+
+snapall is quiet by default. Ask, and every operation it performs (listing, creating, deleting, and each package-manager step of `doctor --install`) produces one line with its outcome and duration:
+
+```console
+$ sudo snapall --log text create "before theming"
+2026-10-23T08:30:14Z INFO  configs_listed count=2 took_ms=6
+2026-10-23T08:30:14Z INFO  snapshot_created config=home snapshot=14 description="before theming" took_ms=29
+2026-10-23T08:30:14Z INFO  snapshot_created config=root snapshot=212 description="before theming" took_ms=9
+
+$ sudo snapall --log-file /var/log/snapall.jsonl delete home 14      # an audit trail: appended, mode 0600
+$ jq -c 'select(.level == "error")' /var/log/snapall.jsonl
+```
+
+`--log text|json` writes to stderr: an event stream you route with your environment (a pipe, journald under systemd). `--log-file` appends JSON Lines to a private file instead, which is what you want from cron or a systemd timer. The `tui` owns the terminal, so it logs only to a file. If a log line cannot be written, the operation still happens: losing a log line is better than failing a snapshot.
 
 ### The terminal UI
 
@@ -101,6 +120,7 @@ Hexagonal, with a functional core and an imperative shell, enforced by crate bou
 | `snapall-core` | Domain types, the planner, the port, the use cases. Pure: no I/O, no parser. |
 | `snapall-snapper` | Driven adapter: the port, implemented by running `snapper`. |
 | `snapall-tui` | Driving adapter: the terminal UI as a pure `update`/`view` state machine. |
+| `snapall-observe` | Adapter for the observability port: times each operation and writes text or JSON log lines. |
 | `snapall` | Composition root: the argenv-declared CLI, wiring, rendering, exit codes. |
 
 ## Development
