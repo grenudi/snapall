@@ -1,0 +1,160 @@
+//! What ends up on screen, rendered into ratatui's in-memory test terminal.
+
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
+use snapall_core::testing::InMemoryBackend;
+use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_tui::model::Key;
+use snapall_tui::{view, Session};
+
+fn screen(session: &Session<'_>, width: u16, height: u16) -> String {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+    terminal
+        .draw(|frame| view::render(&session.state, frame))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    (0..height)
+        .map(|y| {
+            (0..width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn backend_with_data() -> InMemoryBackend {
+    let backend = InMemoryBackend::with_configs(&["root", "home"]);
+    for (config, text) in [
+        ("home", "before theming"),
+        ("home", "after theming"),
+        ("root", "kernel"),
+    ] {
+        backend
+            .create_snapshot(
+                &ConfigName::parse(config).unwrap(),
+                &Description::parse(text).unwrap(),
+            )
+            .unwrap();
+    }
+    backend
+}
+
+#[test]
+fn the_main_screen_shows_configs_snapshots_and_key_hints() {
+    let backend = backend_with_data();
+    let session = Session::new(&backend);
+    let text = screen(&session, 100, 20);
+
+    assert!(text.contains("snapall"), "{text}");
+    assert!(text.contains("Configs"), "{text}");
+    assert!(
+        text.contains("home  (2)"),
+        "loaded counts show in the list\n{text}"
+    );
+    assert!(
+        text.contains("root  (-)"),
+        "unvisited configs show a dash\n{text}"
+    );
+    assert!(text.contains("Snapshots of home (2)"), "{text}");
+    assert!(
+        text.contains("after theming") && text.contains("before theming"),
+        "{text}"
+    );
+    let newest = text.find("after theming").unwrap();
+    let oldest = text.find("before theming").unwrap();
+    assert!(newest < oldest, "newest first\n{text}");
+    assert!(
+        text.contains("c create") && text.contains("q quit"),
+        "{text}"
+    );
+}
+
+#[test]
+fn marked_snapshots_are_visible() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    session.press(Key::Right);
+    session.press(Key::Char(' '));
+    let text = screen(&session, 100, 20);
+    assert!(
+        text.lines()
+            .any(|l| l.contains('*') && l.contains("after theming")),
+        "{text}"
+    );
+}
+
+#[test]
+fn the_create_prompt_shows_its_target_and_the_text_typed_so_far() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    session.press(Key::Char('c'));
+    for c in "my note".chars() {
+        session.press(Key::Char(c));
+    }
+    let text = screen(&session, 100, 20);
+    assert!(text.contains("New snapshot of home"), "{text}");
+    assert!(text.contains("my note"), "{text}");
+    assert!(text.contains("Esc cancel"), "{text}");
+}
+
+#[test]
+fn the_all_configs_prompt_names_every_config() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    session.press(Key::Char('a'));
+    let text = screen(&session, 100, 20);
+    assert!(text.contains("ALL configs (home, root)"), "{text}");
+}
+
+#[test]
+fn the_delete_confirmation_names_what_will_go() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    session.press(Key::Right);
+    session.press(Key::Char('d'));
+    let text = screen(&session, 100, 20);
+    assert!(text.contains("Delete 1 snapshot(s) of home?"), "{text}");
+    assert!(text.contains("#2"), "{text}");
+    assert!(text.contains("cannot be undone"), "{text}");
+}
+
+#[test]
+fn errors_and_an_empty_snapper_are_shown_in_words() {
+    let backend = InMemoryBackend::with_configs(&[]);
+    let session = Session::new(&backend);
+    let text = screen(&session, 120, 12);
+    assert!(text.contains("no snapper configs"), "{text}");
+    assert!(text.contains("create-config"), "{text}");
+}
+
+#[test]
+fn it_never_panics_however_small_the_terminal_is() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    for modal_key in [None, Some('c'), Some('a'), Some('?')] {
+        if let Some(c) = modal_key {
+            session.press(Key::Char(c));
+        }
+        for width in [0, 1, 2, 5, 10, 30, 80] {
+            for height in [0, 1, 2, 3, 5, 12] {
+                let _ = screen(&session, width, height);
+            }
+        }
+        session.press(Key::Esc);
+    }
+}
+
+#[test]
+#[ignore = "prints the screen for a human; run with --ignored --nocapture"]
+fn preview() {
+    let backend = backend_with_data();
+    let mut session = Session::new(&backend);
+    session.press(Key::Right);
+    session.press(Key::Char(' '));
+    println!("{}", screen(&session, 90, 16));
+    session.press(Key::Char('d'));
+    println!("{}", screen(&session, 90, 16));
+}

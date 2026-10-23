@@ -1,0 +1,18 @@
+[package]
+name = "snapall-tui"
+description = "snapall driving adapter: an interactive terminal UI over the snapshot port."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+snapall-core.workspace = true
+ratatui.workspace = true
+
+[dev-dependencies]
+snapall-core = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true
