@@ -12,6 +12,7 @@ Every known gap lives here, not in a prose TODO.
 | 3b | Run the Void and Gentoo install plans in CI (they are unit-tested only) | open |
 | 3c | `doctor`: check the filesystem is Btrfs, and `snapperd`/D-Bus state beyond the error text | open |
 | 4 | Shell completions and a man page, generated from the contract (argenv names both as planned generators) | open |
+| 6 | TUI: a termination signal returns at once, but leaving the worker's thread scope joins it, so a snapper call that hangs forever would delay the exit (systemd would SIGKILL after its timeout). Fix: a detached worker (needs an owned, `'static` backend) or exiting the process after the terminal is restored | open |
 | 7 | TUI: show what a snapshot changed (diff/status) and restore a file (`undochange`) | open |
 | 8 | More `Observer` adapters behind the existing port: journald/syslog, OpenTelemetry. Log rotation stays the environment's job (logrotate, journald) | open |
 | 9 | Confirm snapper's allowed config-name characters; `ConfigName` is currently stricter than necessary | open |
