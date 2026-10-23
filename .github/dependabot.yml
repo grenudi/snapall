@@ -11,6 +11,10 @@ updates:
       # MSRV is a decision, not a bot's job.
       - dependency-name: "ratatui"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # signal-hook stays on 0.3, the version crossterm (via ratatui) already depends on, so the
+      # tree holds one copy of it, not two. Revisit when crossterm moves to 0.4.
+      - dependency-name: "signal-hook"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
