@@ -30,7 +30,7 @@ argenv-resolve = "0.2"
 # Rust 1.88 although ratatui 0.29 only asks for ^0.3. Do not `cargo update` it past 0.3.10.
 ratatui = "0.29"
 # Same major as crossterm (via ratatui) uses, so the tree holds one copy, not two.
-signal-hook = "0.3"
+signal-hook = "0.4"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
