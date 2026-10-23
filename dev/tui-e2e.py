@@ -19,6 +19,7 @@ through a terminal emulator, so this checks what a user would actually see.
 import fcntl
 import os
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -108,6 +109,18 @@ class Tui:
         for char in text:
             self.send(char)
 
+    def stop_with(self, sig):
+        """Send a signal; return the exit status once the process has gone."""
+        os.kill(self.process.pid, sig)
+        deadline = time.time() + 5
+        while self.process.poll() is None and time.time() < deadline:
+            self.pump(0.1)
+        if self.process.poll() is None:
+            self.process.kill()
+            raise AssertionError(f"snapall did not exit after {signal.Signals(sig).name}")
+        self.pump(0.2)
+        return self.process.returncode
+
     def finish(self):
         self.send("q")
         deadline = time.time() + 5
@@ -174,6 +187,16 @@ def main():
     code = tui.finish()
     check(code == 0, "q exits with status 0")
     check(b"\x1b[?1049l" in tui.raw, "the alternate screen was left (terminal restored)")
+    # --- disposability: a termination signal must leave the terminal usable ---------------
+    for sig, status in ((signal.SIGTERM, 143), (signal.SIGHUP, 129), (signal.SIGINT, 130)):
+        tui = Tui()
+        tui.wait_for("Configs")
+        code = tui.stop_with(sig)
+        name = signal.Signals(sig).name
+        check(code == status, f"{name} exits with status {status} (128 + signal), got {code}")
+        check(b"\x1b[?1049l" in tui.raw, f"{name}: the alternate screen was left")
+        check(b"\x1b[?25h" in tui.raw, f"{name}: the cursor was shown again")
+
     print("\nTUI end-to-end: all checks passed")
 
 

@@ -43,6 +43,7 @@ jobs:
             docs
             adr
             license
+            observe
             dev
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$

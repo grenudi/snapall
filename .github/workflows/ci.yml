@@ -115,6 +115,32 @@ jobs:
           $S delete snapall_it_a 1 --dry-run || status=$?
           test "$status" -eq 2
 
+      - name: Logging and the audit trail, against real snapper
+        run: |
+          log="$RUNNER_TEMP/audit.jsonl"
+          sudo rm -f "$log"
+          S="sudo target/debug/snapall --no-dbus"
+
+          $S --log-file "$log" "ci audit"
+          id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci audit") | .id')"
+          $S --log-file "$log" delete snapall_it_a "$id"
+          failed=0
+          $S --log-file "$log" delete snapall_it_a "$id" 2>/dev/null || failed=$?
+          test "$failed" -eq 1
+
+          # private: it records privileged actions
+          test "$(sudo stat -c %a "$log")" = 600
+          # every line is JSON; creations and deletions are there; the second delete is an error
+          sudo jq -e -s '
+            all(.[]; has("time") and has("level") and has("event") and has("took_ms"))
+            and (map(select(.event == "snapshot_created" and .level == "info")) | length) >= 2
+            and (map(select(.event == "snapshot_deleted" and .level == "info")) | length) == 1
+            and (map(select(.event == "snapshot_deleted" and .level == "error")) | length) == 1
+          ' "$log"
+
+          # the stream on stderr, in text
+          $S --log text --dry-run 2>&1 | grep -q "INFO  configs_listed count=2"
+
       - name: Tear down the fixture
         if: always()
         run: sudo ./dev/btrfs-fixture.sh down
@@ -146,7 +172,7 @@ jobs:
       # See docs/backlog.md; add the step once that is fixed upstream.
       - name: Valid invocations satisfy the contract
         run: |
-          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "doctor --install" "tui"; do
+          for invocation in "create --only root,home --dry-run" "list --json" "delete home 12" "snapshots home" "doctor --install" "--log json list" "--log-file /tmp/x.log tui" "tui"; do
             echo "argenv lint: $invocation"
             # shellcheck disable=SC2086  # the invocation is meant to split into arguments
             argenv lint snapall.argenv.json -- $invocation
@@ -155,7 +181,7 @@ jobs:
       - name: An invalid invocation is rejected
         run: |
           # `! cmd` would not fail the step under `bash -e`; check the status explicitly.
-          for invocation in "delete home notanumber" "create --json=yes" "doctor --install=yes"; do
+          for invocation in "delete home notanumber" "create --json=yes" "doctor --install=yes" "--log xml list"; do
             echo "argenv lint must reject: $invocation"
             status=0
             # shellcheck disable=SC2086  # the invocation is meant to split into arguments
