@@ -32,5 +32,8 @@ cargo generate-rpm --package crates/snapall --target "$target" --output dist/
 # The static binary itself, for distributions that package nothing (Alpine, Void, ...).
 cp "$binary" "dist/snapall-$target"
 
-(cd dist && sha256sum -- * | grep -v 'SHA256SUMS$' > SHA256SUMS)
+# Checksums only for what is published: the .deb and .rpm. (The bare binary stays in dist/ for
+# the distro tests; it is not a release asset, and a checksum for a file nobody can download
+# makes `sha256sum -c` fail for users.)
+(cd dist && sha256sum -- *.deb *.rpm > SHA256SUMS)
 echo "built:" && ls -l dist

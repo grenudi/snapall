@@ -211,6 +211,9 @@ jobs:
       - name: Build the .deb and .rpm
         run: packaging/build-packages.sh x86_64-unknown-linux-musl
 
+      - name: The published checksums verify (every line names a file that exists)
+        run: cd dist && sha256sum --check SHA256SUMS
+
       - name: The source, for building the Arch package from this commit
         run: git archive --format=tar.gz --prefix=snapall-src/ -o dist/snapall-src.tar.gz HEAD
 
