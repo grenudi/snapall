@@ -21,5 +21,7 @@ Real snapper and the real TUI (root, loop devices, `snapper`, `btrfs-progs`, `pi
 8. **A new backend must pass `snapall_core::testing::backend_contract`.**
 9. **Third-party behaviour we work around is pinned by a characterization test** (see `cli.rs`). If one fails after an upgrade, remove the workaround.
 10. **MSRV is 1.85.** `Cargo.lock` is committed and pins `instability` to 0.3.10 (see ADR 6). Do not `cargo update` past it, and do not bump ratatui without moving the MSRV deliberately.
-11. **One logical change per PR; the PR title is a Conventional Commit** (see CONTRIBUTING.md).
-12. **Record decisions.** A significant choice, including what was considered and rejected, gets an ADR in `docs/adr/`. Every known gap goes in `docs/backlog.md`, not in a prose TODO.
+11. **`doctor` follows the same split.** What is wrong and what to install are pure functions in `snapall-core/src/doctor.rs`, tested against real `os-release` samples; only `snapall/src/doctor.rs` reads files and runs programs. A new distribution is a new sample and a new test first. Never plan a command that could damage the system (no bare `pacman -Sy`).
+12. **Packages come from one script.** `packaging/build-packages.sh` is used by CI and by the release; the container tests in `packaging/test/` must pass for any change to packaging. Both packages must keep depending on snapper.
+13. **One logical change per PR; the PR title is a Conventional Commit** (see CONTRIBUTING.md).
+14. **Record decisions.** A significant choice, including what was considered and rejected, gets an ADR in `docs/adr/`. Every known gap goes in `docs/backlog.md`, not in a prose TODO.

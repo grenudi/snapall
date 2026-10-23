@@ -20,6 +20,21 @@ home
 $ sudo snapall tui
 ```
 
+## Install
+
+snapall drives [snapper](http://snapper.io/), so every package below **depends on it**: installing snapall installs snapper too. Packages are attached to each [release](https://github.com/grenudi/snapall/releases) (they are not signed yet).
+
+| System | How |
+|---|---|
+| Debian, Ubuntu, Mint, ... | `sudo apt install ./snapall_<version>_<arch>.deb` |
+| Fedora | `sudo dnf install ./snapall-<version>.<arch>.rpm` |
+| openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
+| Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` |
+| Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
+| Anything else (Alpine, Void, Gentoo, ...) | the static `snapall-<version>-<arch>-unknown-linux-musl.tar.gz`, then `sudo ./snapall doctor --install` |
+
+`snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`, `xbps-install`, `emerge`). Where a command would be wrong it says so instead of running anything: RHEL and its rebuilds only have snapper in EPEL; NixOS is declarative; Fedora Atomic, MicroOS and SteamOS have a read-only root.
+
 ## Commands
 
 | Command | What it does |
@@ -28,6 +43,7 @@ $ sudo snapall tui
 | `snapall list` | The configs snapall can see, i.e. exactly what `create` would touch. |
 | `snapall snapshots [CONFIG]` | The snapshots of one config, or of all. |
 | `snapall delete CONFIG ID` | Delete one snapshot. `0` is the current system and is refused. |
+| `snapall doctor [--install]` | Checks that snapper works; with `--install`, installs it with this system's package manager (shows the commands, asks first, needs root). |
 | `snapall tui` | The interactive terminal UI. |
 | `snapall contract` | This program's invocation contract, as [argenv](https://github.com/argenv-opencommons/argenv) JSON. |
 
@@ -74,7 +90,7 @@ Configs on the left, the selected config's snapshots on the right, newest first.
 
 ## Status
 
-Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Distro packaging, shell completions and man pages (both derivable from the contract), and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). No license has been chosen yet.
+Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Shell completions and man pages (both derivable from the contract), repository hosting and signing for the packages, and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). Licensed under MIT OR Apache-2.0, at your option.
 
 ## Architecture
 
@@ -95,6 +111,8 @@ cargo clippy --workspace --all-features --all-targets -- -D warnings
 cargo test --workspace --all-features
 ```
 
+Packaging, `doctor --install` and the packages are tested for real on every push: each of Debian, Ubuntu, Fedora, openSUSE Tumbleweed, Arch and Alpine runs in a fresh container with no snapper, installs through its own package manager, and is checked afterwards (`packaging/test/`). The same script, `packaging/build-packages.sh`, builds the packages CI tests and the packages a release ships.
+
 The real-snapper checks need root, loop devices, `snapper` and `btrfs-progs`:
 
 ```
@@ -112,4 +130,4 @@ cargo run -q -p snapall -- contract > snapall.argenv.json
 
 ## Releases
 
-Pull requests are squash-merged and the **PR title** must be a [Conventional Commit](CONTRIBUTING.md); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries with checksums.
+Pull requests are squash-merged and the **PR title** must be a [Conventional Commit](CONTRIBUTING.md); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum.

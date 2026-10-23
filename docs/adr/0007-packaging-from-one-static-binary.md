@@ -1,0 +1,21 @@
+# 7. Distro packages from one static binary, tested on real containers
+
+Status: accepted
+
+## Context
+The goal is "install snapall on every major distribution". Distributions package software differently, and a package that was never installed on its target distribution is a guess.
+
+## Decision
+- **One binary.** The release binary is a static musl build per architecture, so `.deb`, `.rpm`, the tarball and the Nix wrapper all carry the same executable, and there is no per-distro build matrix.
+- **Declare the dependency.** The `.deb` and `.rpm` depend on `snapper`, so a package manager installs it. The `PKGBUILD` has `depends=('snapper')`; the flake wraps snapper into the program's `PATH`.
+- **One script builds the packages** (`packaging/build-packages.sh`) and both CI and the release workflow call it: what is tested is what ships.
+- **Test on the real thing.** For Debian, Ubuntu, Fedora, openSUSE Tumbleweed, Arch and Alpine, CI starts a fresh container that has no snapper, and (1) runs `snapall doctor --install --yes` with the real package manager, (2) installs the real package and checks that snapper was pulled in. A `nix build` job checks the flake.
+- **`doctor --install` is the fallback**, for systems with no package (Alpine, Void, Gentoo): it installs the dependency, not snapall itself.
+- **Do not run a command that would be wrong.** RHEL and its rebuilds (snapper is only in EPEL), NixOS, and immutable systems get an explanation instead of a command. Arch never runs a bare `pacman -Sy`.
+
+## Considered
+- Native packages built per distribution inside distribution containers: more faithful to each policy, but a build matrix to maintain for a single static binary with one dependency.
+- Having `doctor` install snapall's own updates: out of scope; that is the package manager's job.
+
+## Consequences
+The packages are unsigned and not in any distribution's repository; both are in the backlog. The Void and Gentoo install plans are unit-tested but not run in CI.

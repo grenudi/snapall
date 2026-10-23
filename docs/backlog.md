@@ -5,11 +5,13 @@ Every known gap lives here, not in a prose TODO.
 ## Product
 | # | Item | Status |
 |---|---|---|
-| 1 | Choose a license (`argenv` uses MIT OR Apache-2.0) | open |
-| 2 | Distro packages: `.deb`, `.rpm`, AUR `PKGBUILD`, a Nix flake; consider the openSUSE Build Service for multi-distro builds | open |
-| 3 | Per-distro backends and hooks (pacman, zypper, dnf, apt) behind the existing port | open |
+| 1 | Publish to the AUR (`snapall` and `snapall-bin`); needs an AUR account and an SSH key as a secret | open |
+| 2 | Host signed apt and rpm repositories (or use the openSUSE Build Service / COPR / a PPA) so `apt install snapall` works; sign the packages | open |
+| 3 | Per-distro snapshot hooks (pacman, zypper, dnf, apt) behind the existing port | open |
+| 3a | Commit `flake.lock`; submit the package to nixpkgs | open |
+| 3b | Run the Void and Gentoo install plans in CI (they are unit-tested only) | open |
+| 3c | `doctor`: check the filesystem is Btrfs, and `snapperd`/D-Bus state beyond the error text | open |
 | 4 | Shell completions and a man page, generated from the contract (argenv names both as planned generators) | open |
-| 5 | `snapall doctor`: report missing tools, show (and with confirmation run) the install command for the detected distro | open |
 | 6 | TUI: run snapper calls off the UI thread (a long delete currently freezes the screen until it finishes) | open |
 | 7 | TUI: show what a snapshot changed (diff/status) and restore a file (`undochange`) | open |
 | 8 | Observability as a port (structured logs), once there is something to observe | open |
