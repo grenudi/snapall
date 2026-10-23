@@ -173,6 +173,13 @@ pub enum InstallPlan {
     Manual(String),
 }
 
+/// Alpine `edge` calls itself that: `PRETTY_NAME="Alpine Linux edge"`.
+fn alpine_edge(os: &OsRelease) -> bool {
+    os.pretty_name
+        .as_deref()
+        .is_some_and(|name| name.to_ascii_lowercase().contains("edge"))
+}
+
 /// How to install [`PACKAGE`] on this system.
 pub fn install_plan(os: &OsRelease) -> InstallPlan {
     if let Some(guidance) = immutable(os) {
@@ -201,7 +208,23 @@ pub fn install_plan(os: &OsRelease) -> InstallPlan {
             "zypper",
             &["--non-interactive", "install", PACKAGE],
         )]),
-        Family::Alpine => InstallPlan::Steps(vec![Step::new("apk", &["add", PACKAGE])]),
+        // snapper is only in Alpine's `testing` repository, which exists on `edge` and nowhere
+        // else; mixing it into a stable release would break that release's dependencies.
+        Family::Alpine if alpine_edge(os) => InstallPlan::Steps(vec![Step::new(
+            "apk",
+            &[
+                "add",
+                "--repository",
+                "https://dl-cdn.alpinelinux.org/alpine/edge/testing",
+                PACKAGE,
+            ],
+        )]),
+        Family::Alpine => InstallPlan::Manual(format!(
+            "snapper is only packaged in Alpine's `testing` repository, which exists on `edge`; \
+             {} is not edge, so there is no snapper for it (and mixing edge into a stable \
+             release breaks it)",
+            os.display_name()
+        )),
         Family::Void => InstallPlan::Steps(vec![Step::new("xbps-install", &["-Sy", PACKAGE])]),
         Family::Gentoo => InstallPlan::Steps(vec![Step::new(
             "emerge",
@@ -395,7 +418,8 @@ mod tests {
     const LEAP: &str = "ID=\"opensuse-leap\"\nID_LIKE=\"suse opensuse\"\n";
     const MICROOS: &str =
         "ID=\"opensuse-microos\"\nID_LIKE=\"suse opensuse opensuse-tumbleweed\"\n";
-    const ALPINE: &str = "ID=alpine\n";
+    const ALPINE: &str = "ID=alpine\nPRETTY_NAME=\"Alpine Linux v3.22\"\n";
+    const ALPINE_EDGE: &str = "ID=alpine\nPRETTY_NAME=\"Alpine Linux edge\"\n";
     const VOID: &str = "ID=\"void\"\n";
     const GENTOO: &str = "ID=gentoo\n";
     const NIXOS: &str = "ID=nixos\n";
@@ -468,7 +492,10 @@ mod tests {
             steps(install_plan(&os(LEAP))),
             ["zypper --non-interactive install snapper"]
         );
-        assert_eq!(steps(install_plan(&os(ALPINE))), ["apk add snapper"]);
+        assert_eq!(
+            steps(install_plan(&os(ALPINE_EDGE))),
+            ["apk add --repository https://dl-cdn.alpinelinux.org/alpine/edge/testing snapper"]
+        );
         assert_eq!(steps(install_plan(&os(VOID))), ["xbps-install -Sy snapper"]);
         assert_eq!(
             steps(install_plan(&os(GENTOO))),
@@ -485,6 +512,11 @@ mod tests {
     #[test]
     fn systems_where_a_command_would_be_wrong_say_so_instead_of_running_one() {
         assert!(manual(install_plan(&os(ROCKY))).contains("EPEL"));
+        let stable_alpine = manual(install_plan(&os(ALPINE)));
+        assert!(
+            stable_alpine.contains("testing") && stable_alpine.contains("Alpine Linux v3.22"),
+            "{stable_alpine}"
+        );
         assert!(manual(install_plan(&os(NIXOS))).contains("environment.systemPackages"));
         assert!(manual(install_plan(&os(SILVERBLUE))).contains("rpm-ostree install snapper"));
         assert!(manual(install_plan(&os(MICROOS))).contains("transactional-update"));
