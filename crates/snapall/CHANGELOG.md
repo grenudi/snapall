@@ -1,6 +1,22 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.3.0]
+
+
+### Documentation
+- Glossary, ADR 9, and the architecture map for observability ([c027ed4])
+
+
+### Features
+- **observe:** Observability port, audit log, graceful shutdown, typed install gate ([bda6dc5])
+
+
+### Miscellaneous
+- **license:** Relicense snapall under GPL-3.0-or-later **[BREAKING]** ([77bfa34])
+
+
+
 ## [0.2.0]
 
 
