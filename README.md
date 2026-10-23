@@ -131,7 +131,7 @@ cargo clippy --workspace --all-features --all-targets -- -D warnings
 cargo test --workspace --all-features
 ```
 
-Packaging, `doctor --install` and the packages are tested for real on every push: each of Debian, Ubuntu, Fedora, openSUSE Tumbleweed, Arch and Alpine runs in a fresh container with no snapper, installs through its own package manager, and is checked afterwards (`packaging/test/`). The same script, `packaging/build-packages.sh`, builds the packages CI tests and the packages a release ships.
+Packaging, `doctor --install` and the packages are tested for real on every push, on both architectures: each of Debian, Ubuntu, Fedora, openSUSE Tumbleweed and Alpine (x86_64 and aarch64, on native arm runners) and Arch (x86_64; it has no official aarch64 image) runs in a fresh container with no snapper, installs through its own package manager, and is checked afterwards (`packaging/test/`). After every release, `release-verify.yml` repeats that on what was actually *published*: it downloads the assets, checks them against the checksums published beside them, installs the released packages, builds the released PKGBUILD from the tag's source, and asserts the version matches the tag. The same script, `packaging/build-packages.sh`, builds the packages CI tests and the packages a release ships.
 
 The real-snapper checks need root, loop devices, `snapper` and `btrfs-progs`:
 

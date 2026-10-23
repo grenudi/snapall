@@ -18,5 +18,9 @@ The goal is "install snapall on every major distribution". Distributions package
 - Native packages built per distribution inside distribution containers: more faithful to each policy, but a build matrix to maintain for a single static binary with one dependency.
 - Having `doctor` install snapall's own updates: out of scope; that is the package manager's job.
 
+## Verified after publishing
+
+CI proves what was *built*; users get what was *published*. So `release-verify.yml` runs after every Release workflow (and on demand for a tag): it downloads the published assets, verifies them against the published checksums, asserts the tarball carries the program, the license and the third-party notices, installs the published `.deb` and `.rpm` on fresh containers of each distribution and architecture, builds the published PKGBUILD from the tag's real source tarball (so makepkg checks the sha256 the release published), and asserts the installed program reports the tag's version. aarch64 is built and tested natively on GitHub's arm runners rather than assumed from x86_64; Arch has no official aarch64 image and stays x86_64 only. The first run of this found nothing wrong with v0.3.0, but the earlier defect (a checksum file listing a file that was never published) is exactly the kind of thing it exists to catch.
+
 ## Consequences
 The packages are unsigned and not in any distribution's repository; both are in the backlog. The Void and Gentoo install plans are unit-tested but not run in CI.
