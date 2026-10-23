@@ -1,0 +1,13 @@
+[workspace]
+changelog_config = "cliff.toml"
+dependencies_update = false
+# snapall is distributed as binaries and distro packages for now, not through crates.io.
+# `publish = false` skips `cargo publish` only; tags, changelogs and releases still happen.
+publish = false
+git_tag_enable = true
+git_release_enable = false
+
+# One GitHub release for the product, not one per internal crate.
+[[package]]
+name = "snapall"
+git_release_enable = true

@@ -1,0 +1,49 @@
+name: PR Title
+
+# Plain pull_request, not pull_request_target: the latter reads the workflow file from
+# the base branch, so a workflow introduced in the same PR could never fire on it.
+# Squash-merge is the only merge method, so the PR title becomes the commit on main that
+# release-plz reads; that is why the title is linted and the individual commits are not.
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check:
+    name: conventional commit format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            style
+            test
+            build
+            ci
+            chore
+            revert
+          scopes: |
+            core
+            snapper
+            cli
+            ci
+            deps
+            release
+            docs
+            adr
+            dev
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject after "type(scope): " must not start with an uppercase letter:
+            keep it lowercase, imperative mood.

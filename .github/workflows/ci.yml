@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      # --all-targets: a lint that only fires in a test target is still a lint.
+      - name: Clippy
+        run: cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
+
+      # Includes the architecture fitness functions (crates/snapall/tests/architecture.rs).
+      - name: Test
+        run: cargo test --workspace --all-features --locked
+
+      - name: Docs (warnings are errors)
+        run: cargo doc --workspace --no-deps --all-features --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --all-features --locked
+
+  integration:
+    name: real snapper on Btrfs
+    runs-on: ubuntu-latest
+    # The port contract, run against a real snapper on a loopback Btrfs volume, plus the
+    # real binary end to end. Unit tests prove the command lines; this proves snapper
+    # accepts them.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install snapper and btrfs-progs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y snapper btrfs-progs jq
+
+      - name: Build test binary and the CLI as the normal user
+        run: |
+          cargo build -p snapall --locked
+          cargo test -p snapall-snapper --test real_snapper --no-run --locked \
+            --message-format=json | jq -r 'select(.executable != null) | .executable' > "$RUNNER_TEMP/it-bin"
+          test -s "$RUNNER_TEMP/it-bin"
+
+      - name: Create the Btrfs fixture
+        run: sudo ./dev/btrfs-fixture.sh up
+
+      - name: Port contract against real snapper
+        run: sudo SNAPALL_IT=1 "$(cat "$RUNNER_TEMP/it-bin")" --nocapture
+
+      - name: snapall end to end
+        run: |
+          sudo target/debug/snapall --no-dbus list | tee /dev/stderr | grep -qx snapall_it_a
+          sudo target/debug/snapall --no-dbus create --dry-run "ci dry run"
+          sudo target/debug/snapall --no-dbus create "ci end to end"
+          sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"
+          sudo snapper --no-dbus -c snapall_it_b list | grep -q "ci end to end"
+
+      - name: Tear down the fixture
+        if: always()
+        run: sudo ./dev/btrfs-fixture.sh down
+
+  audit:
+    name: dependency advisories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
