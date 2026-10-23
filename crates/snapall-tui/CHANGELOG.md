@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.4.0]
+
+
+### Features
+- **tui:** Run snapper calls in the background so the screen never freezes ([f70b450])
+
+
+
 ## [0.3.0]
 
 
