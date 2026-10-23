@@ -5,6 +5,7 @@
 
 mod cli;
 mod contract;
+mod doctor;
 mod help;
 mod render;
 
@@ -136,6 +137,7 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
                 return Ok(ExitCode::FAILURE);
             }
         }
+        Request::Doctor { install, yes } => return doctor::run(&backend, install, yes, json),
         Request::Tui => {
             if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
                 return Err("`snapall tui` needs an interactive terminal".into());

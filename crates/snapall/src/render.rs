@@ -1,6 +1,7 @@
 //! Presentation: pure functions from domain values to text or JSON.
 
 use serde_json::{json, Value};
+use snapall_core::doctor::{Check, OsRelease, Status};
 use snapall_core::{ConfigName, Description, Plan, Report, SnapshotInfo, SnapshotKind};
 
 pub fn report(report: &Report) -> String {
@@ -30,6 +31,44 @@ pub fn report_json(report: &Report) -> Value {
         })
         .collect();
     json!({"ok": report.is_success(), "outcomes": outcomes})
+}
+
+fn status_label(status: Status) -> &'static str {
+    match status {
+        Status::Ok => "ok",
+        Status::Warn => "warn",
+        Status::Fail => "FAIL",
+    }
+}
+
+pub fn doctor(os: &OsRelease, checks: &[Check]) -> String {
+    let mut out = format!("system: {}\n", os.display_name());
+    for check in checks {
+        out.push_str(&format!(
+            "{:<5} {:<11} {}\n",
+            status_label(check.status),
+            check.name,
+            check.detail
+        ));
+        if let Some(fix) = &check.fix {
+            out.push_str(&format!("      {:<11} fix: {fix}\n", ""));
+        }
+    }
+    out
+}
+
+pub fn doctor_json(os: &OsRelease, checks: &[Check]) -> Value {
+    let worst = snapall_core::doctor::worst(checks);
+    json!({
+        "system": os.display_name(),
+        "ok": worst != Status::Fail,
+        "checks": checks.iter().map(|c| json!({
+            "name": c.name,
+            "status": status_label(c.status).to_lowercase(),
+            "detail": c.detail,
+            "fix": c.fix,
+        })).collect::<Vec<_>>(),
+    })
 }
 
 pub fn dry_run(plan: &Plan, description: &Description) -> String {
@@ -218,5 +257,29 @@ mod tests {
         assert_eq!(value["configs"]["home"][1]["description"], "after theming");
         assert_eq!(value["configs"]["home"][0]["type"], "single");
         assert_eq!(value["configs"]["root"], json!([]));
+    }
+
+    #[test]
+    fn doctor_output_shows_status_detail_and_fix() {
+        use snapall_core::doctor::{diagnose, Probe};
+        let probe = Probe {
+            os: OsRelease::parse("ID=arch\nPRETTY_NAME=\"Arch Linux\"\n"),
+            snapper: Err("No such file or directory".into()),
+            is_root: Some(false),
+            configs: None,
+        };
+        let checks = diagnose(&probe);
+        let text = doctor(&probe.os, &checks);
+        assert!(text.starts_with("system: Arch Linux\n"), "{text}");
+        assert!(text.contains("FAIL  snapper"), "{text}");
+        assert!(
+            text.contains("fix: pacman -S --needed --noconfirm snapper"),
+            "{text}"
+        );
+        assert!(text.contains("warn  privileges"), "{text}");
+        let value = doctor_json(&probe.os, &checks);
+        assert_eq!(value["ok"], false);
+        assert_eq!(value["checks"][0]["status"], "fail");
+        assert_eq!(value["checks"][1]["fix"], "run with sudo");
     }
 }

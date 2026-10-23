@@ -15,6 +15,7 @@ pub enum Command {
     List,
     Snapshots,
     Delete,
+    Doctor,
     Tui,
     Contract,
 }
@@ -25,6 +26,7 @@ impl Command {
         Command::List,
         Command::Snapshots,
         Command::Delete,
+        Command::Doctor,
         Command::Tui,
         Command::Contract,
     ];
@@ -35,6 +37,7 @@ impl Command {
             Command::List => "list",
             Command::Snapshots => "snapshots",
             Command::Delete => "delete",
+            Command::Doctor => "doctor",
             Command::Tui => "tui",
             Command::Contract => "contract",
         }
@@ -51,6 +54,7 @@ impl Command {
             Command::List => "List the snapper configs snapall can see",
             Command::Snapshots => "List the snapshots of one config, or of every config",
             Command::Delete => "Delete one snapshot of a config",
+            Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Tui => "Open the interactive terminal UI",
             Command::Contract => "Print this program's invocation contract as argenv JSON",
         }
@@ -143,7 +147,7 @@ contract! {
         key:         "json",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::List, Command::Snapshots],
+        subcommands: &[Command::Create, Command::List, Command::Snapshots, Command::Doctor],
         env:         Some(Env::new("SNAPALL_JSON")),
         arg:         Some(Arg::long("json")),
         group:       "output",
@@ -188,6 +192,33 @@ contract! {
         group:       "delete",
         example:     "snapall delete home 12",
         summary:     "The snapshot number to delete (required). 0 is the current system and is refused.",
+        ..Input::EMPTY
+    };
+
+    // ---- doctor ----------------------------------------------------------------------
+
+    /// Install what is missing.
+    INSTALL: bool, Command = Input {
+        key:         "install",
+        ty:          Type::Bool,
+        default:     Some(false),
+        subcommands: &[Command::Doctor],
+        arg:         Some(Arg::long("install")),
+        group:       "doctor",
+        example:     "sudo snapall doctor --install",
+        summary:     "Install snapper with this system's package manager if it is missing. Shows the commands and asks first; needs root.",
+        ..Input::EMPTY
+    };
+
+    /// Do not ask.
+    YES: bool, Command = Input {
+        key:         "yes",
+        ty:          Type::Bool,
+        default:     Some(false),
+        subcommands: &[Command::Doctor],
+        arg:         Some(Arg::pair("yes", 'y')),
+        group:       "doctor",
+        summary:     "With --install: run without asking for confirmation (for scripts and CI).",
         ..Input::EMPTY
     };
 }

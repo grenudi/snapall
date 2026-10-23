@@ -32,6 +32,10 @@ pub enum Request {
         config: ConfigName,
         id: SnapshotId,
     },
+    Doctor {
+        install: bool,
+        yes: bool,
+    },
     Tui,
     Contract,
 }
@@ -251,6 +255,14 @@ fn build_request(
                     usage_error("ID 0 is the current system, not a snapshot; it cannot be deleted")
                 })?,
             }
+        }
+        Command::Doctor => {
+            let install = flag(&Contract::INSTALL, resolution);
+            let yes = flag(&Contract::YES, resolution);
+            if yes && !install {
+                return Err(usage_error("--yes only applies together with --install"));
+            }
+            Request::Doctor { install, yes }
         }
         Command::Tui => Request::Tui,
         Command::Contract => Request::Contract,
@@ -539,6 +551,28 @@ mod tests {
         assert_eq!(ok(&["--version"]).request, Request::Version);
         assert_eq!(ok(&["-V"]).request, Request::Version);
         assert_eq!(ok(&["list", "--help"]).request, Request::Help);
+    }
+
+    #[test]
+    fn doctor_and_its_flags() {
+        assert_eq!(
+            ok(&["doctor"]).request,
+            Request::Doctor {
+                install: false,
+                yes: false
+            }
+        );
+        assert_eq!(
+            ok(&["doctor", "--install", "-y"]).request,
+            Request::Doctor {
+                install: true,
+                yes: true
+            }
+        );
+        assert!(ok(&["doctor", "--json"]).json);
+        assert!(err(&["doctor", "--yes"]).contains("--yes only applies together with --install"));
+        assert!(err(&["list", "--install"]).contains("does not apply to `list`"));
+        assert!(err(&["create", "--yes"]).contains("does not apply to `create`"));
     }
 
     #[test]

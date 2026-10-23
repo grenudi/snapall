@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-23T02:51:56Z",
+  "generated": "2026-10-23T05:33:13Z",
   "inputs": [
     {
       "allowed": [],
@@ -136,7 +136,8 @@
       "subcommands": [
         "create",
         "list",
-        "snapshots"
+        "snapshots",
+        "doctor"
       ],
       "summary": "Print JSON instead of text.",
       "type": "bool"
@@ -198,6 +199,46 @@
       ],
       "summary": "The snapshot number to delete (required). 0 is the current system and is refused.",
       "type": "uint"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "install",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "example": "sudo snapall doctor --install",
+      "group": "doctor",
+      "key": "install",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "doctor"
+      ],
+      "summary": "Install snapper with this system's package manager if it is missing. Shows the commands and asks first; needs root.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "yes",
+        "negatable": false,
+        "repeatable": false,
+        "short": "y"
+      },
+      "default": false,
+      "group": "doctor",
+      "key": "yes",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "doctor"
+      ],
+      "summary": "With --install: run without asking for confirmation (for scripts and CI).",
+      "type": "bool"
     }
   ],
   "precedence": [
