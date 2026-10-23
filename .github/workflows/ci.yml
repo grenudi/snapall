@@ -48,7 +48,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.85.0
+      # The version is an input, not part of the action ref: dependabot reads a ref like
+      # `@1.85.0` as an action version and would "upgrade" the MSRV.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85.0"
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --workspace --all-features --locked
 
