@@ -1,6 +1,19 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.4.0]
+
+
+### Documentation
+- Record the arm64 testing and the post-release verification ([34c8798])
+
+
+### Features
+- **tui:** Run snapper calls in the background so the screen never freezes ([f70b450])
+- **cli:** Adopt argenv 0.3 and delete the workarounds it makes unnecessary **[BREAKING]** ([5433eb8])
+
+
+
 ## [0.3.0]
 
 
