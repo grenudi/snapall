@@ -1,11 +1,15 @@
 [package]
 name = "snapall"
 description = "Snapshot every snapper config in one command, from the command line or a terminal UI."
+readme = "../../README.md"
+keywords = ["snapper", "btrfs", "snapshot", "tui", "cli"]
+categories = ["command-line-utilities", "filesystem"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 authors.workspace = true
+license.workspace = true
 
 [dependencies]
 snapall-core.workspace = true
@@ -20,3 +24,39 @@ snapall-core = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true
+
+# ---- distro packages --------------------------------------------------------------------
+# Built from the static musl release binary by packaging/build-packages.sh, so one binary
+# serves every distribution. Both packages depend on snapper: installing snapall pulls it in.
+
+[package.metadata.deb]
+name = "snapall"
+maintainer = "grenudi <17498075+grenudi@users.noreply.github.com>"
+copyright = "2026, grenudi"
+license-file = ["../../LICENSE-MIT", "0"]
+extended-description = """\
+snapall takes a snapshot of every snapper config in one command, and offers \
+a terminal UI to browse, create and delete snapshots. It drives snapper; it \
+does not replace it."""
+section = "utils"
+priority = "optional"
+depends = "snapper"
+assets = [
+    ["target/release/snapall", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/snapall/README.md", "644"],
+    ["../../LICENSE-MIT", "usr/share/doc/snapall/LICENSE-MIT", "644"],
+    ["../../LICENSE-APACHE", "usr/share/doc/snapall/LICENSE-APACHE", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "snapall"
+summary = "Snapshot every snapper config in one command"
+assets = [
+    { source = "target/release/snapall", dest = "/usr/bin/snapall", mode = "755" },
+    { source = "../../README.md", dest = "/usr/share/doc/snapall/README.md", mode = "644", doc = true },
+    { source = "../../LICENSE-MIT", dest = "/usr/share/licenses/snapall/LICENSE-MIT", mode = "644", doc = true },
+    { source = "../../LICENSE-APACHE", dest = "/usr/share/licenses/snapall/LICENSE-APACHE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+snapper = "*"

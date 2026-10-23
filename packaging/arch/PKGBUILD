@@ -1,0 +1,43 @@
+# Maintainer: grenudi <17498075+grenudi@users.noreply.github.com>
+#
+# Builds snapall from a release tag. The release workflow publishes this file with `pkgver`
+# and `sha256sums` filled in; CI builds it from the checked-out commit by overriding
+# `_source` and `_dir` (see packaging/test/install-package.sh).
+
+pkgname=snapall
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Snapshot every snapper config in one command, from the CLI or a terminal UI'
+arch=('x86_64' 'aarch64')
+url='https://github.com/grenudi/snapall'
+license=('MIT' 'Apache-2.0')
+depends=('snapper')
+makedepends=('cargo')
+_dir="${_dir:-$pkgname-$pkgname-v$pkgver}"
+source=("${_source:-$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$pkgname-v$pkgver.tar.gz}")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$_dir"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$_dir"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p snapall
+}
+
+check() {
+  cd "$_dir"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "$_dir"
+  install -Dm755 target/release/snapall -t "$pkgdir/usr/bin/"
+  install -Dm644 LICENSE-MIT LICENSE-APACHE -t "$pkgdir/usr/share/licenses/$pkgname/"
+  install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
+}

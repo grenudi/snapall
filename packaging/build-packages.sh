@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Build the .deb and .rpm from an already-built static release binary.
+#
+#   cargo build --release --locked --target x86_64-unknown-linux-musl -p snapall
+#   packaging/build-packages.sh x86_64-unknown-linux-musl
+#
+# Needs: cargo-deb, cargo-generate-rpm, jq. Output goes to dist/. CI and the release
+# workflow both call this, so the packages that are tested are the packages that ship.
+set -euo pipefail
+
+target="${1:?usage: $0 <rust target triple, e.g. x86_64-unknown-linux-musl>}"
+cd "$(dirname "$0")/.."
+
+binary="target/$target/release/snapall"
+if [ ! -x "$binary" ]; then
+  echo "missing $binary; build it first:" >&2
+  echo "  cargo build --release --locked --target $target -p snapall" >&2
+  exit 1
+fi
+
+mkdir -p dist
+cargo deb --no-build --package snapall --target "$target" --output dist/
+cargo generate-rpm --package crates/snapall --target "$target" --output dist/
+
+# The static binary itself, for distributions that package nothing (Alpine, Void, ...).
+cp "$binary" "dist/snapall-$target"
+
+(cd dist && sha256sum -- * | grep -v 'SHA256SUMS$' > SHA256SUMS)
+echo "built:" && ls -l dist
