@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.4.1]
+
+
+### CI/CD
+- Build, attest and verify releases through one script, and test the shells for real ([e731b5c])
+
+
+### Features
+- **cli:** Shell completions and a man page, generated from the contract and shipped in every package ([0b27b54])
+
+
+
 ## [0.4.0]
 
 
