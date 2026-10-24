@@ -38,7 +38,7 @@ const SYSTEMD_BOOT: &[&str] = &[
 ];
 
 /// Gather the facts under `root` (the real `/` in production).
-pub fn gather(root: &Path, service_active: &dyn Fn(&str) -> bool) -> BootFacts {
+pub fn gather(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> BootFacts {
     let exists = |relative: &str| root.join(relative).exists();
     let any = |paths: &[&str]| paths.iter().any(|p| exists(p));
 
@@ -54,6 +54,9 @@ pub fn gather(root: &Path, service_active: &dyn Fn(&str) -> bool) -> BootFacts {
     }
 
     let limine_sync = exists("usr/bin/limine-snapper-sync");
+    // The package installs a snapper plugin that runs the sync on every create, delete and modify
+    // of a root snapshot, so the menu is kept in step even with the daemon stopped.
+    let limine_plugin = exists("usr/lib/snapper/plugins/10-limine-snapper-sync");
     let grub_btrfs = exists("usr/bin/grub-btrfsd") || exists("etc/grub.d/41_snapshots-btrfs");
     // grub-btrfs works from the generated menu even without its daemon: the script leaves a
     // marker in grub.cfg when snapshot entries were generated.
@@ -74,30 +77,37 @@ pub fn gather(root: &Path, service_active: &dyn Fn(&str) -> bool) -> BootFacts {
             ToolFacts {
                 tool: Tool::LimineSnapperSync,
                 installed: limine_sync,
-                active: limine_sync && service_active("limine-snapper-sync"),
+                service: limine_sync
+                    .then(|| service_state("limine-snapper-sync"))
+                    .flatten(),
+                hooked: limine_sync && limine_plugin,
             },
             ToolFacts {
                 tool: Tool::GrubBtrfs,
                 installed: grub_btrfs,
-                active: grub_btrfs && (service_active("grub-btrfsd") || grub_menu_has_snapshots),
+                service: grub_btrfs.then(|| service_state("grub-btrfsd")).flatten(),
+                hooked: grub_btrfs && grub_menu_has_snapshots,
             },
         ],
     }
 }
 
-/// Whether a systemd unit is active. Anything that goes wrong (no systemd, no such unit) is "no".
-fn systemctl_is_active(unit: &str) -> bool {
-    Command::new("systemctl")
-        .args(["is-active", "--quiet", unit])
-        .stdout(Stdio::null())
+/// What `systemctl is-active` says about a unit (`active`, `inactive`, `failed`, `activating`...).
+/// It prints the state whatever it exits with; no systemd or no answer is `None`.
+fn systemctl_state(unit: &str) -> Option<String> {
+    let output = Command::new("systemctl")
+        .args(["is-active", unit])
+        .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+        .output()
+        .ok()?;
+    let state = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!state.is_empty()).then_some(state)
 }
 
 /// The facts of the machine snapall is running on.
 pub fn system() -> BootFacts {
-    gather(Path::new("/"), &systemctl_is_active)
+    gather(Path::new("/"), &systemctl_state)
 }
 
 #[cfg(test)]
@@ -146,8 +156,18 @@ mod tests {
 
     const BTRFS: &str = "/dev/nvme0n1p2 / btrfs rw,subvol=/@ 0 0\n";
 
+    /// The machine's verdict, with the named units active and any other unit inactive.
     fn status(machine: &Machine, running: &[&str]) -> BootStatus {
-        assess(&gather(&machine.0, &|unit| running.contains(&unit)))
+        assess(&gather(&machine.0, &|unit| {
+            Some(
+                if running.contains(&unit) {
+                    "active"
+                } else {
+                    "inactive"
+                }
+                .to_owned(),
+            )
+        }))
     }
 
     #[test]
@@ -169,7 +189,46 @@ mod tests {
         assert_eq!(
             status(&machine, &[]),
             BootStatus::Installed {
+                tool: Tool::LimineSnapperSync,
+                service: Some("inactive".into())
+            }
+        );
+    }
+
+    #[test]
+    fn the_snapper_plugin_makes_limine_work_with_the_daemon_stopped() {
+        let machine = Machine::new("limine-plugin", BTRFS).with(&[
+            "etc/default/limine",
+            "usr/bin/limine-snapper-sync",
+            "usr/lib/snapper/plugins/10-limine-snapper-sync",
+        ]);
+        assert_eq!(
+            status(&machine, &[]),
+            BootStatus::Active {
                 tool: Tool::LimineSnapperSync
+            }
+        );
+    }
+
+    #[test]
+    fn the_daemons_real_state_is_carried_into_the_explanation() {
+        let machine = Machine::new("limine-failed", BTRFS)
+            .with(&["etc/default/limine", "usr/bin/limine-snapper-sync"]);
+        let facts = gather(&machine.0, &|_| Some("failed".to_owned()));
+        assert_eq!(
+            assess(&facts),
+            BootStatus::Installed {
+                tool: Tool::LimineSnapperSync,
+                service: Some("failed".into())
+            }
+        );
+        // no systemd, no answer: the explanation says so rather than guessing
+        let facts = gather(&machine.0, &|_| None);
+        assert_eq!(
+            assess(&facts),
+            BootStatus::Installed {
+                tool: Tool::LimineSnapperSync,
+                service: None
             }
         );
     }
@@ -208,7 +267,8 @@ mod tests {
         assert_eq!(
             status(&machine, &[]),
             BootStatus::Installed {
-                tool: Tool::GrubBtrfs
+                tool: Tool::GrubBtrfs,
+                service: Some("inactive".into())
             }
         );
         assert_eq!(
