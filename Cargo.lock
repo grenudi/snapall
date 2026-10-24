@@ -20,9 +20,9 @@ dependencies = [
 
 [[package]]
 name = "argenv-resolve"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "852acf1479da4da01c472cecc0c3180cdbd98e2cf4230a741c1016da07c73f36"
+checksum = "d33e20d9b0f5d50c6b5c7b13d5dea120a1f1d5c5d8995c16ed0d9da71fd3dbd4"
 dependencies = [
  "argenv",
  "serde",

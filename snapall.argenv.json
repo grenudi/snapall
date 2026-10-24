@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-23T19:21:58Z",
+  "generated": "2026-10-23T23:58:29Z",
   "inputs": [
     {
       "allowed": [],
@@ -300,6 +300,46 @@
       ],
       "summary": "With --install: run without asking for confirmation (for scripts and CI).",
       "type": "bool"
+    },
+    {
+      "allowed": [
+        "bash",
+        "zsh",
+        "fish",
+        "nushell"
+      ],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "SHELL"
+      },
+      "example": "snapall completions bash",
+      "group": "completions",
+      "key": "shell",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "completions"
+      ],
+      "summary": "The shell to print completions for. Derived from this very contract, so they cannot disagree with what snapall accepts.",
+      "type": "enum"
+    },
+    {
+      "allowed": [],
+      "env": {
+        "name": "SOURCE_DATE_EPOCH"
+      },
+      "group": "man",
+      "key": "source_date_epoch",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "man"
+      ],
+      "summary": "Seconds since the Unix epoch to use as the man page date, so that builds are reproducible (the SOURCE_DATE_EPOCH convention). Default: now.",
+      "type": "uint"
     }
   ],
   "precedence": [
@@ -307,5 +347,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.3.0"
+  "source": "snapall@0.4.0"
 }

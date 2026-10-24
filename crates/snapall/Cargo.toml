@@ -47,6 +47,12 @@ assets = [
     ["../../README.md", "usr/share/doc/snapall/README.md", "644"],
     ["../../LICENSE", "usr/share/doc/snapall/LICENSE", "644"],
     ["../../THIRD-PARTY-LICENSES.md", "usr/share/doc/snapall/THIRD-PARTY-LICENSES.md", "644"],
+    # Generated from the contract by packaging/build-packages.sh.
+    ["../../packaging/generated/snapall.bash", "usr/share/bash-completion/completions/snapall", "644"],
+    ["../../packaging/generated/_snapall", "usr/share/zsh/site-functions/_snapall", "644"],
+    ["../../packaging/generated/snapall.fish", "usr/share/fish/vendor_completions.d/snapall.fish", "644"],
+    ["../../packaging/generated/snapall.nu", "usr/share/nushell/vendor/autoload/snapall.nu", "644"],
+    ["../../packaging/generated/snapall.1.gz", "usr/share/man/man1/snapall.1.gz", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -57,6 +63,12 @@ assets = [
     { source = "../../README.md", dest = "/usr/share/doc/snapall/README.md", mode = "644", doc = true },
     { source = "../../LICENSE", dest = "/usr/share/licenses/snapall/LICENSE", mode = "644", doc = true },
     { source = "../../THIRD-PARTY-LICENSES.md", dest = "/usr/share/licenses/snapall/THIRD-PARTY-LICENSES.md", mode = "644", doc = true },
+    # Generated from the contract by packaging/build-packages.sh.
+    { source = "../../packaging/generated/snapall.bash", dest = "/usr/share/bash-completion/completions/snapall", mode = "644" },
+    { source = "../../packaging/generated/_snapall", dest = "/usr/share/zsh/site-functions/_snapall", mode = "644" },
+    { source = "../../packaging/generated/snapall.fish", dest = "/usr/share/fish/vendor_completions.d/snapall.fish", mode = "644" },
+    { source = "../../packaging/generated/snapall.nu", dest = "/usr/share/nushell/vendor/autoload/snapall.nu", mode = "644" },
+    { source = "../../packaging/generated/snapall.1.gz", dest = "/usr/share/man/man1/snapall.1.gz", mode = "644", doc = true },
 ]
 
 [package.metadata.generate-rpm.requires]

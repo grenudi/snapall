@@ -42,4 +42,11 @@ package() {
   python packaging/third-party-licenses.py "$(rustc -vV | sed -n 's/host: //p')"
   install -Dm644 LICENSE THIRD-PARTY-LICENSES.md -t "$pkgdir/usr/share/licenses/$pkgname/"
   install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
+  # Completions and the man page come from the contract the binary was built with.
+  # (makepkg sets SOURCE_DATE_EPOCH, so the man page date is reproducible.)
+  target/release/snapall completions bash | install -Dm644 /dev/stdin "$pkgdir/usr/share/bash-completion/completions/$pkgname"
+  target/release/snapall completions zsh | install -Dm644 /dev/stdin "$pkgdir/usr/share/zsh/site-functions/_$pkgname"
+  target/release/snapall completions fish | install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_completions.d/$pkgname.fish"
+  target/release/snapall completions nushell | install -Dm644 /dev/stdin "$pkgdir/usr/share/nushell/vendor/autoload/$pkgname.nu"
+  target/release/snapall man | gzip -9n | install -Dm644 /dev/stdin "$pkgdir/usr/share/man/man1/$pkgname.1.gz"
 }

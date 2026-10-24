@@ -238,3 +238,82 @@ fn a_log_file_that_cannot_be_opened_is_a_clear_error_not_a_silent_loss() {
         stderr(&output)
     );
 }
+
+#[test]
+fn completions_for_every_shell_come_from_the_contract() {
+    for (shell, needle) in [
+        ("bash", "complete -F _snapall snapall"),
+        ("zsh", "#compdef snapall"),
+        ("fish", "complete -c snapall"),
+        ("nushell", "export extern \"snapall create\""),
+    ] {
+        let output = snapall(&["completions", shell]);
+        assert!(output.status.success(), "{shell}: {}", stderr(&output));
+        let text = stdout(&output);
+        assert!(text.contains(needle), "{shell} lacks `{needle}`");
+        // what the user can type is what the contract says
+        // names, not spellings: fish writes `-l dry-run`, bash `--dry-run`
+        for word in [
+            "dry-run",
+            "only",
+            "log-file",
+            "doctor",
+            "snapshots",
+            "completions",
+        ] {
+            assert!(text.contains(word), "{shell} lacks `{word}`");
+        }
+    }
+}
+
+#[test]
+fn a_flag_that_belongs_to_one_command_is_not_offered_for_another_in_the_real_script() {
+    let bash = stdout(&snapall(&["completions", "bash"]));
+    let line = |command: &str| {
+        bash.lines()
+            .find(|l| l.trim_start().starts_with(&format!("{command}) flags=")))
+            .unwrap_or_else(|| panic!("no flags line for {command}"))
+            .to_owned()
+    };
+    assert!(line("create").contains("--dry-run") && line("create").contains("--only"));
+    assert!(
+        !line("delete").contains("--dry-run"),
+        "the very mistake `lint` rejects"
+    );
+    assert!(!line("list").contains("--only"));
+    assert!(line("doctor").contains("--install"));
+}
+
+#[test]
+fn the_man_page_is_reproducible_and_dated_by_source_date_epoch() {
+    let render = || {
+        Command::new(env!("CARGO_BIN_EXE_snapall"))
+            .arg("man")
+            .env_clear()
+            .env("SOURCE_DATE_EPOCH", "1761187392")
+            .output()
+            .expect("run snapall man")
+    };
+    let (first, second) = (render(), render());
+    assert!(first.status.success(), "{}", stderr(&first));
+    assert_eq!(stdout(&first), stdout(&second), "byte for byte");
+    let text = stdout(&first);
+    assert!(
+        text.starts_with(".TH SNAPALL 1 \"2025-10-23\" \"snapall "),
+        "{}",
+        &text[..60]
+    );
+    for section in [
+        "NAME",
+        "SYNOPSIS",
+        "COMMANDS",
+        "OPTIONS",
+        "ARGUMENTS",
+        "ENVIRONMENT",
+        "EXIT STATUS",
+        "SEE ALSO",
+    ] {
+        assert!(text.contains(&format!(".SH {section}")), "{section}");
+    }
+    assert!(text.contains("snapper(8)") && text.contains("SNAPALL_ONLY"));
+}

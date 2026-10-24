@@ -20,9 +20,17 @@
           # The tests need `cargo metadata` and, for the real-snapper ones, root and Btrfs.
           # CI runs them; the package build does not.
           doCheck = false;
-          nativeBuildInputs = [ pkgs.makeWrapper ];
+          nativeBuildInputs = [ pkgs.makeWrapper pkgs.installShellFiles ];
           # snapall drives snapper: make sure it is found whatever the user's PATH.
           postInstall = ''
+            # Completions and the man page are generated from the contract the binary was built with.
+            installShellCompletion --cmd snapall \
+              --bash <($out/bin/snapall completions bash) \
+              --zsh <($out/bin/snapall completions zsh) \
+              --fish <($out/bin/snapall completions fish) \
+              --nushell <($out/bin/snapall completions nushell)
+            $out/bin/snapall man > snapall.1
+            installManPage snapall.1
             wrapProgram $out/bin/snapall --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.snapper ]}
           '';
           meta = {

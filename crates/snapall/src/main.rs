@@ -74,6 +74,57 @@ fn emit(text: &str) -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// The subcommands as the generators present them: the very list `--help` prints.
+fn generate_commands() -> Vec<argenv_resolve::generate::Command<'static>> {
+    contract::Command::ALL
+        .iter()
+        .map(|c| argenv_resolve::generate::Command {
+            name: c.token(),
+            summary: c.summary(),
+        })
+        .collect()
+}
+
+/// What the completion and man page generators need to know that the contract does not say.
+fn generated_program<'a>(
+    commands: &'a [argenv_resolve::generate::Command<'a>],
+    date: &'a str,
+) -> argenv_resolve::generate::Program<'a> {
+    argenv_resolve::generate::Program {
+        name: "snapall",
+        version: VERSION,
+        about: "snapshot every snapper config in one command",
+        commands,
+        exit_status: &[
+            ("0", "done"),
+            (
+                "1",
+                "a snapshot or snapper call failed (or there is no terminal for tui)",
+            ),
+            ("2", "the invocation is wrong"),
+            (
+                "128+n",
+                "tui was stopped by signal n; the terminal is restored first",
+            ),
+        ],
+        see_also: &["snapper(8)", "snapper-configs(5)"],
+        date,
+    }
+}
+
+/// The man page date, `YYYY-MM-DD`, from `SOURCE_DATE_EPOCH` when given (so builds are
+/// reproducible) and from the clock otherwise.
+fn man_date(source_date_epoch: Option<u64>) -> String {
+    let when = match source_date_epoch {
+        Some(seconds) => std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds),
+        None => std::time::SystemTime::now(),
+    };
+    snapall_observe::rfc3339_utc(when)
+        .chars()
+        .take(10)
+        .collect()
+}
+
 fn emit_json(value: &Value) -> Result<(), Box<dyn Error>> {
     let mut text = serde_json::to_string_pretty(value)?;
     text.push('\n');
@@ -178,6 +229,24 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
         }
         Request::Doctor { install, yes } => {
             return doctor::run(&backend, &observer, install, yes, json);
+        }
+        Request::Completions { shell } => {
+            let commands = generate_commands();
+            let program = generated_program(&commands, "");
+            emit(&argenv_resolve::generate::completions(
+                shell,
+                &program,
+                &Contract::records(),
+            )?)?;
+        }
+        Request::Man { source_date_epoch } => {
+            let date = man_date(source_date_epoch);
+            let commands = generate_commands();
+            let program = generated_program(&commands, &date);
+            emit(&argenv_resolve::generate::man_page(
+                &program,
+                &Contract::records(),
+            )?)?;
         }
         Request::Tui => {
             if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {

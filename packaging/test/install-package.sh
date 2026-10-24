@@ -80,4 +80,15 @@ echo "$files" | grep -q '/usr/bin/snapall$' || fail "the package does not contai
 echo "$files" | grep -q 'README.md' || fail "the package does not contain the README"
 echo "$files" | grep -q '/LICENSE$' || fail "the package does not contain the license"
 echo "$files" | grep -q 'THIRD-PARTY-LICENSES.md' || fail "the package does not contain the third-party notices"
+# Completions and the man page, generated from the contract, for every shell snapall supports.
+echo "$files" | grep -q 'bash-completion/completions/snapall$' || fail "no bash completion in the package"
+echo "$files" | grep -q 'site-functions/_snapall$' || fail "no zsh completion in the package"
+echo "$files" | grep -q 'vendor_completions.d/snapall.fish$' || fail "no fish completion in the package"
+echo "$files" | grep -q 'nushell/vendor/autoload/snapall.nu$' || fail "no nushell completion in the package"
+echo "$files" | grep -q 'man/man1/snapall.1.gz$' || fail "no man page in the package"
+# ...and what was installed is what the binary generates, byte for byte.
+snapall completions bash | cmp - /usr/share/bash-completion/completions/snapall || fail "the installed bash completion is not the generated one"
+snapall completions zsh | cmp - /usr/share/zsh/site-functions/_snapall || fail "the installed zsh completion is not the generated one"
+if command -v bash >/dev/null 2>&1; then bash -n /usr/share/bash-completion/completions/snapall || fail "the bash completion has a syntax error"; fi
+gzip -dc /usr/share/man/man1/snapall.1.gz | head -n 1 | grep -q '^\.TH SNAPALL 1 ' || fail "the man page is not a man page"
 echo "PASS: $kind on $ID"

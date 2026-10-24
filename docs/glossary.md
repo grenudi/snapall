@@ -57,6 +57,7 @@ The words snapall uses, and what each one means here. The code, the CLI, the doc
 
 | Term | Meaning |
 |---|---|
+| **derived artifact** | Something shipped about the invocation that is generated from the contract instead of written by hand: the shell completions and the man page. |
 | **contract** (invocation) | The declared surface of the command line: every flag, argument and variable, and which command each belongs to. One declaration, `contract.rs`, published as `snapall.argenv.json`. |
 | **command** | `create`, `list`, `snapshots`, `delete`, `doctor`, `tui` or `contract`. |
 | **scope** | The commands an input belongs to. A flag given to a command outside its scope is an error, never ignored. |

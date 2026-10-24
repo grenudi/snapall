@@ -2,3 +2,4 @@
 *.img
 /dist
 /THIRD-PARTY-LICENSES.md
+/packaging/generated/

@@ -10,6 +10,7 @@
 
 use std::fmt;
 
+use argenv_resolve::generate::Shell;
 use argenv_resolve::{
     lint, EnvSource, Finding, Input, InputResolveDefaultExt, InputResolveExt, Invocation,
     LintPolicy, Record, Resolution, Severity, Source,
@@ -41,6 +42,13 @@ pub enum Request {
     Doctor {
         install: bool,
         yes: bool,
+    },
+    Completions {
+        shell: Shell,
+    },
+    Man {
+        /// The man page date as seconds since the epoch; `None` means now.
+        source_date_epoch: Option<u64>,
     },
     Tui,
     Contract,
@@ -313,6 +321,18 @@ fn build_request(
             }
             Request::Doctor { install, yes }
         }
+        Command::Completions => {
+            let raw = Contract::SHELL
+                .get_from(resolution)
+                .ok_or_else(|| usage_error("missing required argument <SHELL>"))?;
+            Request::Completions {
+                shell: Shell::parse(&raw)
+                    .ok_or_else(|| usage_error(format!("unknown shell `{raw}`")))?,
+            }
+        }
+        Command::Man => Request::Man {
+            source_date_epoch: Contract::SOURCE_DATE_EPOCH.get_from(resolution),
+        },
         Command::Tui => Request::Tui,
         Command::Contract => Request::Contract,
     })
@@ -623,6 +643,46 @@ mod tests {
     }
 
     #[test]
+    fn completions_take_a_shell_and_man_takes_a_date_from_the_environment() {
+        use argenv_resolve::generate::Shell;
+        for (word, shell) in [
+            ("bash", Shell::Bash),
+            ("zsh", Shell::Zsh),
+            ("fish", Shell::Fish),
+            ("nushell", Shell::Nushell),
+        ] {
+            assert_eq!(
+                ok(&["completions", word]).request,
+                Request::Completions { shell }
+            );
+        }
+        assert!(err(&["completions"]).contains("missing required argument <SHELL>"));
+        assert!(err(&["completions", "powershell"]).contains("powershell"));
+        assert!(err(&["completions", "bash", "zsh"]).contains("unexpected argument"));
+        assert!(err(&["completions", "bash", "--json"]).contains("does not apply to `completions`"));
+
+        assert_eq!(
+            ok(&["man"]).request,
+            Request::Man {
+                source_date_epoch: None
+            }
+        );
+        let reproducible = run(&["man"], &[("SOURCE_DATE_EPOCH", "1761187392")]).unwrap();
+        assert_eq!(
+            reproducible.request,
+            Request::Man {
+                source_date_epoch: Some(1_761_187_392)
+            }
+        );
+        assert!(
+            run(&["man"], &[("SOURCE_DATE_EPOCH", "yesterday")]).is_err(),
+            "not a number"
+        );
+        // the variable belongs to `man`: it must not leak into other commands
+        assert!(run(&["list"], &[("SOURCE_DATE_EPOCH", "yesterday")]).is_ok());
+    }
+
+    #[test]
     fn no_dbus_and_json_flags() {
         let parsed = ok(&["--no-dbus", "list", "--json"]);
         assert!(parsed.no_dbus && parsed.json);
@@ -812,13 +872,20 @@ mod tests {
     }
 
     #[test]
-    fn the_published_contract_says_what_delete_needs() {
-        let required: Vec<String> = Contract::records()
+    fn the_published_contract_says_what_each_command_requires() {
+        let required: Vec<(String, Vec<String>)> = Contract::records()
             .into_iter()
             .filter(|r| r.required)
-            .map(|r| r.key)
+            .map(|r| (r.key, r.subcommands))
             .collect();
-        assert_eq!(required, ["delete_config", "snapshot_id"]);
+        assert_eq!(
+            required,
+            [
+                ("delete_config".to_owned(), vec!["delete".to_owned()]),
+                ("snapshot_id".to_owned(), vec!["delete".to_owned()]),
+                ("shell".to_owned(), vec!["completions".to_owned()]),
+            ]
+        );
     }
 
     #[test]

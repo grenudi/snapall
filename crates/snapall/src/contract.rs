@@ -20,6 +20,8 @@ pub enum Command {
     Snapshots,
     Delete,
     Doctor,
+    Completions,
+    Man,
     Tui,
     Contract,
 }
@@ -31,6 +33,8 @@ impl Command {
         Command::Snapshots,
         Command::Delete,
         Command::Doctor,
+        Command::Completions,
+        Command::Man,
         Command::Tui,
         Command::Contract,
     ];
@@ -42,6 +46,8 @@ impl Command {
             Command::Snapshots => "snapshots",
             Command::Delete => "delete",
             Command::Doctor => "doctor",
+            Command::Completions => "completions",
+            Command::Man => "man",
             Command::Tui => "tui",
             Command::Contract => "contract",
         }
@@ -59,6 +65,8 @@ impl Command {
             Command::Snapshots => "List the snapshots of one config, or of every config",
             Command::Delete => "Delete one snapshot of a config",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
+            Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
+            Command::Man => "Print the manual page",
             Command::Tui => "Open the interactive terminal UI",
             Command::Contract => "Print this program's invocation contract as argenv JSON",
         }
@@ -297,6 +305,33 @@ contract! {
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "With --install: run without asking for confirmation (for scripts and CI).",
+        ..Input::EMPTY
+    };
+
+    // ---- completions and man ---------------------------------------------------------
+
+    /// Which shell.
+    SHELL: String, Command = Input {
+        key:         "shell",
+        ty:          Type::Enum,
+        required:    true,
+        allowed:     &["bash", "zsh", "fish", "nushell"],
+        subcommands: &[Command::Completions],
+        arg:         Some(Arg { value_name: "SHELL", ..Arg::positional(0) }),
+        group:       "completions",
+        example:     "snapall completions bash",
+        summary:     "The shell to print completions for. Derived from this very contract, so they cannot disagree with what snapall accepts.",
+        ..Input::EMPTY
+    };
+
+    /// A reproducible man page date.
+    SOURCE_DATE_EPOCH: u64, Command = Input {
+        key:         "source_date_epoch",
+        ty:          Type::Uint,
+        subcommands: &[Command::Man],
+        env:         Some(Env::new("SOURCE_DATE_EPOCH")),
+        group:       "man",
+        summary:     "Seconds since the Unix epoch to use as the man page date, so that builds are reproducible (the SOURCE_DATE_EPOCH convention). Default: now.",
         ..Input::EMPTY
     };
 }
