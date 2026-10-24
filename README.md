@@ -43,11 +43,13 @@ snapall drives [snapper](http://snapper.io/), so every package below **depends o
 | `snapall list` | The configs snapall can see, i.e. exactly what `create` would touch. |
 | `snapall snapshots [CONFIG]` | The snapshots of one config, or of all. |
 | `snapall delete CONFIG ID` | Delete one snapshot. `0` is the current system and is refused. |
+| `snapall changes CONFIG ID [PATH]` | What restoring that snapshot would change: files it would revert, remove or bring back. |
+| `snapall restore CONFIG ID [PATH]` | Put a config (or one path of it) back to how the snapshot had it. Shows what changes and asks first (`--yes` skips the question, `--dry-run` only shows). The state just before is snapshotted first, so a restore can be undone. The system root is refused: see [Restoring](#restoring). |
 | `snapall doctor [--install]` | Checks that snapper works; with `--install`, installs it with this system's package manager (shows the commands, asks first, needs root). |
 | `snapall tui` | The interactive terminal UI. |
 | `snapall contract` | This program's invocation contract, as [argenv](https://github.com/argenv-opencommons/argenv) JSON. |
 
-`--json` (on `create`, `list`, `snapshots`) prints machine-readable output; `--no-dbus` talks to libsnapper directly (root only; for containers and CI). Every flag has a documented home in `snapall --help`, which is generated from the same declarations that parse the command line.
+`--json` (on `create`, `list`, `snapshots`, `delete`, `changes`, `restore` and `doctor`) prints machine-readable output; `--no-dbus` talks to libsnapper directly (root only; for containers and CI). Every flag has a documented home in `snapall --help`, which is generated from the same declarations that parse the command line.
 
 Nothing is assumed: an unknown config name is an error, never a silent skip; one failing config does not stop the others, every outcome is printed, and the exit status says whether any failed.
 
@@ -121,12 +123,21 @@ Configs on the left, the selected config's snapshots on the right, newest first.
 | `c` | create a snapshot of the selected config (asks for a description) |
 | `a` | create a snapshot of every config |
 | `d` | delete the marked snapshots, or the one under the cursor (asks to confirm) |
+| `u` | restore the config to the snapshot under the cursor (shows what changes, asks to confirm) |
 | `r` | reload from snapper |
 | `?` / `q` | help / quit |
+
+The mouse works too: click a config or a snapshot to select it, the first column of a snapshot to mark it, the buttons along the bottom and in prompts, and use the wheel over a pane to scroll it. A click goes through exactly the code its key does, so a button that starts work is refused while snapper is busy, just as the key is. The terminal's mouse mode is handed back on every way out, including a signal.
 
 Snapper calls run in the background: the header shows *working* while one is in flight, the screen stays responsive, and keys that would start more work are refused until it finishes. Quitting while work is in flight waits for it to complete.
 
 > Snapshots live on the same disk. They are not backups.
+
+### Restoring
+
+`restore` and the TUI's `u` put back **files**: a non-root config such as `home`, or single paths of any config. It is `snapper undochange`, always preceded by a snapshot of the current state (`before restoring #N`), so restoring the restore's own snapshot undoes it.
+
+**The system itself** (the root config) is not restored while it runs, and snapall does not edit your bootloader: the kernel and initramfs usually live outside Btrfs, and putting back only the snapshot can leave a system that does not start. What works depends on the machine, and `snapall doctor` reads it for you (a `boot-menu` row): with Limine, `limine-snapper-sync` puts snapshots in the boot menu and `limine-snapper-restore` restores the snapshot with its kernel; with GRUB, `grub-btrfs` adds a snapshots menu; otherwise restore from a live USB. [ADR 12](docs/adr/0012-restore-and-the-boot-menu.md) has the reasoning and its sources. `create` and the TUI show a one-line tip when such a tool would help; `--no-hints` (or `SNAPALL_HINTS=off`) silences it.
 
 ## Status
 

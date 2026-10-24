@@ -10,13 +10,18 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers, MouseButton, MouseEventKind,
+};
+use ratatui::crossterm::execute;
+use ratatui::layout::Rect;
 use ratatui::DefaultTerminal;
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::flag;
 use snapall_core::SnapshotBackend;
 
-use crate::model::{update, Effect, Key, Msg, Notice, State};
+use crate::model::{update, Effect, Key, Msg, Notice, State, UiContext};
 use crate::session::Executor;
 use crate::view;
 
@@ -45,7 +50,7 @@ const TICK: Duration = Duration::from_millis(100);
 /// stopping a unit or an ssh session dropping would leave the user's terminal in raw mode on the
 /// alternate screen. A signal does not wait for work in flight; leaving the scope does join the
 /// worker, which finishes only the single snapper call it is in.
-pub fn run(backend: &(dyn SnapshotBackend + Sync)) -> io::Result<Exit> {
+pub fn run(backend: &(dyn SnapshotBackend + Sync), context: UiContext) -> io::Result<Exit> {
     // Registered before the terminal is touched, so there is no window where a signal kills a
     // process that has already changed the terminal.
     let received = Arc::new(AtomicUsize::new(0));
@@ -53,6 +58,15 @@ pub fn run(backend: &(dyn SnapshotBackend + Sync)) -> io::Result<Exit> {
         flag::register_usize(signal, Arc::clone(&received), signal as usize)?;
     }
     let mut terminal = ratatui::try_init()?;
+    // The mouse is captured for clicks and the wheel, and handed back on every way out: a normal
+    // exit, a signal (both below) and a panic (the hook), because a terminal left capturing the
+    // mouse stays broken after the program is gone.
+    execute!(io::stdout(), EnableMouseCapture)?;
+    let panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = execute!(io::stdout(), DisableMouseCapture);
+        panic_hook(info);
+    }));
     let result = thread::scope(|scope| {
         let (effect_tx, effect_rx) = mpsc::channel::<Effect>();
         let (result_tx, result_rx) = mpsc::channel::<Msg>();
@@ -65,8 +79,9 @@ pub fn run(backend: &(dyn SnapshotBackend + Sync)) -> io::Result<Exit> {
             }
         });
         // `effect_tx` is dropped when this closure returns, which ends the worker's loop.
-        event_loop(&mut terminal, &effect_tx, &result_rx, &received)
+        event_loop(&mut terminal, &effect_tx, &result_rx, &received, context)
     });
+    let _ = execute!(io::stdout(), DisableMouseCapture);
     ratatui::restore();
     result
 }
@@ -93,8 +108,9 @@ fn event_loop(
     effects: &mpsc::Sender<Effect>,
     results: &mpsc::Receiver<Msg>,
     received: &AtomicUsize,
+    context: UiContext,
 ) -> io::Result<Exit> {
-    let mut state = State::default();
+    let mut state = State::with_context(context);
     step(&mut state, Msg::Start, effects);
     terminal.draw(|frame| view::render(&state, frame))?;
     loop {
@@ -126,12 +142,33 @@ fn event_loop(
         }
         if event::poll(TICK)? {
             // Resize and other events simply fall through to a redraw.
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
                     if let Some(key) = translate(key) {
                         step(&mut state, Msg::Key(key), effects);
                     }
                 }
+                Event::Mouse(mouse) => {
+                    let size = terminal.size()?;
+                    let screen = Rect::new(0, 0, size.width, size.height);
+                    let msg = match mouse.kind {
+                        MouseEventKind::Down(MouseButton::Left) => {
+                            view::hit_test(&state, screen, mouse.column, mouse.row).map(Msg::Click)
+                        }
+                        MouseEventKind::ScrollUp => view::pane_at(screen, mouse.column, mouse.row)
+                            .map(|pane| Msg::Scroll { pane, delta: -1 }),
+                        MouseEventKind::ScrollDown => {
+                            view::pane_at(screen, mouse.column, mouse.row)
+                                .map(|pane| Msg::Scroll { pane, delta: 1 })
+                        }
+                        _ => None,
+                    };
+                    if let Some(msg) = msg {
+                        step(&mut state, msg, effects);
+                    }
+                }
+                // Resizes and everything else just fall through to a redraw.
+                _ => {}
             }
             changed = true;
         } else if state.pending > 0 {

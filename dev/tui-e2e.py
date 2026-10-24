@@ -111,6 +111,33 @@ class Tui:
                 return
         raise AssertionError(f"{needle!r} never went away; screen:\n{self.text()}")
 
+    def find(self, needle, nth=0):
+        """(column, row) of the nth occurrence of `needle` on the screen, counting from 0."""
+        seen = 0
+        for row, line in enumerate(self.screen.display):
+            start = 0
+            while (col := line.find(needle, start)) >= 0:
+                if seen == nth:
+                    return col, row
+                seen += 1
+                start = col + 1
+        raise AssertionError(f"{needle!r} is not on the screen:\n{self.text()}")
+
+    def click(self, col, row):
+        """A left click on a screen cell (0-based), as an xterm SGR mouse press and release."""
+        os.write(self.master, f"\x1b[<0;{col + 1};{row + 1}M".encode())
+        self.pump(0.1)
+        os.write(self.master, f"\x1b[<0;{col + 1};{row + 1}m".encode())
+        self.pump(0.3)
+
+    def click_text(self, needle, offset=2, nth=0):
+        col, row = self.find(needle, nth)
+        self.click(col + offset, row)
+
+    def wheel(self, col, row, down=True):
+        os.write(self.master, f"\x1b[<{65 if down else 64};{col + 1};{row + 1}M".encode())
+        self.pump(0.3)
+
     def send(self, *keys):
         for key in keys:
             os.write(self.master, KEYS.get(key, key.encode() if isinstance(key, str) else key))
@@ -210,6 +237,7 @@ def main():
         check(code == status, f"{name} exits with status {status} (128 + signal), got {code}")
         check(b"\x1b[?1049l" in tui.raw, f"{name}: the alternate screen was left")
         check(b"\x1b[?25h" in tui.raw, f"{name}: the cursor was shown again")
+        check(b"\x1b[?1000l" in tui.raw, f"{name}: mouse capture was switched off again")
 
     # --- a slow snapper must not freeze the screen -------------------------------------
     # A shim in front of the real snapper makes every create and delete take two seconds.
@@ -265,6 +293,82 @@ def main():
     check(tui.process.poll() == 0, "it exits cleanly once the work is done")
     check("quit during work" in listing("snapall_it_a").values(), "and the operation was not abandoned half way")
     shutil.rmtree(shim, ignore_errors=True)
+
+
+    # --- the mouse -----------------------------------------------------------------------------
+    tui = Tui()
+    tui.wait_for("Configs")
+    check(b"\x1b[?1000h" in tui.raw, "mouse capture is switched on while the UI runs")
+
+    # A click on a config in the list selects it (the first occurrence is the list, not a title).
+    tui.wait_for("snapall_it_b")
+    tui.click_text("snapall_it_b", offset=2)
+    tui.wait_for("Snapshots of snapall_it_b")
+    check(True, "clicking a config row selects it and shows its snapshots")
+
+    # The wheel over the snapshots pane moves its cursor without taking the keyboard focus.
+    col, row = tui.find("Snapshots of")
+    for _ in range(3):
+        tui.wheel(col + 5, row + 3, down=True)
+    check(tui.process.poll() is None, "the wheel is handled")
+
+    # A click on a footer button does what its key does: "?" opens the help, any click closes it.
+    tui.click_text("? help", offset=0)
+    tui.wait_for("Keys")
+    check("mouse" in tui.text(), "the help explains the mouse")
+    tui.click_text("[ Esc: Close ]", offset=3)
+    tui.wait_gone("Keys")
+    check(True, "the prompt's Close button closes it")
+
+    # "q quit" quits, and gives the mouse back.
+    tui.click_text("q quit", offset=0)
+    deadline = time.time() + 5
+    while tui.process.poll() is None and time.time() < deadline:
+        tui.pump(0.1)
+    tui.pump(0.2)
+    check(tui.process.poll() == 0, "clicking quit exits cleanly")
+    check(b"\x1b[?1000l" in tui.raw, "and mouse capture is switched off again")
+
+    # --- restoring, on real Btrfs, with the mouse -----------------------------------------------
+    import json
+
+    cfg = "snapall_it_a"
+    mnt = [c["subvolume"] for c in json.loads(snapper("--jsonout", "list-configs"))["configs"] if c["config"] == cfg][0]
+    keep, gone, added = (os.path.join(mnt, f"tui-restore-{n}") for n in ("keep", "gone", "added"))
+    open(keep, "w").write("version one")
+    open(gone, "w").write("to be deleted")
+    snapper("-c", cfg, "create", "-d", "e2e restore base")
+    base = [n for n, d in listing(cfg).items() if d == "e2e restore base"][0]
+    open(keep, "w").write("version TWO")
+    os.remove(gone)
+    open(added, "w").write("new")
+
+    tui = Tui()
+    tui.wait_for("Configs")
+    tui.wait_for(cfg)
+    tui.click_text(cfg, offset=2)
+    tui.wait_for(f"Snapshots of {cfg}")
+    tui.wait_for("e2e restore base")
+    tui.click_text("e2e restore base", offset=0)          # selects that snapshot row
+    tui.send("u")                                         # the keyboard path to the same prompt
+    tui.wait_for("reverted")
+    screen = tui.text()
+    check("tui-restore-keep" in screen and "snapshotted first" in screen, "the prompt names what would change and says it is undoable")
+    check(open(keep).read() == "version TWO", "nothing changed yet: the prompt only looked")
+
+    tui.click_text("[ Enter: Restore ]", offset=4)        # the mouse path to confirming
+    tui.wait_for(f"restored {cfg} to #{base}")
+    check(open(keep).read() == "version one", "the edited file is back to the snapshot's version")
+    check(open(gone).read() == "to be deleted", "the deleted file is back")
+    check(not os.path.exists(added), "the file created since is gone")
+    notes = listing(cfg)
+    check(any(d == f"before restoring #{base}" for d in notes.values()), "snapper has the safety snapshot")
+    tui.wait_for(f"before restoring #{base}")
+    check(True, "and the TUI lists it")
+    tui.finish()
+    for path in (keep, gone, added):
+        if os.path.exists(path):
+            os.remove(path)
 
     print("\nTUI end-to-end: all checks passed")
 

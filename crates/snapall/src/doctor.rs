@@ -8,15 +8,16 @@
 //! `snapall_core::doctor`; this module only gathers facts and performs the I/O.
 
 use std::error::Error;
-use std::io::{self, BufRead, IsTerminal, Write};
 use std::process::{Command, ExitCode};
 use std::time::Instant;
 
+use snapall_core::boot::{self, BootStatus};
 use snapall_core::doctor::{
-    diagnose, install_plan, worst, InstallPlan, OsRelease, Probe, Status, Step,
+    diagnose, install_plan, worst, Check, InstallPlan, OsRelease, Probe, Status, Step,
 };
 use snapall_core::{Event, Observer, SnapshotBackend};
 
+use crate::boot_probe;
 use crate::{emit, emit_json, render};
 
 /// Gather the facts about this machine.
@@ -79,17 +80,10 @@ fn effective_uid(status: &str) -> Option<u32> {
 
 /// Ask on the terminal. Refuses to guess when there is nobody to ask.
 fn confirm() -> Result<bool, Box<dyn Error>> {
-    if !io::stdin().is_terminal() {
+    if !crate::ask::can_ask() {
         return Err("not a terminal, so I cannot ask; pass --yes to run without asking".into());
     }
-    eprint!("Proceed? [y/N] ");
-    io::stderr().flush()?;
-    let mut answer = String::new();
-    io::stdin().lock().read_line(&mut answer)?;
-    Ok(matches!(
-        answer.trim().to_ascii_lowercase().as_str(),
-        "y" | "yes"
-    ))
+    crate::ask::yes_no("Proceed?")
 }
 
 /// Install steps the user agreed to. The only way to obtain one is [`approve`], so running steps
@@ -183,8 +177,28 @@ pub fn run(
     })
 }
 
+/// Can this system boot its snapshots? A row of the report, never a failure: it is information
+/// about what to add, not a sign that snapper is broken.
+fn boot_menu_check() -> Option<Check> {
+    let status = boot::assess(&boot_probe::system());
+    let mut lines = boot::details(&status).into_iter();
+    let detail = lines.next()?;
+    let rest: Vec<String> = lines.collect();
+    Some(Check {
+        name: "boot-menu",
+        status: if matches!(status, BootStatus::Active { .. }) {
+            Status::Ok
+        } else {
+            Status::Warn
+        },
+        detail,
+        fix: (!rest.is_empty()).then(|| rest.join("\n      ")),
+    })
+}
+
 fn emit_report(probe: &Probe, json: bool) -> Result<(), Box<dyn Error>> {
-    let checks = diagnose(probe);
+    let mut checks = diagnose(probe);
+    checks.extend(boot_menu_check());
     if json {
         emit_json(&render::doctor_json(&probe.os, &checks))
     } else {

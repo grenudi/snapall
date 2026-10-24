@@ -103,7 +103,10 @@ fn the_create_prompt_shows_its_target_and_the_text_typed_so_far() {
     let text = screen(&session, 100, 20);
     assert!(text.contains("New snapshot of home"), "{text}");
     assert!(text.contains("my note"), "{text}");
-    assert!(text.contains("Esc cancel"), "{text}");
+    assert!(
+        text.contains("[ Esc: Cancel ]") && text.contains("[ Enter: Create ]"),
+        "{text}"
+    );
 }
 
 #[test]

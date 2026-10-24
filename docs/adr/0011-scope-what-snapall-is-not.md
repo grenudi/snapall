@@ -1,6 +1,6 @@
 # 11. Scope: what snapall deliberately is not
 
-Status: accepted.
+Status: accepted. The item "No Btrfs-specific diagnostics" is superseded by [ADR 12](0012-restore-and-the-boot-menu.md).
 
 ## Context
 A small tool grows by accretion: each addition is individually reasonable and together they become
