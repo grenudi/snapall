@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.4.3]
+
+
+### Bug Fixes
+- **core:** Doctor only runs commands as root on systems CI installs on for real ([901347c])
+
+
+
 ## [0.4.2]
 
 
