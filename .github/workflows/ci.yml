@@ -32,6 +32,17 @@ jobs:
       - name: Documentation links point at files that exist
         run: python3 dev/check-links.py
 
+      - name: The launcher entry is valid and the icon renders
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends desktop-file-utils librsvg2-bin
+          # desktop-file-validate exits 0 for hints and warnings, so any output at all is a failure.
+          out="$(desktop-file-validate packaging/desktop/snapall.desktop 2>&1)"
+          test -z "$out" || { echo "$out"; exit 1; }
+          grep -qx 'Icon=snapall' packaging/desktop/snapall.desktop
+          rsvg-convert -w 48 packaging/desktop/snapall.svg -o "$RUNNER_TEMP/icon.png"
+          test -s "$RUNNER_TEMP/icon.png"
+
       # --all-targets: a lint that only fires in a test target is still a lint.
       - name: Clippy
         run: cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
@@ -337,7 +348,7 @@ jobs:
           tar xzf dist/snapall-v*-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP"
           root="$(echo "$RUNNER_TEMP"/snapall-v*-x86_64-unknown-linux-musl)"
           "$root/snapall" --version
-          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz; do
+          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg; do
             test -f "$root/$file" || { echo "the tarball lacks $file"; exit 1; }
           done
 

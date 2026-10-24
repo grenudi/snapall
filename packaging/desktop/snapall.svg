@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 grenudi
+
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<!-- snapall: a stack of layers (the snapshots you keep) and a restore arrow (going back to one). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>snapall</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22324d"/>
+      <stop offset="1" stop-color="#121c2e"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#tile)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- the oldest snapshot, then the one after it: fainter the further back -->
+    <path d="M26 74 L62 92 L98 74" stroke="#2f8f8a" stroke-width="8"/>
+    <path d="M26 60 L62 78 L98 60" stroke="#46b7ae" stroke-width="8"/>
+    <!-- the system as it is now -->
+    <path d="M62 26 L98 44 L62 62 L26 44 Z" fill="#5eead4" stroke="#5eead4" stroke-width="6"/>
+  </g>
+  <!-- restore: an arrow that goes back round -->
+  <circle cx="94" cy="92" r="23" fill="#fbbf24"/>
+  <path d="M94 80.5 A11.5 11.5 0 1 0 105.5 92" fill="none" stroke="#121c2e" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M105.5 84 L100 93 L111 93 Z" fill="#121c2e" stroke="#121c2e" stroke-width="2" stroke-linejoin="round"/>
+</svg>

@@ -53,6 +53,9 @@ assets = [
     ["../../packaging/generated/snapall.fish", "usr/share/fish/vendor_completions.d/snapall.fish", "644"],
     ["../../packaging/generated/snapall.nu", "usr/share/nushell/vendor/autoload/snapall.nu", "644"],
     ["../../packaging/generated/snapall.1.gz", "usr/share/man/man1/snapall.1.gz", "644"],
+    # The launcher entry (a terminal running `sudo snapall tui`) and its icon.
+    ["../../packaging/desktop/snapall.desktop", "usr/share/applications/snapall.desktop", "644"],
+    ["../../packaging/desktop/snapall.svg", "usr/share/icons/hicolor/scalable/apps/snapall.svg", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -69,6 +72,9 @@ assets = [
     { source = "../../packaging/generated/snapall.fish", dest = "/usr/share/fish/vendor_completions.d/snapall.fish", mode = "644" },
     { source = "../../packaging/generated/snapall.nu", dest = "/usr/share/nushell/vendor/autoload/snapall.nu", mode = "644" },
     { source = "../../packaging/generated/snapall.1.gz", dest = "/usr/share/man/man1/snapall.1.gz", mode = "644", doc = true },
+    # The launcher entry (a terminal running `sudo snapall tui`) and its icon.
+    { source = "../../packaging/desktop/snapall.desktop", dest = "/usr/share/applications/snapall.desktop", mode = "644" },
+    { source = "../../packaging/desktop/snapall.svg", dest = "/usr/share/icons/hicolor/scalable/apps/snapall.svg", mode = "644" },
 ]
 
 [package.metadata.generate-rpm.requires]
