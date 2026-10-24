@@ -149,3 +149,49 @@ jobs:
       - name: Install the published package
         if: matrix.package != 'none'
         run: docker run --rm -e EXPECT_VERSION -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/install-package.sh "${{ matrix.package }}"
+
+  reproduce:
+    name: rebuild ${{ matrix.target }} from the tag and compare
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    target: x86_64-unknown-linux-musl }
+          - { runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      TARGET: ${{ matrix.target }}
+    # The strongest check there is that a release is what its source says: build the tag again, on
+    # another machine, with the pinned compiler and the build paths removed, and require the very
+    # same binary to come out. (Releases made before the build was reproducible have no
+    # packaging/build-binary.sh at their tag and are skipped, with a message.)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - name: Can this release be rebuilt reproducibly?
+        id: can
+        run: |
+          if [ -x packaging/build-binary.sh ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "this release predates the reproducible build; nothing to compare"; fi
+      - name: The pinned toolchain (rust-toolchain.toml)
+        if: steps.can.outputs.yes == 'true'
+        run: rustup show
+      - name: Rebuild the binary from the tag
+        if: steps.can.outputs.yes == 'true'
+        run: packaging/build-binary.sh "$TARGET"
+      - name: It is byte for byte the published binary
+        if: steps.can.outputs.yes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir published
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published --pattern "*-${TARGET}.tar.gz"
+          tar xzf "published/snapall-${TAG#snapall-}-${TARGET}.tar.gz" -C published
+          published="$(sha256sum "published/snapall-${TAG#snapall-}-${TARGET}/snapall" | cut -d' ' -f1)"
+          rebuilt="$(sha256sum "target/${TARGET}/release/snapall" | cut -d' ' -f1)"
+          echo "published: $published"
+          echo "rebuilt:   $rebuilt"
+          test "$published" = "$rebuilt"

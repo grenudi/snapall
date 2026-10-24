@@ -83,7 +83,15 @@ $ gh attestation verify snapall-v0.5.0-x86_64-unknown-linux-musl.tar.gz --repo g
 $ sha256sum --check --ignore-missing SHA256SUMS-x86_64-unknown-linux-musl
 ```
 
-The checksums only prove that a file arrived intact; the attestation proves who built it. The builds are also **reproducible**: building the same tag twice gives byte-identical files, so anyone can check a release by rebuilding it. A scheduled verification (`release-verify.yml`) downloads every published release, checks the checksums and the attestations, and installs the packages on fresh containers of each distribution and architecture.
+The checksums only prove that a file arrived intact; the attestation proves who built it. And you do not have to take either on trust: the binary is **reproducible**. The compiler version is pinned (`rust-toolchain.toml`) and the build paths are removed from the binary (`packaging/build-binary.sh`), so the same source gives the same bytes whatever the machine or directory:
+
+```console
+$ git clone --branch snapall-v0.5.0 https://github.com/grenudi/snapall && cd snapall
+$ packaging/build-binary.sh x86_64-unknown-linux-musl
+$ sha256sum target/x86_64-unknown-linux-musl/release/snapall      # the same as `snapall` inside the release tarball
+```
+
+CI builds one commit in two different directories and fails if the binaries differ. After every release, `release-verify.yml` rebuilds the tag on another machine and requires the identical binary, checks the checksums and the attestations, and installs the packages on fresh containers of each distribution and architecture. (Releases up to 0.4.1 were built before this and cannot be checked this way.)
 
 ### Completions and the manual
 

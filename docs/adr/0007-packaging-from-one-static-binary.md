@@ -28,6 +28,12 @@ The release files are no longer produced by a third-party upload action. `packag
 
 Each file is attested with `actions/attest-build-provenance` (SLSA build provenance, Sigstore, keyless). Keyless was chosen over a signing key because a key would have to be generated somewhere, stored as a secret and rotated, which moves trust from the build to whoever holds the key; the attestation is bound to the workflow's identity instead, and `gh attestation verify --signer-workflow` checks that identity. `release-verify.yml` verifies every attestation of every release, so a release without them fails loudly. Releases before this change (up to 0.4.0) have none, and a manual verification of an old tag turns the requirement off explicitly.
 
+## The binary is reproducible
+
+Two builds of one commit in two directories differed, because the compiler embeds absolute paths (the build directory, the Cargo registry, the toolchain) and its own version. Reproducibility therefore has three parts, each in one place: `rust-toolchain.toml` pins the compiler (Dependabot proposes newer ones; the MSRV job selects 1.85 through `RUSTUP_TOOLCHAIN`, which overrides the file, and asserts it got it), `packaging/build-binary.sh` rewrites the three path prefixes with `--remap-path-prefix` and switches incremental compilation off (Cargo's `trim-paths` is still nightly-only), and `packaging/build-packages.sh` makes every timestamp the commit's. CI proves the property on every push (the same commit built in two directories must give the same bytes), and `release-verify.yml` rebuilds each release on a different machine and compares it with the published binary. If that comparison ever fails, the release is reported as unverified, which is the point of having it.
+
+An earlier version of the README claimed that anyone could rebuild a release and get identical files. It had only been shown for two builds on one machine; rebuilding the tag elsewhere gave a different binary. The claim was removed until it was true, and the checks above are what make it true.
+
 Signed apt/rpm *repositories* (so that `apt install snapall` works) still need a long-lived key and a hosting decision; they remain in the backlog.
 
 ## Consequences

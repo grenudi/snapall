@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# The one place the compiler version is chosen. CI, the release build and anyone rebuilding a tag
+# use this version, which is what lets the same source give the same bytes (packaging/build-binary.sh).
+# Dependabot proposes newer releases; the MSRV job tests the minimum separately.
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]

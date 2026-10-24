@@ -22,9 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: The pinned toolchain (rust-toolchain.toml)
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       - name: Format
@@ -46,13 +45,17 @@ jobs:
   msrv:
     name: minimum supported Rust version
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.85.0"
     steps:
       - uses: actions/checkout@v7
-      # The version is an input, not part of the action ref: dependabot reads a ref like
-      # `@1.85.0` as an action version and would "upgrade" the MSRV.
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.85.0"
+      # This job proves the *minimum*, not the pinned toolchain. A rust-toolchain.toml overrides the
+      # default toolchain, so the compiler is chosen with RUSTUP_TOOLCHAIN (job env), which wins, and
+      # the next step fails if that did not take effect: a silent pass on the wrong compiler would
+      # make this job meaningless.
+      - run: rustup toolchain install 1.85.0 --profile minimal
+      - name: The compiler is really the minimum
+        run: rustc -V | grep -q '^rustc 1.85\.'
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --workspace --all-features --locked
 
@@ -64,7 +67,8 @@ jobs:
     # them and that a user sees and gets what the UI says.
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - name: The pinned toolchain (rust-toolchain.toml)
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       - name: Install snapper, btrfs-progs and jq
@@ -152,7 +156,8 @@ jobs:
     # so the contract is judged by the tool that defines the format, not only by our tests.
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - name: The pinned toolchain (rust-toolchain.toml)
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo build -p snapall --locked
@@ -212,16 +217,15 @@ jobs:
           - { arch: aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      - name: The pinned toolchain (rust-toolchain.toml)
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       - name: Install the package builders
         run: cargo install --locked cargo-deb cargo-generate-rpm
 
       - name: Build the static binary
-        run: cargo build --release --locked --target ${{ matrix.target }} -p snapall
+        run: packaging/build-binary.sh ${{ matrix.target }}
 
       - name: Build the .deb and .rpm
         run: packaging/build-packages.sh ${{ matrix.target }}
@@ -273,6 +277,27 @@ jobs:
       - name: "install the package"
         if: matrix.package != 'none'
         run: docker run --rm -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/install-package.sh "${{ matrix.package }}"
+
+  reproducible:
+    name: the same source builds to the same bytes, wherever it is built
+    runs-on: ubuntu-latest
+    # Compilers embed build paths and versions. packaging/build-binary.sh removes the paths and
+    # rust-toolchain.toml pins the version; this builds the same commit in two different directories
+    # and fails if the binaries differ, so the property cannot silently stop holding.
+    steps:
+      - uses: actions/checkout@v7
+      - name: The pinned toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Build the same commit in two different directories
+        run: |
+          for dir in one/deeply/nested/path two; do
+            git worktree add "$RUNNER_TEMP/$dir" HEAD
+            (cd "$RUNNER_TEMP/$dir" && packaging/build-binary.sh x86_64-unknown-linux-musl)
+          done
+          a="$(sha256sum "$RUNNER_TEMP/one/deeply/nested/path/target/x86_64-unknown-linux-musl/release/snapall" | cut -d' ' -f1)"
+          b="$(sha256sum "$RUNNER_TEMP/two/target/x86_64-unknown-linux-musl/release/snapall" | cut -d' ' -f1)"
+          echo "one: $a"; echo "two: $b"
+          test "$a" = "$b"
 
   completions:
     name: completions and man page, in real shells
