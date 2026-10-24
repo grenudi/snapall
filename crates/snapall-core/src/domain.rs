@@ -170,6 +170,39 @@ pub struct SnapshotInfo {
     pub description: String,
 }
 
+/// How one path differs between a snapshot and the live system now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeKind {
+    /// It exists now and did not then: restoring would remove it.
+    Added,
+    /// It existed then and is gone now: restoring would bring it back.
+    Removed,
+    /// It exists in both and differs (content, type, permissions, owner...): restoring would revert it.
+    Changed,
+}
+
+/// One path that differs between a snapshot and the live system.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Change {
+    pub kind: ChangeKind,
+    /// An absolute path inside the config's subvolume.
+    pub path: String,
+}
+
+/// What a restore did, as snapper counts it: files recreated, reverted and removed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RestoreSummary {
+    pub created: u64,
+    pub modified: u64,
+    pub deleted: u64,
+}
+
+impl RestoreSummary {
+    pub fn total(&self) -> u64 {
+        self.created + self.modified + self.deleted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

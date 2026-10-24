@@ -6,7 +6,7 @@
 
 use thiserror::Error;
 
-use crate::domain::{ConfigName, Description, SnapshotId, SnapshotInfo};
+use crate::domain::{Change, ConfigName, Description, RestoreSummary, SnapshotId, SnapshotInfo};
 use crate::plan::{plan, Plan, PlanError};
 use crate::port::{BackendError, SnapshotBackend};
 
@@ -118,6 +118,154 @@ pub fn delete_snapshot(
     Ok(backend.delete_snapshot(config, id)?)
 }
 
+/// Why a restore was refused or failed.
+#[derive(Debug, Error)]
+pub enum RestoreError {
+    #[error(transparent)]
+    Snapshot(#[from] SnapshotError),
+    #[error("{config} has no snapshot #{id}")]
+    UnknownSnapshot { config: ConfigName, id: SnapshotId },
+    /// Putting the whole system root back while it is running would leave files, kernel and
+    /// boot menu out of step with each other. Single paths are fine; the system itself is
+    /// restored from the boot menu or a live system.
+    #[error("`{config}` is the system root: restoring all of it while it runs is not safe (restore single paths, or restore the system from the boot menu)")]
+    SystemRoot { config: ConfigName },
+    #[error("`{path}` is not an absolute path without `..`")]
+    BadPath { path: String },
+    #[error("`{path}` is outside {config}, which is {subvolume}")]
+    OutsideConfig {
+        config: ConfigName,
+        path: String,
+        subvolume: String,
+    },
+    #[error("the safety snapshot could not be taken, so nothing was restored: {0}")]
+    SafetySnapshot(BackendError),
+    #[error(transparent)]
+    Backend(#[from] BackendError),
+}
+
+/// What restoring would do, before anything is touched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Preview {
+    /// Where the config lives.
+    pub subvolume: String,
+    /// Restoring all of it is refused (see [`RestoreError::SystemRoot`]); single paths still work.
+    pub is_system_root: bool,
+    /// The paths that differ now, limited to the requested path if there was one.
+    pub changes: Vec<Change>,
+}
+
+/// What a restore did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Restored {
+    /// The snapshot of the state just before, which undoes this restore.
+    pub safety_snapshot: SnapshotId,
+    pub summary: RestoreSummary,
+}
+
+fn is_root(subvolume: &str) -> bool {
+    subvolume.trim_end_matches('/').is_empty()
+}
+
+/// A path that cannot escape: absolute, no `..` component, no control line breaks.
+fn clean(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.contains(['\0', '\n', '\r'])
+        && !path.split('/').any(|part| part == "..")
+}
+
+/// Whether `path` is `base` or lies under it.
+fn under(base: &str, path: &str) -> bool {
+    let base = base.trim_end_matches('/');
+    base.is_empty()
+        || path == base
+        || path
+            .strip_prefix(base)
+            .is_some_and(|rest| rest.starts_with('/'))
+}
+
+fn checked(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+) -> Result<String, RestoreError> {
+    ensure_config(backend, config)?;
+    if !backend.list_snapshots(config)?.iter().any(|s| s.id == id) {
+        return Err(RestoreError::UnknownSnapshot {
+            config: config.clone(),
+            id,
+        });
+    }
+    let subvolume = backend.config_subvolume(config)?;
+    if let Some(path) = path {
+        if !clean(path) {
+            return Err(RestoreError::BadPath {
+                path: path.to_owned(),
+            });
+        }
+        if !under(&subvolume, path) {
+            return Err(RestoreError::OutsideConfig {
+                config: config.clone(),
+                path: path.to_owned(),
+                subvolume,
+            });
+        }
+    }
+    Ok(subvolume)
+}
+
+/// What restoring snapshot `id` of `config` would change. Read-only.
+pub fn preview_restore(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+) -> Result<Preview, RestoreError> {
+    let subvolume = checked(backend, config, id, path)?;
+    let mut changes = backend.changes_since(config, id)?;
+    if let Some(path) = path {
+        changes.retain(|change| under(path, &change.path));
+    }
+    Ok(Preview {
+        is_system_root: is_root(&subvolume),
+        subvolume,
+        changes,
+    })
+}
+
+/// Put `config` (or only `path` in it) back to how snapshot `id` had it.
+///
+/// Two rules make this safe to offer. The state just before is snapshotted first, and if that
+/// fails nothing is restored, so a restore can always be undone. And the system root is never
+/// restored whole: only single paths of it.
+pub fn restore_snapshot(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+) -> Result<Restored, RestoreError> {
+    let subvolume = checked(backend, config, id, path)?;
+    if path.is_none() && is_root(&subvolume) {
+        return Err(RestoreError::SystemRoot {
+            config: config.clone(),
+        });
+    }
+    let note = Description::parse(&format!("before restoring #{id}")).map_err(|_| {
+        RestoreError::BadPath {
+            path: format!("#{id}"),
+        }
+    })?;
+    let safety_snapshot = backend
+        .create_snapshot(config, &note)
+        .map_err(RestoreError::SafetySnapshot)?;
+    let summary = backend.undo_changes(config, id, path)?;
+    Ok(Restored {
+        safety_snapshot,
+        summary,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +352,218 @@ mod tests {
             delete_snapshot(&backend, &nope, SnapshotId::new(1).unwrap()),
             Err(SnapshotError::Plan(PlanError::UnknownConfigs(_)))
         ));
+    }
+
+    // ---- restoring -----------------------------------------------------------------------
+
+    use crate::domain::ChangeKind;
+
+    fn home() -> ConfigName {
+        ConfigName::parse("home").unwrap()
+    }
+
+    fn id(n: u64) -> SnapshotId {
+        SnapshotId::new(n).unwrap()
+    }
+
+    /// `home` with a.txt = "one", snapshotted as #1, then a.txt edited and b.txt added.
+    fn edited_home() -> InMemoryBackend {
+        let backend = InMemoryBackend::with_configs(&["home"]);
+        backend.write_file("home", "/mnt/home/a.txt", "one");
+        backend.write_file("home", "/mnt/home/c.txt", "kept");
+        backend.create_snapshot(&home(), &desc()).unwrap();
+        backend.write_file("home", "/mnt/home/a.txt", "two");
+        backend.write_file("home", "/mnt/home/b.txt", "new");
+        backend.write_file("home", "/mnt/home/c.txt", "edited");
+        backend
+    }
+
+    #[test]
+    fn a_preview_lists_what_would_change_and_changes_nothing() {
+        let backend = edited_home();
+        let preview = preview_restore(&backend, &home(), id(1), None).unwrap();
+        let kinds: Vec<_> = preview
+            .changes
+            .iter()
+            .map(|c| (c.path.as_str(), c.kind))
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                ("/mnt/home/a.txt", ChangeKind::Changed),
+                ("/mnt/home/b.txt", ChangeKind::Added),
+                ("/mnt/home/c.txt", ChangeKind::Changed),
+            ]
+        );
+        assert!(!preview.is_system_root);
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("two")
+        );
+        assert_eq!(backend.snapshots().len(), 1, "a preview takes no snapshot");
+    }
+
+    #[test]
+    fn restoring_puts_everything_back_after_taking_a_safety_snapshot() {
+        let backend = edited_home();
+        let restored = restore_snapshot(&backend, &home(), id(1), None).unwrap();
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("one")
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/b.txt"),
+            None,
+            "added since: removed"
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/c.txt").as_deref(),
+            Some("kept")
+        );
+        assert_eq!(
+            (restored.summary.modified, restored.summary.deleted),
+            (2, 1)
+        );
+        let note = backend
+            .snapshots()
+            .into_iter()
+            .find(|(_, snapshot, _)| *snapshot == restored.safety_snapshot)
+            .unwrap();
+        assert_eq!(note.2, "before restoring #1");
+    }
+
+    #[test]
+    fn a_restore_can_itself_be_undone_through_its_safety_snapshot() {
+        let backend = edited_home();
+        let restored = restore_snapshot(&backend, &home(), id(1), None).unwrap();
+        restore_snapshot(&backend, &home(), restored.safety_snapshot, None).unwrap();
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("two")
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/b.txt").as_deref(),
+            Some("new")
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/c.txt").as_deref(),
+            Some("edited")
+        );
+    }
+
+    #[test]
+    fn a_restore_can_be_limited_to_one_path() {
+        let backend = edited_home();
+        let preview = preview_restore(&backend, &home(), id(1), Some("/mnt/home/a.txt")).unwrap();
+        assert_eq!(preview.changes.len(), 1);
+        restore_snapshot(&backend, &home(), id(1), Some("/mnt/home/a.txt")).unwrap();
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("one")
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/c.txt").as_deref(),
+            Some("edited"),
+            "not asked for"
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/b.txt").as_deref(),
+            Some("new")
+        );
+    }
+
+    #[test]
+    fn the_system_root_is_never_restored_whole_and_nothing_is_touched_when_refusing() {
+        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let root = ConfigName::parse("root").unwrap();
+        backend.write_file("root", "/etc/fstab", "good");
+        backend.create_snapshot(&root, &desc()).unwrap();
+        backend.write_file("root", "/etc/fstab", "broken");
+
+        let refused = restore_snapshot(&backend, &root, id(1), None).unwrap_err();
+        assert!(
+            matches!(refused, RestoreError::SystemRoot { .. }),
+            "{refused}"
+        );
+        assert_eq!(
+            backend.read_file("root", "/etc/fstab").as_deref(),
+            Some("broken")
+        );
+        assert_eq!(
+            backend.snapshots().len(),
+            1,
+            "no safety snapshot for a refused restore"
+        );
+
+        // A single path of the root is a different matter, and is allowed.
+        let preview = preview_restore(&backend, &root, id(1), None).unwrap();
+        assert!(
+            preview.is_system_root,
+            "the preview says so, so the UI can explain"
+        );
+        restore_snapshot(&backend, &root, id(1), Some("/etc/fstab")).unwrap();
+        assert_eq!(
+            backend.read_file("root", "/etc/fstab").as_deref(),
+            Some("good")
+        );
+    }
+
+    #[test]
+    fn paths_cannot_escape_the_config_and_a_refusal_changes_nothing() {
+        let backend = edited_home();
+        for (path, expect_outside) in [
+            ("/etc/passwd", true),
+            ("/mnt/homeless/a.txt", true),
+            ("/mnt/home/../etc/passwd", false),
+            ("relative/path", false),
+            ("/mnt/home/a\nb", false),
+        ] {
+            let error = restore_snapshot(&backend, &home(), id(1), Some(path)).unwrap_err();
+            assert_eq!(
+                matches!(error, RestoreError::OutsideConfig { .. }),
+                expect_outside,
+                "{path}: {error}"
+            );
+            assert!(
+                !matches!(error, RestoreError::Backend(_)),
+                "{path} must be caught before the backend"
+            );
+        }
+        assert_eq!(backend.snapshots().len(), 1, "no safety snapshot was taken");
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("two")
+        );
+    }
+
+    #[test]
+    fn an_unknown_snapshot_or_config_is_refused_before_anything_changes() {
+        let backend = edited_home();
+        assert!(matches!(
+            restore_snapshot(&backend, &home(), id(9), None),
+            Err(RestoreError::UnknownSnapshot { .. })
+        ));
+        let nope = ConfigName::parse("nope").unwrap();
+        assert!(matches!(
+            restore_snapshot(&backend, &nope, id(1), None),
+            Err(RestoreError::Snapshot(_))
+        ));
+        assert_eq!(backend.snapshots().len(), 1);
+    }
+
+    #[test]
+    fn if_the_safety_snapshot_cannot_be_taken_nothing_is_restored() {
+        let backend = edited_home();
+        backend.refuse_snapshots_of("home");
+        let error = restore_snapshot(&backend, &home(), id(1), None).unwrap_err();
+        assert!(matches!(error, RestoreError::SafetySnapshot(_)), "{error}");
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/a.txt").as_deref(),
+            Some("two")
+        );
+        assert_eq!(
+            backend.read_file("home", "/mnt/home/b.txt").as_deref(),
+            Some("new")
+        );
     }
 }

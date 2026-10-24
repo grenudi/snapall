@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 
-use crate::domain::{ConfigName, SnapshotId};
+use crate::domain::{ConfigName, RestoreSummary, SnapshotId};
 
 /// One thing snapall did, and how it went. Failures carry the error text, never a panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +38,16 @@ pub enum Event {
         result: Result<(), String>,
         took: Duration,
     },
+    /// The live files were put back to how a snapshot had them: the most consequential thing
+    /// snapall does, so it is always an audit line.
+    ChangesUndone {
+        config: ConfigName,
+        id: SnapshotId,
+        /// The one path restored, or `None` for the whole config.
+        path: Option<String>,
+        result: Result<RestoreSummary, String>,
+        took: Duration,
+    },
     /// A privileged command run by `snapall doctor --install`: worth an audit line.
     InstallStepRun {
         command: String,
@@ -54,6 +64,7 @@ impl Event {
             Event::SnapshotsListed { .. } => "snapshots_listed",
             Event::SnapshotCreated { .. } => "snapshot_created",
             Event::SnapshotDeleted { .. } => "snapshot_deleted",
+            Event::ChangesUndone { .. } => "changes_undone",
             Event::InstallStepRun { .. } => "install_step_run",
         }
     }
@@ -65,6 +76,7 @@ impl Event {
             | Event::SnapshotsListed { took, .. }
             | Event::SnapshotCreated { took, .. }
             | Event::SnapshotDeleted { took, .. }
+            | Event::ChangesUndone { took, .. }
             | Event::InstallStepRun { took, .. } => *took,
         }
     }
@@ -79,6 +91,7 @@ impl Event {
             Event::SnapshotDeleted { result, .. } | Event::InstallStepRun { result, .. } => {
                 result.as_ref().err()
             }
+            Event::ChangesUndone { result, .. } => result.as_ref().err(),
         };
         error.map(String::as_str)
     }
@@ -92,7 +105,8 @@ impl Event {
         match self {
             Event::SnapshotsListed { config, .. }
             | Event::SnapshotCreated { config, .. }
-            | Event::SnapshotDeleted { config, .. } => Some(config),
+            | Event::SnapshotDeleted { config, .. }
+            | Event::ChangesUndone { config, .. } => Some(config),
             Event::ConfigsListed { .. } | Event::InstallStepRun { .. } => None,
         }
     }
@@ -182,6 +196,13 @@ mod tests {
                 config: name("a"),
                 id: SnapshotId::new(1).unwrap(),
                 result: Ok(()),
+                took: d,
+            },
+            Event::ChangesUndone {
+                config: name("a"),
+                id: SnapshotId::new(1).unwrap(),
+                path: None,
+                result: Ok(RestoreSummary::default()),
                 took: d,
             },
             Event::InstallStepRun {

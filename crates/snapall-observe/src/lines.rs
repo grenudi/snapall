@@ -82,6 +82,19 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
             fields.push(("description", json!(description)));
         }
         Event::SnapshotDeleted { id, .. } => fields.push(("snapshot", json!(id.get()))),
+        Event::ChangesUndone {
+            id, path, result, ..
+        } => {
+            fields.push(("snapshot", json!(id.get())));
+            if let Some(path) = path {
+                fields.push(("path", json!(path)));
+            }
+            if let Ok(summary) = result {
+                fields.push(("created", json!(summary.created)));
+                fields.push(("modified", json!(summary.modified)));
+                fields.push(("deleted", json!(summary.deleted)));
+            }
+        }
         Event::InstallStepRun { command, .. } => fields.push(("command", json!(command))),
         Event::ConfigsListed { .. } | Event::SnapshotsListed { .. } => {}
     }
