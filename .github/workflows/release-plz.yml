@@ -58,7 +58,9 @@ jobs:
     needs: release-plz
     if: needs.release-plz.outputs.tag != ''
     permissions:
-      contents: write
+      contents: write # attach the assets to the release
+      id-token: write # sign the provenance: keyless, with the workflow's own identity
+      attestations: write # store the signed provenance
     strategy:
       fail-fast: false
       matrix:
@@ -75,42 +77,42 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: sudo apt-get update && sudo apt-get install -y musl-tools
-      # The binary contains MIT/Apache libraries; their notices go into the archive.
-      - name: Third-party license notices
-        run: |
-          cargo fetch --locked
-          python3 packaging/third-party-licenses.py "${{ matrix.target }}"
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          include: LICENSE,README.md,THIRD-PARTY-LICENSES.md
-          bin: snapall
-          target: ${{ matrix.target }}
-          # The tag already starts with `snapall-`, so `$tag-$target` gives
-          # snapall-v0.1.0-x86_64-unknown-linux-musl (not snapall-snapall-v0.1.0-...).
-          archive: $tag-$target
-          # The arm64 runner is natively aarch64; without this the action decides a musl
-          # target is a cross-compile and tries to install `cross`.
-          build-tool: cargo
-          tar: unix
-          checksum: sha256
-          ref: refs/tags/${{ needs.release-plz.outputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # The distro packages come from the very binary just uploaded, through the same script
-      # CI tests, so what ships is what was installed on the test containers.
       - uses: Swatinem/rust-cache@v2
-      - name: Build the .deb and .rpm and attach them to the release
+      - run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends musl-tools
+      - run: cargo install --locked cargo-deb cargo-generate-rpm
+      # The binary contains MIT/Apache libraries; their notices go into every artifact.
+      - run: cargo fetch --locked
+
+      # Everything that ships, built by the one script CI tests: the static binary's tarball (with
+      # the completions and the man page), the .deb, the .rpm and their checksums. Nothing else
+      # uploads release files, so what is attested and attached is exactly what was tested.
+      - name: Build the release files
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo build --release --locked --target "$TARGET" -p snapall
+          packaging/build-packages.sh "$TARGET"
+          mv dist/SHA256SUMS "dist/SHA256SUMS-$TARGET"
+
+      # A signed statement, made by this workflow, of which source and which build produced each
+      # file (SLSA build provenance, Sigstore, keyless: there is no key to store or to leak).
+      # Anyone can check it: gh attestation verify FILE --repo grenudi/snapall
+      - name: Attest the build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/snapall-v*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+
+      - name: Attach to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.release-plz.outputs.tag }}
           TARGET: ${{ matrix.target }}
-        run: |
-          cargo install --locked cargo-deb cargo-generate-rpm
-          cargo build --release --locked --target "$TARGET" -p snapall
-          packaging/build-packages.sh "$TARGET"
-          mv dist/SHA256SUMS "dist/SHA256SUMS-$TARGET"
-          gh release upload "$TAG" dist/*.deb dist/*.rpm "dist/SHA256SUMS-$TARGET" --clobber
+        run: gh release upload "$TAG" dist/snapall-v*.tar.gz dist/*.deb dist/*.rpm "dist/SHA256SUMS-$TARGET" --clobber
 
   pkgbuild:
     name: PKGBUILD for the release

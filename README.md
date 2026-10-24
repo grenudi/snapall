@@ -31,7 +31,7 @@ snapall drives [snapper](http://snapper.io/), so every package below **depends o
 | openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
 | Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` |
 | Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
-| Alpine edge, Void, Gentoo, anything else | the static `snapall-<version>-<arch>-unknown-linux-musl.tar.gz`, then `sudo ./snapall doctor --install` |
+| Alpine edge, Void, Gentoo, anything else | the static `snapall-v<version>-<arch>-unknown-linux-musl.tar.gz` (extract it, then `sudo ./snapall doctor --install`); it also holds the completions and the man page |
 
 `snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`, `xbps-install`, `emerge`). Where a command would be wrong it says so instead of running anything: RHEL and its rebuilds only have snapper in EPEL, and Alpine only in `edge`'s `testing` repository; NixOS is declarative; Fedora Atomic, MicroOS and SteamOS have a read-only root.
 
@@ -74,6 +74,26 @@ One setting, two doors: each of these is the same input as its flag, and an expl
 
 A misspelled `SNAPALL_*` variable is an **error** with a suggestion (`SNAPALL_NO_DBU` stops the run and says it meant `SNAPALL_NO_DBUS`), not a setting that is silently not applied.
 
+### Verifying what you downloaded
+
+Every release file (the tarball, the `.deb`, the `.rpm`) comes with a **signed statement of where it was built**: this repository's release workflow, from the tagged source, on GitHub's runners. It is a [SLSA build provenance attestation](https://slsa.dev/spec/v1.0/provenance), signed keylessly through Sigstore, so there is no signing key to trust, steal or lose; the signature is bound to the workflow's identity.
+
+```console
+$ gh attestation verify snapall-v0.5.0-x86_64-unknown-linux-musl.tar.gz --repo grenudi/snapall
+$ sha256sum --check --ignore-missing SHA256SUMS-x86_64-unknown-linux-musl
+```
+
+The checksums only prove that a file arrived intact; the attestation proves who built it. The builds are also **reproducible**: building the same tag twice gives byte-identical files, so anyone can check a release by rebuilding it. A scheduled verification (`release-verify.yml`) downloads every published release, checks the checksums and the attestations, and installs the packages on fresh containers of each distribution and architecture.
+
+### Completions and the manual
+
+Every package installs shell completions for **bash, zsh, fish and nushell** and the `snapall(1)` manual page, and the tarball carries them in `completions/` and `man/`. They are not written by hand: the contract that parses the command line also generates them (`snapall completions bash|zsh|fish|nushell`, `snapall man`), so they cannot disagree with what snapall accepts. A flag that belongs to one command, like `--dry-run` for `create`, is offered only after that command, which is the same rule `snapall delete --dry-run` is refused by.
+
+```console
+$ snapall completions fish > ~/.config/fish/completions/snapall.fish     # without a package
+$ snapall man | gzip -9n > ~/.local/share/man/man1/snapall.1.gz
+```
+
 ### Logging and the audit trail
 
 snapall is quiet by default. Ask, and every operation it performs (listing, creating, deleting, and each package-manager step of `doctor --install`) produces one line with its outcome and duration:
@@ -111,7 +131,7 @@ Snapper calls run in the background: the header shows *working* while one is in 
 
 ## Status
 
-Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Shell completions and man pages (both derivable from the contract), repository hosting and signing for the packages, and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). Licensed under the GNU General Public License, version 3 or (at your option) any later version.
+Early. Scope today is **snapper-backed snapshots**, which in practice means Btrfs. Repository hosting and signing for the packages, and a few upstream argenv items are tracked in [docs/backlog.md](docs/backlog.md). Licensed under the GNU General Public License, version 3 or (at your option) any later version.
 
 ## Architecture
 

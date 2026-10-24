@@ -22,5 +22,13 @@ The goal is "install snapall on every major distribution". Distributions package
 
 CI proves what was *built*; users get what was *published*. So `release-verify.yml` runs after every Release workflow (and on demand for a tag): it downloads the published assets, verifies them against the published checksums, asserts the tarball carries the program, the license and the third-party notices, installs the published `.deb` and `.rpm` on fresh containers of each distribution and architecture, builds the published PKGBUILD from the tag's real source tarball (so makepkg checks the sha256 the release published), and asserts the installed program reports the tag's version. aarch64 is built and tested natively on GitHub's arm runners rather than assumed from x86_64; Arch has no official aarch64 image and stays x86_64 only. The first run of this found nothing wrong with v0.3.0, but the earlier defect (a checksum file listing a file that was never published) is exactly the kind of thing it exists to catch.
 
+## Provenance, and one script builds everything that ships
+
+The release files are no longer produced by a third-party upload action. `packaging/build-packages.sh` builds the tarball (with the completions and the man page), the `.deb`, the `.rpm` and their checksums, reproducibly (every timestamp is the commit's, tar entries are sorted and owned by root, gzip records no name or time). CI runs that same script on both architectures and tests its output; the release workflow runs it again and attaches exactly those files, so what is attested and attached is what was tested, and one fewer third-party action runs with write access to the release.
+
+Each file is attested with `actions/attest-build-provenance` (SLSA build provenance, Sigstore, keyless). Keyless was chosen over a signing key because a key would have to be generated somewhere, stored as a secret and rotated, which moves trust from the build to whoever holds the key; the attestation is bound to the workflow's identity instead, and `gh attestation verify --signer-workflow` checks that identity. `release-verify.yml` verifies every attestation of every release, so a release without them fails loudly. Releases before this change (up to 0.4.0) have none, and a manual verification of an old tag turns the requirement off explicitly.
+
+Signed apt/rpm *repositories* (so that `apt install snapall` works) still need a long-lived key and a hosting decision; they remain in the backlog.
+
 ## Consequences
 The packages are unsigned and not in any distribution's repository; both are in the backlog. The Void and Gentoo install plans are unit-tested but not run in CI.

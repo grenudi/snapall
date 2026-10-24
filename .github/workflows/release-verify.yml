@@ -18,11 +18,16 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to verify, for example snapall-v0.3.0
+        description: Release tag to verify, for example snapall-v0.5.0
         required: true
+      attestations:
+        description: Require signed build provenance (releases before 0.5.0 have none)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
+  attestations: read
 
 jobs:
   tag:
@@ -79,6 +84,9 @@ jobs:
       TAG: ${{ needs.tag.outputs.tag }}
       TARGET: ${{ matrix.target }}
       PACKAGE: ${{ matrix.package }}
+      # Every release since the attestations were introduced must have them; only a manual run
+      # for an older tag may switch the requirement off.
+      REQUIRE_ATTESTATIONS: ${{ github.event_name == 'workflow_run' || inputs.attestations }}
     steps:
       # The test scripts come from the current commit: they are the harness, not the product.
       - uses: actions/checkout@v7
@@ -90,7 +98,7 @@ jobs:
         run: |
           mkdir -p dist
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
-            --pattern "*-${TARGET}.tar.gz" --pattern "*-${TARGET}.sha256" --pattern "SHA256SUMS-${TARGET}"
+            --pattern "*-${TARGET}.tar.gz" --pattern "SHA256SUMS-${TARGET}"
           if [ -n "$ASSET" ]; then
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist --pattern "$ASSET"
           fi
@@ -100,25 +108,40 @@ jobs:
       - name: The published checksums verify
         run: |
           cd dist
-          sha256sum --check "snapall-${TAG#snapall-}-${TARGET}.sha256"
-          case "$PACKAGE" in
-            deb | rpm-dnf | rpm-zypper)
-              # --ignore-missing: SHA256SUMS lists the deb and the rpm, we fetched one. Insist
-              # that at least one line really was checked, so an empty check cannot pass.
-              sha256sum --check --ignore-missing "SHA256SUMS-${TARGET}" | tee /dev/stderr | grep -q ': OK'
-              ;;
-          esac
+          # --ignore-missing: SHA256SUMS lists the tarball, the .deb and the .rpm, and this job
+          # fetched the tarball and one package. Insist that every file it did fetch was checked,
+          # so an empty check cannot pass.
+          expected=$(find . -maxdepth 1 \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) | wc -l)
+          checked=$(sha256sum --check --ignore-missing "SHA256SUMS-${TARGET}" | tee /dev/stderr | grep -c ': OK')
+          test "$checked" -eq "$expected" || { echo "checked $checked of $expected downloaded files" >&2; exit 1; }
 
-      - name: The tarball carries the program, the license and the third-party notices
+      - name: The files were built by this repository's release workflow
+        if: env.REQUIRE_ATTESTATIONS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in dist/snapall-v*.tar.gz dist/*.deb dist/*.rpm; do
+            [ -f "$file" ] || continue
+            echo "gh attestation verify $file"
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-plz.yml"
+          done
+
+      - name: The tarball carries the program, the license, the notices, the completions and the man page
         run: |
           scratch="$(mktemp -d)"
           tar xzf "dist/snapall-${TAG#snapall-}-${TARGET}.tar.gz" -C "$scratch"
-          for file in snapall LICENSE README.md THIRD-PARTY-LICENSES.md; do
-            test -f "$scratch/$file" || { echo "the tarball lacks $file" >&2; exit 1; }
+          root="$scratch/snapall-${TAG#snapall-}-${TARGET}"
+          for file in snapall LICENSE README.md THIRD-PARTY-LICENSES.md \
+            completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu \
+            man/snapall.1.gz; do
+            test -f "$root/$file" || { echo "the tarball lacks $file" >&2; exit 1; }
           done
-          head -n 3 "$scratch/LICENSE" | grep -q 'GNU GENERAL PUBLIC LICENSE'
+          head -n 3 "$root/LICENSE" | grep -q 'GNU GENERAL PUBLIC LICENSE'
+          # What is shipped is what the binary generates.
+          "$root/snapall" completions bash | cmp - "$root/completions/snapall.bash"
           # The doctor test below runs the very binary users download.
-          cp "$scratch/snapall" "dist/snapall-${TARGET}"
+          cp "$root/snapall" "dist/snapall-${TARGET}"
 
       - name: snapall doctor --install, with the published binary
         run: docker run --rm -e EXPECT_VERSION -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/doctor-install.sh

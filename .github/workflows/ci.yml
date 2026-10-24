@@ -274,6 +274,45 @@ jobs:
         if: matrix.package != 'none'
         run: docker run --rm -v "$PWD:/w" "${{ matrix.image }}" sh /w/packaging/test/install-package.sh "${{ matrix.package }}"
 
+  completions:
+    name: completions and man page, in real shells
+    needs: static-binary
+    runs-on: ubuntu-latest
+    # The completions are generated from the contract, so the question is whether they *work*:
+    # each shell is run for real (zsh in a pseudo-terminal, pressing Tab) against snapall's own
+    # contract, and the man page goes through groff.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-x86_64
+          path: dist
+      - name: Install the shells and groff
+        timeout-minutes: 10
+        run: |
+          apt="sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          $apt update
+          $apt install -y --no-install-recommends fish zsh groff-base
+          nu_version=0.116.1
+          nu="nu-${nu_version}-x86_64-unknown-linux-musl"
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 3 --max-time 180 \
+            -o "$RUNNER_TEMP/nu.tar.gz" \
+            "https://github.com/nushell/nushell/releases/download/${nu_version}/${nu}.tar.gz"
+          tar xzf "$RUNNER_TEMP/nu.tar.gz" -C "$RUNNER_TEMP"
+          sudo install "$RUNNER_TEMP/${nu}/nu" /usr/local/bin/nu
+      - name: The completions work in bash, fish, zsh and nushell, and the man page is clean roff
+        run: |
+          chmod +x dist/snapall-x86_64-unknown-linux-musl
+          packaging/test/completions.sh dist/snapall-x86_64-unknown-linux-musl
+      - name: The tarball is complete and its binary runs
+        run: |
+          tar xzf dist/snapall-v*-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP"
+          root="$(echo "$RUNNER_TEMP"/snapall-v*-x86_64-unknown-linux-musl)"
+          "$root/snapall" --version
+          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz; do
+            test -f "$root/$file" || { echo "the tarball lacks $file"; exit 1; }
+          done
+
   nix:
     name: nix build
     runs-on: ubuntu-latest
