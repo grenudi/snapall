@@ -21,6 +21,7 @@ pub enum Command {
     Delete,
     Changes,
     Restore,
+    History,
     Doctor,
     Completions,
     Man,
@@ -36,6 +37,7 @@ impl Command {
         Command::Delete,
         Command::Changes,
         Command::Restore,
+        Command::History,
         Command::Doctor,
         Command::Completions,
         Command::Man,
@@ -51,6 +53,7 @@ impl Command {
             Command::Delete => "delete",
             Command::Changes => "changes",
             Command::Restore => "restore",
+            Command::History => "history",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -72,6 +75,7 @@ impl Command {
             Command::Delete => "Delete one snapshot of a config",
             Command::Changes => "Show what restoring a snapshot would change",
             Command::Restore => "Put a config, or one path of it, back to how a snapshot had it",
+            Command::History => "Show how one file stood in each snapshot",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -121,6 +125,9 @@ const OBSERVED: &[Command] = &[
     Command::List,
     Command::Snapshots,
     Command::Delete,
+    Command::Changes,
+    Command::Restore,
+    Command::History,
     Command::Doctor,
     Command::Tui,
 ];
@@ -261,6 +268,7 @@ contract! {
             Command::Delete,
             Command::Changes,
             Command::Restore,
+            Command::History,
             Command::Doctor,
         ],
         env:         Some(Env::new("SNAPALL_JSON")),
@@ -319,6 +327,31 @@ contract! {
         group:       "snapshot",
         example:     "snapall restore home 12 /home/me/notes.txt",
         summary:     "Only this file or directory (an absolute path inside the config). Default: everything that differs.",
+        ..Input::EMPTY
+    };
+
+    /// The file whose history to show.
+    HISTORY_FILE: std::path::PathBuf, Command = Input {
+        key:         "history_file",
+        ty:          Type::Path,
+        required:    true,
+        subcommands: &[Command::History],
+        arg:         Some(Arg { value_name: "FILE", ..Arg::positional(0) }),
+        group:       "history",
+        example:     "snapall history ~/notes.txt",
+        summary:     "The file (required). The config that covers it is found from where it is.",
+        ..Input::EMPTY
+    };
+
+    /// Open the TUI on one file.
+    TUI_FILE: std::path::PathBuf, Command = Input {
+        key:         "tui_file",
+        ty:          Type::Path,
+        subcommands: &[Command::Tui],
+        arg:         Some(Arg::long("file")),
+        group:       "tui",
+        example:     "snapall tui --file ~/notes.txt",
+        summary:     "Open on the history of this file, with its versions to restore, instead of on all configs.",
         ..Input::EMPTY
     };
 

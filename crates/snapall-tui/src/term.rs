@@ -155,10 +155,12 @@ fn event_loop(
                         MouseEventKind::Down(MouseButton::Left) => {
                             view::hit_test(&state, screen, mouse.column, mouse.row).map(Msg::Click)
                         }
-                        MouseEventKind::ScrollUp => view::pane_at(screen, mouse.column, mouse.row)
-                            .map(|pane| Msg::Scroll { pane, delta: -1 }),
+                        MouseEventKind::ScrollUp => {
+                            view::pane_at(&state, screen, mouse.column, mouse.row)
+                                .map(|pane| Msg::Scroll { pane, delta: -1 })
+                        }
                         MouseEventKind::ScrollDown => {
-                            view::pane_at(screen, mouse.column, mouse.row)
+                            view::pane_at(&state, screen, mouse.column, mouse.row)
                                 .map(|pane| Msg::Scroll { pane, delta: 1 })
                         }
                         _ => None,

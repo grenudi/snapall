@@ -7,8 +7,8 @@
 use serde_json::{json, Value};
 use snapall_core::doctor::{Check, OsRelease, Status};
 use snapall_core::{
-    ChangeKind, ConfigName, Description, Plan, Preview, Report, Restored, SnapshotId, SnapshotInfo,
-    SnapshotKind,
+    ChangeKind, ConfigName, Description, FileHistory, Plan, Preview, Report, Restored, SnapshotId,
+    SnapshotInfo, SnapshotKind,
 };
 
 pub fn report(report: &Report) -> String {
@@ -130,6 +130,52 @@ pub fn deleted(config: &ConfigName, id: SnapshotId) -> String {
 
 pub fn deleted_json(config: &ConfigName, id: SnapshotId) -> Value {
     json!({"config": config.as_str(), "deleted": id.get()})
+}
+
+pub fn history(history: &FileHistory) -> String {
+    let mut out = format!("{}  (config {})\n", history.path, history.config);
+    if history.versions.is_empty() {
+        out.push_str("no snapshots of this config yet\n");
+        return out;
+    }
+    let width = history
+        .versions
+        .iter()
+        .map(|v| v.snapshot.id.to_string().len())
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    out.push_str(&format!(
+        "{:>width$}  {:<19}  {:<16}  description\n",
+        "#", "date", "state"
+    ));
+    for version in &history.versions {
+        out.push_str(&format!(
+            "{:>width$}  {:<19}  {:<16}  {}\n",
+            version.snapshot.id,
+            version.snapshot.date.as_deref().unwrap_or("-"),
+            version.state.label(),
+            version.snapshot.description
+        ));
+    }
+    out
+}
+
+pub fn history_json(history: &FileHistory) -> Value {
+    let versions: Vec<Value> = history
+        .versions
+        .iter()
+        .map(|v| {
+            json!({
+                "snapshot": v.snapshot.id.get(),
+                "date": v.snapshot.date,
+                "description": v.snapshot.description,
+                "state": v.state.token(),
+                "restorable": v.state.restorable(),
+            })
+        })
+        .collect();
+    json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
 }
 
 pub fn doctor(os: &OsRelease, checks: &[Check]) -> String {

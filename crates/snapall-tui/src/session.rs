@@ -14,8 +14,8 @@
 use std::collections::VecDeque;
 
 use snapall_core::{
-    delete_snapshot, plan_snapshots, preview_restore, restore_snapshot, run_plan, snapshots_of,
-    SnapshotBackend, SnapshotError,
+    delete_snapshot, file_versions_of, plan_snapshots, preview_restore, restore_snapshot, run_plan,
+    snapshots_of, SnapshotBackend, SnapshotError,
 };
 
 use crate::model::{update, Effect, Key, Msg, State, UiContext};
@@ -62,14 +62,28 @@ impl<'a> Executor<'a> {
                     }
                 })
             }
-            Effect::LoadChanges { config, id } => {
-                let result = preview_restore(backend, &config, id, None).map_err(|e| e.to_string());
+            Effect::LoadChanges { config, id, path } => {
+                let result = preview_restore(backend, &config, id, path.as_deref())
+                    .map_err(|e| e.to_string());
                 Msg::ChangesLoaded { config, id, result }
             }
-            Effect::Restore { config, id } => {
-                let result =
-                    restore_snapshot(backend, &config, id, None).map_err(|e| e.to_string());
-                Msg::Restored { config, id, result }
+            Effect::Restore { config, id, path } => {
+                let result = restore_snapshot(backend, &config, id, path.as_deref())
+                    .map_err(|e| e.to_string());
+                Msg::Restored {
+                    config,
+                    id,
+                    path,
+                    result,
+                }
+            }
+            Effect::LoadFileVersions { config, path } => {
+                let result = file_versions_of(backend, &config, &path).map_err(|e| e.to_string());
+                Msg::FileVersionsLoaded {
+                    config,
+                    path,
+                    result,
+                }
             }
             Effect::Delete { config, ids } => {
                 let results = ids

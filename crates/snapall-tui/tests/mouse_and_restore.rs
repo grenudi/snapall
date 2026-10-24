@@ -306,9 +306,19 @@ fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() 
         delta: 1,
     });
     assert_eq!(session.state.selected_config().unwrap().name, name("iso"));
-    assert_eq!(view::pane_at(SIZE, 5, 5), Some(Pane::Configs));
-    assert_eq!(view::pane_at(SIZE, 60, 5), Some(Pane::Snapshots));
-    assert_eq!(view::pane_at(SIZE, 5, 23), None, "the footer is not a pane");
+    assert_eq!(
+        view::pane_at(&session.state, SIZE, 5, 5),
+        Some(Pane::Configs)
+    );
+    assert_eq!(
+        view::pane_at(&session.state, SIZE, 60, 5),
+        Some(Pane::Snapshots)
+    );
+    assert_eq!(
+        view::pane_at(&session.state, SIZE, 5, 23),
+        None,
+        "the footer is not a pane"
+    );
 }
 
 #[test]
@@ -329,7 +339,7 @@ fn no_click_or_scroll_panics_however_small_the_terminal_or_whatever_prompt_is_op
                         let _ = view::hit_test(&session.state, size, col, row);
                     }
                 }
-                let _ = view::pane_at(size, 1, 1);
+                let _ = view::pane_at(&session.state, size, 1, 1);
             }
         }
         session.press(Key::Esc);
@@ -447,6 +457,7 @@ fn the_system_root_gets_the_supported_route_and_no_way_to_confirm() {
         boot_tip: None,
         restore_route:
             "to restore the system: reboot, pick the snapshot, run limine-snapper-restore".into(),
+        file: None,
     };
     let mut session = Session::with_context(&backend, context);
     session.press(Key::Right);
@@ -530,6 +541,7 @@ fn the_boot_tip_is_shown_until_a_real_notice_needs_the_line_and_returns_after() 
     let context = UiContext {
         boot_tip: Some(tip.into()),
         restore_route: String::new(),
+        file: None,
     };
     let mut session = Session::with_context(&backend, context);
     let screen = |s: &Session<'_>| rows(&s.state, 120, 24).join("\n");

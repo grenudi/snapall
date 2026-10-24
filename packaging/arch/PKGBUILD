@@ -58,4 +58,10 @@ package() {
   # The launcher entry and its icon.
   install -Dm644 packaging/desktop/snapall.desktop -t "$pkgdir/usr/share/applications/"
   install -Dm644 packaging/desktop/snapall.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/apps/"
+  # "Restore from snapshots" in the file managers.
+  install -Dm755 packaging/filemanagers/snapall-file-menu -t "$pkgdir/usr/bin/"
+  install -Dm644 packaging/filemanagers/snapall.kio-servicemenu.desktop "$pkgdir/usr/share/kio/servicemenus/snapall.desktop"
+  install -Dm644 packaging/filemanagers/snapall.nemo_action -t "$pkgdir/usr/share/nemo/actions/"
+  install -Dm644 packaging/filemanagers/snapall.libfm-action.desktop "$pkgdir/usr/share/file-manager/actions/snapall.desktop"
+  install -Dm644 packaging/filemanagers/snapall-nautilus.py "$pkgdir/usr/share/nautilus-python/extensions/snapall.py"
 }

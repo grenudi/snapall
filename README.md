@@ -84,6 +84,11 @@ sudo install -Dm644 completions/_snapall /usr/local/share/zsh/site-functions/_sn
 sudo install -Dm644 completions/snapall.fish /usr/local/share/fish/vendor_completions.d/snapall.fish
 sudo install -Dm644 desktop/snapall.desktop /usr/local/share/applications/snapall.desktop
 sudo install -Dm644 desktop/snapall.svg /usr/local/share/icons/hicolor/scalable/apps/snapall.svg
+sudo install -Dm755 filemanagers/snapall-file-menu /usr/local/bin/snapall-file-menu
+sudo install -Dm644 filemanagers/snapall.kio-servicemenu.desktop /usr/local/share/kio/servicemenus/snapall.desktop
+sudo install -Dm644 filemanagers/snapall.nemo_action /usr/local/share/nemo/actions/snapall.nemo_action
+sudo install -Dm644 filemanagers/snapall.libfm-action.desktop /usr/local/share/file-manager/actions/snapall.desktop
+sudo install -Dm644 filemanagers/snapall-nautilus.py /usr/local/share/nautilus-python/extensions/snapall.py
 ```
 
 This is a static binary and it does not install snapper. `sudo snapall doctor --install` does that where it can, and otherwise prints what to run on your system.
@@ -114,7 +119,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall tui` | The interactive terminal UI. |
 | `snapall contract` | This program's invocation contract, as [argenv](https://github.com/argenv-opencommons/argenv) JSON. |
 
-`--json` (on `create`, `list`, `snapshots`, `delete`, `changes`, `restore` and `doctor`) prints machine-readable output; `--no-dbus` talks to libsnapper directly (root only; for containers and CI). Every flag has a documented home in `snapall --help`, which is generated from the same declarations that parse the command line.
+`--json` (on `create`, `list`, `snapshots`, `delete`, `changes`, `restore`, `history` and `doctor`) prints machine-readable output; `--no-dbus` talks to libsnapper directly (root only; for containers and CI). Every flag has a documented home in `snapall --help`, which is generated from the same declarations that parse the command line.
 
 Nothing is assumed: an unknown config name is an error, never a silent skip; one failing config does not stop the others, every outcome is printed, and the exit status says whether any failed.
 
@@ -199,6 +204,10 @@ The mouse works too: click a config or a snapshot to select it, the first column
 Snapper calls run in the background: the header shows *working* while one is in flight, the screen stays responsive, and keys that would start more work are refused until it finishes. Quitting while work is in flight waits for it to complete.
 
 > Snapshots live on the same disk. They are not backups.
+
+### Restore one file from your file manager
+
+Right-click a file and choose **Restore from snapshots**: snapall opens on that file, showing how it stood in every snapshot, and Enter or a click puts the version you pick back (after snapshotting the current state, so it can be undone). The packages install the entry for Dolphin (KDE), Nemo (Cinnamon) and PCManFM(-Qt); Nautilus (GNOME) needs its Python bindings, and Thunar (Xfce) one custom action. [docs/file-managers.md](docs/file-managers.md) has each, and the limits. From a terminal: `snapall history FILE`, or `sudo snapall tui --file FILE`.
 
 ### Restoring
 

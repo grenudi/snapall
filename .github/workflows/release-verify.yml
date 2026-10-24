@@ -134,7 +134,7 @@ jobs:
           root="$scratch/snapall-${TAG#snapall-}-${TARGET}"
           for file in snapall LICENSE README.md THIRD-PARTY-LICENSES.md \
             completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu \
-            man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg; do
+            man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg filemanagers/snapall-file-menu filemanagers/snapall.kio-servicemenu.desktop filemanagers/snapall.nemo_action filemanagers/snapall.libfm-action.desktop filemanagers/snapall-nautilus.py; do
             test -f "$root/$file" || { echo "the tarball lacks $file" >&2; exit 1; }
           done
           head -n 3 "$root/LICENSE" | grep -q 'GNU GENERAL PUBLIC LICENSE'

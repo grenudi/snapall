@@ -9,7 +9,9 @@
 
 use std::collections::BTreeSet;
 
-use snapall_core::{ConfigName, Description, Preview, Restored, SnapshotId, SnapshotInfo};
+use snapall_core::{
+    ConfigName, Description, FileState, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
+};
 
 /// A key, independent of any terminal library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +52,22 @@ pub struct ConfigEntry {
     pub snapshots: Load<Vec<SnapshotInfo>>,
 }
 
+/// One file the UI was opened on: where it is, and the config whose snapshots hold its history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileTarget {
+    pub path: String,
+    pub config: ConfigName,
+}
+
+/// The file history screen's own state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileView {
+    pub target: FileTarget,
+    /// Oldest first, as the backend gives them; shown newest first.
+    pub versions: Load<Vec<FileVersion>>,
+    pub cursor: usize,
+}
+
 /// What the UI is told about the machine it runs on, once, at the start. The model never reads
 /// the machine; the shell does, and hands over plain text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -59,6 +77,8 @@ pub struct UiContext {
     pub boot_tip: Option<String>,
     /// How to restore the *system itself*, shown instead of a confirm button for the system root.
     pub restore_route: String,
+    /// Open on this file's history instead of on all configs.
+    pub file: Option<FileTarget>,
 }
 
 /// Something that can be clicked. Each is the mouse spelling of a key.
@@ -138,6 +158,8 @@ pub enum Modal {
     Restore {
         config: ConfigName,
         id: SnapshotId,
+        /// One path of the config, or `None` for all of it.
+        path: Option<String>,
         stage: RestoreStage,
     },
     Help,
@@ -168,6 +190,8 @@ pub struct State {
     pub spinner: usize,
     /// What the shell told the UI about the machine, once, at the start.
     pub context: UiContext,
+    /// Set when the UI was opened on one file: the screen is then that file's history.
+    pub file: Option<FileView>,
 }
 
 impl Default for State {
@@ -184,15 +208,30 @@ impl Default for State {
             pending: 0,
             spinner: 0,
             context: UiContext::default(),
+            file: None,
         }
     }
 }
 
 impl State {
     pub fn with_context(context: UiContext) -> Self {
+        let file = context.file.clone().map(|target| FileView {
+            target,
+            versions: Load::NotLoaded,
+            cursor: 0,
+        });
         Self {
             context,
+            file,
             ..Self::default()
+        }
+    }
+
+    /// The versions of the open file, newest first.
+    pub fn displayed_versions(&self) -> Vec<&FileVersion> {
+        match self.file.as_ref().map(|view| &view.versions) {
+            Some(Load::Loaded(list)) => list.iter().rev().collect(),
+            _ => Vec::new(),
         }
     }
 
@@ -250,11 +289,18 @@ pub enum Effect {
     LoadChanges {
         config: ConfigName,
         id: SnapshotId,
+        path: Option<String>,
     },
     /// Put `config` back to how `id` had it (after a safety snapshot).
     Restore {
         config: ConfigName,
         id: SnapshotId,
+        path: Option<String>,
+    },
+    /// How the file stood in each snapshot of its config.
+    LoadFileVersions {
+        config: ConfigName,
+        path: String,
     },
 }
 
@@ -280,7 +326,13 @@ pub enum Msg {
     Restored {
         config: ConfigName,
         id: SnapshotId,
+        path: Option<String>,
         result: Result<Restored, String>,
+    },
+    FileVersionsLoaded {
+        config: ConfigName,
+        path: String,
+        result: Result<Vec<FileVersion>, String>,
     },
     ConfigsLoaded(Result<Vec<ConfigName>, String>),
     SnapshotsLoaded {
@@ -301,7 +353,13 @@ pub enum Msg {
 /// everything else.
 pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
     let effects = match msg {
-        Msg::Start => vec![Effect::LoadConfigs],
+        Msg::Start => match &state.file {
+            Some(view) => vec![Effect::LoadFileVersions {
+                config: view.target.config.clone(),
+                path: view.target.path.clone(),
+            }],
+            None => vec![Effect::LoadConfigs],
+        },
         Msg::Tick => {
             state.spinner = state.spinner.wrapping_add(1);
             Vec::new()
@@ -313,9 +371,22 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             settle(state);
             on_changes_loaded(state, &config, id, result)
         }
-        Msg::Restored { config, id, result } => {
+        Msg::Restored {
+            config,
+            id,
+            path,
+            result,
+        } => {
             settle(state);
-            on_restored(state, &config, id, result)
+            on_restored(state, &config, id, path, result)
+        }
+        Msg::FileVersionsLoaded {
+            config,
+            path,
+            result,
+        } => {
+            settle(state);
+            on_file_versions_loaded(state, &config, &path, result)
         }
         Msg::ConfigsLoaded(result) => {
             settle(state);
@@ -353,6 +424,9 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
             "busy: wait for the current operation to finish".into(),
         ));
         return Vec::new();
+    }
+    if state.file.is_some() {
+        return on_file_key(state, key);
     }
     match key {
         Key::CtrlC | Key::Char('q') => {
@@ -470,22 +544,35 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
                 Vec::new()
             }
         },
-        Modal::Restore { config, id, stage } => {
-            // Only a prompt with real changes to restore, on a config that may be restored whole,
-            // can be confirmed. Anything else is information, and any key closes it.
+        Modal::Restore {
+            config,
+            id,
+            path,
+            stage,
+        } => {
+            // Only a prompt with real changes to restore can be confirmed, and the system root only
+            // when it is a single path of it. Anything else is information, and any key closes it.
             let actionable = matches!(
                 &stage,
-                RestoreStage::Ready(p) if !p.is_system_root && !p.changes.is_empty()
+                RestoreStage::Ready(p) if (path.is_some() || !p.is_system_root) && !p.changes.is_empty()
             );
             match key {
                 Key::Char('y' | 'Y') | Key::Enter if actionable => {
-                    state.notice = Some(Notice::Info(format!("restoring {config} to #{id}")));
-                    vec![Effect::Restore { config, id }]
+                    state.notice = Some(Notice::Info(match &path {
+                        Some(path) => format!("restoring {path} from #{id}"),
+                        None => format!("restoring {config} to #{id}"),
+                    }));
+                    vec![Effect::Restore { config, id, path }]
                 }
                 Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Vec::new(),
                 _ if !actionable && stage != RestoreStage::Loading => Vec::new(),
                 _ => {
-                    state.modal = Some(Modal::Restore { config, id, stage });
+                    state.modal = Some(Modal::Restore {
+                        config,
+                        id,
+                        path,
+                        stage,
+                    });
                     Vec::new()
                 }
             }
@@ -767,9 +854,14 @@ fn open_restore(state: &mut State) -> Vec<Effect> {
     state.modal = Some(Modal::Restore {
         config: config.clone(),
         id,
+        path: None,
         stage: RestoreStage::Loading,
     });
-    vec![Effect::LoadChanges { config, id }]
+    vec![Effect::LoadChanges {
+        config,
+        id,
+        path: None,
+    }]
 }
 
 fn on_changes_loaded(
@@ -783,6 +875,7 @@ fn on_changes_loaded(
         config: asked_config,
         id: asked_id,
         stage,
+        ..
     }) = &mut state.modal
     {
         if asked_config == config && *asked_id == id && *stage == RestoreStage::Loading {
@@ -799,18 +892,130 @@ fn on_restored(
     state: &mut State,
     config: &ConfigName,
     id: SnapshotId,
+    path: Option<String>,
     result: Result<Restored, String>,
 ) -> Vec<Effect> {
-    state.notice = Some(match result {
-        Ok(done) => Notice::Info(format!(
+    state.notice = Some(match (&result, &path) {
+        (Ok(done), Some(path)) => Notice::Info(format!(
+            "restored {path} from #{id}; the state before is #{}, restore it to undo",
+            done.safety_snapshot
+        )),
+        (Ok(done), None) => Notice::Info(format!(
             "restored {config} to #{id}; the state before is #{}, restore it to undo",
             done.safety_snapshot
         )),
-        Err(error) => Notice::Error(error),
+        (Err(error), _) => Notice::Error(error.clone()),
     });
     state.marked.clear();
     // Reload either way: a safety snapshot may exist even when the restore itself failed.
-    vec![Effect::LoadSnapshots(config.clone())]
+    match &state.file {
+        Some(view) => vec![Effect::LoadFileVersions {
+            config: view.target.config.clone(),
+            path: view.target.path.clone(),
+        }],
+        None => vec![Effect::LoadSnapshots(config.clone())],
+    }
+}
+
+// ---- the file history screen --------------------------------------------------------------
+
+fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
+    let count = state.displayed_versions().len();
+    let Some(view) = state.file.as_mut() else {
+        return Vec::new();
+    };
+    match key {
+        Key::CtrlC | Key::Char('q') => {
+            state.quit = true;
+            Vec::new()
+        }
+        Key::Char('?') => {
+            state.modal = Some(Modal::Help);
+            Vec::new()
+        }
+        Key::Up | Key::Char('k') => {
+            view.cursor = clamp_step(view.cursor, -1, count);
+            Vec::new()
+        }
+        Key::Down | Key::Char('j') => {
+            view.cursor = clamp_step(view.cursor, 1, count);
+            Vec::new()
+        }
+        Key::Home | Key::Char('g') => {
+            view.cursor = 0;
+            Vec::new()
+        }
+        Key::End | Key::Char('G') => {
+            view.cursor = count.saturating_sub(1);
+            Vec::new()
+        }
+        Key::Char('r') => {
+            state.notice = Some(Notice::Info("reloading".into()));
+            vec![Effect::LoadFileVersions {
+                config: view.target.config.clone(),
+                path: view.target.path.clone(),
+            }]
+        }
+        Key::Enter | Key::Char('u') => open_file_restore(state),
+        _ => Vec::new(),
+    }
+}
+
+fn open_file_restore(state: &mut State) -> Vec<Effect> {
+    let Some(view) = state.file.as_ref() else {
+        return Vec::new();
+    };
+    let (config, path) = (view.target.config.clone(), view.target.path.clone());
+    let cursor = view.cursor;
+    let Some(version) = state
+        .displayed_versions()
+        .get(cursor)
+        .map(|v| (v.snapshot.id, v.state))
+    else {
+        state.notice = Some(Notice::Error("no version to restore".into()));
+        return Vec::new();
+    };
+    let (id, file_state) = version;
+    if !file_state.restorable() {
+        state.notice = Some(Notice::Info(match file_state {
+            FileState::Same => format!("the file is already the same as in #{id}"),
+            _ => format!("the file did not exist in #{id}: there is nothing to restore"),
+        }));
+        return Vec::new();
+    }
+    state.modal = Some(Modal::Restore {
+        config: config.clone(),
+        id,
+        path: Some(path.clone()),
+        stage: RestoreStage::Loading,
+    });
+    vec![Effect::LoadChanges {
+        config,
+        id,
+        path: Some(path),
+    }]
+}
+
+fn on_file_versions_loaded(
+    state: &mut State,
+    config: &ConfigName,
+    path: &str,
+    result: Result<Vec<FileVersion>, String>,
+) -> Vec<Effect> {
+    if let Some(view) = state.file.as_mut() {
+        if &view.target.config == config && view.target.path == path {
+            view.versions = match result {
+                Ok(list) => Load::Loaded(list),
+                Err(error) => Load::Failed(error),
+            };
+            let len = match &view.versions {
+                Load::Loaded(list) => list.len(),
+                _ => 0,
+            };
+            view.cursor = view.cursor.min(len.saturating_sub(1));
+        }
+    }
+    Vec::new()
 }
 
 fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
@@ -826,6 +1031,16 @@ fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
         }
         _ if state.modal.is_some() => Vec::new(),
         Click::Button(button) => on_key(state, button.key()),
+        Click::Row { index, .. } if state.file.is_some() => {
+            let count = state.displayed_versions().len();
+            if let Some(view) = state.file.as_mut() {
+                if index < count {
+                    view.cursor = index;
+                }
+            }
+            Vec::new()
+        }
+        Click::Mark { .. } if state.file.is_some() => Vec::new(),
         Click::Row { pane, index } => {
             state.focus = pane;
             match pane {
@@ -852,6 +1067,13 @@ fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
 
 fn on_scroll(state: &mut State, pane: Pane, delta: i32) -> Vec<Effect> {
     if state.modal.is_some() {
+        return Vec::new();
+    }
+    if state.file.is_some() {
+        let count = state.displayed_versions().len();
+        if let Some(view) = state.file.as_mut() {
+            view.cursor = clamp_step(view.cursor, delta as isize, count);
+        }
         return Vec::new();
     }
     // The wheel moves the pane under the pointer without taking the keyboard focus from the other.

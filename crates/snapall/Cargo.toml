@@ -56,6 +56,12 @@ assets = [
     # The launcher entry (a terminal running `sudo snapall tui`) and its icon.
     ["../../packaging/desktop/snapall.desktop", "usr/share/applications/snapall.desktop", "644"],
     ["../../packaging/desktop/snapall.svg", "usr/share/icons/hicolor/scalable/apps/snapall.svg", "644"],
+    # "Restore from snapshots" in the file managers: the launcher, then one entry per file manager.
+    ["../../packaging/filemanagers/snapall-file-menu", "usr/bin/", "755"],
+    ["../../packaging/filemanagers/snapall.kio-servicemenu.desktop", "usr/share/kio/servicemenus/snapall.desktop", "644"],
+    ["../../packaging/filemanagers/snapall.nemo_action", "usr/share/nemo/actions/snapall.nemo_action", "644"],
+    ["../../packaging/filemanagers/snapall.libfm-action.desktop", "usr/share/file-manager/actions/snapall.desktop", "644"],
+    ["../../packaging/filemanagers/snapall-nautilus.py", "usr/share/nautilus-python/extensions/snapall.py", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -75,6 +81,12 @@ assets = [
     # The launcher entry (a terminal running `sudo snapall tui`) and its icon.
     { source = "../../packaging/desktop/snapall.desktop", dest = "/usr/share/applications/snapall.desktop", mode = "644" },
     { source = "../../packaging/desktop/snapall.svg", dest = "/usr/share/icons/hicolor/scalable/apps/snapall.svg", mode = "644" },
+    # "Restore from snapshots" in the file managers: the launcher, then one entry per file manager.
+    { source = "../../packaging/filemanagers/snapall-file-menu", dest = "/usr/bin/snapall-file-menu", mode = "755" },
+    { source = "../../packaging/filemanagers/snapall.kio-servicemenu.desktop", dest = "/usr/share/kio/servicemenus/snapall.desktop", mode = "644" },
+    { source = "../../packaging/filemanagers/snapall.nemo_action", dest = "/usr/share/nemo/actions/snapall.nemo_action", mode = "644" },
+    { source = "../../packaging/filemanagers/snapall.libfm-action.desktop", dest = "/usr/share/file-manager/actions/snapall.desktop", mode = "644" },
+    { source = "../../packaging/filemanagers/snapall-nautilus.py", dest = "/usr/share/nautilus-python/extensions/snapall.py", mode = "644" },
 ]
 
 [package.metadata.generate-rpm.requires]

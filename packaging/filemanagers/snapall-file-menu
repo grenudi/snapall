@@ -1,0 +1,54 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Open snapall on the history of one file, in a terminal, as root. Every file manager's
+# "Restore from snapshots" entry runs this with the file as its only argument.
+#
+# A terminal is needed because snapper wants root, and a terminal is where sudo can ask for the
+# password. Which flag runs a command inside a terminal differs from one to the next, so this
+# prefers xdg-terminal-exec (the cross-desktop answer to exactly that), then $TERMINAL, then a short
+# list of terminals whose flags are known. Anything else gets an explanation, not a guess.
+
+if [ "$#" -ne 1 ] || [ -z "$1" ]; then
+  echo "usage: snapall-file-menu FILE" >&2
+  exit 2
+fi
+file=$1
+
+# What runs inside the terminal. If snapall stops with an error the terminal would close on it
+# before it can be read, so it waits for Enter. The file name is an argument, never part of the
+# command text, so any characters in it are safe.
+inner='sudo snapall tui --file "$1" || { echo; echo "snapall could not open this file (see above)."; printf "Press Enter to close. "; read -r _; }'
+
+# launch TERMINAL: run the command in it, with the flag that terminal wants.
+launch() {
+  term=$1
+  case "${term##*/}" in
+    konsole | alacritty | xterm) exec "$term" -e sh -c "$inner" sh "$file" ;;
+    gnome-terminal | ptyxis)     exec "$term" -- sh -c "$inner" sh "$file" ;;
+    xfce4-terminal)              exec "$term" -x sh -c "$inner" sh "$file" ;;
+    kitty | foot)                exec "$term" sh -c "$inner" sh "$file" ;;
+    wezterm)                     exec "$term" start -- sh -c "$inner" sh "$file" ;;
+  esac
+  return 1
+}
+
+if command -v xdg-terminal-exec >/dev/null 2>&1; then
+  exec xdg-terminal-exec sh -c "$inner" sh "$file"
+fi
+
+# $TERMINAL first (it is the user's choice), then the known ones.
+for candidate in "${TERMINAL:-}" konsole gnome-terminal ptyxis xfce4-terminal alacritty kitty foot wezterm xterm; do
+  [ -n "$candidate" ] || continue
+  path=$(command -v "$candidate" 2>/dev/null) || continue
+  launch "$path"
+done
+
+message="snapall could not find a terminal it knows how to run a command in. Install xdg-terminal-exec, or set TERMINAL to one of: konsole, gnome-terminal, ptyxis, xfce4-terminal, alacritty, kitty, foot, wezterm, xterm."
+echo "$message" >&2
+for notifier in notify-send; do
+  command -v "$notifier" >/dev/null 2>&1 && "$notifier" snapall "$message"
+done
+exit 1

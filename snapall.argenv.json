@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-24T13:56:17Z",
+  "generated": "2026-10-24T20:48:45Z",
   "inputs": [
     {
       "allowed": [],
@@ -105,6 +105,9 @@
         "list",
         "snapshots",
         "delete",
+        "changes",
+        "restore",
+        "history",
         "doctor",
         "tui"
       ],
@@ -133,6 +136,9 @@
         "list",
         "snapshots",
         "delete",
+        "changes",
+        "restore",
+        "history",
         "doctor",
         "tui"
       ],
@@ -225,6 +231,7 @@
         "delete",
         "changes",
         "restore",
+        "history",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -316,6 +323,45 @@
     {
       "allowed": [],
       "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "FILE"
+      },
+      "example": "snapall history ~/notes.txt",
+      "group": "history",
+      "key": "history_file",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "history"
+      ],
+      "summary": "The file (required). The config that covers it is found from where it is.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "file",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall tui --file ~/notes.txt",
+      "group": "tui",
+      "key": "tui_file",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "tui"
+      ],
+      "summary": "Open on the history of this file, with its versions to restore, instead of on all configs.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
         "arity": 0,
         "long": "install",
         "negatable": false,
@@ -400,5 +446,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.4.2"
+  "source": "snapall@0.6.0"
 }

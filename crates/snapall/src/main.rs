@@ -28,8 +28,8 @@ use argenv_resolve::ProcessEnv;
 use serde_json::Value;
 use snapall_core::boot;
 use snapall_core::{
-    all_snapshots, delete_snapshot, plan_snapshots, preview_restore, restore_snapshot, run_plan,
-    snapshots_of, Observer, RestoreError, Silent, SnapshotBackend,
+    all_snapshots, config_covering, delete_snapshot, file_history, plan_snapshots, preview_restore,
+    restore_snapshot, run_plan, snapshots_of, Observer, RestoreError, Silent, SnapshotBackend,
 };
 use snapall_observe::{Format, Lines, Observed};
 use snapall_snapper::SnapperCli;
@@ -323,15 +323,37 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
                 &Contract::records(),
             )?)?;
         }
-        Request::Tui => {
+        Request::History { path } => {
+            let found = file_history(&backend, &absolute(&path)?)?;
+            if json {
+                emit_json(&render::history_json(&found))?;
+            } else {
+                emit(&render::history(&found))?;
+            }
+        }
+        Request::Tui { file } => {
             if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
                 return Err("`snapall tui` needs an interactive terminal".into());
             }
+            // Which config covers the file is settled here, before the terminal is taken over, so
+            // that a file nothing covers is an error message and not a screen that opens empty.
+            let target = match file {
+                Some(named) => {
+                    let path = absolute(&named)?;
+                    if std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
+                        return Err("directories are not supported yet: choose a file".into());
+                    }
+                    let config = config_covering(&backend, &path)?;
+                    Some(snapall_tui::FileTarget { path, config })
+                }
+                None => None,
+            };
             // Looked at once, here, because the UI's model must not read the machine itself.
             let status = boot::assess(&boot_probe::system());
             let context = snapall_tui::UiContext {
                 boot_tip: if hints { boot::hint(&status) } else { None },
                 restore_route: boot::restore_route(&status),
+                file: target,
             };
             match snapall_tui::run(&backend, context)? {
                 snapall_tui::Exit::Quit => {}
@@ -343,4 +365,28 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// The absolute path of what the user named. A relative path is taken from the working directory,
+/// and symlinks in the *directory* part are resolved, so that a path reached through `/home` being
+/// a link to `/var/home` is found in the subvolume that really holds it. The file's own name is
+/// kept as given: a symlink is itself what is asked about, and a deleted file has nothing to resolve.
+fn absolute(path: &str) -> Result<String, Box<dyn Error>> {
+    let given = std::path::Path::new(path);
+    let joined = if given.is_absolute() {
+        given.to_owned()
+    } else {
+        std::env::current_dir()?.join(given)
+    };
+    let (Some(parent), Some(name)) = (joined.parent(), joined.file_name()) else {
+        return Err(format!("`{path}` does not name a file").into());
+    };
+    let parent = parent
+        .canonicalize()
+        .map_err(|e| format!("{}: {e}", parent.display()))?;
+    parent
+        .join(name)
+        .to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| "a path must be valid UTF-8".into())
 }
