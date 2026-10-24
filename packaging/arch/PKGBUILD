@@ -27,6 +27,14 @@ build() {
   cd "$_dir"
   export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
   cargo build --frozen --release -p snapall
+  # Completions and the man page come from the contract the binary was built with. Generated
+  # here, not in package(): that runs under fakeroot, which is for installing files, not for
+  # running the program. (makepkg sets SOURCE_DATE_EPOCH, so the man page date is reproducible.)
+  target/release/snapall completions bash > target/snapall.bash
+  target/release/snapall completions zsh > target/_snapall
+  target/release/snapall completions fish > target/snapall.fish
+  target/release/snapall completions nushell > target/snapall.nu
+  target/release/snapall man | gzip -9n > target/snapall.1.gz
 }
 
 check() {
@@ -42,11 +50,9 @@ package() {
   python packaging/third-party-licenses.py "$(rustc -vV | sed -n 's/host: //p')"
   install -Dm644 LICENSE THIRD-PARTY-LICENSES.md -t "$pkgdir/usr/share/licenses/$pkgname/"
   install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
-  # Completions and the man page come from the contract the binary was built with.
-  # (makepkg sets SOURCE_DATE_EPOCH, so the man page date is reproducible.)
-  target/release/snapall completions bash | install -Dm644 /dev/stdin "$pkgdir/usr/share/bash-completion/completions/$pkgname"
-  target/release/snapall completions zsh | install -Dm644 /dev/stdin "$pkgdir/usr/share/zsh/site-functions/_$pkgname"
-  target/release/snapall completions fish | install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_completions.d/$pkgname.fish"
-  target/release/snapall completions nushell | install -Dm644 /dev/stdin "$pkgdir/usr/share/nushell/vendor/autoload/$pkgname.nu"
-  target/release/snapall man | gzip -9n | install -Dm644 /dev/stdin "$pkgdir/usr/share/man/man1/$pkgname.1.gz"
+  install -Dm644 target/snapall.bash "$pkgdir/usr/share/bash-completion/completions/$pkgname"
+  install -Dm644 target/_snapall "$pkgdir/usr/share/zsh/site-functions/_$pkgname"
+  install -Dm644 target/snapall.fish "$pkgdir/usr/share/fish/vendor_completions.d/$pkgname.fish"
+  install -Dm644 target/snapall.nu "$pkgdir/usr/share/nushell/vendor/autoload/$pkgname.nu"
+  install -Dm644 target/snapall.1.gz "$pkgdir/usr/share/man/man1/$pkgname.1.gz"
 }

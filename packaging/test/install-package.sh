@@ -90,5 +90,8 @@ echo "$files" | grep -q 'man/man1/snapall.1.gz$' || fail "no man page in the pac
 snapall completions bash | cmp - /usr/share/bash-completion/completions/snapall || fail "the installed bash completion is not the generated one"
 snapall completions zsh | cmp - /usr/share/zsh/site-functions/_snapall || fail "the installed zsh completion is not the generated one"
 if command -v bash >/dev/null 2>&1; then bash -n /usr/share/bash-completion/completions/snapall || fail "the bash completion has a syntax error"; fi
-gzip -dc /usr/share/man/man1/snapall.1.gz | head -n 1 | grep -q '^\.TH SNAPALL 1 ' || fail "the man page is not a man page"
+# The man page is checked through the binary that generates it, not on disk: container images
+# configure the package managers to leave /usr/share/man out (as they do the documentation), so
+# the list above is the proof that the package ships it.
+snapall man | head -n 1 | grep -q '^\.TH SNAPALL 1 ' || fail "snapall man does not print a man page"
 echo "PASS: $kind on $ID"
