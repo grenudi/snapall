@@ -348,6 +348,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
       - run: nix build .#snapall --print-build-logs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flake-lock
+          path: flake.lock
       - run: result/bin/snapall --version
       - name: The wrapper puts snapper on the PATH by itself
         run: env -i result/bin/snapall doctor | tee /dev/stderr | grep -q '^ok    snapper' || true
