@@ -79,14 +79,14 @@ A misspelled `SNAPALL_*` variable is an **error** with a suggestion (`SNAPALL_NO
 Every release file (the tarball, the `.deb`, the `.rpm`) comes with a **signed statement of where it was built**: this repository's release workflow, from the tagged source, on GitHub's runners. It is a [SLSA build provenance attestation](https://slsa.dev/spec/v1.0/provenance), signed keylessly through Sigstore, so there is no signing key to trust, steal or lose; the signature is bound to the workflow's identity.
 
 ```console
-$ gh attestation verify snapall-v0.5.0-x86_64-unknown-linux-musl.tar.gz --repo grenudi/snapall
+$ gh attestation verify snapall-v0.4.2-x86_64-unknown-linux-musl.tar.gz --repo grenudi/snapall
 $ sha256sum --check --ignore-missing SHA256SUMS-x86_64-unknown-linux-musl
 ```
 
 The checksums only prove that a file arrived intact; the attestation proves who built it. And you do not have to take either on trust: the binary is **reproducible**. The compiler version is pinned (`rust-toolchain.toml`) and the build paths are removed from the binary (`packaging/build-binary.sh`), so the same source gives the same bytes whatever the machine or directory:
 
 ```console
-$ git clone --branch snapall-v0.5.0 https://github.com/grenudi/snapall && cd snapall
+$ git clone --branch snapall-v0.4.2 https://github.com/grenudi/snapall && cd snapall
 $ packaging/build-binary.sh x86_64-unknown-linux-musl
 $ sha256sum target/x86_64-unknown-linux-musl/release/snapall      # the same as `snapall` inside the release tarball
 ```

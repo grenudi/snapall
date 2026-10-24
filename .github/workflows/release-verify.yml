@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to verify, for example snapall-v0.5.0
+        description: Release tag to verify, for example snapall-v0.4.2
         required: true
       attestations:
         description: Require signed build provenance (releases before 0.5.0 have none)
