@@ -29,6 +29,9 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
+      - name: Documentation links point at files that exist
+        run: python3 dev/check-links.py
+
       # --all-targets: a lint that only fires in a test target is still a lint.
       - name: Clippy
         run: cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
