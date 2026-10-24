@@ -6,7 +6,9 @@
 
 use thiserror::Error;
 
-use crate::domain::{Change, ConfigName, Description, RestoreSummary, SnapshotId, SnapshotInfo};
+use crate::domain::{
+    Change, ConfigName, Description, FileVersion, RestoreSummary, SnapshotId, SnapshotInfo,
+};
 
 pub trait SnapshotBackend {
     /// Every config the backend manages.
@@ -36,6 +38,15 @@ pub trait SnapshotBackend {
         id: SnapshotId,
     ) -> Result<Vec<Change>, BackendError>;
 
+    /// How the file at `path` (absolute, inside the config's subvolume) stood in every snapshot of
+    /// the config, oldest first, compared with the file as it is now. Read-only. A directory is
+    /// [`BackendError::NotSupported`].
+    fn file_versions(
+        &self,
+        config: &ConfigName,
+        path: &str,
+    ) -> Result<Vec<FileVersion>, BackendError>;
+
     /// Make the live system match snapshot `id` again, for everything in the config or only
     /// for `path` (and what is under it). Files created since are removed, deleted ones come
     /// back, edited ones are reverted. It does not take a safety snapshot first: the use case
@@ -62,4 +73,7 @@ pub enum BackendError {
     UnexpectedOutput { program: String, detail: String },
     #[error("config `{0}` does not exist")]
     UnknownConfig(ConfigName),
+    /// The backend cannot do what was asked of it, and says why.
+    #[error("{0}")]
+    NotSupported(String),
 }

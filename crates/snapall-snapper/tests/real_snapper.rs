@@ -11,8 +11,8 @@
 
 use snapall_core::testing::backend_contract;
 use snapall_core::{
-    preview_restore, restore_snapshot, snapshot_all, ChangeKind, ConfigName, Description,
-    RestoreError, SnapshotBackend,
+    file_history, preview_restore, restore_snapshot, snapshot_all, ChangeKind, ConfigName,
+    Description, FileState, RestoreError, SnapshotBackend,
 };
 use snapall_snapper::SnapperCli;
 
@@ -155,4 +155,72 @@ fn restoring_works_end_to_end_on_a_real_filesystem() {
     for name in ["keep", "gone", "added", "other"] {
         let _ = std::fs::remove_file(file(name));
     }
+}
+
+/// A file's history on real Btrfs and real snapper: this is the test of the assumption the adapter
+/// rests on, that snapper keeps snapshot N of a subvolume at `<subvolume>/.snapshots/N/snapshot`.
+#[test]
+fn a_files_history_is_read_from_real_snapshots_and_a_version_can_be_restored() {
+    if !enabled() {
+        return;
+    }
+    let backend = backend();
+    let config = ConfigName::parse("snapall_it_a").unwrap();
+    let base = backend.config_subvolume(&config).unwrap();
+    let file = format!("{base}/history-it.txt");
+
+    std::fs::write(&file, "first").unwrap();
+    let one = backend
+        .create_snapshot(&config, &Description::parse("it: history one").unwrap())
+        .unwrap();
+    std::fs::write(&file, "second, a little longer").unwrap();
+    let two = backend
+        .create_snapshot(&config, &Description::parse("it: history two").unwrap())
+        .unwrap();
+
+    let history = file_history(&backend, &file).unwrap();
+    assert_eq!(
+        history.config, config,
+        "the config that covers the file is found by its mount point"
+    );
+    let state = |id| {
+        history
+            .versions
+            .iter()
+            .find(|v| v.snapshot.id == id)
+            .map(|v| v.state)
+    };
+    assert_eq!(
+        state(one),
+        Some(FileState::Changed),
+        "#1 had the old content"
+    );
+    assert_eq!(
+        state(two),
+        Some(FileState::Same),
+        "#2 is the file as it is now"
+    );
+
+    // Restoring the old version through the same path the TUI uses, then the history agrees.
+    restore_snapshot(&backend, &config, one, Some(&file)).unwrap();
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "first");
+    let after = file_history(&backend, &file).unwrap();
+    let again = |id| {
+        after
+            .versions
+            .iter()
+            .find(|v| v.snapshot.id == id)
+            .map(|v| v.state)
+    };
+    assert_eq!(again(one), Some(FileState::Same));
+    assert_eq!(again(two), Some(FileState::Changed));
+
+    // A deleted file still has its history, and a directory is refused rather than guessed at.
+    std::fs::remove_file(&file).unwrap();
+    let gone = file_history(&backend, &file).unwrap();
+    assert!(gone
+        .versions
+        .iter()
+        .any(|v| v.snapshot.id == one && v.state == FileState::DeletedSince));
+    assert!(file_history(&backend, &base).is_err());
 }
