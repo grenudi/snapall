@@ -1,6 +1,22 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.5.0]
+
+
+### Bug Fixes
+- **core:** Doctor only runs commands as root on systems CI installs on for real ([901347c])
+
+
+### Documentation
+- The verification examples use a real, verifiable release (0.4.2) ([0e7fd41])
+
+
+### Features
+- Restore, the mouse in the TUI, and boot-menu detection ([#14](https://github.com/grenudi/snapall/pull/14)) ([ef27b84])
+
+
+
 ## [0.4.2]
 
 
