@@ -86,6 +86,15 @@ echo "$files" | grep -q 'site-functions/_snapall$' || fail "no zsh completion in
 echo "$files" | grep -q 'vendor_completions.d/snapall.fish$' || fail "no fish completion in the package"
 echo "$files" | grep -q 'nushell/vendor/autoload/snapall.nu$' || fail "no nushell completion in the package"
 echo "$files" | grep -q 'man/man1/snapall.1.gz$' || fail "no man page in the package"
+# The launcher entry and its icon: present, pointing at each other, and running what it says.
+echo "$files" | grep -q 'share/applications/snapall.desktop$' || fail "no launcher entry in the package"
+echo "$files" | grep -q 'icons/hicolor/scalable/apps/snapall.svg$' || fail "no icon in the package"
+grep -qx 'Exec=sudo snapall tui' /usr/share/applications/snapall.desktop || fail "the launcher does not run sudo snapall tui"
+grep -qx 'Terminal=true' /usr/share/applications/snapall.desktop || fail "the launcher would run snapall without a terminal"
+grep -qx 'Icon=snapall' /usr/share/applications/snapall.desktop || fail "the launcher names a different icon"
+if command -v desktop-file-validate >/dev/null 2>&1; then
+  out="$(desktop-file-validate /usr/share/applications/snapall.desktop 2>&1)"; [ -z "$out" ] || fail "the launcher entry is not valid: $out"
+fi
 # ...and what was installed is what the binary generates, byte for byte.
 snapall completions bash | cmp - /usr/share/bash-completion/completions/snapall || fail "the installed bash completion is not the generated one"
 snapall completions zsh | cmp - /usr/share/zsh/site-functions/_snapall || fail "the installed zsh completion is not the generated one"

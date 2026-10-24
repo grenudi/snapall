@@ -59,6 +59,14 @@ impl Tool {
         }
     }
 
+    /// The systemd unit of its daemon.
+    pub fn unit(self) -> &'static str {
+        match self {
+            Tool::LimineSnapperSync => "limine-snapper-sync",
+            Tool::GrubBtrfs => "grub-btrfsd",
+        }
+    }
+
     pub fn homepage(self) -> &'static str {
         match self {
             Tool::LimineSnapperSync => "https://gitlab.com/Zesko/limine-snapper-sync",
@@ -68,12 +76,27 @@ impl Tool {
 }
 
 /// What was found about one tool.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// "Running" is not the right question: limine-snapper-sync documents two ways of watching for
+/// snapshot changes, its daemon *or* a snapper plugin, and the package ships the plugin, so the
+/// menu stays in step with the daemon stopped. What matters is whether one of the ways is in place.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolFacts {
     pub tool: Tool,
     pub installed: bool,
-    /// Running, or (for GRUB) already present in the generated menu.
-    pub active: bool,
+    /// What `systemctl is-active` said about its daemon (`active`, `inactive`, `failed`,
+    /// `activating`...), or `None` if there is no answer.
+    pub service: Option<String>,
+    /// Wired in a way that works without the daemon: a snapper plugin (Limine), or snapshot
+    /// entries already generated into the menu (GRUB).
+    pub hooked: bool,
+}
+
+impl ToolFacts {
+    /// Installed, and one of its ways of staying in step is in place.
+    fn working(&self) -> bool {
+        self.installed && (self.hooked || self.service.as_deref() == Some("active"))
+    }
 }
 
 /// Facts about this machine, gathered by the shell.
@@ -93,8 +116,12 @@ pub enum BootStatus {
     NotApplicable { root_fs: Option<String> },
     /// A tool is installed and running: snapshots are (or will be) in the boot menu.
     Active { tool: Tool },
-    /// A tool is installed but not running.
-    Installed { tool: Tool },
+    /// A tool is installed but neither its daemon nor its plugin is doing the work.
+    Installed {
+        tool: Tool,
+        /// What `systemctl is-active` said about its daemon, for the explanation.
+        service: Option<String>,
+    },
     /// The bootloader has a tool and it is not installed.
     Missing { bootloader: Bootloader, tool: Tool },
     /// The bootloader is known, and snapall knows no maintained tool for it.
@@ -110,11 +137,14 @@ pub fn assess(facts: &BootFacts) -> BootStatus {
             root_fs: facts.root_fs.clone(),
         };
     }
-    if let Some(found) = facts.tools.iter().find(|t| t.installed && t.active) {
+    if let Some(found) = facts.tools.iter().find(|t| t.working()) {
         return BootStatus::Active { tool: found.tool };
     }
     if let Some(found) = facts.tools.iter().find(|t| t.installed) {
-        return BootStatus::Installed { tool: found.tool };
+        return BootStatus::Installed {
+            tool: found.tool,
+            service: found.service.clone(),
+        };
     }
     match facts.bootloaders.as_slice() {
         [bootloader] => match Tool::for_bootloader(*bootloader) {
@@ -154,8 +184,8 @@ pub fn hint(status: &BootStatus) -> Option<String> {
             "tip: with {} installed, {WHAT_IT_GIVES}. See `snapall doctor`.",
             tool.name()
         )),
-        BootStatus::Installed { tool } => Some(format!(
-            "tip: {} is installed but not running, so snapshots are not in the boot menu. See `snapall doctor`.",
+        BootStatus::Installed { tool, .. } => Some(format!(
+            "tip: {} is installed but is not syncing snapshots to the boot menu. See `snapall doctor`.",
             tool.name()
         )),
         BootStatus::NoKnownTool { bootloader } => Some(format!(
@@ -175,19 +205,31 @@ pub fn details(status: &BootStatus) -> Vec<String> {
             format!("snapshots reach the {} menu through {}", tool.bootloader().name(), tool.name()),
             restore_route(status),
         ],
-        BootStatus::Installed { tool } => vec![
-            format!("{} is installed but not running", tool.name()),
-            match tool {
-                Tool::LimineSnapperSync => "start it with: sudo systemctl enable --now limine-snapper-sync.service".to_owned(),
-                Tool::GrubBtrfs => "start it with: sudo systemctl enable --now grub-btrfsd.service (or regenerate the menu with grub-mkconfig)".to_owned(),
-            },
-            format!("what it gives: {WHAT_IT_GIVES}"),
-        ],
+        BootStatus::Installed { tool, service } => {
+            let why = match service.as_deref() {
+                Some(state) => format!("its service is {state} and no snapper plugin is set up"),
+                None => "its service state could not be read and no snapper plugin is set up".to_owned(),
+            };
+            let unit = tool.unit();
+            let next = match service.as_deref() {
+                // Something is wrong inside it: starting it again would only repeat that.
+                Some("failed" | "activating") => {
+                    format!("find out why with: journalctl -u {unit} -n 30")
+                }
+                _ => format!("start it with: sudo systemctl enable --now {unit}.service"),
+            };
+            vec![
+                format!("{} is installed but is not syncing snapshots to the boot menu ({why})", tool.name()),
+                next,
+                format!("what it gives: {WHAT_IT_GIVES}"),
+            ]
+        }
         BootStatus::Missing { bootloader, tool } => vec![
             format!("this system boots with {} on Btrfs, and no tool puts its snapshots in the boot menu", bootloader.name()),
             format!("{} does that: {}", tool.name(), tool.homepage()),
             format!("what it gives: {WHAT_IT_GIVES}"),
             "snapall does not edit your bootloader itself: a wrong entry can leave a system that does not start".to_owned(),
+            "what it needs and what switching costs: https://github.com/grenudi/snapall/blob/main/docs/boot-menu.md".to_owned(),
         ],
         BootStatus::NoKnownTool { bootloader } => vec![
             format!("this system boots with {} on Btrfs; snapall knows no maintained tool that adds snapshots to its menu", bootloader.name()),
@@ -239,11 +281,12 @@ mod tests {
         }
     }
 
-    fn tool(tool: Tool, installed: bool, active: bool) -> ToolFacts {
+    fn tool(tool: Tool, installed: bool, service: Option<&str>, hooked: bool) -> ToolFacts {
         ToolFacts {
             tool,
             installed,
-            active,
+            service: service.map(str::to_owned),
+            hooked,
         }
     }
 
@@ -266,7 +309,7 @@ mod tests {
         let status = assess(&facts(
             "btrfs",
             &[Bootloader::Limine],
-            &[tool(Tool::LimineSnapperSync, true, true)],
+            &[tool(Tool::LimineSnapperSync, true, Some("active"), false)],
         ));
         assert_eq!(
             status,
@@ -287,18 +330,59 @@ mod tests {
         let status = assess(&facts(
             "btrfs",
             &[Bootloader::Limine],
-            &[tool(Tool::LimineSnapperSync, true, false)],
+            &[tool(Tool::LimineSnapperSync, true, Some("inactive"), false)],
         ));
         assert_eq!(
             status,
             BootStatus::Installed {
-                tool: Tool::LimineSnapperSync
+                tool: Tool::LimineSnapperSync,
+                service: Some("inactive".into())
             }
         );
         assert!(status.deserves_a_hint());
         assert!(details(&status)
             .iter()
             .any(|l| l.contains("enable --now limine-snapper-sync")));
+    }
+
+    #[test]
+    fn the_snapper_plugin_is_enough_without_the_daemon_which_is_how_limine_snapper_sync_ships() {
+        // The report that exposed this: the daemon enabled and still not "running", while the
+        // menu was in step through the plugin the package installs.
+        let status = assess(&facts(
+            "btrfs",
+            &[Bootloader::Limine],
+            &[tool(Tool::LimineSnapperSync, true, Some("inactive"), true)],
+        ));
+        assert_eq!(
+            status,
+            BootStatus::Active {
+                tool: Tool::LimineSnapperSync
+            }
+        );
+        assert_eq!(hint(&status), None, "no nagging when it works");
+    }
+
+    #[test]
+    fn a_daemon_that_failed_is_reported_with_the_state_and_where_to_look_not_a_blind_restart() {
+        let status = assess(&facts(
+            "btrfs",
+            &[Bootloader::Limine],
+            &[tool(Tool::LimineSnapperSync, true, Some("failed"), false)],
+        ));
+        let text = details(&status).join("\n");
+        assert!(text.contains("service is failed"), "{text}");
+        assert!(text.contains("journalctl -u limine-snapper-sync"), "{text}");
+        assert!(
+            !text.contains("enable --now"),
+            "starting a failed service again explains nothing: {text}"
+        );
+        let unreadable = assess(&facts(
+            "btrfs",
+            &[Bootloader::Limine],
+            &[tool(Tool::LimineSnapperSync, true, None, false)],
+        ));
+        assert!(details(&unreadable)[0].contains("could not be read"));
     }
 
     #[test]

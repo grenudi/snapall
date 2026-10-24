@@ -55,4 +55,7 @@ package() {
   install -Dm644 target/snapall.fish "$pkgdir/usr/share/fish/vendor_completions.d/$pkgname.fish"
   install -Dm644 target/snapall.nu "$pkgdir/usr/share/nushell/vendor/autoload/$pkgname.nu"
   install -Dm644 target/snapall.1.gz "$pkgdir/usr/share/man/man1/$pkgname.1.gz"
+  # The launcher entry and its icon.
+  install -Dm644 packaging/desktop/snapall.desktop -t "$pkgdir/usr/share/applications/"
+  install -Dm644 packaging/desktop/snapall.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/apps/"
 }

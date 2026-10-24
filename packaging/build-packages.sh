@@ -54,13 +54,15 @@ cargo deb --no-build --package snapall --target "$target" --output dist/
 cargo generate-rpm --package crates/snapall --target "$target" --output dist/
 
 # The tarball, for distributions that package nothing (Alpine, Void, ...): the static binary, the
-# license and notices, the completions and the man page, under one top-level directory.
+# license and notices, the completions, the man page and the launcher entry with its icon, under
+# one top-level directory.
 name="snapall-v$version-$target"
 stage="$(mktemp -d)"
-mkdir -p "$stage/$name/completions" "$stage/$name/man"
+mkdir -p "$stage/$name/completions" "$stage/$name/man" "$stage/$name/desktop"
 cp "$binary" LICENSE README.md THIRD-PARTY-LICENSES.md "$stage/$name/"
 cp "$generated/snapall.bash" "$generated/_snapall" "$generated/snapall.fish" "$generated/snapall.nu" "$stage/$name/completions/"
 cp "$generated/snapall.1.gz" "$stage/$name/man/"
+cp packaging/desktop/snapall.desktop packaging/desktop/snapall.svg "$stage/$name/desktop/"
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" \
   -C "$stage" -cf - "$name" | gzip -9n > "dist/$name.tar.gz"
 rm -rf "$stage"

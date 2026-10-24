@@ -1,6 +1,13 @@
 # snapall
 
-Snapshot **every** [snapper](http://snapper.io/) config in one command (root, home, whatever you have configured), or browse, create and delete snapshots in a terminal UI.
+**Try risky things on Linux, and go back if they go wrong.**
+
+Before an Arch update, a new desktop theme or a config you are not sure about, add a restore point in one command, try the thing, and put your files back if you do not like it. snapall takes the snapshot of everything you have set up (system and home), lists them in a friendly terminal UI you can drive with the mouse, restores files from them, and deletes the ones you no longer need, so they do not pile up. It is a plug-and-play front end for [snapper](http://snapper.io/) on Btrfs: no configuration of its own, nothing to learn first.
+
+- **One command, everything.** `sudo snapall "before theming"` snapshots every snapper config at once.
+- **A real interface.** `sudo snapall tui`, or the *snapall* icon in your application menu (it opens a terminal and asks for your password). Mouse or keyboard.
+- **Go back.** Restore a file, a folder or your whole home from any snapshot; the state before is snapshotted first, so a restore can be undone. To go back with the *whole system*, boot an earlier snapshot from the boot menu: snapall checks whether your machine has that (Limine or GRUB) and tells you how to get it if not.
+- **Honest about itself.** Snapshots live on the same disk: this is a safety net for experiments, not a backup. `snapall doctor` tells you what is missing before anything goes wrong.
 
 ```console
 $ sudo snapall "before theming"            # shorthand for `snapall create "before theming"`
@@ -115,6 +122,8 @@ $ jq -c 'select(.level == "error")' /var/log/snapall.jsonl
 
 Configs on the left, the selected config's snapshots on the right, newest first.
 
+The packages install a *snapall* entry in your application menu that opens this in a terminal with `sudo`; from a terminal it is `sudo snapall tui`.
+
 | Key | Action |
 |---|---|
 | `j` `k` / arrows | move in the focused pane |
@@ -137,7 +146,7 @@ Snapper calls run in the background: the header shows *working* while one is in 
 
 `restore` and the TUI's `u` put back **files**: a non-root config such as `home`, or single paths of any config. It is `snapper undochange`, always preceded by a snapshot of the current state (`before restoring #N`), so restoring the restore's own snapshot undoes it.
 
-**The system itself** (the root config) is not restored while it runs, and snapall does not edit your bootloader: the kernel and initramfs usually live outside Btrfs, and putting back only the snapshot can leave a system that does not start. What works depends on the machine, and `snapall doctor` reads it for you (a `boot-menu` row): with Limine, `limine-snapper-sync` puts snapshots in the boot menu and `limine-snapper-restore` restores the snapshot with its kernel; with GRUB, `grub-btrfs` adds a snapshots menu; otherwise restore from a live USB. [ADR 12](docs/adr/0012-restore-and-the-boot-menu.md) has the reasoning and its sources. `create` and the TUI show a one-line tip when such a tool would help; `--no-hints` (or `SNAPALL_HINTS=off`) silences it.
+**The system itself** (the root config) is not restored while it runs, and snapall does not edit your bootloader: the kernel and initramfs usually live outside Btrfs, and putting back only the snapshot can leave a system that does not start. What works depends on the machine, and `snapall doctor` reads it for you (a `boot-menu` row): with Limine, `limine-snapper-sync` puts snapshots in the boot menu and `limine-snapper-restore` restores the snapshot with its kernel; with GRUB, `grub-btrfs` adds a snapshots menu; otherwise restore from a live USB. [docs/boot-menu.md](docs/boot-menu.md) says what each setup needs and what switching bootloaders costs; [ADR 12](docs/adr/0012-restore-and-the-boot-menu.md) and [ADR 13](docs/adr/0013-no-automated-boot-menu-setup.md) have the reasoning and its sources. `create` and the TUI show a one-line tip when such a tool would help; `--no-hints` (or `SNAPALL_HINTS=off`) silences it.
 
 ## Status
 

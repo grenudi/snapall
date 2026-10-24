@@ -31,6 +31,8 @@
               --nushell <($out/bin/snapall completions nushell)
             $out/bin/snapall man > snapall.1
             installManPage snapall.1
+            install -Dm644 ${./packaging/desktop/snapall.desktop} $out/share/applications/snapall.desktop
+            install -Dm644 ${./packaging/desktop/snapall.svg} $out/share/icons/hicolor/scalable/apps/snapall.svg
             wrapProgram $out/bin/snapall --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.snapper ]}
           '';
           meta = {
