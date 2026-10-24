@@ -34,7 +34,10 @@ jobs:
           - { name: Ubuntu,   arch: x86_64,  runner: ubuntu-latest,     image: "ubuntu:24.04",          family: deb,        setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
           - { name: Fedora,   arch: x86_64,  runner: ubuntu-latest,     image: "fedora:latest",         family: rpm-dnf,    setup: "dnf install -y sudo gawk" }
           - { name: Fedora,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "fedora:latest",         family: rpm-dnf,    setup: "dnf install -y sudo gawk" }
-          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,     image: "opensuse/tumbleweed",   family: rpm-zypper, setup: "zypper --non-interactive install sudo gawk curl" }
+          # zypper reads its answers from a terminal, not from a pipe like apt, dnf and pacman do,
+          # so with no terminal in CI it is told to take the default answer (sudo finds this wrapper
+          # first through its secure_path). A person at a terminal gets the prompt as usual.
+          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,     image: "opensuse/tumbleweed",   family: rpm-zypper, setup: "zypper --non-interactive install sudo gawk curl && printf '#!/bin/sh\nexec /usr/bin/zypper --non-interactive \"$@\"\n' > /usr/local/bin/zypper && chmod +x /usr/local/bin/zypper" }
           - { name: Alpine,   arch: x86_64,  runner: ubuntu-latest,     image: "alpine:latest",         family: tarball,    setup: "apk add --no-cache bash sudo curl gawk" }
           - { name: Alpine,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "alpine:latest",         family: tarball,    setup: "apk add --no-cache bash sudo curl gawk" }
     steps:
