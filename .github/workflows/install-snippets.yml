@@ -1,0 +1,75 @@
+name: Install snippets
+
+# The README gives each system a block to paste that installs and upgrades snapall. This runs those
+# blocks, exactly as written, on that system: install the previous release, upgrade with the
+# snippet, remove, install fresh, repeat. The script cuts each snippet out of the README, so what
+# is tested is what a user pastes.
+#
+# It runs after every release has been verified, and by hand for the latest release.
+
+on:
+  workflow_run:
+    workflows: [Verify release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SCRIPT: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/packaging/test/readme-snippets.sh
+
+jobs:
+  containers:
+    name: ${{ matrix.name }} (${{ matrix.arch }})
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Debian,   arch: x86_64,  runner: ubuntu-latest,     image: "debian:stable",         family: deb,        setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Debian,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "debian:stable",         family: deb,        setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Ubuntu,   arch: x86_64,  runner: ubuntu-latest,     image: "ubuntu:24.04",          family: deb,        setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Fedora,   arch: x86_64,  runner: ubuntu-latest,     image: "fedora:latest",         family: rpm-dnf,    setup: "dnf install -y sudo gawk" }
+          - { name: Fedora,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "fedora:latest",         family: rpm-dnf,    setup: "dnf install -y sudo gawk" }
+          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,     image: "opensuse/tumbleweed",   family: rpm-zypper, setup: "zypper --non-interactive install sudo gawk curl" }
+          - { name: Alpine,   arch: x86_64,  runner: ubuntu-latest,     image: "alpine:latest",         family: tarball,    setup: "apk add --no-cache bash sudo curl gawk" }
+          - { name: Alpine,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "alpine:latest",         family: tarball,    setup: "apk add --no-cache bash sudo curl gawk" }
+    steps:
+      - name: A user's tools
+        run: ${{ matrix.setup }}
+      - name: Run the README snippet
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh && bash /tmp/readme-snippets.sh ${{ matrix.family }}
+
+  arch:
+    name: Arch (x86_64)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: A user's tools, and a user (makepkg refuses to run as root)
+        run: |
+          pacman -Syu --noconfirm --needed base-devel sudo curl gawk
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+      - name: Run the README snippet as that user
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh
+          su builder -c "GITHUB_TOKEN='$GITHUB_TOKEN' bash /tmp/readme-snippets.sh arch"
+
+  nix:
+    name: Nix
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: cachix/install-nix-action@v31
+      - name: Run the README snippet
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh && bash /tmp/readme-snippets.sh nix

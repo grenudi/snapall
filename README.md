@@ -27,31 +27,76 @@ home
 $ sudo snapall tui
 ```
 
-## Install
+## Install and upgrade
 
-snapall drives [snapper](http://snapper.io/), so every package below **depends on it**: installing snapall installs snapper too. Packages are attached to each [release](https://github.com/grenudi/snapall/releases) (they are not signed yet).
+snapall drives [snapper](http://snapper.io/), so every package depends on it and installing snapall installs snapper too. Pick your system and paste the block: **the same lines install and upgrade**, because they fetch the newest release and your package manager treats a newer version as an upgrade (you never uninstall first). They are written for bash or zsh and need `curl`. Packages are attached to each [release](https://github.com/grenudi/snapall/releases) and are not signed yet; every release carries signed build provenance, see [docs/verifying.md](docs/verifying.md).
 
-| System | How |
-|---|---|
-| Debian, Ubuntu, Mint, ... | `sudo apt install ./snapall_<version>_<arch>.deb` |
-| Fedora | `sudo dnf install ./snapall-<version>.<arch>.rpm` |
-| openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
-| Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` ([upgrading](#upgrading-on-arch-cachyos-manjaro)) |
-| Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
-| Alpine, Void, Gentoo, anything else | the static `snapall-v<version>-<arch>-unknown-linux-musl.tar.gz` (extract it, then `sudo ./snapall doctor --install`); it also holds the completions and the man page |
+### Debian, Ubuntu, Mint, Pop!_OS, ...
 
-### Upgrading on Arch, CachyOS, Manjaro
-
-A newer version installs over the old one: pacman treats it as an upgrade, and you never need to uninstall first. What goes wrong is building from a directory that still holds an older `PKGBUILD`, `src/` or built package (a browser saves a second download as `PKGBUILD (1)`, and `makepkg` reads only the file named `PKGBUILD`). Use an empty directory for each version:
-
-```console
-$ mkdir -p ~/build/snapall-new && cd ~/build/snapall-new
-$ curl -LO https://github.com/grenudi/snapall/releases/latest/download/PKGBUILD
-$ grep ^pkgver PKGBUILD        # it must say the version you want
-$ makepkg -si
+<!-- snippet:deb -->
+```sh
+command -v curl >/dev/null || sudo apt install -y curl
+cd /tmp
+url=$(curl -s https://api.github.com/repos/grenudi/snapall/releases/latest | grep -o "https://[^\"]*_$(dpkg --print-architecture)\.deb")
+curl -LO "$url" && sudo apt install "./$(basename "$url")"
 ```
 
-If you reuse a directory, `makepkg -sCfi` removes the old sources and rebuilds. Until snapall is in the AUR ([backlog](docs/backlog.md)), an AUR helper cannot do this for you.
+### Fedora
+
+<!-- snippet:rpm-dnf -->
+```sh
+cd /tmp
+url=$(curl -s https://api.github.com/repos/grenudi/snapall/releases/latest | grep -o "https://[^\"]*\.$(uname -m)\.rpm")
+curl -LO "$url" && sudo dnf install "./$(basename "$url")"
+```
+
+### openSUSE
+
+<!-- snippet:rpm-zypper -->
+```sh
+cd /tmp
+url=$(curl -s https://api.github.com/repos/grenudi/snapall/releases/latest | grep -o "https://[^\"]*\.$(uname -m)\.rpm")
+curl -LO "$url" && sudo zypper install --allow-unsigned-rpm "./$(basename "$url")"
+```
+
+### Arch, CachyOS, Manjaro, EndeavourOS, ...
+
+<!-- snippet:arch -->
+```sh
+rm -rf ~/.cache/snapall-build && mkdir -p ~/.cache/snapall-build && cd ~/.cache/snapall-build
+curl -LO https://github.com/grenudi/snapall/releases/latest/download/PKGBUILD
+makepkg -si
+```
+
+It builds from the release's source in a fresh directory every time, which is the point: `makepkg` reads only a file named exactly `PKGBUILD` and reuses any `src/` or built package it finds beside it, so building in a directory that still holds an older version can quietly reinstall that older version. Look at `pkgver` in the file if you are ever unsure.
+
+### Alpine, Void, Gentoo, and anything else
+
+<!-- snippet:tarball -->
+```sh
+cd "$(mktemp -d)"
+url=$(curl -s https://api.github.com/repos/grenudi/snapall/releases/latest | grep -o "https://[^\"]*$(uname -m)-unknown-linux-musl\.tar\.gz")
+curl -LO "$url" && tar xzf "$(basename "$url")" && cd snapall-v*/
+sudo install -Dm755 snapall /usr/local/bin/snapall
+sudo install -Dm644 man/snapall.1.gz /usr/local/share/man/man1/snapall.1.gz
+sudo install -Dm644 completions/snapall.bash /usr/local/share/bash-completion/completions/snapall
+sudo install -Dm644 completions/_snapall /usr/local/share/zsh/site-functions/_snapall
+sudo install -Dm644 completions/snapall.fish /usr/local/share/fish/vendor_completions.d/snapall.fish
+sudo install -Dm644 desktop/snapall.desktop /usr/local/share/applications/snapall.desktop
+sudo install -Dm644 desktop/snapall.svg /usr/local/share/icons/hicolor/scalable/apps/snapall.svg
+```
+
+This is a static binary and it does not install snapper. `sudo snapall doctor --install` does that where it can, and otherwise prints what to run on your system.
+
+### Nix, NixOS
+
+<!-- snippet:nix -->
+```sh
+nix profile install github:grenudi/snapall   # install
+nix profile upgrade snapall                  # upgrade later
+```
+
+The flake wraps snapper into the program's `PATH`. A program in your *user* profile is not on root's `PATH`, so run it as `sudo "$(command -v snapall)" tui`. On NixOS, putting the package in `environment.systemPackages` avoids that, and it is what makes the application-menu entry (which runs `sudo snapall tui`) work.
 
 `snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`), showing the commands and asking first. Those are the systems it runs commands on because those are the systems CI installs on, for real, on every push. Everywhere else it prints what to run instead of running it: RHEL and its rebuilds (snapper is only in EPEL), Alpine releases other than `edge` (snapper is only in `edge`'s `testing`), Void and Gentoo (`xbps-install -S snapper`, `emerge --ask app-backup/snapper`), NixOS (declarative), and Fedora Atomic, MicroOS and SteamOS (read-only root).
 

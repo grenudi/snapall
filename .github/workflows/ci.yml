@@ -32,6 +32,9 @@ jobs:
       - name: Documentation links point at files that exist
         run: python3 dev/check-links.py
 
+      - name: The README's install snippets exist for every system and parse
+        run: ./dev/check-snippets.sh
+
       - name: The launcher entry is valid and the icon renders
         run: |
           sudo apt-get update -q
