@@ -22,6 +22,35 @@ Scopes: `observe`, `license`, `core`, `snapper`, `tui`, `cli`, `ci`, `deps`, `re
 ## Before opening a PR
 `cargo fmt --all`, `cargo clippy --workspace --all-features --all-targets -- -D warnings` and `cargo test --workspace --all-features` must pass. See [AGENTS.md](AGENTS.md) for the rules the architecture depends on.
 
+## Building and testing
+
+```
+cargo fmt --all
+cargo clippy --workspace --all-features --all-targets -- -D warnings
+cargo test --workspace --all-features
+```
+
+Packaging, `doctor --install` and the packages are tested for real on every push, on both architectures: each of Debian, Ubuntu, Fedora, openSUSE Tumbleweed and Alpine (x86_64 and aarch64, on native arm runners) and Arch (x86_64; it has no official aarch64 image) runs in a fresh container with no snapper, installs through its own package manager, and is checked afterwards (`packaging/test/`). After every release, `release-verify.yml` repeats that on what was actually *published*: it downloads the assets, checks them against the checksums published beside them, installs the released packages, builds the released PKGBUILD from the tag's source, and asserts the version matches the tag. The same script, `packaging/build-packages.sh`, builds the packages CI tests and the packages a release ships.
+
+The real-snapper checks need root, loop devices, `snapper` and `btrfs-progs`:
+
+```
+sudo ./dev/btrfs-fixture.sh up
+sudo python3 dev/tui-e2e.py target/debug/snapall      # the real TUI in a pty (pip install pyte)
+SNAPALL_IT=1 cargo test -p snapall-snapper --test real_snapper
+sudo ./dev/btrfs-fixture.sh down
+```
+
+CI runs all of it on every push, plus `argenv lint` over the committed contract (`snapall.argenv.json`). After changing the CLI surface in `crates/snapall/src/contract.rs`, regenerate it:
+
+```
+cargo run -q -p snapall -- contract > snapall.argenv.json
+```
+
+## Releases
+
+Pull requests are squash-merged and the **PR title** must be a Conventional Commit (above); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum.
+
 ## Licensing of contributions
 
 snapall is GPL-3.0-or-later. By submitting a contribution you license it under the same terms (inbound = outbound); there is no CLA. Every source file carries an SPDX header, and CI runs `reuse lint`: add one to any new file with

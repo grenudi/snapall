@@ -31,9 +31,9 @@ snapall drives [snapper](http://snapper.io/), so every package below **depends o
 | openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
 | Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` |
 | Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
-| Alpine edge, Void, Gentoo, anything else | the static `snapall-v<version>-<arch>-unknown-linux-musl.tar.gz` (extract it, then `sudo ./snapall doctor --install`); it also holds the completions and the man page |
+| Alpine, Void, Gentoo, anything else | the static `snapall-v<version>-<arch>-unknown-linux-musl.tar.gz` (extract it, then `sudo ./snapall doctor --install`); it also holds the completions and the man page |
 
-`snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`, `xbps-install`, `emerge`). Where a command would be wrong it says so instead of running anything: RHEL and its rebuilds only have snapper in EPEL, and Alpine only in `edge`'s `testing` repository; NixOS is declarative; Fedora Atomic, MicroOS and SteamOS have a read-only root.
+`snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`), showing the commands and asking first. Those are the systems it runs commands on because those are the systems CI installs on, for real, on every push. Everywhere else it prints what to run instead of running it: RHEL and its rebuilds (snapper is only in EPEL), Alpine releases other than `edge` (snapper is only in `edge`'s `testing`), Void and Gentoo (`xbps-install -S snapper`, `emerge --ask app-backup/snapper`), NixOS (declarative), and Fedora Atomic, MicroOS and SteamOS (read-only root).
 
 ## Commands
 
@@ -76,22 +76,13 @@ A misspelled `SNAPALL_*` variable is an **error** with a suggestion (`SNAPALL_NO
 
 ### Verifying what you downloaded
 
-Every release file (the tarball, the `.deb`, the `.rpm`) comes with a **signed statement of where it was built**: this repository's release workflow, from the tagged source, on GitHub's runners. It is a [SLSA build provenance attestation](https://slsa.dev/spec/v1.0/provenance), signed keylessly through Sigstore, so there is no signing key to trust, steal or lose; the signature is bound to the workflow's identity.
+Every release file carries a signed statement of where it was built (SLSA provenance, Sigstore, no key to trust), and the binary is reproducible: rebuilding the tag gives the same bytes.
 
 ```console
 $ gh attestation verify snapall-v0.4.2-x86_64-unknown-linux-musl.tar.gz --repo grenudi/snapall
-$ sha256sum --check --ignore-missing SHA256SUMS-x86_64-unknown-linux-musl
 ```
 
-The checksums only prove that a file arrived intact; the attestation proves who built it. And you do not have to take either on trust: the binary is **reproducible**. The compiler version is pinned (`rust-toolchain.toml`) and the build paths are removed from the binary (`packaging/build-binary.sh`), so the same source gives the same bytes whatever the machine or directory:
-
-```console
-$ git clone --branch snapall-v0.4.2 https://github.com/grenudi/snapall && cd snapall
-$ packaging/build-binary.sh x86_64-unknown-linux-musl
-$ sha256sum target/x86_64-unknown-linux-musl/release/snapall      # the same as `snapall` inside the release tarball
-```
-
-CI builds one commit in two different directories and fails if the binaries differ. After every release, `release-verify.yml` rebuilds the tag on another machine and requires the identical binary, checks the checksums and the attestations, and installs the packages on fresh containers of each distribution and architecture. (Releases up to 0.4.1 were built before this and cannot be checked this way.)
+How to check the checksums, rebuild a release yourself, and what is verified after every release: [docs/verifying.md](docs/verifying.md).
 
 ### Completions and the manual
 
@@ -145,42 +136,9 @@ Early. Scope today is **snapper-backed snapshots**, which in practice means Btrf
 
 Hexagonal, with a functional core and an imperative shell, enforced by crate boundaries and a fitness test. See [ARCHITECTURE.md](ARCHITECTURE.md), which maps each decision back to the [software-engineering-canon](https://github.com/creation-guidelines/software-engineering-canon), and the [ADRs](docs/adr/).
 
-| Crate | Role |
-|---|---|
-| `snapall-core` | Domain types, the planner, the port, the use cases. Pure: no I/O, no parser. |
-| `snapall-snapper` | Driven adapter: the port, implemented by running `snapper`. |
-| `snapall-tui` | Driving adapter: the terminal UI as a pure `update`/`view` state machine. |
-| `snapall-observe` | Adapter for the observability port: times each operation and writes text or JSON log lines. |
-| `snapall` | Composition root: the argenv-declared CLI, wiring, rendering, exit codes. |
+## Contributing
 
-## Development
-
-```
-cargo fmt --all
-cargo clippy --workspace --all-features --all-targets -- -D warnings
-cargo test --workspace --all-features
-```
-
-Packaging, `doctor --install` and the packages are tested for real on every push, on both architectures: each of Debian, Ubuntu, Fedora, openSUSE Tumbleweed and Alpine (x86_64 and aarch64, on native arm runners) and Arch (x86_64; it has no official aarch64 image) runs in a fresh container with no snapper, installs through its own package manager, and is checked afterwards (`packaging/test/`). After every release, `release-verify.yml` repeats that on what was actually *published*: it downloads the assets, checks them against the checksums published beside them, installs the released packages, builds the released PKGBUILD from the tag's source, and asserts the version matches the tag. The same script, `packaging/build-packages.sh`, builds the packages CI tests and the packages a release ships.
-
-The real-snapper checks need root, loop devices, `snapper` and `btrfs-progs`:
-
-```
-sudo ./dev/btrfs-fixture.sh up
-sudo python3 dev/tui-e2e.py target/debug/snapall      # the real TUI in a pty (pip install pyte)
-SNAPALL_IT=1 cargo test -p snapall-snapper --test real_snapper
-sudo ./dev/btrfs-fixture.sh down
-```
-
-CI runs all of it on every push, plus `argenv lint` over the committed contract (`snapall.argenv.json`). After changing the CLI surface in `crates/snapall/src/contract.rs`, regenerate it:
-
-```
-cargo run -q -p snapall -- contract > snapall.argenv.json
-```
-
-## Releases
-
-Pull requests are squash-merged and the **PR title** must be a [Conventional Commit](CONTRIBUTING.md); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum.
+Build, test and release instructions, the commit convention, and how the CI proves the packages are in [CONTRIBUTING.md](CONTRIBUTING.md); the rules the architecture depends on are in [AGENTS.md](AGENTS.md).
 
 ## License
 

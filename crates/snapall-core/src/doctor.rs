@@ -229,11 +229,18 @@ pub fn install_plan(os: &OsRelease) -> InstallPlan {
              release breaks it)",
             os.display_name()
         )),
-        Family::Void => InstallPlan::Steps(vec![Step::new("xbps-install", &["-Sy", PACKAGE])]),
-        Family::Gentoo => InstallPlan::Steps(vec![Step::new(
-            "emerge",
-            &["--noreplace", "app-backup/snapper"],
-        )]),
+        // Void and Gentoo are not installed for the user. snapall runs package-manager commands
+        // as root only where it has run them for real (`packaging/test/doctor-install.sh` does,
+        // on every push), and these two it has not. On Gentoo `emerge` may also compile from
+        // source against a tree that was never synced, which is not a surprise to spring on
+        // someone who asked to "install what is missing".
+        Family::Void => InstallPlan::Manual(
+            "install it with `xbps-install -S snapper`, then run `snapall doctor` again".to_owned(),
+        ),
+        Family::Gentoo => InstallPlan::Manual(
+            "install it with `emerge --ask app-backup/snapper`, then run `snapall doctor` again"
+                .to_owned(),
+        ),
         Family::Nix => InstallPlan::Manual(
             "NixOS is declarative: add `snapper` to environment.systemPackages (or enable \
              services.snapper) and rebuild"
@@ -500,11 +507,59 @@ mod tests {
             steps(install_plan(&os(ALPINE_EDGE))),
             ["apk add --repository https://dl-cdn.alpinelinux.org/alpine/edge/testing snapper"]
         );
-        assert_eq!(steps(install_plan(&os(VOID))), ["xbps-install -Sy snapper"]);
-        assert_eq!(
-            steps(install_plan(&os(GENTOO))),
-            ["emerge --noreplace app-backup/snapper"]
-        );
+    }
+
+    /// The families whose install plan *runs commands as root*. Each is installed for real, in a
+    /// fresh container, on every push (`distros` in ci.yml, `packaging/test/doctor-install.sh`).
+    /// A family does not join this list because its package manager looks familiar: it joins when
+    /// a container proves the commands work, and the matrix in ci.yml grows with it.
+    const RUN_FOR_REAL_IN_CI: [Family; 5] = [
+        Family::Debian,
+        Family::Fedora,
+        Family::Arch,
+        Family::Suse,
+        Family::Alpine,
+    ];
+
+    #[test]
+    fn only_families_that_ci_installs_for_real_run_commands_as_root() {
+        let systems = [
+            DEBIAN,
+            UBUNTU,
+            MINT,
+            FEDORA,
+            SILVERBLUE,
+            ROCKY,
+            NOBARA,
+            ARCH,
+            CACHYOS,
+            MANJARO,
+            TUMBLEWEED,
+            LEAP,
+            MICROOS,
+            ALPINE,
+            ALPINE_EDGE,
+            VOID,
+            GENTOO,
+            NIXOS,
+            STEAMOS,
+        ];
+        for system in systems {
+            let os = os(system);
+            if let InstallPlan::Steps(_) = install_plan(&os) {
+                assert!(
+                    RUN_FOR_REAL_IN_CI.contains(&family(&os)),
+                    "{} would run commands as root, but no container in CI has run them",
+                    os.display_name()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn void_and_gentoo_say_what_to_run_instead_of_running_it() {
+        assert!(manual(install_plan(&os(VOID))).contains("xbps-install -S snapper"));
+        assert!(manual(install_plan(&os(GENTOO))).contains("emerge --ask app-backup/snapper"));
     }
 
     #[test]
