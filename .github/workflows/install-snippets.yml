@@ -5,7 +5,10 @@ name: Install snippets
 # snippet, remove, install fresh, repeat. The script cuts each snippet out of the README, so what
 # is tested is what a user pastes.
 #
-# It runs after every release has been verified, and by hand for the latest release.
+# It runs after a release has been verified (and only then: Verify release also succeeds on pushes
+# that cut no release, which must not trigger this), against the README as it stood at that release's
+# tag, so a README written ahead of a release is not blamed on the previous one. By hand it runs
+# against main and the latest release.
 
 on:
   workflow_run:
@@ -20,9 +23,35 @@ env:
   SCRIPT: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/packaging/test/readme-snippets.sh
 
 jobs:
+  tag:
+    name: which release?
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: The release tag this run cut, if any
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch --tags --force
+          tag=""
+          if [ "$EVENT" != workflow_dispatch ]; then
+            tag="$(git tag --points-at "$HEAD_SHA" | grep -E '^snapall-v[0-9]' | head -n1 || true)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release tag: ${tag:-none (a push that cut no release)}"
+
   containers:
     name: ${{ matrix.name }} (${{ matrix.arch }})
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: tag
+    if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}
     strategy:
@@ -53,11 +82,13 @@ jobs:
       - name: Run the README snippet
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SNIPPET_REF: ${{ needs.tag.outputs.tag || 'main' }}
         run: curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh && bash /tmp/readme-snippets.sh ${{ matrix.family }}
 
   arch:
     name: Arch (x86_64)
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: tag
+    if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
@@ -69,17 +100,20 @@ jobs:
       - name: Run the README snippet as that user
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SNIPPET_REF: ${{ needs.tag.outputs.tag || 'main' }}
         run: |
           curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh
-          su builder -c "GITHUB_TOKEN='$GITHUB_TOKEN' bash /tmp/readme-snippets.sh arch"
+          su builder -c "GITHUB_TOKEN='$GITHUB_TOKEN' SNIPPET_REF='$SNIPPET_REF' bash /tmp/readme-snippets.sh arch"
 
   nix:
     name: Nix
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: tag
+    if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: cachix/install-nix-action@v31
       - name: Run the README snippet
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SNIPPET_REF: ${{ needs.tag.outputs.tag || 'main' }}
         run: curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh && bash /tmp/readme-snippets.sh nix
