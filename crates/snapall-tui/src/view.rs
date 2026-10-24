@@ -12,27 +12,50 @@ use ratatui::widgets::{
     TableState, Wrap,
 };
 use ratatui::Frame;
-use snapall_core::{SnapshotInfo, SnapshotKind};
+use snapall_core::{ChangeKind, SnapshotInfo, SnapshotKind};
 
-use crate::model::{Load, Modal, Notice, Pane, State, Target};
+use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
 
 const ACCENT: Color = Color::Cyan;
 const DIM: Color = Color::DarkGray;
 
-pub fn render(state: &State, frame: &mut Frame) {
+/// Where everything is, for a terminal of this size. Drawing and clicking both start here, so a
+/// click can only ever land on what was drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Areas {
+    pub header: Rect,
+    pub configs: Rect,
+    pub snapshots: Rect,
+    pub notice: Rect,
+    pub keys: Rect,
+}
+
+pub fn areas(size: Rect) -> Areas {
     let [header, body, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(3),
         Constraint::Length(2),
     ])
-    .areas(frame.area());
-
-    render_header(state, frame, header);
+    .areas(size);
     let [configs, snapshots] =
         Layout::horizontal([Constraint::Length(28), Constraint::Min(20)]).areas(body);
-    render_configs(state, frame, configs);
-    render_snapshots(state, frame, snapshots);
-    render_footer(state, frame, footer);
+    let [notice, keys] =
+        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(footer);
+    Areas {
+        header,
+        configs,
+        snapshots,
+        notice,
+        keys,
+    }
+}
+
+pub fn render(state: &State, frame: &mut Frame) {
+    let areas = areas(frame.area());
+    render_header(state, frame, areas.header);
+    render_configs(state, frame, areas.configs);
+    render_snapshots(state, frame, areas.snapshots);
+    render_footer(state, frame, &areas);
 
     if let Some(modal) = &state.modal {
         render_modal(modal, state, frame);
@@ -218,34 +241,62 @@ fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
     }
 }
 
-fn render_footer(state: &State, frame: &mut Frame, area: Rect) {
-    let [notice_area, keys_area] =
-        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
-    let notice = match &state.notice {
-        Some(Notice::Info(text)) => Span::styled(format!(" {text}"), Style::new().fg(Color::Green)),
-        Some(Notice::Error(text)) => Span::styled(format!(" {text}"), Style::new().fg(Color::Red)),
-        None => Span::raw(""),
-    };
-    frame.render_widget(Paragraph::new(Line::from(notice)), notice_area);
+/// The footer's buttons, in order: the button, the key it stands for, and its label.
+const ACTIONS: [(Button, &str, &str); 7] = [
+    (Button::Create, "c", "create"),
+    (Button::CreateAll, "a", "all"),
+    (Button::Delete, "d", "delete"),
+    (Button::Restore, "u", "restore"),
+    (Button::Reload, "r", "reload"),
+    (Button::Help, "?", "help"),
+    (Button::Quit, "q", "quit"),
+];
 
-    // Short enough to fit an 80-column terminal (checked by a rendering test).
-    let hints = [
-        ("j/k", "move"),
-        ("h/l", "pane"),
-        ("space", "mark"),
-        ("c", "create"),
-        ("a", "all"),
-        ("d", "delete"),
-        ("r", "reload"),
-        ("?", "help"),
-        ("q", "quit"),
-    ];
-    let mut spans = vec![Span::raw(" ")];
-    for (key, label) in hints {
-        spans.push(Span::styled(key, Style::new().fg(ACCENT).bold()));
-        spans.push(Span::styled(format!(" {label}  "), Style::new().fg(DIM)));
+/// Each footer button and the cells it covers on the key line.
+fn footer_buttons(keys: Rect) -> Vec<(Rect, Button, &'static str, &'static str)> {
+    let mut x = keys.x.saturating_add(1);
+    let mut out = Vec::new();
+    for (button, key, label) in ACTIONS {
+        let width = (key.chars().count() + 1 + label.chars().count()) as u16;
+        if x.saturating_add(width) > keys.x.saturating_add(keys.width) {
+            break; // what does not fit is not drawn, and so cannot be clicked
+        }
+        out.push((
+            Rect {
+                x,
+                y: keys.y,
+                width,
+                height: 1.min(keys.height),
+            },
+            button,
+            key,
+            label,
+        ));
+        x = x.saturating_add(width).saturating_add(2);
     }
-    frame.render_widget(Paragraph::new(Line::from(spans)), keys_area);
+    out
+}
+
+fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
+    let notice = match (&state.notice, &state.context.boot_tip) {
+        (Some(Notice::Info(text)), _) => {
+            Span::styled(format!(" {text}"), Style::new().fg(Color::Green))
+        }
+        (Some(Notice::Error(text)), _) => {
+            Span::styled(format!(" {text}"), Style::new().fg(Color::Red))
+        }
+        // The tip stays until something else needs the line.
+        (None, Some(tip)) => Span::styled(format!(" {tip}"), Style::new().fg(Color::Yellow)),
+        (None, None) => Span::raw(""),
+    };
+    frame.render_widget(Paragraph::new(Line::from(notice)), areas.notice);
+    for (rect, _button, key, label) in footer_buttons(areas.keys) {
+        let line = Line::from(vec![
+            Span::styled(key, Style::new().fg(ACCENT).bold()),
+            Span::styled(format!(" {label}"), Style::new().fg(DIM)),
+        ]);
+        frame.render_widget(Paragraph::new(line), rect);
+    }
 }
 
 /// A rectangle `width` x `height`, centred in `area` and never larger than it.
@@ -260,13 +311,31 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
     }
 }
 
-fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
+/// How a prompt looks and which buttons it has.
+struct ModalSpec {
+    title: String,
+    lines: Vec<Line<'static>>,
+    color: Color,
+    width: u16,
+    height: u16,
+    /// The buttons, left to right: the button, and its label.
+    buttons: Vec<(Button, String)>,
+}
+
+fn restore_counts(changes: &[snapall_core::Change]) -> (usize, usize, usize) {
+    let count = |kind| changes.iter().filter(|c| c.kind == kind).count();
+    (
+        count(ChangeKind::Changed),
+        count(ChangeKind::Added),
+        count(ChangeKind::Removed),
+    )
+}
+
+fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
+    let confirm = |label: &str| (Button::Confirm, format!("Enter: {label}"));
+    let cancel = (Button::Cancel, "Esc: Cancel".to_owned());
     match modal {
-        Modal::Describe {
-            target,
-            input,
-            error,
-        } => {
+        Modal::Describe { target, input, error } => {
             let title = match target {
                 Target::One(config) => format!(" New snapshot of {config} "),
                 Target::All => {
@@ -279,21 +348,14 @@ fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
                 Line::from("Description (Enter alone uses \"snapall\"):"),
                 Line::from(vec![
                     Span::styled(input.clone(), Style::new().bold()),
-                    Span::styled(
-                        "_",
-                        Style::new().fg(ACCENT).add_modifier(Modifier::SLOW_BLINK),
-                    ),
+                    Span::styled("_", Style::new().fg(ACCENT).add_modifier(Modifier::SLOW_BLINK)),
                 ]),
                 Line::from(""),
             ];
             if let Some(error) = error {
                 lines.push(Line::styled(error.clone(), Style::new().fg(Color::Red)));
             }
-            lines.push(Line::styled(
-                "Enter create   Esc cancel",
-                Style::new().fg(DIM),
-            ));
-            draw_modal(frame, title, lines, ACCENT, 64, 8);
+            ModalSpec { title, lines, color: ACCENT, width: 64, height: 9, buttons: vec![confirm("Create"), cancel] }
         }
         Modal::ConfirmDelete { config, ids } => {
             let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
@@ -302,10 +364,83 @@ fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
                 Line::styled(list.join(", "), Style::new().bold()),
                 Line::from(""),
                 Line::styled("This cannot be undone.", Style::new().fg(Color::Yellow)),
-                Line::styled("y / Enter delete   n / Esc cancel", Style::new().fg(DIM)),
             ];
-            draw_modal(frame, " Delete ".into(), lines, Color::Red, 56, 9);
+            ModalSpec { title: " Delete ".into(), lines, color: Color::Red, width: 56, height: 9, buttons: vec![confirm("Delete"), cancel] }
         }
+        Modal::Restore { config, id, stage } => match stage {
+            RestoreStage::Loading => ModalSpec {
+                title: format!(" Restore {config} to #{id} "),
+                lines: vec![Line::styled("Looking at what would change...", Style::new().fg(DIM))],
+                color: Color::Yellow,
+                width: 72,
+                height: 8,
+                buttons: vec![cancel],
+            },
+            RestoreStage::Failed(error) => ModalSpec {
+                title: format!(" Restore {config} to #{id} "),
+                lines: vec![Line::styled(error.clone(), Style::new().fg(Color::Red))],
+                color: Color::Red,
+                width: 72,
+                height: 9,
+                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
+            },
+            RestoreStage::Ready(preview) if preview.is_system_root => ModalSpec {
+                title: " Restoring the system itself ".into(),
+                lines: vec![
+                    Line::from(format!("{config} is the system root, so snapall will not put it back while it runs.")),
+                    Line::from(""),
+                    Line::from(state.context.restore_route.clone()),
+                ],
+                color: Color::Yellow,
+                width: 78,
+                height: 14,
+                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
+            },
+            RestoreStage::Ready(preview) if preview.changes.is_empty() => ModalSpec {
+                title: format!(" Restore {config} to #{id} "),
+                lines: vec![Line::from(format!("{config} already matches #{id}: there is nothing to restore."))],
+                color: ACCENT,
+                width: 72,
+                height: 8,
+                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
+            },
+            RestoreStage::Ready(preview) => {
+                let (changed, added, removed) = restore_counts(&preview.changes);
+                let mut lines = vec![
+                    Line::from(format!(
+                        "Put {config} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
+                    )),
+                    Line::from(""),
+                ];
+                for change in preview.changes.iter().take(6) {
+                    let verb = match change.kind {
+                        ChangeKind::Changed => "revert    ",
+                        ChangeKind::Added => "remove    ",
+                        ChangeKind::Removed => "bring back",
+                    };
+                    lines.push(Line::from(vec![
+                        Span::styled(verb, Style::new().fg(ACCENT)),
+                        Span::raw(format!(" {}", change.path)),
+                    ]));
+                }
+                if preview.changes.len() > 6 {
+                    lines.push(Line::styled(format!("... and {} more", preview.changes.len() - 6), Style::new().fg(DIM)));
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::styled(
+                    "The current state is snapshotted first, so this can be undone.",
+                    Style::new().fg(Color::Yellow),
+                ));
+                ModalSpec {
+                    title: format!(" Restore {config} to #{id} "),
+                    lines,
+                    color: Color::Yellow,
+                    width: 78,
+                    height: 16,
+                    buttons: vec![confirm("Restore"), cancel],
+                }
+            }
+        },
         Modal::Help => {
             let rows = [
                 ("up/down  k/j", "move in the focused pane"),
@@ -314,14 +449,13 @@ fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
                 ("space", "mark a snapshot, then move on"),
                 ("c", "create a snapshot of the selected config"),
                 ("a", "create a snapshot of every config"),
-                (
-                    "d",
-                    "delete the marked snapshots (or the one under the cursor)",
-                ),
+                ("d", "delete the marked snapshots (or the one under the cursor)"),
+                ("u", "restore the config to the snapshot under the cursor"),
                 ("r", "reload from snapper"),
                 ("q  Ctrl-C", "quit"),
+                ("mouse", "click a row to select, the first column to mark, the wheel to scroll"),
             ];
-            let mut lines: Vec<Line> = rows
+            let lines: Vec<Line> = rows
                 .iter()
                 .map(|(key, what)| {
                     Line::from(vec![
@@ -330,33 +464,154 @@ fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
                     ])
                 })
                 .collect();
-            lines.push(Line::from(""));
-            lines.push(Line::styled("any key closes this", Style::new().fg(DIM)));
-            draw_modal(frame, " Keys ".into(), lines, ACCENT, 72, 14);
+            ModalSpec { title: " Keys ".into(), lines, color: ACCENT, width: 84, height: 16, buttons: vec![(Button::Cancel, "Esc: Close".to_owned())] }
         }
     }
 }
 
-fn draw_modal(
-    frame: &mut Frame,
-    title: String,
-    lines: Vec<Line<'static>>,
-    color: Color,
-    width: u16,
-    height: u16,
-) {
-    let area = centered(frame.area(), width, height);
+/// Where a prompt is and where each of its buttons is, for a terminal of this size.
+fn modal_geometry(
+    modal: &Modal,
+    state: &State,
+    size: Rect,
+) -> (ModalSpec, Rect, Vec<(Rect, Button, String)>) {
+    let spec = modal_spec(modal, state);
+    let area = centered(size, spec.width, spec.height);
+    let inner = Block::default().borders(Borders::ALL).inner(area);
+    // The last inner line holds the buttons; the text above it is cut if the terminal is small.
+    let y = inner.y.saturating_add(inner.height.saturating_sub(1));
+    let mut x = inner.x.saturating_add(1);
+    let mut buttons = Vec::new();
+    for (button, label) in &spec.buttons {
+        let width = (label.chars().count() + 4) as u16; // "[ " + label + " ]"
+        if inner.height == 0 || x.saturating_add(width) > inner.x.saturating_add(inner.width) {
+            break;
+        }
+        buttons.push((
+            Rect {
+                x,
+                y,
+                width,
+                height: 1,
+            },
+            *button,
+            label.clone(),
+        ));
+        x = x.saturating_add(width).saturating_add(2);
+    }
+    (spec, area, buttons)
+}
+
+fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
+    let (spec, area, buttons) = modal_geometry(modal, state, frame.area());
     frame.render_widget(Clear, area);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().fg(color))
-        .title(Span::styled(title, Style::new().fg(color).bold()))
+        .border_style(Style::new().fg(spec.color))
+        .title(Span::styled(
+            spec.title.clone(),
+            Style::new().fg(spec.color).bold(),
+        ))
         .title_alignment(Alignment::Left);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let text_area = Rect {
+        height: inner.height.saturating_sub(1),
+        ..inner
+    };
     frame.render_widget(
-        Paragraph::new(Text::from(lines))
-            .block(block)
-            .wrap(Wrap { trim: false }),
-        area,
+        Paragraph::new(Text::from(spec.lines)).wrap(Wrap { trim: false }),
+        text_area,
     );
+    for (rect, button, label) in buttons {
+        let style = match button {
+            Button::Cancel => Style::new().fg(DIM),
+            _ => Style::new().fg(Color::Black).bg(spec.color).bold(),
+        };
+        frame.render_widget(
+            Paragraph::new(Span::styled(format!("[ {label} ]"), style)),
+            rect,
+        );
+    }
+}
+
+// ---- clicks ---------------------------------------------------------------------------------
+
+/// The first visible row of a list of `len` rows, `rows` high, whose selection is `cursor`. The
+/// panes are redrawn from scratch every frame, so the window depends on nothing but these three
+/// numbers: the selection is brought into view by the least scroll from the top.
+fn window_start(cursor: usize, rows: usize) -> usize {
+    if rows > 0 && cursor >= rows {
+        cursor + 1 - rows
+    } else {
+        0
+    }
+}
+
+fn contains(rect: Rect, col: u16, row: u16) -> bool {
+    col >= rect.x
+        && col < rect.x.saturating_add(rect.width)
+        && row >= rect.y
+        && row < rect.y.saturating_add(rect.height)
+}
+
+/// The pane a terminal cell belongs to, for the wheel.
+pub fn pane_at(size: Rect, col: u16, row: u16) -> Option<Pane> {
+    let areas = areas(size);
+    if contains(areas.configs, col, row) {
+        Some(Pane::Configs)
+    } else if contains(areas.snapshots, col, row) {
+        Some(Pane::Snapshots)
+    } else {
+        None
+    }
+}
+
+/// What a left click at (`col`, `row`) hits, for a terminal of this size, or `None`.
+///
+/// With a prompt open only the prompt's own buttons answer; behind it, nothing does.
+pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> {
+    if let Some(modal) = &state.modal {
+        let (_, _, buttons) = modal_geometry(modal, state, size);
+        return buttons
+            .into_iter()
+            .find(|(rect, _, _)| contains(*rect, col, row))
+            .map(|(_, button, _)| Click::Button(button));
+    }
+    let areas = areas(size);
+    if let Some((_, button, _, _)) = footer_buttons(areas.keys)
+        .into_iter()
+        .find(|(rect, _, _, _)| contains(*rect, col, row))
+    {
+        return Some(Click::Button(button));
+    }
+    let block = Block::default().borders(Borders::ALL);
+    let configs = block.inner(areas.configs);
+    if contains(configs, col, row) && !state.entries().is_empty() {
+        let index =
+            window_start(state.config_cursor, configs.height as usize) + (row - configs.y) as usize;
+        return (index < state.entries().len()).then_some(Click::Row {
+            pane: Pane::Configs,
+            index,
+        });
+    }
+    let snapshots = block.inner(areas.snapshots);
+    // One header line, then the rows.
+    if contains(snapshots, col, row) && row > snapshots.y {
+        let visible = (snapshots.height as usize).saturating_sub(1);
+        let index = window_start(state.snapshot_cursor, visible) + (row - snapshots.y - 1) as usize;
+        if index < state.displayed_snapshots().len() {
+            // The first two cells are the mark column and its spacing.
+            return Some(if col < snapshots.x.saturating_add(2) {
+                Click::Mark { index }
+            } else {
+                Click::Row {
+                    pane: Pane::Snapshots,
+                    index,
+                }
+            });
+        }
+    }
+    None
 }

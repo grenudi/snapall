@@ -15,7 +15,8 @@ use std::process::Command;
 
 use serde::Deserialize;
 use snapall_core::{
-    BackendError, ConfigName, Description, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
+    BackendError, Change, ChangeKind, ConfigName, Description, RestoreSummary, SnapshotBackend,
+    SnapshotId, SnapshotInfo, SnapshotKind,
 };
 
 const PROGRAM: &str = "snapper";
@@ -120,6 +121,8 @@ struct ConfigsDocument {
 #[derive(Deserialize)]
 struct ConfigRow {
     config: String,
+    #[serde(default)]
+    subvolume: String,
 }
 
 /// One row of `snapper --jsonout -c <config> list`. Fields we do not use are ignored, so a
@@ -249,6 +252,101 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         let number = id.to_string();
         self.run(self.args(&["-c", config.as_str(), "delete", number.as_str()]))
             .map(|_| ())
+    }
+
+    fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
+        let output = self.run(self.args(&["--jsonout", "list-configs"]))?;
+        let document: ConfigsDocument = serde_json::from_str(&output.stdout)
+            .map_err(|e| unexpected(format!("list-configs is not the expected JSON: {e}")))?;
+        let row = document
+            .configs
+            .into_iter()
+            .find(|row| row.config == config.as_str())
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+        if row.subvolume.starts_with('/') {
+            Ok(row.subvolume)
+        } else {
+            Err(unexpected(format!(
+                "config `{config}` has no absolute subvolume path (`{}`)",
+                row.subvolume
+            )))
+        }
+    }
+
+    fn changes_since(
+        &self,
+        config: &ConfigName,
+        id: SnapshotId,
+    ) -> Result<Vec<Change>, BackendError> {
+        let range = format!("{id}..0");
+        let output = self.run(self.args(&["-c", config.as_str(), "status", range.as_str()]))?;
+        parse_status(&output.stdout)
+    }
+
+    fn undo_changes(
+        &self,
+        config: &ConfigName,
+        id: SnapshotId,
+        path: Option<&str>,
+    ) -> Result<RestoreSummary, BackendError> {
+        let range = format!("{id}..0");
+        let mut rest = vec!["-c", config.as_str(), "undochange", range.as_str()];
+        if let Some(path) = path {
+            // The use case only passes absolute paths, so this can never be read as an option.
+            rest.push(path);
+        }
+        let output = self.run(self.args(&rest))?;
+        Ok(parse_summary(&output.stdout))
+    }
+}
+
+/// `snapper status A..B` prints one line per path: six status characters, a space, the path.
+/// The first character is what matters here: `+` created since, `-` deleted since, anything
+/// else a difference in content, type, permissions, ownership or attributes.
+fn parse_status(stdout: &str) -> Result<Vec<Change>, BackendError> {
+    stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut chars = line.chars();
+            let kind = chars.next();
+            let flags_and_space: String = chars.by_ref().take(6).collect();
+            let path: String = chars.collect();
+            let well_formed = flags_and_space.chars().count() == 6
+                && flags_and_space.ends_with(' ')
+                && path.starts_with('/');
+            match (kind, well_formed) {
+                (Some(kind), true) => Ok(Change {
+                    kind: match kind {
+                        '+' => ChangeKind::Added,
+                        '-' => ChangeKind::Removed,
+                        _ => ChangeKind::Changed,
+                    },
+                    path,
+                }),
+                _ => Err(unexpected(format!(
+                    "a status line that is not `<flags> <path>`: `{line}`"
+                ))),
+            }
+        })
+        .collect()
+}
+
+/// `snapper undochange` ends with `create:N modify:N delete:N`. If it printed nothing of the
+/// kind the restore still happened (it exited successfully), so the counts are zero rather
+/// than an error that would suggest it had not.
+fn parse_summary(stdout: &str) -> RestoreSummary {
+    let count = |key: &str| {
+        stdout
+            .split_whitespace()
+            .find_map(|word| word.strip_prefix(key))
+            .and_then(|number| number.parse().ok())
+            .unwrap_or(0)
+    };
+    RestoreSummary {
+        created: count("create:"),
+        modified: count("modify:"),
+        deleted: count("delete:"),
     }
 }
 
@@ -508,6 +606,108 @@ mod tests {
             .unwrap_err();
         assert!(
             matches!(err, BackendError::CommandFailed { ref stderr, .. } if stderr == "Snapshot '999' not found.")
+        );
+    }
+
+    // ---- restoring ------------------------------------------------------------------------
+
+    fn id(n: u64) -> SnapshotId {
+        SnapshotId::new(n).unwrap()
+    }
+
+    #[test]
+    fn the_mount_point_comes_from_list_configs() {
+        let json = r#"{"configs":[{"config":"home","subvolume":"/home"},{"config":"root","subvolume":"/"}]}"#;
+        let script = Scripted::new(vec![ok(json), ok(json), ok(json)]);
+        let backend = SnapperCli::new(&script);
+        assert_eq!(backend.config_subvolume(&name("root")).unwrap(), "/");
+        assert_eq!(backend.config_subvolume(&name("home")).unwrap(), "/home");
+        assert!(matches!(
+            backend.config_subvolume(&name("nope")),
+            Err(BackendError::UnknownConfig(_))
+        ));
+        assert_eq!(script.calls.borrow()[0], ["--jsonout", "list-configs"]);
+    }
+
+    #[test]
+    fn changes_are_read_from_status_with_the_verified_command_line_and_format() {
+        let status = "+..... /home/u/added.txt\n-..... /home/u/gone.txt\nc..... /home/u/edited.txt\n.p.... /home/u/a file with spaces\n";
+        let script = Scripted::new(vec![ok(status)]);
+        let changes = SnapperCli::new(&script)
+            .changes_since(&name("home"), id(14))
+            .unwrap();
+        assert_eq!(script.calls.borrow()[0], ["-c", "home", "status", "14..0"]);
+        let seen: Vec<_> = changes.iter().map(|c| (c.kind, c.path.as_str())).collect();
+        assert_eq!(
+            seen,
+            [
+                (ChangeKind::Added, "/home/u/added.txt"),
+                (ChangeKind::Removed, "/home/u/gone.txt"),
+                (ChangeKind::Changed, "/home/u/edited.txt"),
+                (ChangeKind::Changed, "/home/u/a file with spaces"),
+            ]
+        );
+    }
+
+    #[test]
+    fn nothing_changed_is_an_empty_list_and_a_malformed_line_is_an_error_not_a_guess() {
+        let script = Scripted::new(vec![
+            ok(""),
+            ok("this is not a status line\n"),
+            ok("c..... relative/path\n"),
+        ]);
+        let backend = SnapperCli::new(&script);
+        assert!(backend
+            .changes_since(&name("home"), id(1))
+            .unwrap()
+            .is_empty());
+        for _ in 0..2 {
+            assert!(matches!(
+                backend.changes_since(&name("home"), id(1)),
+                Err(BackendError::UnexpectedOutput { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn undoing_uses_undochange_with_the_path_as_its_own_argument() {
+        let script = Scripted::new(vec![
+            ok("create:1 modify:2 delete:3\n"),
+            ok("create:0 modify:1 delete:0\n"),
+        ]);
+        let backend = SnapperCli::new(&script);
+        let all = backend.undo_changes(&name("home"), id(7), None).unwrap();
+        assert_eq!((all.created, all.modified, all.deleted), (1, 2, 3));
+        let one = backend
+            .undo_changes(&name("home"), id(7), Some("/home/u/a b.txt"))
+            .unwrap();
+        assert_eq!(one.total(), 1);
+        let calls = script.calls.borrow();
+        assert_eq!(calls[0], ["-c", "home", "undochange", "7..0"]);
+        assert_eq!(
+            calls[1],
+            ["-c", "home", "undochange", "7..0", "/home/u/a b.txt"]
+        );
+    }
+
+    #[test]
+    fn a_successful_undo_that_prints_no_summary_is_still_a_success() {
+        let script = Scripted::new(vec![ok("")]);
+        let done = SnapperCli::new(&script)
+            .undo_changes(&name("home"), id(1), None)
+            .unwrap();
+        assert_eq!(done, RestoreSummary::default());
+    }
+
+    #[test]
+    fn a_failed_undo_reports_snappers_message() {
+        let script = Scripted::new(vec![failed("Snapshot '99' not found.")]);
+        let error = SnapperCli::new(&script)
+            .undo_changes(&name("home"), id(99), None)
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("Snapshot '99' not found"),
+            "{error}"
         );
     }
 }

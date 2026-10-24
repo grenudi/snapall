@@ -18,8 +18,8 @@ mod lines;
 use std::time::Instant;
 
 use snapall_core::{
-    BackendError, ConfigName, Description, Event, Observer, SnapshotBackend, SnapshotId,
-    SnapshotInfo,
+    BackendError, Change, ConfigName, Description, Event, Observer, RestoreSummary,
+    SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
 pub use clock::rfc3339_utc;
@@ -35,6 +35,14 @@ pub struct Observed<B, O> {
 impl<B, O> Observed<B, O> {
     pub fn new(inner: B, observer: O) -> Self {
         Self { inner, observer }
+    }
+}
+
+#[cfg(test)]
+impl<O> Observed<snapall_core::testing::InMemoryBackend, O> {
+    /// Edit a live file of the wrapped in-memory backend (tests only).
+    fn write_file_for_test(&self, path: &str, content: &str) {
+        self.inner.write_file("home", path, content);
     }
 }
 
@@ -87,6 +95,40 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
             config: config.clone(),
             id,
             result: message(&result),
+            took: start.elapsed(),
+        });
+        result
+    }
+
+    // Reading where a config lives and what changed is not an event; only the mutation is.
+    fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
+        self.inner.config_subvolume(config)
+    }
+
+    fn changes_since(
+        &self,
+        config: &ConfigName,
+        id: SnapshotId,
+    ) -> Result<Vec<Change>, BackendError> {
+        self.inner.changes_since(config, id)
+    }
+
+    fn undo_changes(
+        &self,
+        config: &ConfigName,
+        id: SnapshotId,
+        path: Option<&str>,
+    ) -> Result<RestoreSummary, BackendError> {
+        let start = Instant::now();
+        let result = self.inner.undo_changes(config, id, path);
+        self.observer.observe(&Event::ChangesUndone {
+            config: config.clone(),
+            id,
+            path: path.map(str::to_owned),
+            result: result
+                .as_ref()
+                .map(|summary| *summary)
+                .map_err(ToString::to_string),
             took: start.elapsed(),
         });
         result
@@ -201,5 +243,43 @@ mod tests {
             plain.list_snapshots(&name("home")).unwrap(),
             observed.list_snapshots(&name("home")).unwrap()
         );
+    }
+
+    #[test]
+    fn a_restore_is_an_audited_event_with_what_it_did_and_reading_is_not() {
+        let recorder = Recorder::default();
+        let inner = InMemoryBackend::with_configs(&["home"]);
+        inner.write_file("home", "/mnt/home/a.txt", "one");
+        let backend = Observed::new(inner, &recorder);
+        let id = backend
+            .create_snapshot(&name("home"), &Description::default())
+            .unwrap();
+        backend.write_file_for_test("/mnt/home/a.txt", "two");
+
+        backend.config_subvolume(&name("home")).unwrap();
+        backend.changes_since(&name("home"), id).unwrap();
+        let before_undo = recorder.0.borrow().len();
+        assert_eq!(
+            before_undo, 1,
+            "only the creation so far: reads are not events"
+        );
+
+        let summary = backend
+            .undo_changes(&name("home"), id, Some("/mnt/home/a.txt"))
+            .unwrap();
+        assert_eq!(summary.modified, 1);
+        let events = recorder.0.borrow();
+        assert!(matches!(
+            events.last().unwrap(),
+            Event::ChangesUndone { path: Some(p), result: Ok(s), .. } if p == "/mnt/home/a.txt" && s.modified == 1
+        ));
+
+        // A failed restore is audited as a failure, with the reason.
+        drop(events);
+        let nowhere = SnapshotId::new(99).unwrap();
+        backend
+            .undo_changes(&name("home"), nowhere, None)
+            .unwrap_err();
+        assert!(recorder.0.borrow().last().unwrap().is_failure());
     }
 }

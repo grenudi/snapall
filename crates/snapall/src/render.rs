@@ -6,7 +6,10 @@
 
 use serde_json::{json, Value};
 use snapall_core::doctor::{Check, OsRelease, Status};
-use snapall_core::{ConfigName, Description, Plan, Report, SnapshotInfo, SnapshotKind};
+use snapall_core::{
+    ChangeKind, ConfigName, Description, Plan, Preview, Report, Restored, SnapshotId, SnapshotInfo,
+    SnapshotKind,
+};
 
 pub fn report(report: &Report) -> String {
     let width = report
@@ -43,6 +46,90 @@ fn status_label(status: Status) -> &'static str {
         Status::Warn => "warn",
         Status::Fail => "FAIL",
     }
+}
+
+/// What a restore would do to one path, in words that say what *happens*, not how it differs.
+fn verb(kind: ChangeKind) -> &'static str {
+    match kind {
+        ChangeKind::Changed => "revert",
+        ChangeKind::Added => "remove",
+        ChangeKind::Removed => "bring back",
+    }
+}
+
+fn kind_word(kind: ChangeKind) -> &'static str {
+    match kind {
+        ChangeKind::Changed => "changed",
+        ChangeKind::Added => "added",
+        ChangeKind::Removed => "removed",
+    }
+}
+
+/// How many changed paths a human sees before the rest is summarised. `--json` is never cut.
+const SHOWN: usize = 200;
+
+pub fn changes(config: &ConfigName, id: SnapshotId, preview: &Preview) -> String {
+    if preview.changes.is_empty() {
+        return format!("{config} already matches #{id}: nothing would change\n");
+    }
+    let count = preview.changes.len();
+    let mut out = format!(
+        "{config}: restoring #{id} would change {count} path{}:\n",
+        if count == 1 { "" } else { "s" }
+    );
+    for change in preview.changes.iter().take(SHOWN) {
+        out.push_str(&format!("  {:<10} {}\n", verb(change.kind), change.path));
+    }
+    if count > SHOWN {
+        out.push_str(&format!(
+            "  ... and {} more (use --json for all of them)\n",
+            count - SHOWN
+        ));
+    }
+    out
+}
+
+pub fn changes_json(config: &ConfigName, id: SnapshotId, preview: &Preview) -> Value {
+    let changes: Vec<Value> = preview
+        .changes
+        .iter()
+        .map(|c| json!({"kind": kind_word(c.kind), "path": c.path}))
+        .collect();
+    json!({
+        "config": config.as_str(),
+        "snapshot": id.get(),
+        "subvolume": preview.subvolume,
+        "system_root": preview.is_system_root,
+        "changes": changes,
+    })
+}
+
+pub fn restored(config: &ConfigName, id: SnapshotId, done: &Restored) -> String {
+    let s = done.summary;
+    format!(
+        "restored {config} to #{id}: {} reverted, {} removed, {} brought back\n\
+         undo this with: snapall restore {config} {}  (the state before is snapshot #{})\n",
+        s.modified, s.deleted, s.created, done.safety_snapshot, done.safety_snapshot
+    )
+}
+
+pub fn restored_json(config: &ConfigName, id: SnapshotId, done: &Restored) -> Value {
+    json!({
+        "config": config.as_str(),
+        "snapshot": id.get(),
+        "safety_snapshot": done.safety_snapshot.get(),
+        "reverted": done.summary.modified,
+        "removed": done.summary.deleted,
+        "brought_back": done.summary.created,
+    })
+}
+
+pub fn deleted(config: &ConfigName, id: SnapshotId) -> String {
+    format!("deleted #{id} from {config}\n")
+}
+
+pub fn deleted_json(config: &ConfigName, id: SnapshotId) -> Value {
+    json!({"config": config.as_str(), "deleted": id.get()})
 }
 
 pub fn doctor(os: &OsRelease, checks: &[Check]) -> String {

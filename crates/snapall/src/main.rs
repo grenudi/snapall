@@ -9,6 +9,8 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod ask;
+mod boot_probe;
 mod cli;
 mod contract;
 mod doctor;
@@ -24,9 +26,10 @@ use std::process::ExitCode;
 
 use argenv_resolve::ProcessEnv;
 use serde_json::Value;
+use snapall_core::boot;
 use snapall_core::{
-    all_snapshots, delete_snapshot, plan_snapshots, run_plan, snapshots_of, Observer, Silent,
-    SnapshotBackend,
+    all_snapshots, delete_snapshot, plan_snapshots, preview_restore, restore_snapshot, run_plan,
+    snapshots_of, Observer, RestoreError, Silent, SnapshotBackend,
 };
 use snapall_observe::{Format, Lines, Observed};
 use snapall_snapper::SnapperCli;
@@ -160,6 +163,7 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
         request,
         no_dbus,
         json,
+        hints,
         logging,
         ..
     } = parsed;
@@ -201,7 +205,72 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
         }
         Request::Delete { config, id } => {
             delete_snapshot(&backend, &config, id)?;
-            emit(&format!("deleted #{id} from {config}\n"))?;
+            if json {
+                emit_json(&render::deleted_json(&config, id))?;
+            } else {
+                emit(&render::deleted(&config, id))?;
+            }
+        }
+        Request::Changes { config, id, path } => {
+            let preview = preview_restore(&backend, &config, id, path.as_deref())?;
+            if json {
+                emit_json(&render::changes_json(&config, id, &preview))?;
+            } else {
+                emit(&render::changes(&config, id, &preview))?;
+            }
+        }
+        Request::Restore {
+            config,
+            id,
+            path,
+            dry_run,
+            yes,
+        } => {
+            let preview = preview_restore(&backend, &config, id, path.as_deref())?;
+            if preview.is_system_root && path.is_none() {
+                // Not a usage error and not a crash: a deliberate refusal, with the way that works.
+                let route = boot::restore_route(&boot::assess(&boot_probe::system()));
+                return Err(format!(
+                    "{}\n{route}",
+                    RestoreError::SystemRoot {
+                        config: config.clone()
+                    }
+                )
+                .into());
+            }
+            if dry_run || preview.changes.is_empty() {
+                if json {
+                    emit_json(&render::changes_json(&config, id, &preview))?;
+                } else {
+                    emit(&render::changes(&config, id, &preview))?;
+                }
+                return Ok(ExitCode::SUCCESS);
+            }
+            if !yes {
+                if !ask::can_ask() {
+                    eprintln!(
+                        "snapall: restore changes files and there is no terminal to ask on; \
+                         look first with `snapall changes`, then pass --yes"
+                    );
+                    return Ok(ExitCode::from(2));
+                }
+                eprint!("{}", render::changes(&config, id, &preview));
+                let count = preview.changes.len();
+                let question = format!(
+                    "Restore {count} path{} of {config} to #{id}? The current state is snapshotted first, so this can be undone.",
+                    if count == 1 { "" } else { "s" }
+                );
+                if !ask::yes_no(&question)? {
+                    eprintln!("snapall: not restoring");
+                    return Ok(ExitCode::FAILURE);
+                }
+            }
+            let done = restore_snapshot(&backend, &config, id, path.as_deref())?;
+            if json {
+                emit_json(&render::restored_json(&config, id, &done))?;
+            } else {
+                emit(&render::restored(&config, id, &done))?;
+            }
         }
         Request::Create {
             only,
@@ -225,6 +294,12 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
             }
             if !report.is_success() {
                 return Ok(ExitCode::FAILURE);
+            }
+            // A nudge, to a person, on stderr (stdout stays parseable), and only when it helps.
+            if hints && !json && std::io::stderr().is_terminal() {
+                if let Some(tip) = boot::hint(&boot::assess(&boot_probe::system())) {
+                    eprintln!("{tip}");
+                }
             }
         }
         Request::Doctor { install, yes } => {
@@ -252,7 +327,13 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
             if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
                 return Err("`snapall tui` needs an interactive terminal".into());
             }
-            match snapall_tui::run(&backend)? {
+            // Looked at once, here, because the UI's model must not read the machine itself.
+            let status = boot::assess(&boot_probe::system());
+            let context = snapall_tui::UiContext {
+                boot_tip: if hints { boot::hint(&status) } else { None },
+                restore_route: boot::restore_route(&status),
+            };
+            match snapall_tui::run(&backend, context)? {
                 snapall_tui::Exit::Quit => {}
                 // Exit as a signalled process would, once the terminal is back to normal.
                 snapall_tui::Exit::Signal(signal) => {

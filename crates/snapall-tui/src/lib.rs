@@ -20,5 +20,6 @@ pub mod session;
 pub mod term;
 pub mod view;
 
+pub use model::UiContext;
 pub use session::{Executor, Session};
 pub use term::{run, Exit};

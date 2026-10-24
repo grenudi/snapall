@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-23T23:58:29Z",
+  "generated": "2026-10-24T13:56:17Z",
   "inputs": [
     {
       "allowed": [],
@@ -53,6 +53,29 @@
       "required": false,
       "stability": "unknown",
       "summary": "Talk to libsnapper directly instead of through snapperd (root only; for containers and CI).",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "hints",
+        "negatable": true,
+        "repeatable": false
+      },
+      "default": true,
+      "env": {
+        "name": "SNAPALL_HINTS"
+      },
+      "group": "output",
+      "key": "hints",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "tui"
+      ],
+      "summary": "Show a one-line tip when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences it.",
       "type": "bool"
     },
     {
@@ -173,9 +196,10 @@
       "required": false,
       "stability": "unknown",
       "subcommands": [
-        "create"
+        "create",
+        "restore"
       ],
-      "summary": "Show what would be snapshotted without creating anything.",
+      "summary": "Show what would happen without changing anything.",
       "type": "bool"
     },
     {
@@ -198,6 +222,9 @@
         "create",
         "list",
         "snapshots",
+        "delete",
+        "changes",
+        "restore",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -231,12 +258,14 @@
         "repeatable": false,
         "value_name": "CONFIG"
       },
-      "group": "delete",
-      "key": "delete_config",
+      "group": "snapshot",
+      "key": "config",
       "required": true,
       "stability": "unknown",
       "subcommands": [
-        "delete"
+        "delete",
+        "changes",
+        "restore"
       ],
       "summary": "The config the snapshot belongs to (required).",
       "type": "string"
@@ -250,16 +279,39 @@
         "repeatable": false,
         "value_name": "ID"
       },
-      "example": "snapall delete home 12",
-      "group": "delete",
+      "example": "snapall restore home 12",
+      "group": "snapshot",
       "key": "snapshot_id",
       "required": true,
       "stability": "unknown",
       "subcommands": [
-        "delete"
+        "delete",
+        "changes",
+        "restore"
       ],
-      "summary": "The snapshot number to delete (required). 0 is the current system and is refused.",
+      "summary": "The snapshot number (required). 0 is the current system, not a snapshot, and is refused.",
       "type": "uint"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 2,
+        "repeatable": false,
+        "value_name": "PATH"
+      },
+      "example": "snapall restore home 12 /home/me/notes.txt",
+      "group": "snapshot",
+      "key": "path",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "changes",
+        "restore"
+      ],
+      "summary": "Only this file or directory (an absolute path inside the config). Default: everything that differs.",
+      "type": "path"
     },
     {
       "allowed": [],
@@ -296,9 +348,10 @@
       "required": false,
       "stability": "unknown",
       "subcommands": [
-        "doctor"
+        "doctor",
+        "restore"
       ],
-      "summary": "With --install: run without asking for confirmation (for scripts and CI).",
+      "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
       "type": "bool"
     },
     {
@@ -347,5 +400,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.4.0"
+  "source": "snapall@0.4.2"
 }

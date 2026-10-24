@@ -317,3 +317,194 @@ fn the_man_page_is_reproducible_and_dated_by_source_date_epoch() {
     }
     assert!(text.contains("snapper(8)") && text.contains("SNAPALL_ONLY"));
 }
+
+// ---- restore, through the real binary against a fake `snapper` -------------------------------
+//
+// A shell script stands in for snapper, answering exactly what the real one was observed to print
+// (see crates/snapall-snapper). That lets the binary be driven through cases a throwaway Btrfs
+// volume cannot produce, such as a config whose subvolume is the system root `/`.
+
+/// A fake snapper with two configs: `home` at /home and `root` at `/`, each with snapshot #1.
+/// `status` reports three changes; `undochange` and `create` succeed and log what they were asked.
+fn fake_snapper(label: &str) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!(
+        "snapall-fake-snapper-{label}-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("create dir");
+    let script = r#"#!/bin/sh
+echo "$@" >> "$0.log"
+case "$*" in
+  *list-configs*) echo '{"configs":[{"config":"home","subvolume":"/home"},{"config":"root","subvolume":"/"}]}' ;;
+  *" list"*) echo '{"'"$(echo "$*" | sed 's/.*-c \([a-z]*\) .*/\1/')"'":[{"number":0,"type":"single","date":"","user":"root","cleanup":"","description":"current"},{"number":1,"type":"single","date":"2026-10-24 10:00:00","user":"root","cleanup":"number","description":"base"}]}' ;;
+  *" status 1..0"*) printf '%s\n' '+..... /home/u/new.txt' '-..... /home/u/old.txt' 'c..... /home/u/edit.txt' ;;
+  *" create "*) echo 5 ;;
+  *undochange*) echo 'create:1 modify:1 delete:1' ;;
+  *) echo "fake snapper: unhandled: $*" >&2; exit 3 ;;
+esac
+"#;
+    let path = dir.join("snapper");
+    std::fs::write(&path, script).expect("write script");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    dir
+}
+
+fn with_fake(dir: &std::path::Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_snapall"))
+        .args(args)
+        .env_clear()
+        .env("PATH", format!("{}:/usr/bin:/bin", dir.display()))
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("run snapall")
+}
+
+#[test]
+fn changes_lists_what_restoring_would_do_in_words_and_in_json() {
+    let dir = fake_snapper("changes");
+    let human = with_fake(&dir, &["--no-dbus", "changes", "home", "1"]);
+    assert!(human.status.success(), "{}", stderr(&human));
+    let text = stdout(&human);
+    assert!(text.contains("restoring #1 would change 3 paths"), "{text}");
+    assert!(
+        text.contains("remove") && text.contains("/home/u/new.txt"),
+        "{text}"
+    );
+    assert!(
+        text.contains("bring back") && text.contains("/home/u/old.txt"),
+        "{text}"
+    );
+    assert!(
+        text.contains("revert") && text.contains("/home/u/edit.txt"),
+        "{text}"
+    );
+
+    let json = with_fake(&dir, &["--no-dbus", "changes", "home", "1", "--json"]);
+    let value: Value = serde_json::from_str(&stdout(&json)).expect("JSON");
+    assert_eq!(value["config"], "home");
+    assert_eq!(value["snapshot"], 1);
+    assert_eq!(value["system_root"], false);
+    assert_eq!(value["changes"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        value["changes"][0],
+        serde_json::json!({"kind": "added", "path": "/home/u/new.txt"})
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn restoring_the_system_root_is_refused_with_the_way_that_works_and_nothing_is_run() {
+    let dir = fake_snapper("root");
+    let output = with_fake(&dir, &["--no-dbus", "restore", "root", "1", "--yes"]);
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    let message = stderr(&output);
+    assert!(message.contains("is the system root"), "{message}");
+    assert!(
+        message.contains("live USB") || message.contains("boot menu"),
+        "the supported route is named: {message}"
+    );
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap_or_default();
+    assert!(
+        !log.contains("undochange") && !log.contains(" create "),
+        "nothing was changed or snapshotted:\n{log}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_single_path_of_the_system_root_may_be_restored() {
+    let dir = fake_snapper("root-path");
+    // A path of the root where something differs is restored...
+    let output = with_fake(
+        &dir,
+        &[
+            "--no-dbus",
+            "restore",
+            "root",
+            "1",
+            "/home/u/edit.txt",
+            "--yes",
+        ],
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap();
+    assert!(log.contains("undochange 1..0 /home/u/edit.txt"), "{log}");
+
+    // ...and a path where nothing differs is not, and wastes no safety snapshot.
+    let nothing = with_fake(
+        &dir,
+        &["--no-dbus", "restore", "root", "1", "/etc/fstab", "--yes"],
+    );
+    assert!(nothing.status.success());
+    assert!(
+        stdout(&nothing).contains("nothing would change"),
+        "{}",
+        stdout(&nothing)
+    );
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap();
+    assert!(!log.contains("/etc/fstab"), "{log}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn restore_without_a_terminal_and_without_yes_refuses_and_changes_nothing() {
+    let dir = fake_snapper("noyes");
+    let output = with_fake(&dir, &["--no-dbus", "restore", "home", "1"]);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "a usage problem: {}",
+        stderr(&output)
+    );
+    assert!(stderr(&output).contains("--yes"), "{}", stderr(&output));
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap_or_default();
+    assert!(
+        !log.contains("undochange") && !log.contains(" create "),
+        "{log}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn restore_takes_the_safety_snapshot_first_then_restores_and_reports_both() {
+    let dir = fake_snapper("restore");
+    let output = with_fake(
+        &dir,
+        &["--no-dbus", "restore", "home", "1", "--yes", "--json"],
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    let value: Value = serde_json::from_str(&stdout(&output)).expect("JSON");
+    assert_eq!(value["safety_snapshot"], 5);
+    assert_eq!(
+        (
+            value["reverted"].clone(),
+            value["removed"].clone(),
+            value["brought_back"].clone()
+        ),
+        (1.into(), 1.into(), 1.into())
+    );
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap();
+    let create = log.find(" create ").expect("a safety snapshot was taken");
+    let undo = log.find("undochange").expect("then the restore ran");
+    assert!(create < undo, "the safety snapshot must come first:\n{log}");
+    assert!(log.contains("before restoring #1"), "{log}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_error() {
+    let dir = fake_snapper("dry");
+    let output = with_fake(&dir, &["--no-dbus", "restore", "home", "1", "--dry-run"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("would change 3 paths"));
+    let log = std::fs::read_to_string(dir.join("snapper.log")).unwrap_or_default();
+    assert!(
+        !log.contains("undochange") && !log.contains(" create "),
+        "{log}"
+    );
+    let zero = with_fake(&dir, &["--no-dbus", "restore", "home", "0", "--yes"]);
+    assert_eq!(zero.status.code(), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}

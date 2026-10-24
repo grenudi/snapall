@@ -14,10 +14,11 @@
 use std::collections::VecDeque;
 
 use snapall_core::{
-    delete_snapshot, plan_snapshots, run_plan, snapshots_of, SnapshotBackend, SnapshotError,
+    delete_snapshot, plan_snapshots, preview_restore, restore_snapshot, run_plan, snapshots_of,
+    SnapshotBackend, SnapshotError,
 };
 
-use crate::model::{update, Effect, Key, Msg, State};
+use crate::model::{update, Effect, Key, Msg, State, UiContext};
 
 /// Performs effects. `Sync` is required of the backend so one executor can serve a worker thread.
 #[derive(Clone, Copy)]
@@ -61,6 +62,15 @@ impl<'a> Executor<'a> {
                     }
                 })
             }
+            Effect::LoadChanges { config, id } => {
+                let result = preview_restore(backend, &config, id, None).map_err(|e| e.to_string());
+                Msg::ChangesLoaded { config, id, result }
+            }
+            Effect::Restore { config, id } => {
+                let result =
+                    restore_snapshot(backend, &config, id, None).map_err(|e| e.to_string());
+                Msg::Restored { config, id, result }
+            }
             Effect::Delete { config, ids } => {
                 let results = ids
                     .into_iter()
@@ -89,8 +99,13 @@ pub struct Session<'a> {
 impl<'a> Session<'a> {
     /// Start a session and load the configs.
     pub fn new(backend: &'a (dyn SnapshotBackend + Sync)) -> Self {
+        Self::with_context(backend, UiContext::default())
+    }
+
+    /// A session for a machine the shell has already looked at.
+    pub fn with_context(backend: &'a (dyn SnapshotBackend + Sync), context: UiContext) -> Self {
         let mut session = Self {
-            state: State::default(),
+            state: State::with_context(context),
             executor: Executor::new(backend),
         };
         session.dispatch(Msg::Start);

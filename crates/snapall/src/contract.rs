@@ -19,6 +19,8 @@ pub enum Command {
     List,
     Snapshots,
     Delete,
+    Changes,
+    Restore,
     Doctor,
     Completions,
     Man,
@@ -32,6 +34,8 @@ impl Command {
         Command::List,
         Command::Snapshots,
         Command::Delete,
+        Command::Changes,
+        Command::Restore,
         Command::Doctor,
         Command::Completions,
         Command::Man,
@@ -45,6 +49,8 @@ impl Command {
             Command::List => "list",
             Command::Snapshots => "snapshots",
             Command::Delete => "delete",
+            Command::Changes => "changes",
+            Command::Restore => "restore",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -64,6 +70,8 @@ impl Command {
             Command::List => "List the snapper configs snapall can see",
             Command::Snapshots => "List the snapshots of one config, or of every config",
             Command::Delete => "Delete one snapshot of a config",
+            Command::Changes => "Show what restoring a snapshot would change",
+            Command::Restore => "Put a config, or one path of it, back to how a snapshot had it",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -154,6 +162,19 @@ contract! {
         ..Input::EMPTY
     };
 
+    /// Tips.
+    HINTS: bool, Command = Input {
+        key:         "hints",
+        ty:          Type::Bool,
+        default:     Some(true),
+        subcommands: &[Command::Create, Command::Tui],
+        env:         Some(Env::new("SNAPALL_HINTS")),
+        arg:         Some(Arg { negatable: true, ..Arg::long("hints") }),
+        group:       "output",
+        summary:     "Show a one-line tip when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences it.",
+        ..Input::EMPTY
+    };
+
     // ---- logging ---------------------------------------------------------------------
 
     /// What to log.
@@ -219,10 +240,10 @@ contract! {
         key:         "dry_run",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create],
+        subcommands: &[Command::Create, Command::Restore],
         arg:         Some(Arg::long("dry-run")),
         group:       "create",
-        summary:     "Show what would be snapshotted without creating anything.",
+        summary:     "Show what would happen without changing anything.",
         ..Input::EMPTY
     };
 
@@ -233,7 +254,15 @@ contract! {
         key:         "json",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::List, Command::Snapshots, Command::Doctor],
+        subcommands: &[
+            Command::Create,
+            Command::List,
+            Command::Snapshots,
+            Command::Delete,
+            Command::Changes,
+            Command::Restore,
+            Command::Doctor,
+        ],
         env:         Some(Env::new("SNAPALL_JSON")),
         arg:         Some(Arg::long("json")),
         group:       "output",
@@ -256,28 +285,40 @@ contract! {
 
     // ---- delete ----------------------------------------------------------------------
 
-    /// The config to delete from. Required by `delete`; argenv demands it only when `delete` runs.
-    DELETE_CONFIG: String, Command = Input {
-        key:         "delete_config",
+    /// The config a snapshot belongs to.
+    TARGET_CONFIG: String, Command = Input {
+        key:         "config",
         ty:          Type::String,
         required:    true,
-        subcommands: &[Command::Delete],
+        subcommands: &[Command::Delete, Command::Changes, Command::Restore],
         arg:         Some(Arg { value_name: "CONFIG", ..Arg::positional(0) }),
-        group:       "delete",
+        group:       "snapshot",
         summary:     "The config the snapshot belongs to (required).",
         ..Input::EMPTY
     };
 
-    /// The snapshot to delete.
+    /// The snapshot to act on.
     SNAPSHOT_ID: u64, Command = Input {
         key:         "snapshot_id",
         ty:          Type::Uint,
         required:    true,
-        subcommands: &[Command::Delete],
+        subcommands: &[Command::Delete, Command::Changes, Command::Restore],
         arg:         Some(Arg { value_name: "ID", ..Arg::positional(1) }),
-        group:       "delete",
-        example:     "snapall delete home 12",
-        summary:     "The snapshot number to delete (required). 0 is the current system and is refused.",
+        group:       "snapshot",
+        example:     "snapall restore home 12",
+        summary:     "The snapshot number (required). 0 is the current system, not a snapshot, and is refused.",
+        ..Input::EMPTY
+    };
+
+    /// Limit changes and restore to one path.
+    PATH: std::path::PathBuf, Command = Input {
+        key:         "path",
+        ty:          Type::Path,
+        subcommands: &[Command::Changes, Command::Restore],
+        arg:         Some(Arg { value_name: "PATH", ..Arg::positional(2) }),
+        group:       "snapshot",
+        example:     "snapall restore home 12 /home/me/notes.txt",
+        summary:     "Only this file or directory (an absolute path inside the config). Default: everything that differs.",
         ..Input::EMPTY
     };
 
@@ -301,10 +342,10 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor],
+        subcommands: &[Command::Doctor, Command::Restore],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
-        summary:     "With --install: run without asking for confirmation (for scripts and CI).",
+        summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
         ..Input::EMPTY
     };
 

@@ -39,6 +39,20 @@ pub enum Request {
         config: ConfigName,
         id: SnapshotId,
     },
+    /// What restoring snapshot `id` would change.
+    Changes {
+        config: ConfigName,
+        id: SnapshotId,
+        path: Option<String>,
+    },
+    /// Put the config, or one path of it, back to how snapshot `id` had it.
+    Restore {
+        config: ConfigName,
+        id: SnapshotId,
+        path: Option<String>,
+        dry_run: bool,
+        yes: bool,
+    },
     Doctor {
         install: bool,
         yes: bool,
@@ -75,6 +89,8 @@ pub struct Parsed {
     pub request: Request,
     pub no_dbus: bool,
     pub json: bool,
+    /// Whether tips (such as "snapshots can be booted") may be shown.
+    pub hints: bool,
     pub logging: Logging,
     /// Problems worth showing that do not stop the run (for example a misspelled
     /// `SNAPALL_*` variable).
@@ -125,9 +141,42 @@ pub fn parse(args: &[String], env: &dyn EnvSource) -> Result<Parsed, UsageError>
         request,
         no_dbus: flag(&Contract::NO_DBUS, &resolution),
         json: flag(&Contract::JSON, &resolution),
+        hints: flag(&Contract::HINTS, &resolution),
         logging,
         warnings,
     })
+}
+
+/// The config and snapshot a command acts on (`delete`, `changes`, `restore`).
+fn target(resolution: &Resolution) -> Result<(ConfigName, SnapshotId), UsageError> {
+    let missing = |record: argenv_resolve::Record| {
+        usage_error(format!("missing required argument {}", record.usage()))
+    };
+    let config = Contract::TARGET_CONFIG
+        .get_from(resolution)
+        .ok_or_else(|| missing(Contract::TARGET_CONFIG.to_record()))?;
+    let id = Contract::SNAPSHOT_ID
+        .get_from(resolution)
+        .ok_or_else(|| missing(Contract::SNAPSHOT_ID.to_record()))?;
+    Ok((
+        parse_config("CONFIG", &config)?,
+        SnapshotId::new(id).ok_or_else(|| {
+            usage_error("ID 0 is the current system, not a snapshot; there is nothing to act on")
+        })?,
+    ))
+}
+
+/// The optional PATH argument, as text. Paths that are not valid UTF-8 are refused up front,
+/// because everything downstream (snapper's output, the audit log, JSON) is text.
+fn path_argument(resolution: &Resolution) -> Result<Option<String>, UsageError> {
+    Contract::PATH
+        .get_from(resolution)
+        .map(|path| {
+            path.to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| usage_error("PATH must be valid UTF-8"))
+        })
+        .transpose()
 }
 
 /// Combine `--log` and `--log-file`. A log file on its own means JSON (an audit trail is for
@@ -297,20 +346,25 @@ fn build_request(
                 .transpose()?,
         },
         Command::Delete => {
-            let missing = |record: argenv_resolve::Record| {
-                usage_error(format!("missing required argument {}", record.usage()))
-            };
-            let config = Contract::DELETE_CONFIG
-                .get_from(resolution)
-                .ok_or_else(|| missing(Contract::DELETE_CONFIG.to_record()))?;
-            let id = Contract::SNAPSHOT_ID
-                .get_from(resolution)
-                .ok_or_else(|| missing(Contract::SNAPSHOT_ID.to_record()))?;
-            Request::Delete {
-                config: parse_config("CONFIG", &config)?,
-                id: SnapshotId::new(id).ok_or_else(|| {
-                    usage_error("ID 0 is the current system, not a snapshot; it cannot be deleted")
-                })?,
+            let (config, id) = target(resolution)?;
+            Request::Delete { config, id }
+        }
+        Command::Changes => {
+            let (config, id) = target(resolution)?;
+            Request::Changes {
+                config,
+                id,
+                path: path_argument(resolution)?,
+            }
+        }
+        Command::Restore => {
+            let (config, id) = target(resolution)?;
+            Request::Restore {
+                config,
+                id,
+                path: path_argument(resolution)?,
+                dry_run: flag(&Contract::DRY_RUN, resolution),
+                yes: flag(&Contract::YES, resolution),
             }
         }
         Command::Doctor => {
@@ -474,9 +528,17 @@ mod tests {
 
     #[test]
     fn a_scoped_environment_variable_does_not_leak_into_other_commands() {
-        // SNAPALL_JSON applies to create/list/snapshots only; deleting must ignore it.
-        let parsed = run(&["delete", "home", "3"], &[("SNAPALL_JSON", "1")]).unwrap();
+        // SNAPALL_JSON applies to the commands that print results; the TUI and the generators
+        // must ignore it.
+        let parsed = run(&["tui"], &[("SNAPALL_JSON", "1")]).unwrap();
         assert!(!parsed.json);
+        let parsed = run(&["man"], &[("SNAPALL_JSON", "1")]).unwrap();
+        assert!(!parsed.json);
+        let parsed = run(&["delete", "home", "3"], &[("SNAPALL_JSON", "1")]).unwrap();
+        assert!(
+            parsed.json,
+            "delete prints a result too, so it takes --json"
+        );
         let parsed = run(&["list"], &[("SNAPALL_JSON", "1")]).unwrap();
         assert!(parsed.json);
     }
@@ -531,6 +593,7 @@ mod tests {
                 },
                 no_dbus: false,
                 json: true,
+                hints: true,
                 logging: Logging::default(),
                 warnings: vec![],
             }
@@ -575,7 +638,11 @@ mod tests {
         );
         assert!(err(&["list", "--only", "root"]).contains("does not apply to `list`"));
         assert!(err(&["tui", "--json"]).contains("does not apply to `tui`"));
-        assert!(err(&["delete", "home", "3", "--json"]).contains("does not apply"));
+        assert!(err(&["completions", "bash", "--json"]).contains("does not apply"));
+        // `--dry-run` is create's and restore's, and `restore` takes it; `delete` still does not.
+        assert!(run(&["restore", "home", "3", "--dry-run"], &[]).is_ok());
+        // `--yes` is doctor's and restore's, not create's.
+        assert!(err(&["create", "--yes"]).contains("does not apply to `create`"));
     }
 
     #[test]
@@ -680,6 +747,82 @@ mod tests {
         );
         // the variable belongs to `man`: it must not leak into other commands
         assert!(run(&["list"], &[("SOURCE_DATE_EPOCH", "yesterday")]).is_ok());
+    }
+
+    #[test]
+    fn changes_and_restore_take_a_config_a_snapshot_and_an_optional_path() {
+        let home = ConfigName::parse("home").unwrap();
+        let id = SnapshotId::new(12).unwrap();
+        assert_eq!(
+            ok(&["changes", "home", "12"]).request,
+            Request::Changes {
+                config: home.clone(),
+                id,
+                path: None
+            }
+        );
+        assert_eq!(
+            ok(&["changes", "home", "12", "/home/me/notes.txt"]).request,
+            Request::Changes {
+                config: home.clone(),
+                id,
+                path: Some("/home/me/notes.txt".into())
+            }
+        );
+        assert_eq!(
+            ok(&["restore", "home", "12"]).request,
+            Request::Restore {
+                config: home.clone(),
+                id,
+                path: None,
+                dry_run: false,
+                yes: false
+            }
+        );
+        assert_eq!(
+            ok(&["restore", "home", "12", "/home/me/a", "--dry-run", "--yes"]).request,
+            Request::Restore {
+                config: home,
+                id,
+                path: Some("/home/me/a".into()),
+                dry_run: true,
+                yes: true,
+            }
+        );
+    }
+
+    #[test]
+    fn changes_and_restore_need_a_real_snapshot_and_refuse_flags_that_are_not_theirs() {
+        assert!(err(&["restore", "home"]).contains("missing required argument"));
+        assert!(err(&["changes"]).contains("missing required argument"));
+        assert!(err(&["restore", "home", "0"]).contains("current system"));
+        assert!(err(&["restore", "home", "x"]).contains("expected a non-negative integer"));
+        // `--yes` belongs to doctor and restore: asking for it on a read-only command is a mistake.
+        assert!(err(&["changes", "home", "3", "--yes"]).contains("does not apply to `changes`"));
+        // `--dry-run` belongs to create and restore: it can never reach delete.
+        assert!(err(&["delete", "home", "3", "--dry-run"]).contains("does not apply to `delete`"));
+        // a fourth positional is surplus
+        assert!(err(&["restore", "home", "3", "/a", "/b"]).contains("unexpected argument"));
+    }
+
+    #[test]
+    fn tips_are_on_by_default_and_can_be_silenced_by_flag_or_variable() {
+        assert!(ok(&["create"]).hints);
+        assert!(!ok(&["create", "--no-hints"]).hints);
+        assert!(!ok(&["tui", "--no-hints"]).hints);
+        assert!(!run(&["create"], &[("SNAPALL_HINTS", "off")]).unwrap().hints);
+        assert!(
+            run(&["create", "--hints"], &[("SNAPALL_HINTS", "off")])
+                .unwrap()
+                .hints,
+            "the flag wins"
+        );
+        assert!(
+            run(&["create"], &[("SNAPALL_HINTS", "maybe")]).is_err(),
+            "not a boolean"
+        );
+        // tips only exist where a snapshot is made or browsed
+        assert!(err(&["list", "--no-hints"]).contains("does not apply to `list`"));
     }
 
     #[test]
@@ -881,8 +1024,22 @@ mod tests {
         assert_eq!(
             required,
             [
-                ("delete_config".to_owned(), vec!["delete".to_owned()]),
-                ("snapshot_id".to_owned(), vec!["delete".to_owned()]),
+                (
+                    "config".to_owned(),
+                    vec![
+                        "delete".to_owned(),
+                        "changes".to_owned(),
+                        "restore".to_owned()
+                    ]
+                ),
+                (
+                    "snapshot_id".to_owned(),
+                    vec![
+                        "delete".to_owned(),
+                        "changes".to_owned(),
+                        "restore".to_owned()
+                    ]
+                ),
                 ("shell".to_owned(), vec!["completions".to_owned()]),
             ]
         );

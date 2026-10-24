@@ -9,7 +9,7 @@
 
 use std::collections::BTreeSet;
 
-use snapall_core::{ConfigName, Description, SnapshotId, SnapshotInfo};
+use snapall_core::{ConfigName, Description, Preview, Restored, SnapshotId, SnapshotInfo};
 
 /// A key, independent of any terminal library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +50,73 @@ pub struct ConfigEntry {
     pub snapshots: Load<Vec<SnapshotInfo>>,
 }
 
+/// What the UI is told about the machine it runs on, once, at the start. The model never reads
+/// the machine; the shell does, and hands over plain text.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UiContext {
+    /// A one-line tip (for example that snapshots cannot be booted), shown until something else
+    /// needs the line.
+    pub boot_tip: Option<String>,
+    /// How to restore the *system itself*, shown instead of a confirm button for the system root.
+    pub restore_route: String,
+}
+
+/// Something that can be clicked. Each is the mouse spelling of a key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Button {
+    Create,
+    CreateAll,
+    Delete,
+    Restore,
+    Reload,
+    Help,
+    Quit,
+    /// The affirmative button of a prompt (Enter).
+    Confirm,
+    /// The negative button of a prompt (Esc).
+    Cancel,
+}
+
+impl Button {
+    /// The key this button stands for, so a click goes through exactly the code the key does.
+    pub fn key(self) -> Key {
+        match self {
+            Button::Create => Key::Char('c'),
+            Button::CreateAll => Key::Char('a'),
+            Button::Delete => Key::Char('d'),
+            Button::Restore => Key::Char('u'),
+            Button::Reload => Key::Char('r'),
+            Button::Help => Key::Char('?'),
+            Button::Quit => Key::Char('q'),
+            Button::Confirm => Key::Enter,
+            Button::Cancel => Key::Esc,
+        }
+    }
+}
+
+/// A left click, already resolved by the view to what is under the pointer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Click {
+    Button(Button),
+    /// A row of a pane (its position in what is displayed, not on screen).
+    Row {
+        pane: Pane,
+        index: usize,
+    },
+    /// The mark column of a snapshot row: toggles the mark without moving the cursor.
+    Mark {
+        index: usize,
+    },
+}
+
+/// Where a restore prompt is: looking at what would change, ready, or unable to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RestoreStage {
+    Loading,
+    Ready(Preview),
+    Failed(String),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
     One(ConfigName),
@@ -66,6 +133,12 @@ pub enum Modal {
     ConfirmDelete {
         config: ConfigName,
         ids: Vec<SnapshotId>,
+    },
+    /// Put a config back to how a snapshot had it.
+    Restore {
+        config: ConfigName,
+        id: SnapshotId,
+        stage: RestoreStage,
     },
     Help,
 }
@@ -93,6 +166,8 @@ pub struct State {
     pub pending: usize,
     /// Advances on every `Tick`, to animate the working indicator.
     pub spinner: usize,
+    /// What the shell told the UI about the machine, once, at the start.
+    pub context: UiContext,
 }
 
 impl Default for State {
@@ -108,11 +183,19 @@ impl Default for State {
             quit: false,
             pending: 0,
             spinner: 0,
+            context: UiContext::default(),
         }
     }
 }
 
 impl State {
+    pub fn with_context(context: UiContext) -> Self {
+        Self {
+            context,
+            ..Self::default()
+        }
+    }
+
     pub fn entries(&self) -> &[ConfigEntry] {
         match &self.configs {
             Load::Loaded(entries) => entries,
@@ -163,6 +246,16 @@ pub enum Effect {
         config: ConfigName,
         ids: Vec<SnapshotId>,
     },
+    /// What would restoring `id` change?
+    LoadChanges {
+        config: ConfigName,
+        id: SnapshotId,
+    },
+    /// Put `config` back to how `id` had it (after a safety snapshot).
+    Restore {
+        config: ConfigName,
+        id: SnapshotId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,6 +265,23 @@ pub enum Msg {
     /// Time passed while work is in flight; animates the indicator.
     Tick,
     Key(Key),
+    /// A left click, resolved by the view.
+    Click(Click),
+    /// The wheel over a pane: positive moves down.
+    Scroll {
+        pane: Pane,
+        delta: i32,
+    },
+    ChangesLoaded {
+        config: ConfigName,
+        id: SnapshotId,
+        result: Result<Preview, String>,
+    },
+    Restored {
+        config: ConfigName,
+        id: SnapshotId,
+        result: Result<Restored, String>,
+    },
     ConfigsLoaded(Result<Vec<ConfigName>, String>),
     SnapshotsLoaded {
         config: ConfigName,
@@ -197,6 +307,16 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             Vec::new()
         }
         Msg::Key(key) => on_key(state, key),
+        Msg::Click(click) => on_click(state, click),
+        Msg::Scroll { pane, delta } => on_scroll(state, pane, delta),
+        Msg::ChangesLoaded { config, id, result } => {
+            settle(state);
+            on_changes_loaded(state, &config, id, result)
+        }
+        Msg::Restored { config, id, result } => {
+            settle(state);
+            on_restored(state, &config, id, result)
+        }
         Msg::ConfigsLoaded(result) => {
             settle(state);
             on_configs_loaded(state, result)
@@ -228,7 +348,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return on_modal_key(state, key);
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
-    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd')) {
+    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u')) {
         state.notice = Some(Notice::Info(
             "busy: wait for the current operation to finish".into(),
         ));
@@ -273,6 +393,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         Key::Char('c') => open_describe(state, false),
         Key::Char('a') => open_describe(state, true),
         Key::Char('d') => open_delete(state),
+        Key::Char('u') => open_restore(state),
         _ => Vec::new(),
     }
 }
@@ -349,6 +470,26 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
                 Vec::new()
             }
         },
+        Modal::Restore { config, id, stage } => {
+            // Only a prompt with real changes to restore, on a config that may be restored whole,
+            // can be confirmed. Anything else is information, and any key closes it.
+            let actionable = matches!(
+                &stage,
+                RestoreStage::Ready(p) if !p.is_system_root && !p.changes.is_empty()
+            );
+            match key {
+                Key::Char('y' | 'Y') | Key::Enter if actionable => {
+                    state.notice = Some(Notice::Info(format!("restoring {config} to #{id}")));
+                    vec![Effect::Restore { config, id }]
+                }
+                Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Vec::new(),
+                _ if !actionable && stage != RestoreStage::Loading => Vec::new(),
+                _ => {
+                    state.modal = Some(Modal::Restore { config, id, stage });
+                    Vec::new()
+                }
+            }
+        }
         Modal::ConfirmDelete { config, ids } => match key {
             Key::Char('y') | Key::Char('Y') | Key::Enter => {
                 state.notice = Some(Notice::Info(format!("deleting {} snapshot(s)", ids.len())));
@@ -607,4 +748,116 @@ fn on_deleted(
     });
     state.marked.clear();
     vec![Effect::LoadSnapshots(config.clone())]
+}
+
+fn open_restore(state: &mut State) -> Vec<Effect> {
+    let Some(config) = state.selected_config().map(|c| c.name.clone()) else {
+        return Vec::new();
+    };
+    if state.focus != Pane::Snapshots {
+        state.notice = Some(Notice::Info(
+            "move to the snapshots pane (right arrow) to choose the snapshot to restore".into(),
+        ));
+        return Vec::new();
+    }
+    let Some(id) = state.selected_snapshot().map(|s| s.id) else {
+        state.notice = Some(Notice::Error("no snapshot to restore".into()));
+        return Vec::new();
+    };
+    state.modal = Some(Modal::Restore {
+        config: config.clone(),
+        id,
+        stage: RestoreStage::Loading,
+    });
+    vec![Effect::LoadChanges { config, id }]
+}
+
+fn on_changes_loaded(
+    state: &mut State,
+    config: &ConfigName,
+    id: SnapshotId,
+    result: Result<Preview, String>,
+) -> Vec<Effect> {
+    // The answer only matters to the prompt that asked. If it was closed meanwhile, drop it.
+    if let Some(Modal::Restore {
+        config: asked_config,
+        id: asked_id,
+        stage,
+    }) = &mut state.modal
+    {
+        if asked_config == config && *asked_id == id && *stage == RestoreStage::Loading {
+            *stage = match result {
+                Ok(preview) => RestoreStage::Ready(preview),
+                Err(error) => RestoreStage::Failed(error),
+            };
+        }
+    }
+    Vec::new()
+}
+
+fn on_restored(
+    state: &mut State,
+    config: &ConfigName,
+    id: SnapshotId,
+    result: Result<Restored, String>,
+) -> Vec<Effect> {
+    state.notice = Some(match result {
+        Ok(done) => Notice::Info(format!(
+            "restored {config} to #{id}; the state before is #{}, restore it to undo",
+            done.safety_snapshot
+        )),
+        Err(error) => Notice::Error(error),
+    });
+    state.marked.clear();
+    // Reload either way: a safety snapshot may exist even when the restore itself failed.
+    vec![Effect::LoadSnapshots(config.clone())]
+}
+
+fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
+    match click {
+        // A prompt's buttons work only while a prompt is open, and nothing else works then:
+        // a click on a button behind a prompt must not be typed into it as a letter.
+        Click::Button(button @ (Button::Confirm | Button::Cancel)) => {
+            if state.modal.is_some() {
+                on_key(state, button.key())
+            } else {
+                Vec::new()
+            }
+        }
+        _ if state.modal.is_some() => Vec::new(),
+        Click::Button(button) => on_key(state, button.key()),
+        Click::Row { pane, index } => {
+            state.focus = pane;
+            match pane {
+                Pane::Configs if index < state.entries().len() => select_config(state, index),
+                Pane::Snapshots if index < state.displayed_snapshots().len() => {
+                    state.snapshot_cursor = index;
+                    Vec::new()
+                }
+                _ => Vec::new(),
+            }
+        }
+        Click::Mark { index } => {
+            state.focus = Pane::Snapshots;
+            if index < state.displayed_snapshots().len() {
+                state.snapshot_cursor = index;
+                toggle_mark(state);
+                // Marking by click does not move on to the next row, unlike the space key.
+                state.snapshot_cursor = index;
+            }
+            Vec::new()
+        }
+    }
+}
+
+fn on_scroll(state: &mut State, pane: Pane, delta: i32) -> Vec<Effect> {
+    if state.modal.is_some() {
+        return Vec::new();
+    }
+    // The wheel moves the pane under the pointer without taking the keyboard focus from the other.
+    let focus = state.focus;
+    state.focus = pane;
+    let effects = step(state, delta as isize);
+    state.focus = focus;
+    effects
 }
