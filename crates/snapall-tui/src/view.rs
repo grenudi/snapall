@@ -12,7 +12,7 @@ use ratatui::widgets::{
     TableState, Wrap,
 };
 use ratatui::Frame;
-use snapall_core::{ChangeKind, SnapshotInfo, SnapshotKind};
+use snapall_core::{ChangeKind, FileState, SnapshotInfo, SnapshotKind};
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
 
@@ -50,11 +50,35 @@ pub fn areas(size: Rect) -> Areas {
     }
 }
 
+/// [`areas`], adjusted for what is on screen: when the UI is open on one file, its versions take the
+/// whole body and there is no configs pane.
+pub fn layout(state: &State, size: Rect) -> Areas {
+    let mut areas = areas(size);
+    if state.file.is_some() {
+        areas.snapshots = Rect {
+            x: areas.configs.x,
+            y: areas.configs.y,
+            width: areas.configs.width.saturating_add(areas.snapshots.width),
+            height: areas.configs.height,
+        };
+        areas.configs = Rect {
+            width: 0,
+            height: 0,
+            ..areas.configs
+        };
+    }
+    areas
+}
+
 pub fn render(state: &State, frame: &mut Frame) {
-    let areas = areas(frame.area());
+    let areas = layout(state, frame.area());
     render_header(state, frame, areas.header);
-    render_configs(state, frame, areas.configs);
-    render_snapshots(state, frame, areas.snapshots);
+    if state.file.is_some() {
+        render_file(state, frame, areas.snapshots);
+    } else {
+        render_configs(state, frame, areas.configs);
+        render_snapshots(state, frame, areas.snapshots);
+    }
     render_footer(state, frame, &areas);
 
     if let Some(modal) = &state.modal {
@@ -65,7 +89,13 @@ pub fn render(state: &State, frame: &mut Frame) {
 fn render_header(state: &State, frame: &mut Frame, area: Rect) {
     let mut spans = vec![
         Span::styled(" snapall ", Style::new().fg(Color::Black).bg(ACCENT).bold()),
-        Span::styled("  snapper snapshots", Style::new().fg(DIM)),
+        Span::styled(
+            match &state.file {
+                Some(view) => format!("  history of {}", view.target.path),
+                None => "  snapper snapshots".to_owned(),
+            },
+            Style::new().fg(DIM),
+        ),
     ];
     if state.pending > 0 {
         // Work is in flight on the worker thread: say so, and keep the screen moving.
@@ -253,10 +283,18 @@ const ACTIONS: [(Button, &str, &str); 7] = [
 ];
 
 /// Each footer button and the cells it covers on the key line.
-fn footer_buttons(keys: Rect) -> Vec<(Rect, Button, &'static str, &'static str)> {
+const FILE_ACTIONS: [(Button, &str, &str); 4] = [
+    (Button::Restore, "u", "restore this version"),
+    (Button::Reload, "r", "reload"),
+    (Button::Help, "?", "help"),
+    (Button::Quit, "q", "quit"),
+];
+
+fn footer_buttons(keys: Rect, file_mode: bool) -> Vec<(Rect, Button, &'static str, &'static str)> {
     let mut x = keys.x.saturating_add(1);
     let mut out = Vec::new();
-    for (button, key, label) in ACTIONS {
+    let actions: &[(Button, &str, &str)] = if file_mode { &FILE_ACTIONS } else { &ACTIONS };
+    for &(button, key, label) in actions {
         let width = (key.chars().count() + 1 + label.chars().count()) as u16;
         if x.saturating_add(width) > keys.x.saturating_add(keys.width) {
             break; // what does not fit is not drawn, and so cannot be clicked
@@ -290,7 +328,7 @@ fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
         (None, None) => Span::raw(""),
     };
     frame.render_widget(Paragraph::new(Line::from(notice)), areas.notice);
-    for (rect, _button, key, label) in footer_buttons(areas.keys) {
+    for (rect, _button, key, label) in footer_buttons(areas.keys, state.file.is_some()) {
         let line = Line::from(vec![
             Span::styled(key, Style::new().fg(ACCENT).bold()),
             Span::styled(format!(" {label}"), Style::new().fg(DIM)),
@@ -367,7 +405,12 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
             ];
             ModalSpec { title: " Delete ".into(), lines, color: Color::Red, width: 56, height: 9, buttons: vec![confirm("Delete"), cancel] }
         }
-        Modal::Restore { config, id, stage } => match stage {
+        Modal::Restore {
+            config,
+            id,
+            path,
+            stage,
+        } => match stage {
             RestoreStage::Loading => ModalSpec {
                 title: format!(" Restore {config} to #{id} "),
                 lines: vec![Line::styled("Looking at what would change...", Style::new().fg(DIM))],
@@ -384,7 +427,7 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
                 height: 9,
                 buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
             },
-            RestoreStage::Ready(preview) if preview.is_system_root => ModalSpec {
+            RestoreStage::Ready(preview) if preview.is_system_root && path.is_none() => ModalSpec {
                 title: " Restoring the system itself ".into(),
                 lines: vec![
                     Line::from(format!("{config} is the system root, so snapall will not put it back while it runs.")),
@@ -408,7 +451,8 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
                 let (changed, added, removed) = restore_counts(&preview.changes);
                 let mut lines = vec![
                     Line::from(format!(
-                        "Put {config} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
+                        "Put {} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
+                        path.as_deref().unwrap_or(config.as_str())
                     )),
                     Line::from(""),
                 ];
@@ -536,6 +580,82 @@ fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
     }
 }
 
+fn state_style(state: FileState) -> Style {
+    match state {
+        FileState::Changed => Style::new().fg(Color::Yellow),
+        FileState::DeletedSince => Style::new().fg(Color::Red),
+        FileState::Same | FileState::AbsentThen => Style::new().fg(DIM),
+    }
+}
+
+/// The history of one file: a row per snapshot, newest first, saying how the file stood in it.
+fn render_file(state: &State, frame: &mut Frame, area: Rect) {
+    let Some(view) = &state.file else {
+        return;
+    };
+    let name = view
+        .target
+        .path
+        .rsplit('/')
+        .next()
+        .unwrap_or(view.target.path.as_str());
+    let title = format!(" {name} in {} ", view.target.config);
+    let block = pane_block(title, state.modal.is_none());
+    match &view.versions {
+        Load::NotLoaded => frame.render_widget(Paragraph::new("loading...").block(block), area),
+        Load::Failed(error) => frame.render_widget(
+            Paragraph::new(error.as_str())
+                .style(Style::new().fg(Color::Red))
+                .wrap(Wrap { trim: true })
+                .block(block),
+            area,
+        ),
+        Load::Loaded(list) if list.is_empty() => frame.render_widget(
+            Paragraph::new("no snapshots of this config yet. Press q to quit.")
+                .style(Style::new().fg(DIM))
+                .block(block),
+            area,
+        ),
+        Load::Loaded(_) => {
+            let rows: Vec<Row> = state
+                .displayed_versions()
+                .into_iter()
+                .map(|version| {
+                    Row::new(vec![
+                        version.snapshot.id.to_string(),
+                        version.snapshot.date.clone().unwrap_or_default(),
+                        version.state.label().to_owned(),
+                        version.snapshot.description.clone(),
+                    ])
+                    .style(state_style(version.state))
+                })
+                .collect();
+            let header = Row::new(["#", "Date", "This file", "Snapshot"])
+                .style(Style::new().fg(DIM).add_modifier(Modifier::BOLD));
+            let highlight = if state.modal.is_none() {
+                Style::new().fg(Color::Black).bg(ACCENT).bold()
+            } else {
+                Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            };
+            let table = Table::new(
+                rows,
+                [
+                    Constraint::Length(6),
+                    Constraint::Length(19),
+                    Constraint::Length(17),
+                    Constraint::Min(10),
+                ],
+            )
+            .header(header)
+            .block(block)
+            .row_highlight_style(highlight)
+            .column_spacing(1);
+            let mut table_state = TableState::default().with_selected(Some(view.cursor));
+            frame.render_stateful_widget(table, area, &mut table_state);
+        }
+    }
+}
+
 // ---- clicks ---------------------------------------------------------------------------------
 
 /// The first visible row of a list of `len` rows, `rows` high, whose selection is `cursor`. The
@@ -557,8 +677,8 @@ fn contains(rect: Rect, col: u16, row: u16) -> bool {
 }
 
 /// The pane a terminal cell belongs to, for the wheel.
-pub fn pane_at(size: Rect, col: u16, row: u16) -> Option<Pane> {
-    let areas = areas(size);
+pub fn pane_at(state: &State, size: Rect, col: u16, row: u16) -> Option<Pane> {
+    let areas = layout(state, size);
     if contains(areas.configs, col, row) {
         Some(Pane::Configs)
     } else if contains(areas.snapshots, col, row) {
@@ -579,8 +699,8 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
             .find(|(rect, _, _)| contains(*rect, col, row))
             .map(|(_, button, _)| Click::Button(button));
     }
-    let areas = areas(size);
-    if let Some((_, button, _, _)) = footer_buttons(areas.keys)
+    let areas = layout(state, size);
+    if let Some((_, button, _, _)) = footer_buttons(areas.keys, state.file.is_some())
         .into_iter()
         .find(|(rect, _, _, _)| contains(*rect, col, row))
     {
@@ -588,7 +708,7 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
     }
     let block = Block::default().borders(Borders::ALL);
     let configs = block.inner(areas.configs);
-    if contains(configs, col, row) && !state.entries().is_empty() {
+    if state.file.is_none() && contains(configs, col, row) && !state.entries().is_empty() {
         let index =
             window_start(state.config_cursor, configs.height as usize) + (row - configs.y) as usize;
         return (index < state.entries().len()).then_some(Click::Row {
@@ -597,6 +717,20 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
         });
     }
     let snapshots = block.inner(areas.snapshots);
+    if let Some(view) = &state.file {
+        // One header line, then a row per version, newest first.
+        if contains(snapshots, col, row) && row > snapshots.y {
+            let visible = (snapshots.height as usize).saturating_sub(1);
+            let index = window_start(view.cursor, visible) + (row - snapshots.y - 1) as usize;
+            if index < state.displayed_versions().len() {
+                return Some(Click::Row {
+                    pane: Pane::Snapshots,
+                    index,
+                });
+            }
+        }
+        return None;
+    }
     // One header line, then the rows.
     if contains(snapshots, col, row) && row > snapshots.y {
         let visible = (snapshots.height as usize).saturating_sub(1);

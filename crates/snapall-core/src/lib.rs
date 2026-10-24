@@ -22,13 +22,14 @@ pub mod usecase;
 pub mod testing;
 
 pub use domain::{
-    Change, ChangeKind, ConfigName, Description, ParseError, RestoreSummary, SnapshotId,
-    SnapshotInfo, SnapshotKind,
+    Change, ChangeKind, ConfigName, Description, FileState, FileVersion, ParseError,
+    RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{
-    all_snapshots, delete_snapshot, plan_snapshots, preview_restore, restore_snapshot, run_plan,
-    snapshot_all, snapshots_of, Outcome, Preview, Report, RestoreError, Restored, SnapshotError,
+    all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
+    plan_snapshots, preview_restore, restore_snapshot, run_plan, snapshot_all, snapshots_of,
+    FileHistory, HistoryError, Outcome, Preview, Report, RestoreError, Restored, SnapshotError,
 };

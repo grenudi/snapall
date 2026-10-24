@@ -95,6 +95,13 @@ grep -qx 'Icon=snapall' /usr/share/applications/snapall.desktop || fail "the lau
 if command -v desktop-file-validate >/dev/null 2>&1; then
   out="$(desktop-file-validate /usr/share/applications/snapall.desktop 2>&1)"; [ -z "$out" ] || fail "the launcher entry is not valid: $out"
 fi
+# "Restore from snapshots" in the file managers: every entry is installed where that file manager looks.
+for path in usr/bin/snapall-file-menu usr/share/kio/servicemenus/snapall.desktop usr/share/nemo/actions/snapall.nemo_action \
+  usr/share/file-manager/actions/snapall.desktop usr/share/nautilus-python/extensions/snapall.py; do
+  echo "$files" | grep -q "$path\$" || fail "the package does not contain /$path"
+done
+[ -x /usr/bin/snapall-file-menu ] || fail "the file-manager launcher is not executable"
+sh -n /usr/bin/snapall-file-menu || fail "the file-manager launcher is not valid shell"
 # ...and what was installed is what the binary generates, byte for byte.
 snapall completions bash | cmp - /usr/share/bash-completion/completions/snapall || fail "the installed bash completion is not the generated one"
 snapall completions zsh | cmp - /usr/share/zsh/site-functions/_snapall || fail "the installed zsh completion is not the generated one"

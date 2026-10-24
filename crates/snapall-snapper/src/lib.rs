@@ -14,9 +14,14 @@ use std::io;
 use std::process::Command;
 
 use serde::Deserialize;
+use std::fs::{self, File};
+use std::io::Read;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::Path;
+
 use snapall_core::{
-    BackendError, Change, ChangeKind, ConfigName, Description, RestoreSummary, SnapshotBackend,
-    SnapshotId, SnapshotInfo, SnapshotKind,
+    BackendError, Change, ChangeKind, ConfigName, Description, FileState, FileVersion,
+    RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 
 const PROGRAM: &str = "snapper";
@@ -283,6 +288,38 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         parse_status(&output.stdout)
     }
 
+    fn file_versions(
+        &self,
+        config: &ConfigName,
+        path: &str,
+    ) -> Result<Vec<FileVersion>, BackendError> {
+        let subvolume = self.config_subvolume(config)?;
+        let base = subvolume.trim_end_matches('/');
+        let relative = path
+            .strip_prefix(base)
+            .map(|rest| rest.trim_start_matches('/'))
+            .ok_or_else(|| unexpected(format!("`{path}` is not under `{subvolume}`")))?;
+        self.list_snapshots(config)?
+            .into_iter()
+            .map(|snapshot| {
+                // snapper keeps snapshot N of a subvolume at <subvolume>/.snapshots/N/snapshot
+                let root = format!("{base}/.snapshots/{}/snapshot", snapshot.id);
+                if !Path::new(&root).is_dir() {
+                    return Err(BackendError::Unavailable {
+                        program: "snapshot directory".into(),
+                        detail: format!(
+                            "snapshot {} is not at `{root}` (a snapper layout other than the default?)",
+                            snapshot.id
+                        ),
+                    });
+                }
+                let then = Path::new(&root).join(relative);
+                let state = file_state(&then, Path::new(path))?;
+                Ok(FileVersion { snapshot, state })
+            })
+            .collect()
+    }
+
     fn undo_changes(
         &self,
         config: &ConfigName,
@@ -298,6 +335,95 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         let output = self.run(self.args(&rest))?;
         Ok(parse_summary(&output.stdout))
     }
+}
+
+fn io_error(path: &Path, error: &io::Error) -> BackendError {
+    BackendError::Unavailable {
+        program: "filesystem".into(),
+        detail: format!("{}: {error}", path.display()),
+    }
+}
+
+/// Metadata of what is at `path` itself (not what a symlink points at), or `None` if nothing is.
+fn lstat(path: &Path) -> Result<Option<fs::Metadata>, BackendError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => Ok(Some(metadata)),
+        // A parent that is not a directory, or missing, means the file is not there either.
+        Err(e)
+            if matches!(
+                e.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            ) =>
+        {
+            Ok(None)
+        }
+        Err(e) => Err(io_error(path, &e)),
+    }
+}
+
+/// Whether two readers hold the same bytes.
+fn same_bytes(a: &Path, b: &Path) -> Result<bool, BackendError> {
+    let mut left = File::open(a).map_err(|e| io_error(a, &e))?;
+    let mut right = File::open(b).map_err(|e| io_error(b, &e))?;
+    let (mut x, mut y) = ([0u8; 64 * 1024], [0u8; 64 * 1024]);
+    loop {
+        let n = left.read(&mut x).map_err(|e| io_error(a, &e))?;
+        let mut filled = 0;
+        while filled < n {
+            let got = right.read(&mut y[filled..n]).map_err(|e| io_error(b, &e))?;
+            if got == 0 {
+                return Ok(false); // the other ended first
+            }
+            filled += got;
+        }
+        if n == 0 {
+            // `left` is exhausted: equal only if `right` is too
+            return Ok(right.read(&mut y).map_err(|e| io_error(b, &e))? == 0);
+        }
+        if x[..n] != y[..n] {
+            return Ok(false);
+        }
+    }
+}
+
+/// How the file as the snapshot had it (`then`) compares with the file now (`now`). Content, type,
+/// permissions and owner all count, because restoring puts all of them back.
+fn file_state(then: &Path, now: &Path) -> Result<FileState, BackendError> {
+    let Some(before) = lstat(then)? else {
+        return Ok(FileState::AbsentThen);
+    };
+    if before.is_dir() {
+        return Err(BackendError::NotSupported(
+            "directories are not supported yet: choose a file".into(),
+        ));
+    }
+    let Some(after) = lstat(now)? else {
+        return Ok(FileState::DeletedSince);
+    };
+    if after.is_dir() {
+        return Err(BackendError::NotSupported(
+            "directories are not supported yet: choose a file".into(),
+        ));
+    }
+    let same_kind = before.file_type().is_symlink() == after.file_type().is_symlink();
+    let same_owner = before.uid() == after.uid() && before.gid() == after.gid();
+    let same_mode = before.permissions().mode() & 0o7777 == after.permissions().mode() & 0o7777;
+    let same_content = if !same_kind {
+        false
+    } else if before.file_type().is_symlink() {
+        fs::read_link(then).map_err(|e| io_error(then, &e))?
+            == fs::read_link(now).map_err(|e| io_error(now, &e))?
+    } else {
+        before.len() == after.len() && same_bytes(then, now)?
+    };
+    Ok(
+        if same_kind && same_content && same_owner && (same_mode || before.file_type().is_symlink())
+        {
+            FileState::Same
+        } else {
+            FileState::Changed
+        },
+    )
 }
 
 /// `snapper status A..B` prints one line per path: six status characters, a space, the path.
@@ -707,6 +833,196 @@ mod tests {
             .unwrap_err();
         assert!(
             error.to_string().contains("Snapshot '99' not found"),
+            "{error}"
+        );
+    }
+
+    // ---- file history ---------------------------------------------------------------------
+
+    /// A fake subvolume on disk, laid out the way snapper lays out its snapshots.
+    struct Volume(std::path::PathBuf);
+
+    impl Volume {
+        fn new(label: &str) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("snapall-fv-{label}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(&root).unwrap();
+            Volume(root)
+        }
+
+        fn path(&self, relative: &str) -> String {
+            format!("{}/{relative}", self.0.display())
+        }
+
+        fn write(&self, full: &str, content: &[u8]) {
+            let path = std::path::PathBuf::from(full);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, content).unwrap();
+        }
+
+        /// The live file.
+        fn live(&self, relative: &str, content: &[u8]) {
+            self.write(&self.path(relative), content);
+        }
+
+        /// The file as snapshot `id` had it.
+        fn snap(&self, id: u64, relative: &str, content: &[u8]) {
+            self.write(
+                &self.path(&format!(".snapshots/{id}/snapshot/{relative}")),
+                content,
+            );
+        }
+
+        /// A snapshot that exists but does not hold the file.
+        fn empty_snap(&self, id: u64) {
+            fs::create_dir_all(self.path(&format!(".snapshots/{id}/snapshot"))).unwrap();
+        }
+
+        /// The history of `relative` over snapshots `ids`, through the real adapter code.
+        fn history(
+            &self,
+            ids: &[u64],
+            relative: &str,
+        ) -> Result<Vec<(u64, FileState)>, BackendError> {
+            let configs = format!(
+                r#"{{"configs":[{{"config":"vol","subvolume":"{}"}}]}}"#,
+                self.0.display()
+            );
+            let mut rows = vec![r#"{"number":0,"type":"single","date":"","user":"root","cleanup":"","description":"current"}"#.to_owned()];
+            rows.extend(ids.iter().map(|n| {
+                format!(r#"{{"number":{n},"type":"single","date":"2026-10-24 10:00:00","user":"root","cleanup":"number","description":"s{n}"}}"#)
+            }));
+            let list = format!(r#"{{"vol":[{}]}}"#, rows.join(","));
+            let script = Scripted::new(vec![ok(&configs), ok(&list)]);
+            SnapperCli::new(&script)
+                .file_versions(&name("vol"), &self.path(relative))
+                .map(|versions| {
+                    versions
+                        .into_iter()
+                        .map(|v| (v.snapshot.id.get(), v.state))
+                        .collect()
+                })
+        }
+    }
+
+    impl Drop for Volume {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn a_file_is_compared_with_every_snapshot_by_content() {
+        let v = Volume::new("states");
+        v.live("docs/notes.txt", b"version two");
+        v.snap(1, "docs/notes.txt", b"version two"); // identical
+        v.snap(2, "docs/notes.txt", b"version one"); // same length, other bytes
+        v.snap(3, "docs/notes.txt", b"v1"); // other length
+        v.empty_snap(4); // the snapshot exists and the file was not in it
+        assert_eq!(
+            v.history(&[1, 2, 3, 4], "docs/notes.txt").unwrap(),
+            [
+                (1, FileState::Same),
+                (2, FileState::Changed),
+                (3, FileState::Changed),
+                (4, FileState::AbsentThen),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_deleted_file_is_deleted_since_where_it_existed_and_absent_where_it_did_not() {
+        let v = Volume::new("deleted");
+        v.snap(1, "gone.txt", b"it was here");
+        v.empty_snap(2);
+        assert_eq!(
+            v.history(&[1, 2], "gone.txt").unwrap(),
+            [(1, FileState::DeletedSince), (2, FileState::AbsentThen)]
+        );
+    }
+
+    #[test]
+    fn large_files_are_compared_to_the_last_byte() {
+        let v = Volume::new("large");
+        let mut big = vec![7u8; 300 * 1024];
+        v.live("big.bin", &big);
+        v.snap(1, "big.bin", &big);
+        *big.last_mut().unwrap() = 8;
+        v.snap(2, "big.bin", &big); // equal length, differs only in the final byte
+        assert_eq!(
+            v.history(&[1, 2], "big.bin").unwrap(),
+            [(1, FileState::Same), (2, FileState::Changed)]
+        );
+    }
+
+    #[test]
+    fn permissions_count_because_restoring_puts_them_back() {
+        let v = Volume::new("mode");
+        v.live("run.sh", b"#!/bin/sh");
+        v.snap(1, "run.sh", b"#!/bin/sh");
+        fs::set_permissions(v.path("run.sh"), fs::Permissions::from_mode(0o644)).unwrap();
+        fs::set_permissions(
+            v.path(".snapshots/1/snapshot/run.sh"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        assert_eq!(
+            v.history(&[1], "run.sh").unwrap(),
+            [(1, FileState::Changed)]
+        );
+    }
+
+    #[test]
+    fn symlinks_are_compared_by_where_they_point_not_by_what_they_point_at() {
+        let v = Volume::new("links");
+        v.write(&v.path("target-a"), b"a");
+        std::os::unix::fs::symlink("target-a", v.path("link")).unwrap();
+        for id in [1, 2, 3] {
+            fs::create_dir_all(v.path(&format!(".snapshots/{id}/snapshot"))).unwrap();
+        }
+        std::os::unix::fs::symlink("target-a", v.path(".snapshots/1/snapshot/link")).unwrap();
+        std::os::unix::fs::symlink("target-b", v.path(".snapshots/2/snapshot/link")).unwrap();
+        v.snap(3, "link", b"a regular file where the link is now");
+        assert_eq!(
+            v.history(&[1, 2, 3], "link").unwrap(),
+            [
+                (1, FileState::Same),
+                (2, FileState::Changed),
+                (3, FileState::Changed)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_parent_that_is_a_file_in_the_snapshot_means_the_path_was_not_there() {
+        let v = Volume::new("parent");
+        v.live("a/b.txt", b"x");
+        v.snap(1, "a", b"a was a file then, so a/b.txt could not exist");
+        assert_eq!(
+            v.history(&[1], "a/b.txt").unwrap(),
+            [(1, FileState::AbsentThen)]
+        );
+    }
+
+    #[test]
+    fn a_directory_is_refused_with_a_reason_not_compared_wrongly() {
+        let v = Volume::new("dir");
+        v.live("folder/inner.txt", b"x");
+        v.snap(1, "folder/inner.txt", b"x");
+        let error = v.history(&[1], "folder").unwrap_err();
+        assert!(matches!(error, BackendError::NotSupported(_)), "{error}");
+        assert!(error.to_string().contains("directories"), "{error}");
+    }
+
+    #[test]
+    fn a_snapshot_that_is_not_where_snapper_keeps_them_is_an_error_not_a_missing_file() {
+        let v = Volume::new("nosnap");
+        v.live("f.txt", b"x");
+        // snapshot 1 is listed, but there is no .snapshots/1/snapshot at all
+        let error = v.history(&[1], "f.txt").unwrap_err();
+        assert!(
+            error.to_string().contains("snapshot 1 is not at"),
             "{error}"
         );
     }

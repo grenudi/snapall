@@ -18,7 +18,7 @@ mod lines;
 use std::time::Instant;
 
 use snapall_core::{
-    BackendError, Change, ConfigName, Description, Event, Observer, RestoreSummary,
+    BackendError, Change, ConfigName, Description, Event, FileVersion, Observer, RestoreSummary,
     SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
@@ -111,6 +111,14 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
         id: SnapshotId,
     ) -> Result<Vec<Change>, BackendError> {
         self.inner.changes_since(config, id)
+    }
+
+    fn file_versions(
+        &self,
+        config: &ConfigName,
+        path: &str,
+    ) -> Result<Vec<FileVersion>, BackendError> {
+        self.inner.file_versions(config, path)
     }
 
     fn undo_changes(

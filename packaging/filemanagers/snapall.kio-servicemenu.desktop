@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Dolphin and other KDE file managers. Installed in /usr/share/kio/servicemenus/ (KDE Frameworks
+# 5.85 and later; entries there are authorised by default). All files, not folders.
+[Desktop Entry]
+Type=Service
+MimeType=application/octet-stream;
+Actions=snapallHistory;
+X-KDE-Priority=TopLevel
+
+[Desktop Action snapallHistory]
+Name=Restore from snapshots
+Icon=snapall
+Exec=snapall-file-menu %f

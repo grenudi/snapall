@@ -203,6 +203,53 @@ impl RestoreSummary {
     }
 }
 
+/// How a file as one snapshot had it compares with the file as it is now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileState {
+    /// The same content, type, permissions and owner: restoring would change nothing.
+    Same,
+    /// It exists in both and differs: restoring would revert it.
+    Changed,
+    /// It existed then and is gone now: restoring would bring it back.
+    DeletedSince,
+    /// It did not exist then: there is nothing in this snapshot to restore.
+    AbsentThen,
+}
+
+impl FileState {
+    /// What to tell a person: how the file in the snapshot compares with the file now.
+    pub fn label(self) -> &'static str {
+        match self {
+            FileState::Same => "same as now",
+            FileState::Changed => "differs from now",
+            FileState::DeletedSince => "deleted since",
+            FileState::AbsentThen => "did not exist",
+        }
+    }
+
+    /// A stable token for machine-readable output.
+    pub fn token(self) -> &'static str {
+        match self {
+            FileState::Same => "same",
+            FileState::Changed => "changed",
+            FileState::DeletedSince => "deleted_since",
+            FileState::AbsentThen => "absent_then",
+        }
+    }
+
+    /// Whether restoring from a snapshot in this state would put something back.
+    pub fn restorable(self) -> bool {
+        matches!(self, FileState::Changed | FileState::DeletedSince)
+    }
+}
+
+/// One snapshot, and how the file in question stood in it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileVersion {
+    pub snapshot: SnapshotInfo,
+    pub state: FileState,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

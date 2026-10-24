@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# PCManFM and PCManFM-Qt (libfm actions). Installed in /usr/share/file-manager/actions/. Files only.
+# PCManFM-Qt reads actions at start, so restart it after installing.
+[Desktop Entry]
+Type=Action
+Name=Restore from snapshots
+Icon=snapall
+Profiles=snapall;
+
+[X-Action-Profile snapall]
+MimeTypes=all/allfiles;
+Exec=snapall-file-menu %f

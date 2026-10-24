@@ -33,6 +33,11 @@
             installManPage snapall.1
             install -Dm644 ${./packaging/desktop/snapall.desktop} $out/share/applications/snapall.desktop
             install -Dm644 ${./packaging/desktop/snapall.svg} $out/share/icons/hicolor/scalable/apps/snapall.svg
+            install -Dm755 ${./packaging/filemanagers/snapall-file-menu} $out/bin/snapall-file-menu
+            install -Dm644 ${./packaging/filemanagers/snapall.kio-servicemenu.desktop} $out/share/kio/servicemenus/snapall.desktop
+            install -Dm644 ${./packaging/filemanagers/snapall.nemo_action} $out/share/nemo/actions/snapall.nemo_action
+            install -Dm644 ${./packaging/filemanagers/snapall.libfm-action.desktop} $out/share/file-manager/actions/snapall.desktop
+            install -Dm644 ${./packaging/filemanagers/snapall-nautilus.py} $out/share/nautilus-python/extensions/snapall.py
             wrapProgram $out/bin/snapall --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.snapper ]}
           '';
           meta = {

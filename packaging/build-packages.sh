@@ -58,11 +58,12 @@ cargo generate-rpm --package crates/snapall --target "$target" --output dist/
 # one top-level directory.
 name="snapall-v$version-$target"
 stage="$(mktemp -d)"
-mkdir -p "$stage/$name/completions" "$stage/$name/man" "$stage/$name/desktop"
+mkdir -p "$stage/$name/completions" "$stage/$name/man" "$stage/$name/desktop" "$stage/$name/filemanagers"
 cp "$binary" LICENSE README.md THIRD-PARTY-LICENSES.md "$stage/$name/"
 cp "$generated/snapall.bash" "$generated/_snapall" "$generated/snapall.fish" "$generated/snapall.nu" "$stage/$name/completions/"
 cp "$generated/snapall.1.gz" "$stage/$name/man/"
 cp packaging/desktop/snapall.desktop packaging/desktop/snapall.svg "$stage/$name/desktop/"
+cp packaging/filemanagers/* "$stage/$name/filemanagers/"
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" \
   -C "$stage" -cf - "$name" | gzip -9n > "dist/$name.tar.gz"
 rm -rf "$stage"

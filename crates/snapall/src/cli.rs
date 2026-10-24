@@ -53,6 +53,10 @@ pub enum Request {
         dry_run: bool,
         yes: bool,
     },
+    /// How one file stood in each snapshot.
+    History {
+        path: String,
+    },
     Doctor {
         install: bool,
         yes: bool,
@@ -64,7 +68,10 @@ pub enum Request {
         /// The man page date as seconds since the epoch; `None` means now.
         source_date_epoch: Option<u64>,
     },
-    Tui,
+    Tui {
+        /// Open on the history of this file instead of on all configs.
+        file: Option<String>,
+    },
     Contract,
 }
 
@@ -164,6 +171,14 @@ fn target(resolution: &Resolution) -> Result<(ConfigName, SnapshotId), UsageErro
             usage_error("ID 0 is the current system, not a snapshot; there is nothing to act on")
         })?,
     ))
+}
+
+/// A path as text. Paths that are not valid UTF-8 are refused up front, because everything downstream
+/// (snapper's output, the audit log, JSON) is text.
+fn utf8(path: &std::path::Path) -> Result<String, UsageError> {
+    path.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| usage_error("a path must be valid UTF-8"))
 }
 
 /// The optional PATH argument, as text. Paths that are not valid UTF-8 are refused up front,
@@ -387,7 +402,18 @@ fn build_request(
         Command::Man => Request::Man {
             source_date_epoch: Contract::SOURCE_DATE_EPOCH.get_from(resolution),
         },
-        Command::Tui => Request::Tui,
+        Command::History => {
+            let path = Contract::HISTORY_FILE
+                .get_from(resolution)
+                .ok_or_else(|| usage_error("missing required argument <FILE>"))?;
+            Request::History { path: utf8(&path)? }
+        }
+        Command::Tui => Request::Tui {
+            file: Contract::TUI_FILE
+                .get_from(resolution)
+                .map(|path| utf8(&path))
+                .transpose()?,
+        },
         Command::Contract => Request::Contract,
     })
 }
@@ -579,7 +605,7 @@ mod tests {
     #[test]
     fn list_snapshots_tui_and_contract() {
         assert_eq!(ok(&["list"]).request, Request::List);
-        assert_eq!(ok(&["tui"]).request, Request::Tui);
+        assert_eq!(ok(&["tui"]).request, Request::Tui { file: None });
         assert_eq!(ok(&["contract"]).request, Request::Contract);
         assert_eq!(
             ok(&["snapshots"]).request,
@@ -1040,9 +1066,53 @@ mod tests {
                         "restore".to_owned()
                     ]
                 ),
+                ("history_file".to_owned(), vec!["history".to_owned()]),
                 ("shell".to_owned(), vec!["completions".to_owned()]),
             ]
         );
+    }
+
+    #[test]
+    fn history_takes_a_file_and_the_tui_can_be_opened_on_one() {
+        assert_eq!(
+            ok(&["history", "/home/me/notes.txt"]).request,
+            Request::History {
+                path: "/home/me/notes.txt".into()
+            }
+        );
+        assert!(err(&["history"]).contains("missing required argument"));
+        assert!(ok(&["history", "f", "--json"]).json);
+        assert_eq!(
+            ok(&["tui", "--file", "notes.txt"]).request,
+            Request::Tui {
+                file: Some("notes.txt".into())
+            }
+        );
+        // --file belongs to the TUI alone, and a history is read, so --dry-run is not for it
+        assert!(err(&["list", "--file", "x"]).contains("does not apply to `list`"));
+        assert!(err(&["history", "f", "--dry-run"]).contains("does not apply to `history`"));
+    }
+
+    #[test]
+    fn every_command_that_reads_or_changes_snapshots_can_be_logged_restore_above_all() {
+        for command in [
+            "restore home 1 --yes",
+            "changes home 1",
+            "history /x",
+            "delete home 1",
+        ] {
+            let mut args: Vec<&str> = command.split(' ').collect();
+            args.extend(["--log", "json"]);
+            assert!(
+                run(&args, &[]).is_ok(),
+                "`{command} --log json` must be accepted"
+            );
+        }
+        assert!(run(
+            &["restore", "home", "1", "--yes", "--log-file", "/tmp/a.log"],
+            &[]
+        )
+        .is_ok());
     }
 
     #[test]

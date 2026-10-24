@@ -508,3 +508,193 @@ fn a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_e
     assert_eq!(zero.status.code(), Some(2));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+// ---- a file's history, and the audit trail of a restore ---------------------------------------
+
+/// A real directory laid out the way snapper lays out snapshots, behind a fake `snapper` that says
+/// it is the subvolume of a config called `vol`: notes.txt is "now" live, snapshot 1 had other
+/// text, snapshot 2 had the same, snapshot 3 did not have the file.
+struct Volume {
+    root: std::path::PathBuf,
+    bin: std::path::PathBuf,
+}
+
+impl Volume {
+    fn new(label: &str) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("snapall-vol-{label}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let put = |relative: &str, text: &str| {
+            let path = root.join(relative);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        put("docs/notes.txt", "the text now");
+        put(".snapshots/1/snapshot/docs/notes.txt", "older text");
+        put(".snapshots/2/snapshot/docs/notes.txt", "the text now");
+        std::fs::create_dir_all(root.join(".snapshots/3/snapshot/docs")).unwrap();
+        let bin =
+            std::env::temp_dir().join(format!("snapall-vol-bin-{label}-{}", std::process::id()));
+        std::fs::create_dir_all(&bin).unwrap();
+        let script = format!(
+            r#"#!/bin/sh
+echo "$@" >> "$0.log"
+case "$*" in
+  *list-configs*) echo '{{"configs":[{{"config":"vol","subvolume":"{root}"}}]}}' ;;
+  *"-c vol list"*) echo '{{"vol":[
+    {{"number":0,"type":"single","date":"","user":"root","cleanup":"","description":"current"}},
+    {{"number":1,"type":"single","date":"2026-10-24 10:00:00","user":"root","cleanup":"number","description":"older"}},
+    {{"number":2,"type":"single","date":"2026-10-24 11:00:00","user":"root","cleanup":"number","description":"same"}},
+    {{"number":3,"type":"single","date":"2026-10-24 12:00:00","user":"root","cleanup":"number","description":"before the file"}}]}}' ;;
+  *) echo "fake snapper: unhandled: $*" >&2; exit 3 ;;
+esac
+"#,
+            root = root.display()
+        );
+        let path = bin.join("snapper");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        Volume { root, bin }
+    }
+
+    fn run(&self, cwd: &std::path::Path, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_snapall"))
+            .args(args)
+            .current_dir(cwd)
+            .env_clear()
+            .env("PATH", format!("{}:/usr/bin:/bin", self.bin.display()))
+            .stdin(std::process::Stdio::null())
+            .output()
+            .expect("run snapall")
+    }
+}
+
+impl Drop for Volume {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+        let _ = std::fs::remove_dir_all(&self.bin);
+    }
+}
+
+#[test]
+fn history_says_how_the_file_stood_in_each_snapshot() {
+    let v = Volume::new("human");
+    let file = v.root.join("docs/notes.txt");
+    let output = v.run(&v.root, &["--no-dbus", "history", file.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("(config vol)"), "{text}");
+    let line = |id: &str| {
+        text.lines()
+            .find(|l| l.trim_start().starts_with(id))
+            .unwrap_or_else(|| panic!("{text}"))
+            .to_owned()
+    };
+    assert!(line("1 ").contains("differs from now"), "{text}");
+    assert!(line("2 ").contains("same as now"), "{text}");
+    assert!(line("3 ").contains("did not exist"), "{text}");
+}
+
+#[test]
+fn history_as_json_has_stable_tokens_and_says_what_can_be_restored() {
+    let v = Volume::new("json");
+    let output = v.run(
+        &v.root.join("docs"),
+        &["--no-dbus", "history", "notes.txt", "--json"],
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    let value: Value = serde_json::from_str(&stdout(&output)).expect("JSON");
+    assert_eq!(value["config"], "vol");
+    assert!(
+        value["path"].as_str().unwrap().ends_with("/docs/notes.txt"),
+        "a relative path is made absolute: {value}"
+    );
+    let versions = value["versions"].as_array().unwrap();
+    let states: Vec<_> = versions
+        .iter()
+        .map(|v| {
+            (
+                v["snapshot"].as_u64().unwrap(),
+                v["state"].as_str().unwrap().to_owned(),
+                v["restorable"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (1, "changed".to_owned(), true),
+            (2, "same".to_owned(), false),
+            (3, "absent_then".to_owned(), false)
+        ]
+    );
+}
+
+#[test]
+fn history_refuses_a_directory_and_a_file_no_config_covers_with_the_reason() {
+    let v = Volume::new("errors");
+    let dir = v.run(
+        &v.root,
+        &[
+            "--no-dbus",
+            "history",
+            v.root.join("docs").to_str().unwrap(),
+        ],
+    );
+    assert_eq!(dir.status.code(), Some(1));
+    assert!(stderr(&dir).contains("directories"), "{}", stderr(&dir));
+    let outside = v.run(&v.root, &["--no-dbus", "history", "/etc/hostname"]);
+    assert_eq!(outside.status.code(), Some(1));
+    assert!(
+        stderr(&outside).contains("no snapper config covers"),
+        "{}",
+        stderr(&outside)
+    );
+}
+
+#[test]
+fn the_tui_opened_on_a_file_still_needs_a_terminal() {
+    let v = Volume::new("tui");
+    let output = v.run(&v.root, &["--no-dbus", "tui", "--file", "docs/notes.txt"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stderr(&output).contains("interactive terminal"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn a_restore_can_be_logged_and_the_log_says_what_it_restored() {
+    // 0.5.0 rejected --log on restore, so the most consequential command had no audit trail.
+    let dir = fake_snapper("audit");
+    let output = with_fake(
+        &dir,
+        &[
+            "--no-dbus",
+            "restore",
+            "home",
+            "1",
+            "--yes",
+            "--log",
+            "json",
+        ],
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    let log: Vec<Value> = stderr(&output)
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
+    let undone = log
+        .iter()
+        .find(|e| e["event"] == "changes_undone")
+        .expect("a changes_undone line");
+    assert_eq!(undone["config"], "home");
+    assert_eq!(undone["snapshot"], 1);
+    assert_eq!(undone["modified"], 1);
+    assert!(
+        log.iter().any(|e| e["event"] == "snapshot_created"),
+        "the safety snapshot is logged too"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

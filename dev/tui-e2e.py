@@ -59,13 +59,13 @@ def listing(config):
 
 
 class Tui:
-    def __init__(self, extra_path=None):
+    def __init__(self, extra_path=None, args=("tui",)):
         master, slave = os.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
         path = os.environ["PATH"] if not extra_path else f"{extra_path}:{os.environ['PATH']}"
         env = {"PATH": path, "TERM": "xterm-256color", "HOME": "/root"}
         self.process = subprocess.Popen(
-            [BINARY, "--no-dbus", "tui"],
+            [BINARY, "--no-dbus", *args],
             stdin=slave,
             stdout=slave,
             stderr=slave,
@@ -369,6 +369,52 @@ def main():
     for path in (keep, gone, added):
         if os.path.exists(path):
             os.remove(path)
+
+    # --- one file's history, as a file manager's right-click opens it ----------------------------
+    cfg = "snapall_it_b"
+    mnt = [c["subvolume"] for c in json.loads(snapper("--jsonout", "list-configs"))["configs"] if c["config"] == cfg][0]
+    doc = os.path.join(mnt, "e2e-history.txt")
+    open(doc, "w").write("first version")
+    snapper("-c", cfg, "create", "-d", "e2e file one")
+    open(doc, "w").write("second version")
+    snapper("-c", cfg, "create", "-d", "e2e file two")
+    open(doc, "w").write("current version")
+
+    tui = Tui(args=("tui", "--file", doc))
+    tui.wait_for("history of")
+    tui.wait_for("e2e file two")
+    screen = tui.text()
+    check(doc in screen, "the header names the file")
+    check("Configs" not in screen, "there is no configs pane when opened on a file")
+    check(screen.count("differs from now") >= 2, "both snapshots say the file differs from now")
+    check(screen.find("e2e file two") < screen.find("e2e file one"), "newest first")
+    check(b"\x1b[?1000h" in tui.raw, "the mouse is captured on the file screen too")
+
+    # the keyboard: restore the newest snapshot's version
+    tui.send("u")
+    tui.wait_for("1 reverted")
+    check("snapshotted first" in tui.text(), "the prompt says the current state is saved first")
+    check(open(doc).read() == "current version", "the prompt alone changed nothing")
+    tui.send("\r")
+    tui.wait_for("restored")
+    check(open(doc).read() == "second version", "the file is back to the second version")
+    check(any(d.startswith("before restoring") for d in listing(cfg).values()), "snapper has the safety snapshot")
+    tui.wait_for("same as now")
+    check(True, "the list caught up: the version just restored now says same as now")
+
+    # the mouse: click the older version, click the restore button, confirm with the button
+    tui.click_text("e2e file one", offset=2)
+    tui.click_text("u restore this version", offset=0)
+    tui.wait_for("Put")
+    tui.click_text("[ Enter: Restore ]", offset=4)
+    tui.wait_for("restored")
+    check(open(doc).read() == "first version", "by mouse: the file is back to the first version")
+    check(tui.finish() == 0, "q leaves cleanly")
+    os.remove(doc)
+
+    # a file no config covers is an error before the terminal is taken over
+    refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
+    check(refused.returncode == 1 and "no snapper config covers" in refused.stderr, "a file no config covers is refused with the reason")
 
     print("\nTUI end-to-end: all checks passed")
 

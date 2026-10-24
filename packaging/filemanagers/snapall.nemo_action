@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Nemo (Cinnamon). Installed in /usr/share/nemo/actions/. One selected file, not a folder.
+[Nemo Action]
+Name=Restore from snapshots
+Comment=Show earlier versions of %f in snapshots and restore one
+Exec=snapall-file-menu %F
+Icon-Name=snapall
+Selection=s
+Extensions=nodirs;
+Quote=double
+Dependencies=snapall;

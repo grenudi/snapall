@@ -3,3 +3,4 @@
 /dist
 /THIRD-PARTY-LICENSES.md
 /packaging/generated/
+__pycache__/

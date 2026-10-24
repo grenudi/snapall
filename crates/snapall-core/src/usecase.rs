@@ -6,7 +6,9 @@
 
 use thiserror::Error;
 
-use crate::domain::{Change, ConfigName, Description, RestoreSummary, SnapshotId, SnapshotInfo};
+use crate::domain::{
+    Change, ConfigName, Description, FileVersion, RestoreSummary, SnapshotId, SnapshotInfo,
+};
 use crate::plan::{plan, Plan, PlanError};
 use crate::port::{BackendError, SnapshotBackend};
 
@@ -263,6 +265,90 @@ pub fn restore_snapshot(
     Ok(Restored {
         safety_snapshot,
         summary,
+    })
+}
+
+/// Why a file's history could not be read.
+#[derive(Debug, Error)]
+pub enum HistoryError {
+    #[error(transparent)]
+    Snapshot(#[from] SnapshotError),
+    #[error("`{path}` is not an absolute path without `..`")]
+    BadPath { path: String },
+    #[error("no snapper config covers `{path}`: it is not under any config's subvolume")]
+    NoConfig { path: String },
+    #[error(transparent)]
+    Backend(#[from] BackendError),
+}
+
+/// A file, the config that covers it, and how it stood in each snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileHistory {
+    pub config: ConfigName,
+    pub path: String,
+    /// Oldest first, as snapper lists them.
+    pub versions: Vec<FileVersion>,
+}
+
+/// The config whose subvolume holds `path`: the one with the longest matching mount point, so a
+/// file in `/home` belongs to `home` and not to `root`, which also contains it.
+pub fn config_covering(
+    backend: &dyn SnapshotBackend,
+    path: &str,
+) -> Result<ConfigName, HistoryError> {
+    if !clean(path) {
+        return Err(HistoryError::BadPath {
+            path: path.to_owned(),
+        });
+    }
+    let mut best: Option<(usize, ConfigName)> = None;
+    for config in backend.list_configs().map_err(SnapshotError::from)? {
+        let subvolume = backend.config_subvolume(&config)?;
+        if under(&subvolume, path) {
+            let length = subvolume.trim_end_matches('/').len();
+            if best.as_ref().is_none_or(|(longest, _)| length > *longest) {
+                best = Some((length, config));
+            }
+        }
+    }
+    best.map(|(_, config)| config)
+        .ok_or_else(|| HistoryError::NoConfig {
+            path: path.to_owned(),
+        })
+}
+
+/// How `path` stood in every snapshot of `config`.
+pub fn file_versions_of(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    path: &str,
+) -> Result<Vec<FileVersion>, HistoryError> {
+    if !clean(path) {
+        return Err(HistoryError::BadPath {
+            path: path.to_owned(),
+        });
+    }
+    ensure_config(backend, config)?;
+    let subvolume = backend.config_subvolume(config)?;
+    if !under(&subvolume, path) {
+        return Err(HistoryError::NoConfig {
+            path: path.to_owned(),
+        });
+    }
+    Ok(backend.file_versions(config, path)?)
+}
+
+/// The history of one file: which config covers it, and how it stood in each snapshot.
+pub fn file_history(
+    backend: &dyn SnapshotBackend,
+    path: &str,
+) -> Result<FileHistory, HistoryError> {
+    let config = config_covering(backend, path)?;
+    let versions = file_versions_of(backend, &config, path)?;
+    Ok(FileHistory {
+        config,
+        path: path.to_owned(),
+        versions,
     })
 }
 
@@ -565,5 +651,98 @@ mod tests {
             backend.read_file("home", "/mnt/home/b.txt").as_deref(),
             Some("new")
         );
+    }
+
+    // ---- a file's history --------------------------------------------------------------------
+
+    use crate::domain::FileState;
+
+    fn states(history: &FileHistory) -> Vec<(u64, FileState)> {
+        history
+            .versions
+            .iter()
+            .map(|v| (v.snapshot.id.get(), v.state))
+            .collect()
+    }
+
+    #[test]
+    fn the_config_with_the_longest_mount_point_covers_a_file() {
+        let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+        assert_eq!(
+            config_covering(&backend, "/mnt/home/a.txt")
+                .unwrap()
+                .as_str(),
+            "home"
+        );
+        assert_eq!(
+            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            "root"
+        );
+        // a sibling that merely starts with the same letters is not inside
+        assert_eq!(
+            config_covering(&backend, "/mnt/homeless/a.txt")
+                .unwrap()
+                .as_str(),
+            "root"
+        );
+    }
+
+    #[test]
+    fn a_file_no_config_covers_or_a_path_that_could_escape_is_refused() {
+        let backend = InMemoryBackend::with_configs(&["home"]);
+        assert!(matches!(
+            config_covering(&backend, "/etc/fstab"),
+            Err(HistoryError::NoConfig { .. })
+        ));
+        for bad in ["relative.txt", "/mnt/home/../etc/passwd", "/mnt/home/a\nb"] {
+            assert!(
+                matches!(
+                    config_covering(&backend, bad),
+                    Err(HistoryError::BadPath { .. })
+                ),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_files_history_says_in_each_snapshot_how_it_compares_with_now() {
+        let backend = InMemoryBackend::with_configs(&["home"]);
+        backend.write_file("home", "/mnt/home/a.txt", "one");
+        backend.create_snapshot(&home(), &desc()).unwrap(); // #1: one
+        backend.write_file("home", "/mnt/home/a.txt", "two");
+        backend.create_snapshot(&home(), &desc()).unwrap(); // #2: two
+        backend.write_file("home", "/mnt/home/b.txt", "new"); // not in either snapshot
+
+        let a = file_history(&backend, "/mnt/home/a.txt").unwrap();
+        assert_eq!(a.config, home());
+        assert_eq!(states(&a), [(1, FileState::Changed), (2, FileState::Same)]);
+        let b = file_history(&backend, "/mnt/home/b.txt").unwrap();
+        assert_eq!(
+            states(&b),
+            [(1, FileState::AbsentThen), (2, FileState::AbsentThen)]
+        );
+
+        backend.remove_file("home", "/mnt/home/a.txt");
+        let gone = file_history(&backend, "/mnt/home/a.txt").unwrap();
+        assert_eq!(
+            states(&gone),
+            [(1, FileState::DeletedSince), (2, FileState::DeletedSince)]
+        );
+    }
+
+    #[test]
+    fn only_a_version_that_would_put_something_back_is_restorable() {
+        assert!(FileState::Changed.restorable() && FileState::DeletedSince.restorable());
+        assert!(!FileState::Same.restorable() && !FileState::AbsentThen.restorable());
+    }
+
+    #[test]
+    fn a_history_for_a_path_outside_the_given_config_is_refused() {
+        let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+        assert!(matches!(
+            file_versions_of(&backend, &home(), "/etc/fstab"),
+            Err(HistoryError::NoConfig { .. })
+        ));
     }
 }

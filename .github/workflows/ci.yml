@@ -35,6 +35,9 @@ jobs:
       - name: The README's install snippets exist for every system and parse
         run: ./dev/check-snippets.sh
 
+      - name: The file-manager entries, the launcher and the Nautilus extension
+        run: bash packaging/test/filemanagers.sh
+
       - name: The launcher entry is valid and the icon renders
         run: |
           sudo apt-get update -q
@@ -351,7 +354,7 @@ jobs:
           tar xzf dist/snapall-v*-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP"
           root="$(echo "$RUNNER_TEMP"/snapall-v*-x86_64-unknown-linux-musl)"
           "$root/snapall" --version
-          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg; do
+          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg filemanagers/snapall-file-menu filemanagers/snapall.kio-servicemenu.desktop filemanagers/snapall.nemo_action filemanagers/snapall.libfm-action.desktop filemanagers/snapall-nautilus.py; do
             test -f "$root/$file" || { echo "the tarball lacks $file"; exit 1; }
           done
 
