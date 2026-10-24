@@ -36,9 +36,22 @@ snapall drives [snapper](http://snapper.io/), so every package below **depends o
 | Debian, Ubuntu, Mint, ... | `sudo apt install ./snapall_<version>_<arch>.deb` |
 | Fedora | `sudo dnf install ./snapall-<version>.<arch>.rpm` |
 | openSUSE | `sudo zypper install --allow-unsigned-rpm ./snapall-<version>.<arch>.rpm` |
-| Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` |
+| Arch, CachyOS, Manjaro, ... | download `PKGBUILD` from the release, then `makepkg -si` ([upgrading](#upgrading-on-arch-cachyos-manjaro)) |
 | Nix, NixOS | `nix run github:grenudi/snapall` (the flake wraps snapper into the program's `PATH`) |
 | Alpine, Void, Gentoo, anything else | the static `snapall-v<version>-<arch>-unknown-linux-musl.tar.gz` (extract it, then `sudo ./snapall doctor --install`); it also holds the completions and the man page |
+
+### Upgrading on Arch, CachyOS, Manjaro
+
+A newer version installs over the old one: pacman treats it as an upgrade, and you never need to uninstall first. What goes wrong is building from a directory that still holds an older `PKGBUILD`, `src/` or built package (a browser saves a second download as `PKGBUILD (1)`, and `makepkg` reads only the file named `PKGBUILD`). Use an empty directory for each version:
+
+```console
+$ mkdir -p ~/build/snapall-new && cd ~/build/snapall-new
+$ curl -LO https://github.com/grenudi/snapall/releases/latest/download/PKGBUILD
+$ grep ^pkgver PKGBUILD        # it must say the version you want
+$ makepkg -si
+```
+
+If you reuse a directory, `makepkg -sCfi` removes the old sources and rebuilds. Until snapall is in the AUR ([backlog](docs/backlog.md)), an AUR helper cannot do this for you.
 
 `snapall doctor --install` installs the one package snapall needs through the system's own package manager (`apt-get`, `dnf`, `pacman`, `zypper`, `apk`), showing the commands and asking first. Those are the systems it runs commands on because those are the systems CI installs on, for real, on every push. Everywhere else it prints what to run instead of running it: RHEL and its rebuilds (snapper is only in EPEL), Alpine releases other than `edge` (snapper is only in `edge`'s `testing`), Void and Gentoo (`xbps-install -S snapper`, `emerge --ask app-backup/snapper`), NixOS (declarative), and Fedora Atomic, MicroOS and SteamOS (read-only root).
 
