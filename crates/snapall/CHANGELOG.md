@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.6.0]
+
+
+### Features
+- A desktop launcher and icon, a truthful boot-menu check, and a boot-menu guide ([#15](https://github.com/grenudi/snapall/pull/15)) ([13a1401])
+
+
+
 ## [0.5.0]
 
 
