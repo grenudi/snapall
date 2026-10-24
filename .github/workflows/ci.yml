@@ -347,7 +347,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
-      - run: nix build .#snapall --print-build-logs
+      # --no-update-lock-file: the build must use the committed flake.lock exactly. A missing or
+      # outdated lock fails here instead of being quietly regenerated to whatever nixpkgs is today.
+      - run: nix build .#snapall --no-update-lock-file --print-build-logs
       - run: result/bin/snapall --version
       - name: The wrapper puts snapper on the PATH by itself
         run: env -i result/bin/snapall doctor | tee /dev/stderr | grep -q '^ok    snapper' || true

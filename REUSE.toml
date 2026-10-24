@@ -8,7 +8,8 @@ SPDX-PackageDownloadLocation = "https://github.com/grenudi/snapall"
 [[annotations]]
 path = [
   "**/*.md", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.nix",
-  "Cargo.lock", "PKGBUILD", "**/PKGBUILD", ".gitignore", "LICENSE",
+  "Cargo.lock",
+  "flake.lock", "PKGBUILD", "**/PKGBUILD", ".gitignore", "LICENSE",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 grenudi"
