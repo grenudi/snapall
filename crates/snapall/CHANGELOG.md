@@ -1,6 +1,19 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.7.0]
+
+
+### Documentation
+- How to upgrade on Arch without uninstalling ([#17](https://github.com/grenudi/snapall/pull/17)) ([eac3396])
+- Install-and-upgrade snippets for each major system, tested as written ([#19](https://github.com/grenudi/snapall/pull/19)) ([37402b2])
+
+
+### Features
+- Restore one file from your file manager, and make restore auditable ([#22](https://github.com/grenudi/snapall/pull/22)) ([f725b3e])
+
+
+
 ## [0.6.0]
 
 
