@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.7.1]
+
+
+### Bug Fixes
+- The tarball installs itself, and the snippet test runs only for a release ([#23](https://github.com/grenudi/snapall/pull/23)) ([be4e335])
+
+
+
 ## [0.7.0]
 
 
