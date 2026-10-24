@@ -38,6 +38,9 @@ jobs:
       - name: The file-manager entries, the launcher and the Nautilus extension
         run: bash packaging/test/filemanagers.sh
 
+      - name: The tarball's installer installs what the .deb installs
+        run: bash packaging/test/install-tarball.sh
+
       - name: The launcher entry is valid and the icon renders
         run: |
           sudo apt-get update -q
@@ -354,9 +357,19 @@ jobs:
           tar xzf dist/snapall-v*-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP"
           root="$(echo "$RUNNER_TEMP"/snapall-v*-x86_64-unknown-linux-musl)"
           "$root/snapall" --version
-          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg filemanagers/snapall-file-menu filemanagers/snapall.kio-servicemenu.desktop filemanagers/snapall.nemo_action filemanagers/snapall.libfm-action.desktop filemanagers/snapall-nautilus.py; do
+          for file in LICENSE README.md THIRD-PARTY-LICENSES.md completions/snapall.bash completions/_snapall completions/snapall.fish completions/snapall.nu man/snapall.1.gz desktop/snapall.desktop desktop/snapall.svg filemanagers/snapall-file-menu filemanagers/snapall.kio-servicemenu.desktop filemanagers/snapall.nemo_action filemanagers/snapall.libfm-action.desktop filemanagers/snapall-nautilus.py install.sh; do
             test -f "$root/$file" || { echo "the tarball lacks $file"; exit 1; }
           done
+          # the installer, on the real tarball: it must place the binary and the man page, and
+          # remove them again
+          stage="$RUNNER_TEMP/stage"
+          DESTDIR="$stage" sh "$root/install.sh"
+          test -x "$stage/usr/local/bin/snapall"
+          test -x "$stage/usr/local/bin/snapall-file-menu"
+          test -f "$stage/usr/local/share/man/man1/snapall.1.gz"
+          test -f "$stage/usr/local/share/kio/servicemenus/snapall.desktop"
+          DESTDIR="$stage" sh "$root/install.sh" --uninstall
+          test ! -e "$stage/usr/local/bin/snapall"
 
   nix:
     name: nix build

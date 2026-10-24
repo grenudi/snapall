@@ -64,6 +64,7 @@ cp "$generated/snapall.bash" "$generated/_snapall" "$generated/snapall.fish" "$g
 cp "$generated/snapall.1.gz" "$stage/$name/man/"
 cp packaging/desktop/snapall.desktop packaging/desktop/snapall.svg "$stage/$name/desktop/"
 cp packaging/filemanagers/* "$stage/$name/filemanagers/"
+cp packaging/install.sh "$stage/$name/"
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" \
   -C "$stage" -cf - "$name" | gzip -9n > "dist/$name.tar.gz"
 rm -rf "$stage"

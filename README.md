@@ -76,22 +76,10 @@ It builds from the release's source in a fresh directory every time, which is th
 ```sh
 cd "$(mktemp -d)"
 url=$(curl -s https://api.github.com/repos/grenudi/snapall/releases/latest | grep -o "https://[^\"]*$(uname -m)-unknown-linux-musl\.tar\.gz")
-curl -LO "$url" && tar xzf "$(basename "$url")" && cd snapall-v*/
-sudo install -Dm755 snapall /usr/local/bin/snapall
-sudo install -Dm644 man/snapall.1.gz /usr/local/share/man/man1/snapall.1.gz
-sudo install -Dm644 completions/snapall.bash /usr/local/share/bash-completion/completions/snapall
-sudo install -Dm644 completions/_snapall /usr/local/share/zsh/site-functions/_snapall
-sudo install -Dm644 completions/snapall.fish /usr/local/share/fish/vendor_completions.d/snapall.fish
-sudo install -Dm644 desktop/snapall.desktop /usr/local/share/applications/snapall.desktop
-sudo install -Dm644 desktop/snapall.svg /usr/local/share/icons/hicolor/scalable/apps/snapall.svg
-sudo install -Dm755 filemanagers/snapall-file-menu /usr/local/bin/snapall-file-menu
-sudo install -Dm644 filemanagers/snapall.kio-servicemenu.desktop /usr/local/share/kio/servicemenus/snapall.desktop
-sudo install -Dm644 filemanagers/snapall.nemo_action /usr/local/share/nemo/actions/snapall.nemo_action
-sudo install -Dm644 filemanagers/snapall.libfm-action.desktop /usr/local/share/file-manager/actions/snapall.desktop
-sudo install -Dm644 filemanagers/snapall-nautilus.py /usr/local/share/nautilus-python/extensions/snapall.py
+curl -LO "$url" && tar xzf "$(basename "$url")" && cd snapall-v*/ && sudo ./install.sh
 ```
 
-This is a static binary and it does not install snapper. `sudo snapall doctor --install` does that where it can, and otherwise prints what to run on your system.
+The tarball carries its own installer, so this snippet does not change when a release adds files: it installs the binary, the man page, completions, the application-menu entry with its icon and the file-manager entries under `/usr/local`. `sudo ./install.sh --uninstall` removes them again; `PREFIX=/usr` and `DESTDIR=...` are honoured. It is a static binary and does not install snapper: `sudo snapall doctor --install` does that where it can, and otherwise prints what to run on your system.
 
 ### Nix, NixOS
 
