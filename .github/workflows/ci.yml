@@ -308,7 +308,7 @@ jobs:
     # contract, and the man page goes through groff.
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist-x86_64
           path: dist
