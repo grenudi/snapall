@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.4.2]
+
+
+### CI/CD
+- Pin the toolchain and make the release binary reproducible, and prove it ([1baacfa])
+
+
+
 ## [0.4.1]
 
 
