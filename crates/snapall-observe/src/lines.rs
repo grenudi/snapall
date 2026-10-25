@@ -73,6 +73,7 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
         } => fields.push(("count", json!(count))),
         Event::SnapshotCreated {
             description,
+            point,
             result,
             ..
         } => {
@@ -80,6 +81,9 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
                 fields.push(("snapshot", json!(id.get())));
             }
             fields.push(("description", json!(description)));
+            if let Some(point) = point {
+                fields.push(("point", json!(point)));
+            }
         }
         Event::SnapshotDeleted { id, .. } => fields.push(("snapshot", json!(id.get()))),
         Event::ChangesUndone {
@@ -169,6 +173,7 @@ mod tests {
                 .map(|n| SnapshotId::new(n).unwrap())
                 .map_err(str::to_owned),
             took: Duration::from_millis(212),
+            point: None,
         }
     }
 

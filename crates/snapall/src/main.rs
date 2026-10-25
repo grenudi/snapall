@@ -98,6 +98,7 @@ fn run(parsed: Parsed) -> Outcome {
 
         // looking
         Request::List => commands::list(&ctx),
+        Request::Points => commands::points(&ctx),
         Request::Snapshots { config } => commands::snapshots(&ctx, config),
         Request::History { path } => commands::history(&ctx, &path),
         Request::Changes { config, id, path } => {
@@ -118,6 +119,12 @@ fn run(parsed: Parsed) -> Outcome {
             dry_run,
             yes,
         } => commands::restore(&ctx, &config, id, path.as_deref(), dry_run, yes),
+
+        Request::RestoreAll {
+            point,
+            yes,
+            dry_run,
+        } => commands::restore_all(&ctx, &point, dry_run, yes),
 
         // setting up
         Request::Setup { area, yes, dry_run } => {

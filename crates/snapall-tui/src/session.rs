@@ -14,11 +14,12 @@
 use std::collections::VecDeque;
 
 use snapall_core::{
-    delete_snapshot, file_versions_of, plan_snapshots, preview_restore, protect_area,
-    restore_snapshot, run_plan, snapshots_of, SnapshotBackend, SnapshotError,
+    all_snapshots, delete_snapshot, file_versions_of, fresh_point, plan_snapshots, point_of,
+    preview_point, preview_restore, protect_area, restore_point, restore_points, restore_snapshot,
+    run_plan, snapshots_of, SnapshotBackend, SnapshotError,
 };
 
-use crate::model::{update, Effect, Key, Msg, State, UiContext};
+use crate::model::{update, Effect, Key, Msg, PointOffer, PointOutcome, State, UiContext};
 
 /// Performs effects. `Sync` is required of the backend so one executor can serve a worker thread.
 #[derive(Clone, Copy)]
@@ -48,11 +49,17 @@ impl<'a> Executor<'a> {
             } => {
                 let planned = plan_snapshots(backend, Some(&targets));
                 Msg::Created(match planned {
-                    Ok(plan) => run_plan(backend, &plan, &description)
-                        .outcomes
-                        .into_iter()
-                        .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
-                        .collect(),
+                    // all the snapshots of this one action are one restore point
+                    Ok(plan) => run_plan(
+                        backend,
+                        &plan,
+                        &description,
+                        Some(&fresh_point(backend, unix_now())),
+                    )
+                    .outcomes
+                    .into_iter()
+                    .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
+                    .collect(),
                     Err(error) => {
                         let message = describe(&error);
                         targets
@@ -75,6 +82,28 @@ impl<'a> Executor<'a> {
                     id,
                     path,
                     result,
+                }
+            }
+            Effect::LoadPointOffer { config, id } => {
+                // Is this snapshot one of several taken by one action? Failing to look is not an
+                // error to show: the prompt simply does not offer the extra action.
+                let offer = all_snapshots(backend).ok().and_then(|all| {
+                    let points = restore_points(&all);
+                    point_of(&points, &config, id)
+                        .cloned()
+                        .map(|point| PointOffer {
+                            views: preview_point(backend, &point),
+                            point,
+                        })
+                });
+                Msg::PointOfferLoaded { config, id, offer }
+            }
+            Effect::RestorePoint { point } => {
+                let name = point.point.to_string();
+                let done = restore_point(backend, &point, fresh_point(backend, unix_now()));
+                Msg::PointRestored {
+                    point: name,
+                    result: Ok(outcome_of(&done)),
                 }
             }
             Effect::Protect { mount_point } => {
@@ -147,5 +176,33 @@ impl<'a> Session<'a> {
                 queue.push_back(self.executor.execute(effect));
             }
         }
+    }
+}
+
+/// Seconds since 1970, which is what names a restore point after the moment an action started.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
+}
+
+/// What a person is told about putting a restore point back, from what happened to each area.
+fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
+    use snapall_core::MemberResult;
+    let count = |wanted: fn(&MemberResult) -> bool| {
+        done.members.iter().filter(|m| wanted(&m.result)).count()
+    };
+    PointOutcome {
+        restored: count(|r| matches!(r, MemberResult::Restored(_))),
+        unchanged: count(|r| matches!(r, MemberResult::AlreadyThere)),
+        failed: done
+            .members
+            .iter()
+            .filter_map(|m| match &m.result {
+                MemberResult::Failed(why) => Some(format!("{}: {why}", m.config)),
+                _ => None,
+            })
+            .collect(),
+        undo: done.changed_anything().then(|| done.safety.to_string()),
     }
 }

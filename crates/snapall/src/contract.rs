@@ -21,6 +21,10 @@ pub enum Command {
     Delete,
     Changes,
     Restore,
+    /// Spelled with a hyphen on the command line, so it is in the contract as well.
+    #[serde(rename = "restore-all")]
+    RestoreAll,
+    Points,
     History,
     Setup,
     Doctor,
@@ -38,6 +42,8 @@ impl Command {
         Command::Delete,
         Command::Changes,
         Command::Restore,
+        Command::RestoreAll,
+        Command::Points,
         Command::History,
         Command::Setup,
         Command::Doctor,
@@ -55,6 +61,8 @@ impl Command {
             Command::Delete => "delete",
             Command::Changes => "changes",
             Command::Restore => "restore",
+            Command::RestoreAll => "restore-all",
+            Command::Points => "points",
             Command::History => "history",
             Command::Setup => "setup",
             Command::Doctor => "doctor",
@@ -81,6 +89,10 @@ impl Command {
                 "Put a protected area, or one path of it, back to how a snapshot had it"
             }
             Command::History => "Show how one file stood in each snapshot",
+            Command::RestoreAll => {
+                "Put every protected area back to one restore point, in one action"
+            }
+            Command::Points => "List the restore points: the snapshots one action took together",
             Command::Setup => "Protect what has no snapshots yet, explaining each step",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
@@ -133,6 +145,8 @@ const OBSERVED: &[Command] = &[
     Command::Delete,
     Command::Changes,
     Command::Restore,
+    Command::RestoreAll,
+    Command::Points,
     Command::History,
     Command::Doctor,
     Command::Tui,
@@ -254,7 +268,7 @@ contract! {
         key:         "dry_run",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::Restore, Command::Setup],
+        subcommands: &[Command::Create, Command::Restore, Command::RestoreAll, Command::Setup],
         arg:         Some(Arg::long("dry-run")),
         group:       "create",
         summary:     "Show what would happen without changing anything.",
@@ -275,6 +289,8 @@ contract! {
             Command::Delete,
             Command::Changes,
             Command::Restore,
+            Command::RestoreAll,
+            Command::Points,
             Command::History,
             Command::Setup,
             Command::Doctor,
@@ -363,6 +379,18 @@ contract! {
         ..Input::EMPTY
     };
 
+    /// Which restore point to put every area back to.
+    RESTORE_POINT: String, Command = Input {
+        key:         "point",
+        ty:          Type::String,
+        subcommands: &[Command::RestoreAll],
+        arg:         Some(Arg { value_name: "POINT", ..Arg::positional(0) }),
+        group:       "restore",
+        example:     "snapall restore-all 20261025T181500Z",
+        summary:     "The restore point to go back to, as `snapall points` shows it (required).",
+        ..Input::EMPTY
+    };
+
     /// Protect this part of the disk.
     SETUP_AREA: std::path::PathBuf, Command = Input {
         key:         "area",
@@ -395,7 +423,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::Setup],
+        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",

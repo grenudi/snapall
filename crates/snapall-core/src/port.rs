@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 use crate::domain::{
-    Change, ConfigName, ConfigOption, Description, FileVersion, RestoreSummary, SnapshotId,
+    Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, SnapshotId,
     SnapshotInfo,
 };
 
@@ -16,6 +16,15 @@ pub trait SnapshotBackend {
     fn list_configs(&self) -> Result<Vec<ConfigName>, BackendError>;
 
     /// Take one snapshot of `config` and return its number.
+    /// Like [`SnapshotBackend::create_snapshot`], and the snapshot is marked as part of `point`, so the
+    /// snapshots of every area made by one action can be found together again.
+    fn create_snapshot_in(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: &Point,
+    ) -> Result<SnapshotId, BackendError>;
+
     fn create_snapshot(
         &self,
         config: &ConfigName,

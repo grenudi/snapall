@@ -29,6 +29,8 @@ pub enum Event {
     SnapshotCreated {
         config: ConfigName,
         description: String,
+        /// The restore point it was taken as part of, if any.
+        point: Option<String>,
         result: Result<SnapshotId, String>,
         took: Duration,
     },
@@ -168,6 +170,7 @@ mod tests {
             description: "x".into(),
             result: Ok(SnapshotId::new(7).unwrap()),
             took: Duration::from_millis(12),
+            point: None,
         };
         assert_eq!(ok.name(), "snapshot_created");
         assert_eq!(ok.took(), Duration::from_millis(12));
@@ -203,6 +206,7 @@ mod tests {
                 description: String::new(),
                 result: Err(String::new()),
                 took: d,
+                point: None,
             },
             Event::SnapshotDeleted {
                 config: name("a"),

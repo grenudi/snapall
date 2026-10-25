@@ -21,7 +21,7 @@ use std::path::Path;
 
 use snapall_core::{
     BackendError, Change, ChangeKind, ConfigName, ConfigOption, Description, FileState,
-    FileVersion, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
+    FileVersion, Point, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 
 const PROGRAM: &str = "snapper";
@@ -69,6 +69,38 @@ impl SnapperCli<SystemRunner> {
 }
 
 impl<R: CommandRunner> SnapperCli<R> {
+    /// One `snapper create`, tagged when it belongs to a restore point.
+    fn create(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: Option<&Point>,
+    ) -> Result<SnapshotId, BackendError> {
+        let tag = point.map(|p| format!("{POINT_KEY}={p}"));
+        let mut args = vec![
+            "-c",
+            config.as_str(),
+            "create",
+            "--type",
+            "single",
+            "--cleanup-algorithm",
+            "number",
+            "--print-number",
+            "--description",
+            description.as_str(),
+        ];
+        if let Some(tag) = &tag {
+            args.extend(["--userdata", tag.as_str()]);
+        }
+        let output = self.run(self.args(&args))?;
+        SnapshotId::parse(&output.stdout).map_err(|_| {
+            unexpected(format!(
+                "expected a snapshot number, got `{}`",
+                output.stdout.trim()
+            ))
+        })
+    }
+
     pub fn new(runner: R) -> Self {
         Self {
             runner,
@@ -147,7 +179,13 @@ struct SnapshotRow {
     cleanup: String,
     #[serde(default)]
     description: String,
+    /// What was stored with the snapshot (`null` when nothing was).
+    #[serde(default)]
+    userdata: Option<std::collections::BTreeMap<String, String>>,
 }
+
+/// The key a snapshot's tag is stored under: snapper keeps free `key=value` pairs with a snapshot.
+const POINT_KEY: &str = "snapall-point";
 
 fn non_empty(text: String) -> Option<String> {
     if text.is_empty() {
@@ -188,6 +226,11 @@ fn snapshot_from_row(row: SnapshotRow) -> Result<Option<SnapshotInfo>, BackendEr
         user: row.user,
         cleanup: non_empty(row.cleanup),
         description: row.description,
+        point: row
+            .userdata
+            .as_ref()
+            .and_then(|data| data.get(POINT_KEY))
+            .and_then(|value| Point::parse(value).ok()),
     }))
 }
 
@@ -218,24 +261,16 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         config: &ConfigName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError> {
-        let output = self.run(self.args(&[
-            "-c",
-            config.as_str(),
-            "create",
-            "--type",
-            "single",
-            "--cleanup-algorithm",
-            "number",
-            "--print-number",
-            "--description",
-            description.as_str(),
-        ]))?;
-        SnapshotId::parse(&output.stdout).map_err(|_| {
-            unexpected(format!(
-                "expected a snapshot number, got `{}`",
-                output.stdout.trim()
-            ))
-        })
+        self.create(config, description, None)
+    }
+
+    fn create_snapshot_in(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: &Point,
+    ) -> Result<SnapshotId, BackendError> {
+        self.create(config, description, Some(point))
     }
 
     fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {

@@ -155,6 +155,8 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 |---|---|
 | `snapall [create] [DESCRIPTION]` | One snapshot of every protected area (the default). `--only root,home` restricts it, `--dry-run` previews it. |
 | `snapall list` | The protected areas snapall can see, i.e. exactly what `create` would touch. |
+| `snapall points` | The restore points: the snapshots that one action took together, one in every area. |
+| `snapall restore-all POINT` | Put **every** area back to one restore point with a single action. Shows what changes in each, asks first (`--yes` skips the question, `--dry-run` only shows), takes a safety snapshot per area, and prints the one command that undoes all of it. The running system is left alone. |
 | `snapall setup [AREA]` | Find the parts of your disk that have no snapshots yet (such as your Home files), explain in plain words what protecting them means, ask, and do it. `--dry-run` only explains; `--yes` accepts what snapall recommends. Needs `sudo`. |
 | `snapall snapshots [AREA]` | The snapshots of one protected area, or of all. |
 | `snapall delete AREA ID` | Delete one snapshot. `0` is the current system and is refused. |
@@ -257,6 +259,30 @@ Protect Home now? [Y/n]
 
 It also tells you whether old snapshots are cleaned up automatically on your computer (a new area keeps the newest 50), and offers to switch that on if it is off. `sudo snapall doctor` warns when a part of your disk that matters has no snapshots, and points at `setup`; `snapall history` and the file-manager entry say the same about a file that no snapshot can contain. Snapshots are not a backup: they live on the same disk.
 
+## Going back to one moment
+
+Every time you run `sudo snapall` (or press `a` in the window) the snapshots it takes in each area are tagged as one **restore point**, named after the time it started. `snapall points` lists them, and one command puts everything back:
+
+```console
+$ snapall points
+POINT             WHEN                 AREAS            NAME
+20261025T181500Z  2026-10-25 18:15:00  docs, home, root  before theming
+
+$ sudo snapall restore-all 20261025T181500Z
+Restore point 20261025T181500Z (before theming):
+
+  docs  put back (3 paths); the state before is snapshot #12
+  home  put back (1 path); the state before is snapshot #31
+  root  left alone: the running system is not put back while it runs
+
+To undo all of this at once: sudo snapall restore-all 20261025T190200Z
+```
+
+- **Undo is the same action.** Each area takes a safety snapshot first, and those form a restore point of their own: the last line is the command that puts everything back as it was just before.
+- **The running system is the one thing it will not put back** (see [ADR 12](docs/adr/0012-restore-and-the-boot-menu.md)): files, kernel and boot menu would fall out of step. Every other area is restored, and the output says how to restore the system itself.
+- **Older snapshots** made before restore points existed are grouped when they have the same description and were taken within two minutes of each other, which is what pressing `a` did. They are marked *older: matched by name and time*, because that is a match, not a record.
+- In the window, press `u` on a snapshot: if it belongs to a restore point the prompt says so, and `A` puts all of it back.
+
 ## The terminal UI
 
 Your protected areas on the left, the selected area's snapshots on the right, newest first. The window explains itself: hover over any button and a sentence on the bottom line says what it does, and `?` opens a two-page help that starts with what a snapshot is. If part of your disk has no snapshots yet (your Home files, usually), the bottom line says so when the window opens, and `p` explains what protecting means and does it, with no command to type.
@@ -272,7 +298,7 @@ The packages install a *snapall* entry in your application menu that opens this 
 | `a` | create a snapshot of every protected area |
 | `p` | protect a part of your disk that has no snapshots yet (explains first, asks, does it) |
 | `d` | delete the marked snapshots, or the one under the cursor (asks to confirm) |
-| `u` | restore the area to the snapshot under the cursor (shows what changes, asks to confirm) |
+| `u` | restore the area to the snapshot under the cursor (shows what changes, asks to confirm); `A` in that prompt puts the snapshot's whole restore point back |
 | `r` | look again at which snapshots exist |
 | `?` / `q` | help (two pages; `Esc` closes) / quit |
 

@@ -183,6 +183,43 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def restore_point_scenario():
+    """One action snapshots both areas; both are ruined; in the window, `u` on a snapshot of that
+    action offers the whole restore point and `A` puts both areas back."""
+    fixture = os.environ.get("SNAPALL_FIXTURE", "/tmp/snapall-fixture")
+    a, b = f"{fixture}/mnt/snapall_it_a/point-e2e.txt", f"{fixture}/mnt/snapall_it_b/point-e2e.txt"
+    with open(a, "w") as f:
+        f.write("a, then")
+    with open(b, "w") as f:
+        f.write("b, then")
+    made = subprocess.run([BINARY, "--no-dbus", "create", "e2e restore point"], capture_output=True, text=True)
+    check(made.returncode == 0, "one action snapshots every area")
+    with open(a, "w") as f:
+        f.write("a, ruined")
+    os.remove(b)
+
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=5)
+    tui.send("right")  # to the snapshots, newest first: the one just made
+    tui.send("u")
+    tui.wait_for("This snapshot is part of restore point")
+    tui.wait_for("Press A to put all 2 that differ back at once.")
+    check("The running system is left alone." in tui.text(), "the prompt says the running system is left alone")
+    tui.hover(*tui.find("A: Restore all 2"))
+    tui.wait_for("Put all areas of this restore point back at once (not the system)")
+    check(True, "hovering the button explains it, and the prompt does not cover that line")
+    tui.send("A")
+    tui.wait_for("Put 2 area(s) back to", timeout=10)
+    tui.wait_for("Undo it: restore point")
+    check(True, "it confirms in plain words and names the way back")
+    check(open(a).read() == "a, then" and open(b).read() == "b, then", "both areas are really back on disk, a deleted file included")
+    tui.send("q")
+    tui.finish()
+    os.remove(a)
+    os.remove(b)
+
+
 def protect_scenario():
     """Protect a part of the disk from inside the window, on a real mounted Btrfs subvolume: the
     way /home is mounted on a real machine, with no snapper config of its own."""
@@ -485,6 +522,7 @@ def main():
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
+    restore_point_scenario()
     protect_scenario()
 
     print("\nTUI end-to-end: all checks passed")

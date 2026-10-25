@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use crate::domain::{
-    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion,
+    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, Point,
     RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 use crate::port::{BackendError, SnapshotBackend};
@@ -81,6 +81,39 @@ impl InMemoryBackend {
             entry.subvolume = "/".into();
         }
         self
+    }
+
+    fn create(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: Option<Point>,
+    ) -> Result<SnapshotId, BackendError> {
+        let mut state = self.lock();
+        if state.failing.contains(config) {
+            return Err(BackendError::CommandFailed {
+                program: "in-memory".into(),
+                status: "injected failure".into(),
+                stderr: format!("snapshot of {config} refused"),
+            });
+        }
+        let entry = state
+            .configs
+            .get_mut(config)
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+        let id = SnapshotId::new(entry.next_id).expect("ids start at 1");
+        entry.next_id += 1;
+        entry.saved.insert(id.get(), entry.files.clone());
+        entry.snapshots.push(SnapshotInfo {
+            id,
+            kind: SnapshotKind::Single,
+            date: Some(format!("2026-01-01 00:00:{:02}", id.get() % 60)),
+            user: "root".into(),
+            cleanup: Some("number".into()),
+            description: description.as_str().to_owned(),
+            point,
+        });
+        Ok(id)
     }
 
     /// From now on, changing a config's settings fails.
@@ -168,35 +201,21 @@ impl SnapshotBackend for InMemoryBackend {
         Ok(self.lock().configs.keys().cloned().collect())
     }
 
+    fn create_snapshot_in(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: &Point,
+    ) -> Result<SnapshotId, BackendError> {
+        self.create(config, description, Some(point.clone()))
+    }
+
     fn create_snapshot(
         &self,
         config: &ConfigName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError> {
-        let mut state = self.lock();
-        if state.failing.contains(config) {
-            return Err(BackendError::CommandFailed {
-                program: "in-memory".into(),
-                status: "injected failure".into(),
-                stderr: format!("snapshot of {config} refused"),
-            });
-        }
-        let entry = state
-            .configs
-            .get_mut(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
-        let id = SnapshotId::new(entry.next_id).expect("ids start at 1");
-        entry.next_id += 1;
-        entry.saved.insert(id.get(), entry.files.clone());
-        entry.snapshots.push(SnapshotInfo {
-            id,
-            kind: SnapshotKind::Single,
-            date: Some(format!("2026-01-01 00:00:{:02}", id.get() % 60)),
-            user: "root".into(),
-            cleanup: Some("number".into()),
-            description: description.as_str().to_owned(),
-        });
-        Ok(id)
+        self.create(config, description, None)
     }
 
     fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {

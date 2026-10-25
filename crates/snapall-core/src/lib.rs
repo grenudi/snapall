@@ -11,12 +11,14 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod boot;
+pub mod calendar;
 pub mod coverage;
 pub mod doctor;
 pub mod domain;
 pub mod explain;
 pub mod observe;
 pub mod plan;
+pub mod points;
 pub mod port;
 pub mod usecase;
 
@@ -25,14 +27,18 @@ pub mod testing;
 
 pub use domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
-    RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
+    Point, RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
+pub use points::{
+    fresh_point, point_of, preview_point, restore_point, restore_points, Member, MemberPreview,
+    MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
+};
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
-    plan_snapshots, preview_restore, protect_area, restore_snapshot, run_plan, snapshot_all,
-    snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report, RestoreError, Restored,
-    SetupError, SnapshotError,
+    plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,
+    run_plan, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report,
+    RestoreError, Restored, Safety, SetupError, SnapshotError,
 };
