@@ -62,7 +62,11 @@ $SUDO apt-get install -y -q --only-upgrade snapall >/dev/null 2>&1 || fail "upgr
 ok "an ordinary upgrade reaches the newer version ($new_v)"
 $SUDO apt-get remove -y -q snapall >/dev/null 2>&1
 
-# a package changed after signing
+# a package changed after signing. apt reuses a cached download whose checksum matches the signed
+# index, which would install the pristine file and never look at the tampered one (a machine that
+# keeps its downloads, such as a CI runner, does exactly that), so the cache is emptied first: the
+# tampered file has to be fetched.
+$SUDO apt-get clean
 cp "$work/site/apt/$(basename "$newer")" "$work/pristine.deb"
 printf 'x' >> "$work/site/apt/$(basename "$newer")"
 if $SUDO apt-get install -y -q "snapall=$new_v" >"$work/out" 2>&1; then fail "a modified package must be refused"; fi
