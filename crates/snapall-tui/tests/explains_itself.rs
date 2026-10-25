@@ -96,7 +96,7 @@ fn every_button_a_person_can_click_has_an_explanation_that_fits_the_footer_in_ev
         Button::Help,
         Button::Quit,
     ];
-    let mut session = Session::new(&backend);
+    let session = Session::new(&backend);
     for button in footer {
         let text = view::button_help(button, &session.state);
         assert!(
