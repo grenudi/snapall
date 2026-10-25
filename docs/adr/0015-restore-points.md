@@ -46,6 +46,6 @@ wrong.
 - A point needs snapshots in at least two areas; one area alone has nothing to put back together.
 - Restoring is not atomic across areas (they are independent subvolumes); the safety snapshots make the
   whole thing undoable whatever happens part way.
-- Not done: a column in the window's snapshot list marking which snapshots belong to a point (it is
-  shown in the restore prompt); listing and restoring points from the window without going through a
-  snapshot.
+- The window lists and restores points on its own screen (`R`) as well as from a snapshot's restore
+  prompt (`u`, then `A`). Not done: a column in the snapshot list marking which snapshots belong to a
+  point.

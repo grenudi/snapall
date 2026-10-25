@@ -273,11 +273,12 @@ fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
 }
 
 /// The footer's buttons, in order: the button, the key it stands for, and its label.
-const ACTIONS: [(Button, &str, &str); 8] = [
+const ACTIONS: [(Button, &str, &str); 9] = [
     (Button::Create, "c", "create"),
     (Button::CreateAll, "a", "all"),
     (Button::Delete, "d", "delete"),
     (Button::Restore, "u", "restore"),
+    (Button::Points, "R", "points"),
     (Button::Reload, "r", "reload"),
     (Button::Protect, "p", "protect"),
     (Button::Help, "?", "help"),
@@ -312,7 +313,8 @@ fn footer_buttons(keys: Rect, file_mode: bool) -> Vec<(Rect, Button, &'static st
             key,
             label,
         ));
-        x = x.saturating_add(width).saturating_add(2);
+        // one space between buttons: nine of them must fit 80 columns, and the key letter is bold
+        x = x.saturating_add(width).saturating_add(1);
     }
     out
 }
@@ -333,6 +335,9 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Set this part of the disk up for snapshots (nothing is copied or moved)"
         }
         (Some(Modal::Protect { .. }), Button::Next) => "Show the next part of the disk",
+        (Some(Modal::Points { .. }), Button::Confirm) => {
+            "Put every area of the chosen restore point back (not the system)"
+        }
         (Some(Modal::Restore { .. }), Button::RestoreAll) => {
             "Put all areas of this restore point back at once (not the system)"
         }
@@ -352,6 +357,7 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Go back to the selected snapshot: shows what changes and asks first"
         }
         (None, Button::Reload) => "Look again at which snapshots exist",
+        (None, Button::Points) => "See the restore points and put every area back to one",
         (None, Button::Protect) => {
             "See which parts of your disk have no snapshots yet, and protect them"
         }
@@ -456,6 +462,7 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
         } => restore_spec(config, *id, path.as_deref(), stage, state),
         Modal::Help { page } => help_spec(*page),
         Modal::Protect { index } => protect_spec(*index, state),
+        Modal::Points { index } => points_spec(*index, state),
     }
 }
 
@@ -671,6 +678,118 @@ fn restore_summary(
     lines
 }
 
+/// The restore points: the list with the cursor on one, and what putting that one back would do.
+fn points_spec(index: usize, state: &State) -> ModalSpec {
+    let simple = |lines: Vec<Line<'static>>, height: u16| ModalSpec {
+        title: " Restore points ".into(),
+        lines,
+        color: ACCENT,
+        width: 78,
+        height,
+        buttons: vec![close_button()],
+    };
+    let Some(points) = &state.points else {
+        return simple(
+            vec![Line::styled(
+                "Looking for restore points...",
+                Style::new().fg(DIM),
+            )],
+            8,
+        );
+    };
+    if points.is_empty() {
+        return simple(
+            vec![
+                Line::from("There are no restore points yet."),
+                Line::from(""),
+                Line::from("Taking a snapshot of every area at once (press a, or run sudo snapall) makes one: the snapshots one action takes together, so that everything can be put back to that moment in one step."),
+            ],
+            11,
+        );
+    }
+    let index = index.min(points.len() - 1);
+    let mut lines = vec![
+        Line::from("Choose a restore point (Up and Down):"),
+        Line::from(""),
+    ];
+    let first = index.saturating_sub(5);
+    for (at, point) in points.iter().enumerate().skip(first).take(6) {
+        let marker = if at == index { "> " } else { "  " };
+        let note = if point.tagged {
+            ""
+        } else {
+            " (older: matched by name and time)"
+        };
+        let row = format!(
+            "{marker}{}  {}  {}{note}",
+            point.point,
+            point.date.as_deref().unwrap_or(""),
+            point.description
+        );
+        let row: String = row.chars().take(74).collect();
+        lines.push(if at == index {
+            Line::styled(row, Style::new().fg(Color::Yellow).bold())
+        } else {
+            Line::styled(row, Style::new().fg(DIM))
+        });
+    }
+    lines.push(Line::from(""));
+    let preview = state
+        .point_preview
+        .as_ref()
+        .filter(|p| p.point.point == points[index].point);
+    match preview {
+        None => lines.push(Line::styled(
+            "Looking at what it would change...",
+            Style::new().fg(DIM),
+        )),
+        Some(preview) => {
+            lines.push(Line::from("Putting every area back would:"));
+            let width = preview
+                .views
+                .iter()
+                .map(|v| v.config.as_str().len())
+                .max()
+                .unwrap_or(0);
+            for view in &preview.views {
+                let what = match &view.view {
+                    snapall_core::MemberView::Changes(p) if p.changes.is_empty() => {
+                        "nothing: it already matches".to_owned()
+                    }
+                    snapall_core::MemberView::Changes(p) => {
+                        let (changed, added, removed) = restore_counts(&p.changes);
+                        format!("change {} path(s): {changed} reverted, {added} removed, {removed} brought back", p.changes.len())
+                    }
+                    snapall_core::MemberView::SystemRoot => {
+                        "left alone: the running system is not put back".to_owned()
+                    }
+                    snapall_core::MemberView::Failed(why) => {
+                        format!("could not be looked at: {why}")
+                    }
+                };
+                lines.push(Line::from(format!("  {:<width$}  {what}", view.config)));
+            }
+        }
+    }
+    let mut buttons = Vec::new();
+    if let Some(preview) = preview.filter(|p| p.areas_to_change() > 0) {
+        buttons.push(confirm_button(&format!(
+            "Restore all {}",
+            preview.areas_to_change()
+        )));
+    }
+    buttons.push(close_button());
+    let height = u16::try_from(lines.len() + 3).unwrap_or(20).clamp(10, 21);
+    ModalSpec {
+        title: format!(" Restore points  ({} of {}) ", index + 1, points.len()),
+        lines,
+        color: Color::Yellow,
+        width: 78,
+        height,
+        buttons,
+    }
+}
+
 /// The offer to protect a part of the disk: one at a time, with what it holds and what will happen.
 fn protect_spec(index: usize, state: &State) -> ModalSpec {
     let count = state.offers.len();
@@ -780,6 +899,7 @@ fn keys_page() -> Vec<Line<'static>> {
         ),
         ("A", "In Restore: put its whole restore point back"),
         ("p", "Protect: see what has no snapshots yet, and set it up"),
+        ("R", "Restore points: put every area back to one moment"),
         ("r", "Look again at which snapshots exist"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
         (

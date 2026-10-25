@@ -149,6 +149,8 @@ pub enum Button {
     Next,
     /// In the restore prompt: put every area of the snapshot's restore point back.
     RestoreAll,
+    /// See the restore points and put every area back to one of them.
+    Points,
 }
 
 impl Button {
@@ -167,6 +169,7 @@ impl Button {
             Button::Protect => Key::Char('p'),
             Button::Next => Key::Tab,
             Button::RestoreAll => Key::Char('A'),
+            Button::Points => Key::Char('R'),
         }
     }
 }
@@ -223,6 +226,8 @@ pub enum Modal {
     Help { page: usize },
     /// Offering to protect one of the parts of the disk that have no snapshots yet.
     Protect { index: usize },
+    /// The restore points, one chosen: what putting it back would do, and the way to do it.
+    Points { index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -261,6 +266,10 @@ pub struct State {
     pub after_reload: Option<Notice>,
     /// The restore point of the snapshot the restore prompt is about, once looked up.
     pub point_offer: Option<(ConfigName, SnapshotId, PointOffer)>,
+    /// The restore points, newest first, once looked up (`None` while looking).
+    pub points: Option<Vec<snapall_core::RestorePoint>>,
+    /// What putting the chosen restore point back would do.
+    pub point_preview: Option<PointOffer>,
 }
 
 impl Default for State {
@@ -282,6 +291,8 @@ impl Default for State {
             offers: Vec::new(),
             after_reload: None,
             point_offer: None,
+            points: None,
+            point_preview: None,
         }
     }
 }
@@ -378,6 +389,12 @@ pub enum Effect {
     RestorePoint {
         point: snapall_core::RestorePoint,
     },
+    /// Look up every restore point.
+    LoadPoints,
+    /// What would putting this restore point back do?
+    LoadPointPreview {
+        point: snapall_core::RestorePoint,
+    },
     /// Put `config` back to how `id` had it (after a safety snapshot).
     Restore {
         config: ConfigName,
@@ -430,6 +447,10 @@ pub enum Msg {
         id: SnapshotId,
         offer: Option<PointOffer>,
     },
+    /// Every restore point, or why they could not be looked up.
+    PointsLoaded(Result<Vec<snapall_core::RestorePoint>, String>),
+    /// What putting one restore point back would do.
+    PointPreviewLoaded(PointOffer),
     /// A restore point was put back.
     PointRestored {
         point: String,
@@ -478,6 +499,20 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             );
             if asked {
                 state.point_offer = offer.map(|offer| (config, id, offer));
+            }
+            Vec::new()
+        }
+        Msg::PointsLoaded(result) => {
+            settle(state);
+            on_points_loaded(state, result)
+        }
+        Msg::PointPreviewLoaded(offer) => {
+            settle(state);
+            if state
+                .chosen_point()
+                .is_some_and(|p| p.point == offer.point.point)
+            {
+                state.point_preview = Some(offer);
             }
             Vec::new()
         }
@@ -550,7 +585,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return on_modal_key(state, key);
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
-    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p')) {
+    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R')) {
         state.notice = Some(Notice::Info(
             "busy: wait for the current operation to finish".into(),
         ));
@@ -603,6 +638,12 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
             state.modal = Some(Modal::Protect { index: 0 });
             Vec::new()
         }
+        Key::Char('R') => {
+            state.modal = Some(Modal::Points { index: 0 });
+            state.points = None;
+            state.point_preview = None;
+            vec![Effect::LoadPoints]
+        }
         _ => Vec::new(),
     }
 }
@@ -630,6 +671,14 @@ impl Reaction {
         }
     }
 
+    /// The prompt stays open and work starts (moving to another restore point looks it up).
+    fn stays_and_starts(modal: Modal, effects: Vec<Effect>) -> Self {
+        Self {
+            modal: Some(modal),
+            effects,
+        }
+    }
+
     /// The prompt is answered: it closes and the work it asked for starts.
     fn closes_and_starts(effects: Vec<Effect>) -> Self {
         Self {
@@ -646,6 +695,7 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     let reaction = match modal {
         Modal::Help { page } => reading_help(key, page),
         Modal::Protect { index } => protecting(state, key, index),
+        Modal::Points { index } => browsing_points(state, key, index),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {
@@ -657,6 +707,84 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     };
     state.modal = reaction.modal;
     reaction.effects
+}
+
+impl State {
+    /// The restore point the points screen has the cursor on.
+    pub fn chosen_point(&self) -> Option<&snapall_core::RestorePoint> {
+        match &self.modal {
+            Some(Modal::Points { index }) => self.points.as_ref()?.get(*index),
+            _ => None,
+        }
+    }
+}
+
+/// The restore points arrived: show them, and look up what the first would do.
+fn on_points_loaded(
+    state: &mut State,
+    result: Result<Vec<snapall_core::RestorePoint>, String>,
+) -> Vec<Effect> {
+    match result {
+        Err(why) => {
+            state.modal = None;
+            state.notice = Some(Notice::Error(why));
+            Vec::new()
+        }
+        Ok(points) => {
+            let first = points.first().cloned();
+            state.points = Some(points);
+            first
+                .map(|point| vec![Effect::LoadPointPreview { point }])
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// The restore points screen: Up and Down choose, Enter or `A` puts every area of the chosen one back,
+/// Esc leaves. Nothing happens to a point whose areas already match.
+fn browsing_points(state: &mut State, key: Key, index: usize) -> Reaction {
+    let count = state.points.as_ref().map_or(0, Vec::len);
+    let index = index.min(count.saturating_sub(1));
+    let moved = |to: usize, state: &mut State| {
+        state.point_preview = None;
+        let effects = state
+            .points
+            .as_ref()
+            .and_then(|points| points.get(to))
+            .map(|point| {
+                vec![Effect::LoadPointPreview {
+                    point: point.clone(),
+                }]
+            })
+            .unwrap_or_default();
+        Reaction::stays_and_starts(Modal::Points { index: to }, effects)
+    };
+    match key {
+        Key::Esc | Key::CtrlC | Key::Char('q') => Reaction::closes(),
+        Key::Down | Key::Char('j') | Key::Tab if index + 1 < count => moved(index + 1, state),
+        Key::Up | Key::Char('k') if index > 0 => moved(index - 1, state),
+        Key::Enter | Key::Char('A') => {
+            let chosen = state
+                .points
+                .as_ref()
+                .and_then(|points| points.get(index))
+                .cloned();
+            match (chosen, &state.point_preview) {
+                (Some(point), Some(preview))
+                    if preview.point.point == point.point && preview.areas_to_change() > 0 =>
+                {
+                    state.notice = Some(Notice::Info(format!(
+                        "putting {} area(s) back to {}",
+                        preview.areas_to_change(),
+                        point.point
+                    )));
+                    Reaction::closes_and_starts(vec![Effect::RestorePoint { point }])
+                }
+                _ => Reaction::stays(Modal::Points { index }),
+            }
+        }
+        _ => Reaction::stays(Modal::Points { index }),
+    }
 }
 
 /// The offer to protect a part of the disk: Tab and the arrows go to the next one, Enter protects the

@@ -84,6 +84,15 @@ impl<'a> Executor<'a> {
                     result,
                 }
             }
+            Effect::LoadPoints => Msg::PointsLoaded(
+                all_snapshots(backend)
+                    .map(|all| restore_points(&all))
+                    .map_err(|error| describe(&error)),
+            ),
+            Effect::LoadPointPreview { point } => Msg::PointPreviewLoaded(PointOffer {
+                views: preview_point(backend, &point),
+                point,
+            }),
             Effect::LoadPointOffer { config, id } => {
                 // Is this snapshot one of several taken by one action? Failing to look is not an
                 // error to show: the prompt simply does not offer the extra action.

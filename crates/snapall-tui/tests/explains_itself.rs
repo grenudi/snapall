@@ -95,6 +95,7 @@ fn every_button_a_person_can_click_has_an_explanation_that_fits_the_footer_in_ev
         Button::Reload,
         Button::Help,
         Button::Quit,
+        Button::Points,
     ];
     let session = Session::new(&backend);
     for button in footer {
@@ -222,13 +223,14 @@ fn the_main_screen_calls_the_parts_of_the_disk_protected_areas() {
 #[test]
 fn no_prompt_covers_the_two_footer_lines_at_24_rows() {
     let backend = backend();
-    let prompts: [(&str, &[Key]); 6] = [
+    let prompts: [(&str, &[Key]); 7] = [
         ("snapshot description", &[Key::Char('c')]),
         ("delete", &[Key::Right, Key::Char('d')]),
         ("restore", &[Key::Right, Key::Char('u')]),
         ("help, page 1", &[Key::Char('?')]),
         ("help, page 2", &[Key::Char('?'), Key::Enter]),
         ("protect", &[Key::Char('p')]),
+        ("restore points", &[Key::Char('R')]),
     ];
     for (name, keys) in prompts {
         let offers = vec![snapall_tui::Offer {

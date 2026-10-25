@@ -281,7 +281,7 @@ To undo all of this at once: sudo snapall restore-all 20261025T190200Z
 - **Undo is the same action.** Each area takes a safety snapshot first, and those form a restore point of their own: the last line is the command that puts everything back as it was just before.
 - **The running system is the one thing it will not put back** (see [ADR 12](docs/adr/0012-restore-and-the-boot-menu.md)): files, kernel and boot menu would fall out of step. Every other area is restored, and the output says how to restore the system itself.
 - **Older snapshots** made before restore points existed are grouped when they have the same description and were taken within two minutes of each other, which is what pressing `a` did. They are marked *older: matched by name and time*, because that is a match, not a record.
-- In the window, press `u` on a snapshot: if it belongs to a restore point the prompt says so, and `A` puts all of it back.
+- In the window, press `R` for the list of restore points: choose one with Up and Down, read what it would change in each area, and press Enter to put all of it back. (Or press `u` on a snapshot: if it belongs to a restore point the prompt says so, and `A` puts all of it back.)
 
 ## The terminal UI
 
@@ -296,6 +296,7 @@ The packages install a *snapall* entry in your application menu that opens this 
 | `space` | mark a snapshot, then move on |
 | `c` | create a snapshot of the selected area (asks for a short note) |
 | `a` | create a snapshot of every protected area |
+| `R` | restore points: list them, see what each would change in every area, put all of one back (Enter) |
 | `p` | protect a part of your disk that has no snapshots yet (explains first, asks, does it) |
 | `d` | delete the marked snapshots, or the one under the cursor (asks to confirm) |
 | `u` | restore the area to the snapshot under the cursor (shows what changes, asks to confirm); `A` in that prompt puts the snapshot's whole restore point back |
