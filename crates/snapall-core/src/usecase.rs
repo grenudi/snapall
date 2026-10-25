@@ -276,11 +276,11 @@ pub enum HistoryError {
     Snapshot(#[from] SnapshotError),
     #[error("`{path}` is not an absolute path without `..`")]
     BadPath { path: String },
-    #[error("no snapper config covers `{path}`: it is not under any config's subvolume")]
+    #[error("no protected area contains `{path}`")]
     NoConfig { path: String },
     /// The path is under a config's directory but on another subvolume, which that config's
     /// snapshots do not include. Saying "did not exist" here would be wrong: it never could have.
-    #[error("`{path}` is on a different subvolume than config `{config}` (`{subvolume}`), so no snapshot of `{config}` contains it")]
+    #[error("`{path}` is in a different part of the disk than {config} (`{subvolume}`), so no snapshot of {config} contains it")]
     OtherSubvolume {
         path: String,
         config: ConfigName,
@@ -870,7 +870,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("no snapshot of `root` contains it"),
+                .contains("no snapshot of root contains it"),
             "{error}"
         );
         // a file of the root subvolume itself is still covered by it

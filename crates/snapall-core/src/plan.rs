@@ -27,12 +27,12 @@ impl Plan {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PlanError {
-    #[error("snapper reports no configs; create one first, for example `snapper -c home create-config /home`")]
+    #[error("There are no protected areas yet, so there is nothing to snapshot. Run `sudo snapall setup` to set one up.")]
     NoConfigs,
-    #[error("an empty list of configs was requested")]
+    #[error("an empty list of areas was requested")]
     NothingRequested,
     #[error(
-        "unknown config(s): {}",
+        "unknown area(s): {} (`snapall list` shows the ones that exist)",
         .0.iter().map(ConfigName::as_str).collect::<Vec<_>>().join(", ")
     )]
     UnknownConfigs(Vec<ConfigName>),

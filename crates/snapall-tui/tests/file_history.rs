@@ -349,7 +349,7 @@ fn a_file_no_config_covers_shows_the_reason_on_the_screen() {
     let backend = history();
     let session = open(&backend, "/etc/fstab", "home");
     let text = screen(&session);
-    assert!(text.contains("no snapper config covers"), "{text}");
+    assert!(text.contains("no protected area contains"), "{text}");
 }
 
 #[test]
@@ -371,7 +371,7 @@ fn a_file_on_a_separate_subvolume_says_so_instead_of_listing_snapshots_that_cann
     snap(&backend, &root, "base");
     let session = open(&backend, "/mnt/home/u/notes.txt", "root");
     let text = screen(&session);
-    assert!(text.contains("different subvolume"), "{text}");
+    assert!(text.contains("different part of the disk"), "{text}");
     assert!(
         !text.contains("did not exist"),
         "it must not claim the file was absent:\n{text}"

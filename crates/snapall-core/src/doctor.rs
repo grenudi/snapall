@@ -331,7 +331,7 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
         Some(false) => check(
             "privileges",
             Status::Warn,
-            "not root; snapper normally needs root (or permission granted in its config)",
+            "not root; snapper normally needs root (or permission granted in its settings)",
             Some("run with sudo".to_owned()),
         ),
         None => check(
@@ -344,30 +344,33 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
 
     match &probe.configs {
         None => checks.push(check(
-            "configs",
+            "areas",
             Status::Warn,
             "not checked: snapper is missing",
             None,
         )),
         Some(Ok(configs)) if configs.is_empty() => checks.push(check(
-            "configs",
+            "areas",
             Status::Warn,
-            "snapper has no configs, so there is nothing to snapshot yet",
-            Some("snapper -c home create-config /home".to_owned()),
+            "No part of your disk is protected yet, so there is nothing to snapshot",
+            Some(
+                "run `sudo snapall setup`: it explains what protecting means and does it for you"
+                    .to_owned(),
+            ),
         )),
         Some(Ok(configs)) => {
             let names: Vec<&str> = configs.iter().map(ConfigName::as_str).collect();
             checks.push(check(
-                "configs",
+                "areas",
                 Status::Ok,
-                format!("{} found: {}", names.len(), names.join(", ")),
+                format!("{} protected: {}", names.len(), names.join(", ")),
                 None,
             ));
         }
         Some(Err(why)) => checks.push(check(
-            "configs",
+            "areas",
             Status::Fail,
-            format!("could not list configs: {why}"),
+            format!("could not list the protected areas: {why}"),
             config_fix(why, probe.is_root),
         )),
     }
@@ -620,7 +623,7 @@ mod tests {
         ));
         assert_eq!(worst(&checks), Status::Ok);
         assert!(checks.iter().all(|c| c.fix.is_none()));
-        assert!(checks[2].detail.contains("2 found: home, root"));
+        assert!(checks[2].detail.contains("2 protected: home, root"));
     }
 
     #[test]
@@ -635,7 +638,7 @@ mod tests {
         assert_eq!(
             checks[2].status,
             Status::Warn,
-            "configs cannot be checked, which is not a failure of their own"
+            "areas cannot be checked, which is not a failure of their own"
         );
     }
 
@@ -644,7 +647,7 @@ mod tests {
         let checks = diagnose(&probe(Ok("snapper 0.13.1"), Some(false), Some(Ok(&[]))));
         assert_eq!(worst(&checks), Status::Warn);
         assert_eq!(checks[1].fix.as_deref(), Some("run with sudo"));
-        assert!(checks[2].fix.as_deref().unwrap().contains("create-config"));
+        assert!(checks[2].fix.as_deref().unwrap().contains("snapall setup"));
     }
 
     #[test]

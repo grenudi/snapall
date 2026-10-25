@@ -13,9 +13,9 @@ use thiserror::Error;
 /// Why a piece of input could not become a domain value.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ParseError {
-    #[error("config name is empty")]
+    #[error("the area's name is empty")]
     EmptyConfigName,
-    #[error("config name `{name}` is not allowed: {reason}")]
+    #[error("the area name `{name}` is not allowed: {reason}")]
     InvalidConfigName { name: String, reason: &'static str },
     #[error("description is empty")]
     EmptyDescription,
