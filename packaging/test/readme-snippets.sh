@@ -33,6 +33,25 @@ if [ -n "${GITHUB_TOKEN:-}" ]; then
   trap 'rm -f "$HOME/.curlrc"' EXIT
 fi
 
+# GitHub's releases API lists tags sorted as TEXT (0.9.1 comes before 0.10.0), not by version and not
+# by date, so "the newest releases" are chosen here, by version. RELEASES_JSON_FILE lets a test hand in
+# a list instead of asking GitHub.
+releases_json() {
+  if [ -n "${RELEASES_JSON_FILE:-}" ]; then cat "$RELEASES_JSON_FILE"
+  else curl -fsS "https://api.github.com/repos/$repo/releases?per_page=100"; fi
+}
+newest_tags() { # newest_tags COUNT: the COUNT highest versions among the tags on stdin, highest first
+  grep -o '"tag_name": *"snapall-v[0-9.]*"' | grep -o 'snapall-v[0-9.]*' | sed 's/^snapall-v//' \
+    | sort -u -t. -k1,1nr -k2,2nr -k3,3nr | head -n "$1" | sed 's/^/snapall-v/'
+}
+
+mapfile -t tags < <(releases_json | newest_tags 2)
+[ "${#tags[@]}" -ge 2 ] || fail "need two releases to test an upgrade, found ${#tags[@]}"
+latest="${tags[0]}"; previous="${tags[1]}"
+want="${latest#snapall-v}"; before="${previous#snapall-v}"
+echo "family $family: $before -> $want"
+[ -z "${SELECT_ONLY:-}" ] || { echo "$want $before"; exit 0; }
+
 curl -fsSL "https://raw.githubusercontent.com/$repo/$ref/README.md" -o README.md
 snippet="$(awk -v id="$family" '
   $0 == "<!-- snippet:" id " -->" { want = 1; next }
@@ -40,13 +59,7 @@ snippet="$(awk -v id="$family" '
   inblock { print }' README.md)"
 [ -n "$snippet" ] || fail "no snippet marked <!-- snippet:$family --> in the README at $ref"
 
-# The two newest releases, newest first.
-mapfile -t tags < <(curl -fsS "https://api.github.com/repos/$repo/releases?per_page=2" \
-  | grep -o '"tag_name": *"snapall-v[0-9.]*"' | grep -o 'snapall-v[0-9.]*')
-[ "${#tags[@]}" -ge 2 ] || fail "need two releases to test an upgrade, found ${#tags[@]}"
-latest="${tags[0]}"; previous="${tags[1]}"
-want="${latest#snapall-v}"; before="${previous#snapall-v}"
-echo "family $family: $before -> $want"
+
 
 have() { # the installed version, or nothing
   PATH="$HOME/.nix-profile/bin:/usr/local/bin:$PATH" snapall --version 2>/dev/null | awk '{print $2}' || true
