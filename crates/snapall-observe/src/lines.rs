@@ -95,6 +95,7 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
                 fields.push(("deleted", json!(summary.deleted)));
             }
         }
+        Event::ConfigChanged { change, .. } => fields.push(("change", json!(change))),
         Event::InstallStepRun { command, .. } => fields.push(("command", json!(command))),
         Event::ConfigsListed { .. } | Event::SnapshotsListed { .. } => {}
     }

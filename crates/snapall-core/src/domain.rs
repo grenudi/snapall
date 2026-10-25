@@ -250,6 +250,25 @@ pub struct FileVersion {
     pub state: FileState,
 }
 
+/// A setting of a config that snapall chooses for the configs it creates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigOption {
+    /// Whether snapper takes snapshots by itself on a schedule (hourly, daily, ...). snapall turns
+    /// it off for what it sets up: snapshots happen when you ask, so nothing piles up on its own.
+    TimelineCreate(bool),
+}
+
+impl ConfigOption {
+    /// What the setting means, for the audit log.
+    pub fn describe(self) -> String {
+        match self {
+            ConfigOption::TimelineCreate(on) => {
+                format!("snapshots on a schedule: {}", if on { "on" } else { "off" })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

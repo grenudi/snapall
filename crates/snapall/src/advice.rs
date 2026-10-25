@@ -2,79 +2,55 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What to tell someone whose file no snapshot can contain: why, and the command that fixes it.
+//! What to tell someone whose file no snapshot can contain: why, and what to do about it, in
+//! snapall's own words and with snapall's own command.
 
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
-
+use snapall_core::coverage::{self, Mount};
 use snapall_core::HistoryError;
 
-/// The directory at the top of the subvolume that holds `path`: the highest ancestor of the file's
-/// directory that is still on the same device. Btrfs gives each subvolume its own device number, so
-/// where the number changes is where the subvolume begins, whether it is mounted there (`/home`) or
-/// only nested.
-pub fn subvolume_root(path: &Path) -> PathBuf {
-    let device = |p: &Path| std::fs::metadata(p).map(|m| m.dev()).ok();
-    let start = path
-        .parent()
-        .and_then(|dir| dir.ancestors().find(|a| a.exists()))
-        .unwrap_or(Path::new("/"));
-    let Some(wanted) = device(start) else {
-        return PathBuf::from("/");
-    };
-    let mut top = start;
-    for ancestor in start.ancestors().skip(1) {
-        if device(ancestor) != Some(wanted) {
-            break;
-        }
-        top = ancestor;
-    }
-    top.to_owned()
-}
-
-/// A config name for a subvolume at `root`: its last directory name with anything snapper's names do
-/// not take replaced, `root` for `/`.
-pub fn config_name_for(root: &Path) -> String {
-    let last = root
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let cleaned: String = last
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
+/// The mount that holds `path`: the one with the longest mount point that `path` is under.
+fn holder<'a>(mounts: &'a [Mount], path: &str) -> Option<&'a Mount> {
+    mounts
+        .iter()
+        .filter(|mount| {
+            let point = mount.point.trim_end_matches('/');
+            point.is_empty() || path == point || path.starts_with(&format!("{point}/"))
         })
-        .collect();
-    if cleaned.chars().all(|c| c == '_') {
-        if root == Path::new("/") {
-            "root".to_owned()
-        } else {
-            "data".to_owned()
-        }
-    } else {
-        cleaned
-    }
+        .max_by_key(|mount| mount.point.len())
 }
 
-/// The error, and where it is one of the two that mean "no snapshot can contain this file", the
-/// command that gives it one.
-pub fn explain(error: &HistoryError, path: &str) -> String {
+/// The error as a person should read it. Where it means "no snapshot can contain this file", it says
+/// where the file is and what to do, given the machine's `mounts`.
+pub fn explain_with(error: &HistoryError, path: &str, mounts: &[Mount]) -> String {
     if !matches!(
         error,
         HistoryError::OtherSubvolume { .. } | HistoryError::NoConfig { .. }
     ) {
         return error.to_string();
     }
-    let root = subvolume_root(Path::new(path));
-    let name = config_name_for(&root);
+    let Some(holder) = holder(mounts, path) else {
+        return format!(
+            "No snapshot contains {path}, and snapall could not tell where on the disk it is."
+        );
+    };
+    if holder.fstype != "btrfs" {
+        return format!(
+            "No snapshot contains {path}.\n\nIt is on {point}, a part of the disk snapall cannot protect: it only works with disks formatted as Btrfs.",
+            point = holder.point
+        );
+    }
+    let info = coverage::describe(&holder.point);
     format!(
-        "{error}\n\nTo give it snapshots, make a snapper config for the subvolume that holds it:\n    sudo snapper -c {name} create-config {root}\n    sudo snapper -c {name} set-config TIMELINE_CREATE=no   (so only snapall makes its snapshots)\nsnapall then snapshots it together with your other configs.",
-        root = root.display()
+        "No snapshot contains {path}.\n\nIt is in {title} ({point}). Snapshots are kept for one part of the disk at a time, and none of the parts they are kept for includes it.\n\nTo see whether {title} is protected, and protect it if it is not, run:\n\n    sudo snapall setup\n\nIt explains what protecting means and does it for you. Snapshots taken after that will include this file.",
+        title = info.title,
+        point = holder.point
     )
+}
+
+/// [`explain_with`] for this machine.
+pub fn explain(error: &HistoryError, path: &str) -> String {
+    let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
+    explain_with(error, path, &coverage::mounts_from_mountinfo(&mountinfo))
 }
 
 #[cfg(test)]
@@ -82,70 +58,81 @@ mod tests {
     use super::*;
     use snapall_core::ConfigName;
 
-    #[test]
-    fn a_config_name_is_made_from_the_directory_and_always_valid() {
-        for (root, expected) in [
-            ("/home", "home"),
-            ("/", "root"),
-            ("/srv/my data", "my_data"),
-            ("/mnt/games-2", "games-2"),
-            ("/mnt/\u{e4}\u{f6}\u{fc}", "data"),
-        ] {
-            let name = config_name_for(Path::new(root));
-            assert_eq!(name, expected, "{root}");
-            assert!(
-                ConfigName::parse(&name).is_ok(),
-                "`{name}` must be a name snapper accepts"
-            );
-        }
-    }
+    const MOUNTINFO: &str = "\
+24 1 0:21 /@ / rw - btrfs /dev/x rw,subvol=/@
+25 24 0:21 /@home /home rw - btrfs /dev/x rw,subvol=/@home
+30 24 8:3 / /mnt/usb rw - ext4 /dev/sdb1 rw
+";
 
-    #[test]
-    fn the_subvolume_root_is_where_the_device_changes() {
-        // /proc is a filesystem of its own, so a file in it belongs to a "subvolume" rooted at /proc,
-        // not at /
-        assert_eq!(
-            subvolume_root(Path::new("/proc/self/environ")),
-            Path::new("/proc")
-        );
-        // whatever the machine's layout, the answer is an ancestor, and the one above it differs
-        let tmp = std::env::temp_dir().join("snapall-advice-x");
-        let root = subvolume_root(&tmp);
-        assert!(tmp.starts_with(&root), "{root:?} is an ancestor of {tmp:?}");
-        if let (Some(above), Ok(top)) = (root.parent(), std::fs::metadata(&root)) {
-            assert_ne!(
-                std::fs::metadata(above).map(|m| m.dev()).ok(),
-                Some(top.dev()),
-                "the parent is on another device"
-            );
-        }
-    }
-
-    #[test]
-    fn only_the_two_no_snapshot_can_contain_it_errors_get_the_command() {
-        let root = ConfigName::parse("root").unwrap();
-        let other = HistoryError::OtherSubvolume {
-            path: "/proc/self/environ".into(),
-            config: root,
+    fn not_covered(path: &str) -> HistoryError {
+        HistoryError::OtherSubvolume {
+            path: path.into(),
+            config: ConfigName::parse("root").unwrap(),
             subvolume: "/".into(),
-        };
-        let text = explain(&other, "/proc/self/environ");
+        }
+    }
+
+    fn mounts() -> Vec<Mount> {
+        coverage::mounts_from_mountinfo(MOUNTINFO)
+    }
+
+    #[test]
+    fn a_file_in_a_btrfs_area_is_pointed_at_setup_in_plain_words() {
+        let text = explain_with(
+            &not_covered("/home/me/notes.txt"),
+            "/home/me/notes.txt",
+            &mounts(),
+        );
+        for must in [
+            "No snapshot contains /home/me/notes.txt",
+            "It is in Home (/home)",
+            "sudo snapall setup",
+            "explains what protecting means",
+        ] {
+            assert!(text.contains(must), "`{must}` missing:\n{text}");
+        }
+        for jargon in ["snapper", "config", "subvolume", "create-config"] {
+            assert!(
+                !text.to_lowercase().contains(jargon),
+                "`{jargon}` in:\n{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_most_specific_mount_names_the_area_not_the_one_above_it() {
+        let text = explain_with(&not_covered("/home/me/a"), "/home/me/a", &mounts());
         assert!(
-            text.contains("sudo snapper -c proc create-config /proc"),
+            text.contains("Home (/home)") && !text.contains("System (/)"),
             "{text}"
         );
-        assert!(text.contains("TIMELINE_CREATE=no"), "{text}");
-        let none = explain(
-            &HistoryError::NoConfig {
-                path: "/x/y".into(),
-            },
-            "/proc/self/environ",
+        let system = explain_with(&not_covered("/etc/fstab"), "/etc/fstab", &mounts());
+        assert!(system.contains("System (/)"), "{system}");
+    }
+
+    #[test]
+    fn a_file_on_a_disk_snapall_cannot_protect_says_so_and_does_not_promise_setup_will_help() {
+        let text = explain_with(
+            &not_covered("/mnt/usb/photo.jpg"),
+            "/mnt/usb/photo.jpg",
+            &mounts(),
         );
-        assert!(none.contains("create-config"), "{none}");
-        let bad = explain(&HistoryError::BadPath { path: "rel".into() }, "rel");
         assert!(
-            !bad.contains("create-config"),
-            "an unrelated error is passed through: {bad}"
+            text.contains("cannot protect") && text.contains("Btrfs"),
+            "{text}"
         );
+        assert!(!text.contains("sudo snapall setup"), "{text}");
+    }
+
+    #[test]
+    fn other_errors_and_unknown_places_are_not_dressed_up() {
+        let bad = explain_with(
+            &HistoryError::BadPath { path: "rel".into() },
+            "rel",
+            &mounts(),
+        );
+        assert!(!bad.contains("setup"), "{bad}");
+        let lost = explain_with(&not_covered("/x"), "/x", &[]);
+        assert!(lost.contains("could not tell where"), "{lost}");
     }
 }

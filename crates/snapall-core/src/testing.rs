@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use crate::domain::{
-    Change, ChangeKind, ConfigName, Description, FileState, FileVersion, RestoreSummary,
-    SnapshotId, SnapshotInfo, SnapshotKind,
+    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion,
+    RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 use crate::port::{BackendError, SnapshotBackend};
 
@@ -28,6 +28,8 @@ struct ConfigState {
     files: BTreeMap<String, String>,
     /// The files as each snapshot saw them, by snapshot number.
     saved: BTreeMap<u64, BTreeMap<String, String>>,
+    /// Whether snapshots are taken on a schedule, as snapper does for a new config.
+    timeline_create: bool,
 }
 
 #[derive(Default)]
@@ -37,6 +39,9 @@ struct State {
     /// Directories that are the root of a separate subvolume: not part of any snapshot of a config
     /// above them, as a separate `/home` is not part of a snapshot of `/`.
     separate: Vec<String>,
+    /// Operations made to fail, to test what is undone when one does.
+    refuse_option_changes: bool,
+    refuse_removals: bool,
 }
 
 /// A backend that keeps everything in memory. Fast core tests need nothing else.
@@ -61,6 +66,7 @@ impl InMemoryBackend {
                         subvolume,
                         files: BTreeMap::new(),
                         saved: BTreeMap::new(),
+                        timeline_create: true,
                     },
                 );
             }
@@ -75,6 +81,22 @@ impl InMemoryBackend {
             entry.subvolume = "/".into();
         }
         self
+    }
+
+    /// From now on, changing a config's settings fails.
+    pub fn refuse_option_changes(&self) {
+        self.lock().refuse_option_changes = true;
+    }
+
+    /// From now on, removing a config fails.
+    pub fn refuse_removals(&self) {
+        self.lock().refuse_removals = true;
+    }
+
+    /// Whether the config takes snapshots on a schedule, if it exists.
+    pub fn timeline_create(&self, config: &str) -> Option<bool> {
+        let name = ConfigName::parse(config).ok()?;
+        self.lock().configs.get(&name).map(|c| c.timeline_create)
     }
 
     /// Declare `directory` the root of a separate subvolume: everything under it is no longer
@@ -210,6 +232,58 @@ impl SnapshotBackend for InMemoryBackend {
             .get(config)
             .map(|entry| entry.subvolume.clone())
             .ok_or_else(|| BackendError::UnknownConfig(config.clone()))
+    }
+
+    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
+        let mut state = self.lock();
+        if state.configs.contains_key(name) {
+            return Err(BackendError::NotSupported(format!(
+                "config `{name}` exists"
+            )));
+        }
+        state.configs.insert(
+            name.clone(),
+            ConfigState {
+                next_id: 1,
+                snapshots: Vec::new(),
+                subvolume: subvolume.to_owned(),
+                files: BTreeMap::new(),
+                saved: BTreeMap::new(),
+                timeline_create: true,
+            },
+        );
+        Ok(())
+    }
+
+    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
+        let mut state = self.lock();
+        if state.refuse_removals {
+            return Err(BackendError::NotSupported("removal refused".into()));
+        }
+        state
+            .configs
+            .remove(name)
+            .map(|_| ())
+            .ok_or_else(|| BackendError::UnknownConfig(name.clone()))
+    }
+
+    fn set_config_option(
+        &self,
+        name: &ConfigName,
+        option: ConfigOption,
+    ) -> Result<(), BackendError> {
+        let mut state = self.lock();
+        if state.refuse_option_changes {
+            return Err(BackendError::NotSupported("setting change refused".into()));
+        }
+        let entry = state
+            .configs
+            .get_mut(name)
+            .ok_or_else(|| BackendError::UnknownConfig(name.clone()))?;
+        match option {
+            ConfigOption::TimelineCreate(on) => entry.timeline_create = on,
+        }
+        Ok(())
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {

@@ -28,7 +28,7 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
 
 pub fn render(records: &[Record], version: &str) -> String {
     let mut out = format!(
-        "snapall {version}\nSnapshot every snapper config in one command.\n\n\
+        "snapall {version}\nSnapshot every protected area in one command.\n\n\
          USAGE\n    snapall [OPTIONS] [DESCRIPTION]    shorthand for `snapall create`\n    \
          snapall <COMMAND> [OPTIONS]\n\nCOMMANDS\n"
     );

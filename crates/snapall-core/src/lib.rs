@@ -14,6 +14,7 @@ pub mod boot;
 pub mod coverage;
 pub mod doctor;
 pub mod domain;
+pub mod explain;
 pub mod observe;
 pub mod plan;
 pub mod port;
@@ -23,7 +24,7 @@ pub mod usecase;
 pub mod testing;
 
 pub use domain::{
-    Change, ChangeKind, ConfigName, Description, FileState, FileVersion, ParseError,
+    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
     RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 pub use observe::{Event, Observer, Silent};
@@ -31,6 +32,7 @@ pub use plan::{plan, Plan, PlanError};
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
-    plan_snapshots, preview_restore, restore_snapshot, run_plan, snapshot_all, snapshots_of,
-    FileHistory, HistoryError, Outcome, Preview, Report, RestoreError, Restored, SnapshotError,
+    plan_snapshots, preview_restore, protect_area, restore_snapshot, run_plan, snapshot_all,
+    snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report, RestoreError, Restored,
+    SetupError, SnapshotError,
 };

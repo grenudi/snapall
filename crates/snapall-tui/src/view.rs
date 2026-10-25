@@ -12,6 +12,7 @@ use ratatui::widgets::{
     TableState, Wrap,
 };
 use ratatui::Frame;
+use snapall_core::explain;
 use snapall_core::{ChangeKind, ConfigName, FileState, SnapshotId, SnapshotInfo, SnapshotKind};
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
@@ -92,7 +93,7 @@ fn render_header(state: &State, frame: &mut Frame, area: Rect) {
         Span::styled(
             match &state.file {
                 Some(view) => format!("  history of {}", view.target.path),
-                None => "  snapper snapshots".to_owned(),
+                None => "  snapshots of your computer".to_owned(),
             },
             Style::new().fg(DIM),
         ),
@@ -124,7 +125,7 @@ fn pane_block(title: String, focused: bool) -> Block<'static> {
 
 fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
     let focused = state.focus == Pane::Configs && state.modal.is_none();
-    let block = pane_block(" Configs ".into(), focused);
+    let block = pane_block(" Protected areas ".into(), focused);
     match &state.configs {
         Load::NotLoaded => {
             frame.render_widget(Paragraph::new("loading...").block(block), area);
@@ -140,7 +141,7 @@ fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
         }
         Load::Loaded(entries) if entries.is_empty() => {
             frame.render_widget(
-                Paragraph::new("no snapper configs")
+                Paragraph::new("no protected areas yet")
                     .style(Style::new().fg(DIM))
                     .block(block),
                 area,
@@ -272,12 +273,13 @@ fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
 }
 
 /// The footer's buttons, in order: the button, the key it stands for, and its label.
-const ACTIONS: [(Button, &str, &str); 7] = [
+const ACTIONS: [(Button, &str, &str); 8] = [
     (Button::Create, "c", "create"),
     (Button::CreateAll, "a", "all"),
     (Button::Delete, "d", "delete"),
     (Button::Restore, "u", "restore"),
     (Button::Reload, "r", "reload"),
+    (Button::Protect, "p", "protect"),
     (Button::Help, "?", "help"),
     (Button::Quit, "q", "quit"),
 ];
@@ -315,17 +317,71 @@ fn footer_buttons(keys: Rect, file_mode: bool) -> Vec<(Rect, Button, &'static st
     out
 }
 
+/// What a button does, in plain words, for the footer line while the mouse is over it. The same
+/// button means different things in different prompts, so the prompt it is in is taken into account.
+pub fn button_help(button: Button, state: &State) -> &'static str {
+    match (&state.modal, button) {
+        (Some(Modal::Describe { .. }), Button::Confirm) => "Take the snapshot now",
+        (Some(Modal::ConfirmDelete { .. }), Button::Confirm) => {
+            "Delete them for good (your files are not touched)"
+        }
+        (Some(Modal::Restore { .. }), Button::Confirm) => {
+            "Put the files back (how they are now is saved first, so this can be undone)"
+        }
+        (Some(Modal::Help { .. }), Button::Confirm) => "Show the other page",
+        (Some(Modal::Protect { .. }), Button::Confirm) => {
+            "Set this part of the disk up for snapshots (nothing is copied or moved)"
+        }
+        (Some(Modal::Protect { .. }), Button::Next) => "Show the next part of the disk",
+        (Some(_), Button::Cancel) => "Close this without changing anything",
+        (Some(_), _) => "",
+        (None, Button::Create) => {
+            "Take a snapshot of the selected area now: a saved moment you can go back to"
+        }
+        (None, Button::CreateAll) => "Take a snapshot of every protected area at once",
+        (None, Button::Delete) => {
+            "Delete the marked snapshots for good. Your files are not touched"
+        }
+        (None, Button::Restore) if state.file.is_some() => {
+            "Put this file back to how this snapshot had it (asks first)"
+        }
+        (None, Button::Restore) => {
+            "Go back to the selected snapshot: shows what changes and asks first"
+        }
+        (None, Button::Reload) => "Look again at which snapshots exist",
+        (None, Button::Protect) => {
+            "See which parts of your disk have no snapshots yet, and protect them"
+        }
+        (None, Button::Help) => "Explain what snapshots are and what each key does",
+        (None, Button::Quit) => "Close snapall. Nothing is changed",
+        (None, Button::Confirm | Button::Cancel | Button::Next) => "",
+    }
+}
+
 fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
-    let notice = match (&state.notice, &state.context.boot_tip) {
-        (Some(Notice::Info(text)), _) => {
+    let explanation = state
+        .hover
+        .map(|button| button_help(button, state))
+        .filter(|text| !text.is_empty());
+    // What deserves attention comes before a tip: a part of the disk without snapshots, then the boot menu.
+    let attention = state
+        .context
+        .protect_hint
+        .as_ref()
+        .filter(|_| state.offers.iter().any(|offer| offer.recommended))
+        .or(state.context.boot_tip.as_ref());
+    let notice = match (explanation, &state.notice, attention) {
+        // Under the mouse: what the button does.
+        (Some(text), _, _) => Span::styled(format!(" {text}"), Style::new().fg(Color::Cyan)),
+        (None, Some(Notice::Info(text)), _) => {
             Span::styled(format!(" {text}"), Style::new().fg(Color::Green))
         }
-        (Some(Notice::Error(text)), _) => {
+        (None, Some(Notice::Error(text)), _) => {
             Span::styled(format!(" {text}"), Style::new().fg(Color::Red))
         }
         // The tip stays until something else needs the line.
-        (None, Some(tip)) => Span::styled(format!(" {tip}"), Style::new().fg(Color::Yellow)),
-        (None, None) => Span::raw(""),
+        (None, None, Some(tip)) => Span::styled(format!(" {tip}"), Style::new().fg(Color::Yellow)),
+        (None, None, None) => Span::raw(""),
     };
     frame.render_widget(Paragraph::new(Line::from(notice)), areas.notice);
     for (rect, _button, key, label) in footer_buttons(areas.keys, state.file.is_some()) {
@@ -395,7 +451,8 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
             path,
             stage,
         } => restore_spec(config, *id, path.as_deref(), stage, state),
-        Modal::Help => help_spec(),
+        Modal::Help { page } => help_spec(*page),
+        Modal::Protect { index } => protect_spec(*index, state),
     }
 }
 
@@ -405,11 +462,14 @@ fn describe_spec(target: &Target, input: &str, error: Option<&str>, state: &Stat
         Target::One(config) => format!(" New snapshot of {config} "),
         Target::All => {
             let names: Vec<String> = state.entries().iter().map(|e| e.name.to_string()).collect();
-            format!(" New snapshot of ALL configs ({}) ", names.join(", "))
+            format!(
+                " New snapshot of ALL protected areas ({}) ",
+                names.join(", ")
+            )
         }
     };
     let mut lines = vec![
-        Line::from("Description (Enter alone uses \"snapall\"):"),
+        Line::from("A short note to help you recognise this snapshot later (Enter alone uses \"snapall\"):"),
         Line::from(vec![
             Span::styled(input.to_owned(), Style::new().bold()),
             Span::styled(
@@ -438,6 +498,7 @@ fn delete_spec(config: &ConfigName, ids: &[SnapshotId]) -> ModalSpec {
         Line::from(format!("Delete {} snapshot(s) of {config}?", ids.len())),
         Line::styled(list.join(", "), Style::new().bold()),
         Line::from(""),
+        Line::from("Your files are not touched: only the saved moments are removed, and the space they held is freed."),
         Line::styled("This cannot be undone.", Style::new().fg(Color::Yellow)),
     ];
     ModalSpec {
@@ -554,44 +615,129 @@ fn restore_summary(
     lines
 }
 
-/// The key reference.
-fn help_spec() -> ModalSpec {
-    let rows = [
-        ("up/down  k/j", "move in the focused pane"),
-        ("left/right  h/l  Tab", "switch pane"),
-        ("Home/End  g/G", "first / last"),
-        ("space", "mark a snapshot, then move on"),
-        ("c", "create a snapshot of the selected config"),
-        ("a", "create a snapshot of every config"),
-        (
-            "d",
-            "delete the marked snapshots (or the one under the cursor)",
-        ),
-        ("u", "restore the config to the snapshot under the cursor"),
-        ("r", "reload from snapper"),
-        ("q  Ctrl-C", "quit"),
-        (
-            "mouse",
-            "click a row to select, the first column to mark, the wheel to scroll",
-        ),
-    ];
-    let lines: Vec<Line> = rows
-        .iter()
-        .map(|(key, what)| {
-            Line::from(vec![
-                Span::styled(format!("{key:<22}"), Style::new().fg(ACCENT).bold()),
-                Span::raw(*what),
-            ])
-        })
+/// The offer to protect a part of the disk: one at a time, with what it holds and what will happen.
+fn protect_spec(index: usize, state: &State) -> ModalSpec {
+    let count = state.offers.len();
+    let Some(offer) = state.offers.get(index) else {
+        return ModalSpec {
+            title: " Protect ".into(),
+            lines: vec![
+                Line::from("Everything snapall recommends protecting has snapshots already."),
+                Line::from(""),
+                Line::from(explain::NOT_A_BACKUP),
+            ],
+            color: ACCENT,
+            width: 72,
+            height: 10,
+            buttons: vec![close_button()],
+        };
+    };
+    let mut lines: Vec<Line> = offer
+        .summary
+        .lines()
+        .map(|l| Line::from(l.to_owned()))
         .collect();
+    let mut buttons = Vec::new();
+    if state.context.administrator {
+        buttons.push(confirm_button("Protect it"));
+    } else {
+        lines.push(Line::from(""));
+        lines.push(Line::styled(
+            "To protect it, close this and start snapall with administrator rights:",
+            Style::new().fg(Color::Yellow),
+        ));
+        lines.push(Line::styled(
+            "    sudo snapall tui",
+            Style::new().fg(Color::Yellow).bold(),
+        ));
+    }
+    if count > 1 {
+        buttons.push((Button::Next, "Tab: Next".to_owned()));
+    }
+    buttons.push(if state.context.administrator {
+        cancel_button()
+    } else {
+        close_button()
+    });
     ModalSpec {
-        title: " Keys ".into(),
+        title: format!(" Protect  ({} of {count}) ", index + 1),
+        lines,
+        color: Color::Yellow,
+        width: 78,
+        height: 20,
+        buttons,
+    }
+}
+
+/// The help. Page one teaches what snapall is about, for someone who knows nothing of it; page two
+/// says what each key and button does.
+fn help_spec(page: usize) -> ModalSpec {
+    let (title, lines) = if page == 0 {
+        (" What is this?  (1 of 2) ", concepts_page())
+    } else {
+        (" Keys and buttons  (2 of 2) ", keys_page())
+    };
+    ModalSpec {
+        title: title.into(),
         lines,
         color: ACCENT,
         width: 84,
-        height: 16,
-        buttons: vec![close_button()],
+        height: 22,
+        buttons: vec![confirm_button("Other page"), close_button()],
     }
+}
+
+fn concepts_page() -> Vec<Line<'static>> {
+    let term = |name: &'static str, meaning: &'static str| {
+        vec![
+            Line::from(Span::styled(name, Style::new().fg(ACCENT).bold())),
+            Line::from(format!("    {meaning}")),
+        ]
+    };
+    let mut lines: Vec<Line> = explain::WHAT_IS_A_SNAPSHOT
+        .split("\n\n")
+        .flat_map(|paragraph| [Line::from(paragraph.to_owned()), Line::from("")])
+        .collect();
+    lines.extend(term(
+        "Protected area (the list on the left)",
+        "A part of your disk that snapshots are kept for, such as System or Home.",
+    ));
+    lines.extend(term(
+        "Snapshot (the list on the right)",
+        "One saved moment of that area. Newest first.",
+    ));
+    lines.extend(term("Restore", explain::RESTORING));
+    lines
+}
+
+fn keys_page() -> Vec<Line<'static>> {
+    let rows = [
+        ("up/down  k/j", "Move in the list that is selected"),
+        ("left/right  Tab", "Switch between areas and snapshots"),
+        ("space", "Mark a snapshot (Delete can take several)"),
+        ("c", "Take a snapshot of the selected area now"),
+        ("a", "Take a snapshot of every protected area"),
+        ("d", "Delete marked snapshots for good (files untouched)"),
+        (
+            "u",
+            "Restore: go back to the selected snapshot (asks first)",
+        ),
+        ("p", "Protect: see what has no snapshots yet, and set it up"),
+        ("r", "Look again at which snapshots exist"),
+        ("q  Ctrl-C", "Close snapall (changes nothing)"),
+        (
+            "mouse",
+            "Click anything; hover a button to read what it does",
+        ),
+    ];
+    rows.iter()
+        .map(|(key, what)| {
+            Line::from(vec![
+                Span::styled(format!("{key:<20}"), Style::new().fg(ACCENT).bold()),
+                Span::raw(*what),
+            ])
+        })
+        .collect()
 }
 
 /// Where a prompt is and where each of its buttons is, for a terminal of this size.
@@ -692,7 +838,7 @@ fn render_file(state: &State, frame: &mut Frame, area: Rect) {
             area,
         ),
         Load::Loaded(list) if list.is_empty() => frame.render_widget(
-            Paragraph::new("no snapshots of this config yet. Press q to quit.")
+            Paragraph::new("no snapshots of this area yet. Press q to quit.")
                 .style(Style::new().fg(DIM))
                 .block(block),
             area,

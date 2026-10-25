@@ -42,7 +42,7 @@ fn program<'a>(commands: &'a [Command<'a>], date: &'a str) -> Program<'a> {
     Program {
         name: "snapall",
         version: VERSION,
-        about: "snapshot every snapper config in one command",
+        about: "snapshot every protected area in one command",
         commands,
         exit_status: &[
             ("0", "done"),

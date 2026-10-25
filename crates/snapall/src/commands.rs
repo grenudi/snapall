@@ -17,7 +17,7 @@ use snapall_core::{
 };
 
 use crate::output::{Outcome, Show};
-use crate::{advice, ask, boot_probe, render};
+use crate::{advice, ask, boot_probe, render, setup};
 
 /// What every command works with: the backend (already observed, so every operation is reported),
 /// how to show results, and whether tips are allowed.
@@ -196,6 +196,31 @@ fn suggest_the_boot_menu(ctx: &Context) {
     }
 }
 
+/// Protect the parts of the disk that snapshots do not cover yet: explain, ask, and do it. With
+/// `--json` nothing is said or asked, and nothing is changed unless `--yes` is given as well.
+pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Outcome {
+    let json = ctx.show.is_json();
+    let options = setup::Options {
+        area: area.map(str::to_owned),
+        yes,
+        dry_run: dry_run || (json && !yes),
+    };
+    let facts = setup::gather();
+    let report = if json {
+        setup::run(ctx.backend, &facts, &mut setup::Quiet, &options)?
+    } else {
+        setup::run(ctx.backend, &facts, &mut setup::Terminal, &options)?
+    };
+    if json {
+        ctx.show.json(&render::setup_json(&report))?;
+    }
+    Ok(if report.succeeded() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
+
 // ---- the terminal UI -------------------------------------------------------------------------
 
 /// Open the terminal UI, on every config or on one file.
@@ -241,6 +266,13 @@ fn file_target(
 /// not read the machine itself.
 fn ui_context(ctx: &Context, file: Option<snapall_tui::FileTarget>) -> snapall_tui::UiContext {
     let boot_menu = boot::assess(&boot_probe::system());
+    // What could be protected matters to the whole window, not to one file's history.
+    let facts = setup::gather();
+    let offers = if file.is_some() {
+        Vec::new()
+    } else {
+        setup::offers(ctx.backend, &facts)
+    };
     snapall_tui::UiContext {
         boot_tip: if ctx.hints {
             boot::hint(&boot_menu)
@@ -249,6 +281,9 @@ fn ui_context(ctx: &Context, file: Option<snapall_tui::FileTarget>) -> snapall_t
         },
         restore_route: boot::restore_route(&boot_menu),
         file,
+        protect_hint: setup::hint_for(&offers),
+        offers,
+        administrator: facts.is_root,
     }
 }
 

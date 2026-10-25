@@ -224,7 +224,9 @@ fn no_configs_is_explained_not_empty() {
     let mut session = Session::new(&backend);
 
     assert!(session.state.entries().is_empty());
-    assert!(matches!(&session.state.notice, Some(Notice::Error(t)) if t.contains("create-config")));
+    assert!(
+        matches!(&session.state.notice, Some(Notice::Error(t)) if t.contains("no protected areas") && !t.contains("create-config"))
+    );
     press(&mut session, &[Key::Char('c'), Key::Char('a')]);
     assert!(
         session.state.modal.is_none(),
@@ -245,14 +247,23 @@ fn reload_keeps_the_selection_by_name() {
 }
 
 #[test]
-fn quit_keys_quit_and_help_opens_and_closes_on_any_key() {
+fn quit_keys_quit_and_help_opens_turns_its_pages_and_closes_with_escape() {
     let backend = InMemoryBackend::with_configs(&["home"]);
     let mut session = Session::new(&backend);
     press(&mut session, &[Key::Char('?')]);
-    assert_eq!(session.state.modal, Some(Modal::Help));
+    assert_eq!(session.state.modal, Some(Modal::Help { page: 0 }));
+    // an unrelated key does nothing: help is two pages now, so it no longer closes on any key
     session.press(Key::Char('x'));
+    assert_eq!(session.state.modal, Some(Modal::Help { page: 0 }));
+    // Enter, Tab and the arrows turn the page, and turn back round after the last
+    session.press(Key::Enter);
+    assert_eq!(session.state.modal, Some(Modal::Help { page: 1 }));
+    session.press(Key::Tab);
+    assert_eq!(session.state.modal, Some(Modal::Help { page: 0 }));
+    session.press(Key::Right);
+    session.press(Key::Esc);
     assert!(session.state.modal.is_none());
-    assert!(!session.state.quit);
+    assert!(!session.state.quit, "closing the help does not quit");
 
     session.press(Key::Char('q'));
     assert!(session.state.quit);

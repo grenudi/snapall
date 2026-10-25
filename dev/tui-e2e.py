@@ -35,6 +35,7 @@ BINARY = sys.argv[1] if len(sys.argv) > 1 else "target/debug/snapall"
 
 KEYS = {
     "enter": b"\r",
+    "tab": b"\t",
     "esc": b"\x1b",
     "up": b"\x1b[A",
     "down": b"\x1b[B",
@@ -134,6 +135,11 @@ class Tui:
         col, row = self.find(needle, nth)
         self.click(col + offset, row)
 
+    def hover(self, col, row):
+        """Move the mouse over a cell (an xterm motion report: button code 35, no button held)."""
+        os.write(self.master, f"\x1b[<35;{col + 1};{row + 1}M".encode())
+        self.pump(0.3)
+
     def wheel(self, col, row, down=True):
         os.write(self.master, f"\x1b[<{65 if down else 64};{col + 1};{row + 1}M".encode())
         self.pump(0.3)
@@ -177,6 +183,56 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def protect_scenario():
+    """Protect a part of the disk from inside the window, on a real mounted Btrfs subvolume: the
+    way /home is mounted on a real machine, with no snapper config of its own."""
+    fixture = os.environ.get("SNAPALL_FIXTURE", "/tmp/snapall-fixture")
+    loop = subprocess.run(["losetup", "-j", f"{fixture}/disk.img"], capture_output=True, text=True).stdout.split(":")[0]
+    volume, area = f"{fixture}/mnt/notes-vol", f"{fixture}/notes"
+    subprocess.run(["btrfs", "subvolume", "create", volume], check=True, capture_output=True)
+    os.makedirs(area, exist_ok=True)
+    subprocess.run(["mount", "-o", "subvol=notes-vol", loop, area], check=True)
+    with open(f"{area}/letter.txt", "w") as f:
+        f.write("a file in a part of the disk with no snapshots\n")
+    try:
+        tui = Tui()
+        tui.wait_for("Snapshots of snapall_it_a (")
+        tui.wait_gone("working", timeout=5)  # a person waits for it to finish loading, too
+        tui.send("p")
+        tui.wait_for("Protect  (1 of")
+        # the fixture's own mount is offered too: go round with Tab until it is the one we want
+        for _ in range(4):
+            if "Protect Notes" in tui.text():
+                break
+            tui.send("tab")
+            tui.pump(0.3)
+        screen = tui.text()
+        if "Protect Notes" not in screen:
+            print("--- the screen when the offer was not found ---\n" + screen + "\n-----------------------------------------------")
+        check("Protect Notes" in screen, "the window offers to protect the new part of the disk by name")
+        for must in ("It holds whatever is kept in", "does not copy, move or change any of your files", "never on a schedule"):
+            check(must in screen, f"the offer says: {must}")
+        check("[ Enter: Protect it ]" in screen and "[ Tab: Next ]" in screen, "its buttons are shown")
+        tui.hover(*tui.find("[ Enter: Protect it ]"))
+        tui.wait_for("Set this part of the disk up for snapshots (nothing is copied or moved)")
+        check(True, "hovering Protect it explains what it will do")
+        tui.send("enter")
+        tui.wait_for("Notes (")
+        tui.wait_for("is protected now", timeout=10)
+        check(True, "it confirms in plain words and the confirmation survives the reload")
+        configs = snapper("--jsonout", "list-configs")
+        check(f"{fixture}/notes" in configs, "snapper really has the new area")
+        timeline = [l for l in snapper("-c", "notes", "get-config").splitlines() if "TIMELINE_CREATE" in l][0]
+        check("no" in timeline, "snapshots on a schedule are off for it")
+        check(os.path.exists(f"{area}/.snapshots") and open(f"{area}/letter.txt").read().startswith("a file"), "the hidden folder exists and the file is untouched")
+        tui.send("q")
+        tui.finish()
+    finally:
+        subprocess.run(["snapper", "--no-dbus", "-c", "notes", "delete-config"], capture_output=True)
+        subprocess.run(["umount", area], capture_output=True)
+        subprocess.run(["btrfs", "subvolume", "delete", volume], capture_output=True)
+
+
 def main():
     # Ground truth we control: two snapshots in config a.
     snapper("-c", "snapall_it_a", "create", "--description", "seed one")
@@ -217,7 +273,7 @@ def main():
     # --- snapshot every config ----------------------------------------------------------
     tui.send("left")
     tui.send("a")
-    tui.wait_for("ALL configs")
+    tui.wait_for("ALL protected areas")
     tui.send("enter")  # empty description -> default
     tui.wait_for("created")
     check("snapall" in listing("snapall_it_a").values(), "config a got the default-described snapshot")
@@ -231,7 +287,7 @@ def main():
     # --- disposability: a termination signal must leave the terminal usable ---------------
     for sig, status in ((signal.SIGTERM, 143), (signal.SIGHUP, 129), (signal.SIGINT, 130)):
         tui = Tui()
-        tui.wait_for("Configs")
+        tui.wait_for("Protected areas")
         code = tui.stop_with(sig)
         name = signal.Signals(sig).name
         check(code == status, f"{name} exits with status {status} (128 + signal), got {code}")
@@ -263,9 +319,10 @@ def main():
     # The operation takes two seconds. The screen must answer within a fraction of that.
     asked = time.time()
     tui.send("?")
-    tui.wait_for("Keys", timeout=1.0)
+    tui.wait_for("What is this?", timeout=1.0)
     check(time.time() - asked < 1.5 and tui.process.poll() is None, "the UI answers a key while snapper is busy (help opened)")
-    tui.send("x")  # any key closes help
+    tui.send("\x1b")  # Esc closes the help
+    tui.wait_gone("What is this?", timeout=2)
 
     tui.send("c")
     tui.wait_for("busy: wait for the current operation")
@@ -297,7 +354,7 @@ def main():
 
     # --- the mouse -----------------------------------------------------------------------------
     tui = Tui()
-    tui.wait_for("Configs")
+    tui.wait_for("Protected areas")
     check(b"\x1b[?1000h" in tui.raw, "mouse capture is switched on while the UI runs")
 
     # A click on a config in the list selects it (the first occurrence is the list, not a title).
@@ -314,11 +371,23 @@ def main():
 
     # A click on a footer button does what its key does: "?" opens the help, any click closes it.
     tui.click_text("? help", offset=0)
-    tui.wait_for("Keys")
-    check("mouse" in tui.text(), "the help explains the mouse")
+    tui.wait_for("What is this?")
+    check("saved moment" in tui.text(), "the help starts by saying what a snapshot is")
+    tui.click_text("[ Enter: Other page ]", offset=4)
+    tui.wait_for("Keys and buttons")
+    check("hover a button to read what it does" in tui.text(), "page two explains the keys and the mouse")
     tui.click_text("[ Esc: Close ]", offset=3)
-    tui.wait_gone("Keys")
+    tui.wait_gone("Keys and buttons")
     check(True, "the prompt's Close button closes it")
+
+    # Hovering a button (a real motion report) says in plain words what it does; leaving clears it.
+    col, row = tui.find("d delete")
+    tui.hover(col + 2, row)
+    tui.wait_for("Delete the marked snapshots for good. Your files are not touched")
+    check(True, "hovering a button explains it")
+    tui.hover(2, 5)
+    tui.wait_gone("for good. Your files are not touched")
+    check(True, "moving away clears the explanation")
 
     # "q quit" quits, and gives the mouse back.
     tui.click_text("q quit", offset=0)
@@ -344,7 +413,7 @@ def main():
     open(added, "w").write("new")
 
     tui = Tui()
-    tui.wait_for("Configs")
+    tui.wait_for("Protected areas")
     tui.wait_for(cfg)
     tui.click_text(cfg, offset=2)
     tui.wait_for(f"Snapshots of {cfg}")
@@ -385,7 +454,7 @@ def main():
     tui.wait_for("e2e file two")
     screen = tui.text()
     check(doc in screen, "the header names the file")
-    check("Configs" not in screen, "there is no configs pane when opened on a file")
+    check("Protected areas" not in screen, "there is no areas pane when opened on a file")
     check(screen.count("differs from now") >= 2, "both snapshots say the file differs from now")
     check(screen.find("e2e file two") < screen.find("e2e file one"), "newest first")
     check(b"\x1b[?1000h" in tui.raw, "the mouse is captured on the file screen too")
@@ -414,7 +483,9 @@ def main():
 
     # a file no config covers is an error before the terminal is taken over
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
-    check(refused.returncode == 1 and "no snapper config covers" in refused.stderr, "a file no config covers is refused with the reason")
+    check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
+
+    protect_scenario()
 
     print("\nTUI end-to-end: all checks passed")
 

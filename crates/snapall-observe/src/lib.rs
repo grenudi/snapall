@@ -18,8 +18,8 @@ mod lines;
 use std::time::Instant;
 
 use snapall_core::{
-    BackendError, Change, ConfigName, Description, Event, FileVersion, Observer, RestoreSummary,
-    SnapshotBackend, SnapshotId, SnapshotInfo,
+    BackendError, Change, ConfigName, ConfigOption, Description, Event, FileVersion, Observer,
+    RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
 pub use clock::rfc3339_utc;
@@ -35,6 +35,26 @@ pub struct Observed<B, O> {
 impl<B, O> Observed<B, O> {
     pub fn new(inner: B, observer: O) -> Self {
         Self { inner, observer }
+    }
+}
+
+impl<B, O: Observer> Observed<B, O> {
+    /// Run a change to a config and report it, with how long it took and how it ended.
+    fn audited(
+        &self,
+        config: &ConfigName,
+        change: String,
+        operation: impl FnOnce() -> Result<(), BackendError>,
+    ) -> Result<(), BackendError> {
+        let start = Instant::now();
+        let result = operation();
+        self.observer.observe(&Event::ConfigChanged {
+            config: config.clone(),
+            change,
+            result: result.as_ref().copied().map_err(ToString::to_string),
+            took: start.elapsed(),
+        });
+        result
     }
 }
 
@@ -103,6 +123,28 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
     // Reading where a config lives and what changed is not an event; only the mutation is.
     fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
         self.inner.config_subvolume(config)
+    }
+
+    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
+        self.audited(name, format!("created for {subvolume}"), || {
+            self.inner.create_config(name, subvolume)
+        })
+    }
+
+    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
+        self.audited(name, "removed".to_owned(), || {
+            self.inner.delete_config(name)
+        })
+    }
+
+    fn set_config_option(
+        &self,
+        name: &ConfigName,
+        option: ConfigOption,
+    ) -> Result<(), BackendError> {
+        self.audited(name, option.describe(), || {
+            self.inner.set_config_option(name, option)
+        })
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
@@ -293,5 +335,35 @@ mod tests {
             .undo_changes(&name("home"), nowhere, None)
             .unwrap_err();
         assert!(recorder.0.borrow().last().unwrap().is_failure());
+    }
+
+    #[test]
+    fn setting_an_area_up_is_an_audited_event_for_each_step_and_for_a_failure() {
+        let recorder = Recorder::default();
+        let backend = Observed::new(InMemoryBackend::with_configs(&["root"]), &recorder);
+        let home = name("home");
+        backend.create_config(&home, "/home").unwrap();
+        backend
+            .set_config_option(&home, snapall_core::ConfigOption::TimelineCreate(false))
+            .unwrap();
+        backend.create_config(&home, "/home").unwrap_err(); // already exists
+        let events = recorder.0.borrow();
+        let changes: Vec<(&str, bool)> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::ConfigChanged { change, result, .. } => {
+                    Some((change.as_str(), result.is_ok()))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            changes,
+            [
+                ("created for /home", true),
+                ("snapshots on a schedule: off", true),
+                ("created for /home", false)
+            ]
+        );
     }
 }

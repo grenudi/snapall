@@ -33,7 +33,7 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
     let subvolumes = match &configs {
         Some(Ok(names)) => names
             .iter()
-            .filter_map(|name| backend.config_subvolume(name).ok())
+            .filter_map(|name| Some((name.clone(), backend.config_subvolume(name).ok()?)))
             .collect(),
         _ => Vec::new(),
     };
@@ -82,7 +82,7 @@ fn snapper_version() -> Result<String, String> {
 }
 
 /// The effective uid from the text of `/proc/self/status` (`Uid: real effective saved fs`).
-fn effective_uid(status: &str) -> Option<u32> {
+pub(crate) fn effective_uid(status: &str) -> Option<u32> {
     status
         .lines()
         .find_map(|line| line.strip_prefix("Uid:"))
@@ -208,33 +208,47 @@ fn boot_menu_check() -> Option<Check> {
     })
 }
 
-/// Is the user's own data left out of every snapshot? A snapshot stops at a subvolume boundary, so
-/// with `/home` as a separate Btrfs subvolume (as on Arch and CachyOS) the config for `/` holds none
-/// of it. A warning, never a failure: nothing is broken, a part of the system is just not protected.
-fn home_check(probe: &Probe) -> Option<Check> {
+/// Is any part of the disk where a mistake could not be undone left without snapshots? Nothing is
+/// broken, so this is a warning and never a failure; it says what is left out in plain words and
+/// points at the one command that sets it up and explains it.
+fn protection_check(probe: &Probe) -> Option<Check> {
     if !matches!(probe.configs, Some(Ok(_))) {
         return None;
     }
     let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").ok()?;
-    let point = coverage::uncovered_home(
+    let areas = coverage::areas(
         &coverage::mounts_from_mountinfo(&mountinfo),
         &probe.subvolumes,
-    )?;
+    );
+    let gaps = coverage::gaps(&areas);
+    if gaps.is_empty() {
+        return None;
+    }
+    let detail = gaps
+        .iter()
+        .map(|area| {
+            let info = coverage::describe(&area.mount_point);
+            format!(
+                "{} ({}) is not protected: {}",
+                info.title, area.mount_point, info.reason
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n      ");
     Some(Check {
-        name: "home",
+        name: "protection",
         status: Status::Warn,
-        detail: format!(
-            "{point} is a separate Btrfs subvolume that no snapper config covers: snapshots of your other configs do not contain your files"
+        detail,
+        fix: Some(
+            "run `sudo snapall setup`: it explains what protecting means and does it for you"
+                .into(),
         ),
-        fix: Some(format!(
-            "sudo snapper -c home create-config {point}\n      sudo snapper -c home set-config TIMELINE_CREATE=no   (so only snapall makes its snapshots)\n      snapall then snapshots it together with the rest"
-        )),
     })
 }
 
 fn emit_report(probe: &Probe, json: bool) -> Result<(), Box<dyn Error>> {
     let mut checks = diagnose(probe);
-    checks.extend(home_check(probe));
+    checks.extend(protection_check(probe));
     checks.extend(boot_menu_check());
     if json {
         emit_json(&render::doctor_json(&probe.os, &checks))

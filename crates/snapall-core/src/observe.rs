@@ -48,6 +48,15 @@ pub enum Event {
         result: Result<RestoreSummary, String>,
         took: Duration,
     },
+    /// An area of the disk was set up for snapshots, changed or removed: it changes how the whole
+    /// system is protected, so it is always an audit line.
+    ConfigChanged {
+        config: ConfigName,
+        /// What was done, in words: `created for /home`, `removed`, a setting.
+        change: String,
+        result: Result<(), String>,
+        took: Duration,
+    },
     /// A privileged command run by `snapall doctor --install`: worth an audit line.
     InstallStepRun {
         command: String,
@@ -65,6 +74,7 @@ impl Event {
             Event::SnapshotCreated { .. } => "snapshot_created",
             Event::SnapshotDeleted { .. } => "snapshot_deleted",
             Event::ChangesUndone { .. } => "changes_undone",
+            Event::ConfigChanged { .. } => "config_changed",
             Event::InstallStepRun { .. } => "install_step_run",
         }
     }
@@ -77,6 +87,7 @@ impl Event {
             | Event::SnapshotCreated { took, .. }
             | Event::SnapshotDeleted { took, .. }
             | Event::ChangesUndone { took, .. }
+            | Event::ConfigChanged { took, .. }
             | Event::InstallStepRun { took, .. } => *took,
         }
     }
@@ -88,9 +99,9 @@ impl Event {
                 result.as_ref().err()
             }
             Event::SnapshotCreated { result, .. } => result.as_ref().err(),
-            Event::SnapshotDeleted { result, .. } | Event::InstallStepRun { result, .. } => {
-                result.as_ref().err()
-            }
+            Event::SnapshotDeleted { result, .. }
+            | Event::ConfigChanged { result, .. }
+            | Event::InstallStepRun { result, .. } => result.as_ref().err(),
             Event::ChangesUndone { result, .. } => result.as_ref().err(),
         };
         error.map(String::as_str)
@@ -106,7 +117,8 @@ impl Event {
             Event::SnapshotsListed { config, .. }
             | Event::SnapshotCreated { config, .. }
             | Event::SnapshotDeleted { config, .. }
-            | Event::ChangesUndone { config, .. } => Some(config),
+            | Event::ChangesUndone { config, .. }
+            | Event::ConfigChanged { config, .. } => Some(config),
             Event::ConfigsListed { .. } | Event::InstallStepRun { .. } => None,
         }
     }
@@ -195,6 +207,12 @@ mod tests {
             Event::SnapshotDeleted {
                 config: name("a"),
                 id: SnapshotId::new(1).unwrap(),
+                result: Ok(()),
+                took: d,
+            },
+            Event::ConfigChanged {
+                config: name("a"),
+                change: String::new(),
                 result: Ok(()),
                 took: d,
             },

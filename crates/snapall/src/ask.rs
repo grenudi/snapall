@@ -24,3 +24,18 @@ pub fn yes_no(question: &str) -> Result<bool, Box<dyn Error>> {
         "y" | "yes"
     ))
 }
+
+/// Like [`yes_no`], but Enter alone means `default`, and the prompt shows which: for questions where
+/// one answer is the one snapall recommends.
+pub fn confirm(question: &str, default: bool) -> Result<bool, Box<dyn Error>> {
+    let hint = if default { "[Y/n]" } else { "[y/N]" };
+    eprint!("{question} {hint} ");
+    io::stderr().flush()?;
+    let mut answer = String::new();
+    io::stdin().lock().read_line(&mut answer)?;
+    Ok(match answer.trim().to_ascii_lowercase().as_str() {
+        "y" | "yes" => true,
+        "n" | "no" => false,
+        _ => default,
+    })
+}

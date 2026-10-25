@@ -279,7 +279,7 @@ pub struct Probe {
     /// The configs snapper reports, or why asking failed. `None` when snapper is missing.
     pub configs: Option<Result<Vec<ConfigName>, String>>,
     /// The subvolume of each config (where it is mounted), for what the configs do not cover.
-    pub subvolumes: Vec<String>,
+    pub subvolumes: Vec<(ConfigName, String)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

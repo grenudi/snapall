@@ -53,6 +53,7 @@ fn open<'a>(backend: &'a InMemoryBackend, path: &str, config: &str) -> Session<'
             path: path.to_owned(),
             config: ConfigName::parse(config).unwrap(),
         }),
+        ..UiContext::default()
     };
     Session::with_context(backend, context)
 }
@@ -97,7 +98,7 @@ fn it_opens_on_the_file_and_says_how_each_snapshot_compares_with_it() {
     assert!(text.contains("history of /mnt/home/notes.txt"), "{text}");
     assert!(text.contains("notes.txt in home"), "{text}");
     assert!(
-        !text.contains("Configs"),
+        !text.contains("Protected areas"),
         "there is no configs pane when opened on a file:\n{text}"
     );
     // newest first, each with the words for how it compares
@@ -355,7 +356,7 @@ fn a_file_no_config_covers_shows_the_reason_on_the_screen() {
 fn q_quits_and_a_file_with_no_snapshots_says_so() {
     let backend = InMemoryBackend::with_configs(&["home"]);
     let mut session = open(&backend, FILE, "home");
-    assert!(screen(&session).contains("no snapshots of this config yet"));
+    assert!(screen(&session).contains("no snapshots of this area yet"));
     session.press(Key::Char('q'));
     assert!(session.state.quit);
 }
