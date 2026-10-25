@@ -406,3 +406,29 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # The repository formats against real tools, on the real packages of the two newest releases. The
+  # workflow that publishes them (repos.yml) runs after a release; this keeps the formats honest on
+  # every change.
+  repositories:
+    name: Repository formats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends apt-utils createrepo-c gnupg rpm python3
+      - name: The packages of the two newest releases
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash packaging/test/fetch-release-packages.sh pkgs 2
+      - name: apt, against real apt (installs, upgrades; refuses a tampered package, a wrong key, edited metadata)
+        run: |
+          older="$(ls pkgs/*_amd64.deb | sort -V | head -n1)"
+          newer="$(ls pkgs/*_amd64.deb | sort -V | tail -n1)"
+          sudo bash packaging/test/repo-apt.sh "$older" "$newer"
+      - name: rpm (layout, signed metadata, checksums in the signed metadata)
+        run: bash packaging/test/repo-rpm.sh pkgs/*.rpm
+      - name: The signing path (key wrapper, build, the pre-deploy check and what it must refuse)
+        run: bash packaging/test/repo-signing.sh pkgs/*.deb pkgs/*.rpm
