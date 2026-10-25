@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.9.0]
+
+
+### Features
+- Snapall sets up protection itself and explains every step ([#31](https://github.com/grenudi/snapall/pull/31)) ([4c09b39])
+
+
+### Testing
+- The real-Btrfs tests take turns and clean up after themselves ([#32](https://github.com/grenudi/snapall/pull/32)) ([b20a6ce])
+
+
+
 ## [0.8.0]
 
 
