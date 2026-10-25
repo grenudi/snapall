@@ -12,8 +12,8 @@ use std::process::ExitCode;
 use snapall_core::boot;
 use snapall_core::{
     all_snapshots, config_covering, delete_snapshot, file_history, plan_snapshots, preview_restore,
-    restore_snapshot, run_plan, snapshots_of, ConfigName, Description, Preview, RestoreError,
-    SnapshotBackend, SnapshotId,
+    restore_snapshot, run_plan, snapshots_of, ConfigName, Description, Point, Preview,
+    RestoreError, SnapshotBackend, SnapshotId,
 };
 
 use crate::output::{Outcome, Show};
@@ -76,7 +76,9 @@ pub fn create(
             render::dry_run_json(&plan, description),
         );
     }
-    let report = run_plan(ctx.backend, &plan, description);
+    // every snapshot of this one action is the same restore point
+    let point = Point::at(unix_now());
+    let report = run_plan(ctx.backend, &plan, description, Some(&point));
     ctx.show
         .result(render::report(&report), render::report_json(&report))?;
     if !report.is_success() {
@@ -311,4 +313,11 @@ fn absolute(path: &str) -> Result<String, Box<dyn Error>> {
         .to_str()
         .map(str::to_owned)
         .ok_or_else(|| "a path must be valid UTF-8".into())
+}
+
+/// Seconds since 1970, which is what names a restore point after the moment an action started.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
 }

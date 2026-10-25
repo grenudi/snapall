@@ -12,7 +12,7 @@
 use snapall_core::testing::backend_contract;
 use snapall_core::{
     config_covering, file_history, preview_restore, protect_area, restore_snapshot, snapshot_all,
-    ChangeKind, ConfigName, Description, FileState, HistoryError, RestoreError, SetupError,
+    ChangeKind, ConfigName, Description, FileState, HistoryError, Point, RestoreError, SetupError,
     SnapshotBackend,
 };
 use snapall_snapper::SnapperCli;
@@ -90,10 +90,13 @@ fn snapshot_all_covers_every_fixture_config() {
         return;
     }
     let _turn = take_turns();
+    let backend = backend();
+    let point = Point::parse("itpoint-snapshot-all").unwrap();
     let report = snapshot_all(
-        &backend(),
+        &backend,
         None,
         &Description::parse("it: snapshot_all").unwrap(),
+        Some(&point),
     )
     .expect("plan and run");
     // Other configs may exist on the machine; assert on the fixture's own.
@@ -104,7 +107,30 @@ fn snapshot_all_covers_every_fixture_config() {
             .find(|o| o.config.as_str() == name)
             .unwrap_or_else(|| panic!("{name} missing from {report:?}"));
         assert!(outcome.result.is_ok(), "{name}: {:?}", outcome.result);
+        // the tag went in with the snapshot and comes back out of real snapper's listing
+        let id = outcome.result.as_ref().copied().unwrap();
+        let listed = backend.list_snapshots(&outcome.config).unwrap();
+        let snapshot = listed
+            .iter()
+            .find(|s| s.id == id)
+            .expect("the new snapshot is listed");
+        assert_eq!(
+            snapshot.point.as_ref(),
+            Some(&point),
+            "{name}: the restore point round-trips"
+        );
     }
+    // a snapshot taken without a point carries none
+    let plain = backend
+        .create_snapshot(
+            &ConfigName::parse("snapall_it_a").unwrap(),
+            &Description::parse("it: untagged").unwrap(),
+        )
+        .unwrap();
+    let listed = backend
+        .list_snapshots(&ConfigName::parse("snapall_it_a").unwrap())
+        .unwrap();
+    assert_eq!(listed.iter().find(|s| s.id == plain).unwrap().point, None);
 }
 
 /// The whole restore round trip on real Btrfs with real snapper: what the preview says, what the

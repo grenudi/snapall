@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 use crate::domain::{
-    Change, ConfigName, ConfigOption, Description, FileVersion, RestoreSummary, SnapshotId,
+    Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, SnapshotId,
     SnapshotInfo,
 };
 use crate::plan::{plan, Plan, PlanError};
@@ -55,13 +55,23 @@ pub fn plan_snapshots(
 
 /// Execute a plan. One failing config does not stop the others: every config gets its
 /// attempt and the caller sees every outcome.
-pub fn run_plan(backend: &dyn SnapshotBackend, plan: &Plan, description: &Description) -> Report {
+pub fn run_plan(
+    backend: &dyn SnapshotBackend,
+    plan: &Plan,
+    description: &Description,
+    point: Option<&Point>,
+) -> Report {
     let outcomes = plan
         .targets()
         .iter()
         .map(|config| Outcome {
             config: config.clone(),
-            result: backend.create_snapshot(config, description),
+            // every snapshot of one action carries the same restore point, so they can be found
+            // together again and put back with one action
+            result: match point {
+                Some(point) => backend.create_snapshot_in(config, description, point),
+                None => backend.create_snapshot(config, description),
+            },
         })
         .collect();
     Report { outcomes }
@@ -71,9 +81,10 @@ pub fn snapshot_all(
     backend: &dyn SnapshotBackend,
     only: Option<&[ConfigName]>,
     description: &Description,
+    point: Option<&Point>,
 ) -> Result<Report, SnapshotError> {
     let plan = plan_snapshots(backend, only)?;
-    Ok(run_plan(backend, &plan, description))
+    Ok(run_plan(backend, &plan, description, point))
 }
 
 /// Fail fast, with our own message, when `config` is not one the backend manages.
@@ -472,7 +483,7 @@ mod tests {
     #[test]
     fn snapshots_every_config_by_default() {
         let backend = InMemoryBackend::with_configs(&["root", "home"]);
-        let report = snapshot_all(&backend, None, &desc()).unwrap();
+        let report = snapshot_all(&backend, None, &desc(), None).unwrap();
         assert!(report.is_success());
         assert_eq!(report.outcomes.len(), 2);
         assert_eq!(backend.snapshots().len(), 2);
@@ -482,7 +493,7 @@ mod tests {
     fn only_restricts_the_targets() {
         let backend = InMemoryBackend::with_configs(&["root", "home"]);
         let only = [ConfigName::parse("home").unwrap()];
-        let report = snapshot_all(&backend, Some(&only), &desc()).unwrap();
+        let report = snapshot_all(&backend, Some(&only), &desc(), None).unwrap();
         assert_eq!(report.outcomes.len(), 1);
         assert_eq!(backend.snapshots()[0].0.as_str(), "home");
     }
@@ -490,7 +501,7 @@ mod tests {
     #[test]
     fn one_failure_does_not_stop_the_rest_and_is_reported() {
         let backend = InMemoryBackend::with_configs(&["root", "home"]).failing_on("home");
-        let report = snapshot_all(&backend, None, &desc()).unwrap();
+        let report = snapshot_all(&backend, None, &desc(), None).unwrap();
         assert_eq!(report.outcomes.len(), 2);
         assert_eq!(report.failures(), 1);
         assert!(!report.is_success());
@@ -509,7 +520,7 @@ mod tests {
     fn a_backend_without_configs_is_a_plan_error() {
         let backend = InMemoryBackend::with_configs(&[]);
         assert!(matches!(
-            snapshot_all(&backend, None, &desc()),
+            snapshot_all(&backend, None, &desc(), None),
             Err(SnapshotError::Plan(PlanError::NoConfigs))
         ));
     }
@@ -517,7 +528,7 @@ mod tests {
     #[test]
     fn listing_and_deleting_go_through_the_use_cases() {
         let backend = InMemoryBackend::with_configs(&["root", "home"]);
-        snapshot_all(&backend, None, &desc()).unwrap();
+        snapshot_all(&backend, None, &desc(), None).unwrap();
         let root = ConfigName::parse("root").unwrap();
 
         let listed = snapshots_of(&backend, &root).unwrap();

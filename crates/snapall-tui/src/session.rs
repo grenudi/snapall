@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 
 use snapall_core::{
     delete_snapshot, file_versions_of, plan_snapshots, preview_restore, protect_area,
-    restore_snapshot, run_plan, snapshots_of, SnapshotBackend, SnapshotError,
+    restore_snapshot, run_plan, snapshots_of, Point, SnapshotBackend, SnapshotError,
 };
 
 use crate::model::{update, Effect, Key, Msg, State, UiContext};
@@ -48,11 +48,14 @@ impl<'a> Executor<'a> {
             } => {
                 let planned = plan_snapshots(backend, Some(&targets));
                 Msg::Created(match planned {
-                    Ok(plan) => run_plan(backend, &plan, &description)
-                        .outcomes
-                        .into_iter()
-                        .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
-                        .collect(),
+                    // all the snapshots of this one action are one restore point
+                    Ok(plan) => {
+                        run_plan(backend, &plan, &description, Some(&Point::at(unix_now())))
+                            .outcomes
+                            .into_iter()
+                            .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
+                            .collect()
+                    }
                     Err(error) => {
                         let message = describe(&error);
                         targets
@@ -148,4 +151,11 @@ impl<'a> Session<'a> {
             }
         }
     }
+}
+
+/// Seconds since 1970, which is what names a restore point after the moment an action started.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
 }

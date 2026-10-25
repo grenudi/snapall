@@ -25,6 +25,48 @@ pub enum ParseError {
     DescriptionControlChar,
     #[error("`{0}` is not a snapshot number")]
     InvalidSnapshotId(String),
+    #[error("`{0}` is not a valid restore point name")]
+    InvalidPoint(String),
+}
+
+/// A restore point: the snapshots that one action took together, one in every area. Restoring a point
+/// puts every area back to how it was at that moment with a single action.
+///
+/// It is a short name made of letters, digits, `-` and `_` (snapall uses the time it was taken, such
+/// as `20261025T181500Z`), so it can sit in a snapshot's tag and in a command line unquoted.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Point(String);
+
+impl Point {
+    pub const MAX_LEN: usize = 64;
+
+    pub fn parse(input: &str) -> Result<Self, ParseError> {
+        let ok = !input.is_empty()
+            && input.len() <= Self::MAX_LEN
+            && input
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+        if ok {
+            Ok(Self(input.to_owned()))
+        } else {
+            Err(ParseError::InvalidPoint(input.to_owned()))
+        }
+    }
+
+    /// The point named for the moment `seconds` (since 1970, UTC) that one action started.
+    pub fn at(seconds: u64) -> Self {
+        Self(crate::calendar::compact_utc(seconds))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 /// The name of a snapper config (`root`, `home`, ...).
@@ -168,6 +210,8 @@ pub struct SnapshotInfo {
     /// Free text stored with the snapshot. Not a `Description`: it may have been written by
     /// anything, so it is shown, never trusted.
     pub description: String,
+    /// The restore point it belongs to, if one action made it together with snapshots of other areas.
+    pub point: Option<Point>,
 }
 
 /// How one path differs between a snapshot and the live system now.

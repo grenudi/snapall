@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn report_lists_successes_and_failures_aligned() {
         let backend = InMemoryBackend::with_configs(&["root", "home"]).failing_on("home");
-        let r = snapshot_all(&backend, None, &Description::default()).unwrap();
+        let r = snapshot_all(&backend, None, &Description::default(), None).unwrap();
         assert_eq!(
             report(&r),
             "FAIL  home  `in-memory` failed (injected failure): snapshot of home refused\nok    root  #1\n"

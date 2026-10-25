@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use snapall_core::{
     BackendError, Change, ConfigName, ConfigOption, Description, Event, FileVersion, Observer,
-    RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo,
+    Point, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
 pub use clock::rfc3339_utc;
@@ -39,6 +39,23 @@ impl<B, O> Observed<B, O> {
 }
 
 impl<B, O: Observer> Observed<B, O> {
+    fn created(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: Option<&Point>,
+        result: &Result<SnapshotId, BackendError>,
+        start: Instant,
+    ) {
+        self.observer.observe(&Event::SnapshotCreated {
+            config: config.clone(),
+            description: description.as_str().to_owned(),
+            point: point.map(ToString::to_string),
+            result: result.as_ref().copied().map_err(ToString::to_string),
+            took: start.elapsed(),
+        });
+    }
+
     /// Run a change to a config and report it, with how long it took and how it ended.
     fn audited(
         &self,
@@ -88,12 +105,19 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
     ) -> Result<SnapshotId, BackendError> {
         let start = Instant::now();
         let result = self.inner.create_snapshot(config, description);
-        self.observer.observe(&Event::SnapshotCreated {
-            config: config.clone(),
-            description: description.as_str().to_owned(),
-            result: result.as_ref().map(|id| *id).map_err(ToString::to_string),
-            took: start.elapsed(),
-        });
+        self.created(config, description, None, &result, start);
+        result
+    }
+
+    fn create_snapshot_in(
+        &self,
+        config: &ConfigName,
+        description: &Description,
+        point: &Point,
+    ) -> Result<SnapshotId, BackendError> {
+        let start = Instant::now();
+        let result = self.inner.create_snapshot_in(config, description, point);
+        self.created(config, description, Some(point), &result, start);
         result
     }
 
