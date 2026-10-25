@@ -12,7 +12,7 @@ use ratatui::widgets::{
     TableState, Wrap,
 };
 use ratatui::Frame;
-use snapall_core::{ChangeKind, FileState, SnapshotInfo, SnapshotKind};
+use snapall_core::{ChangeKind, ConfigName, FileState, SnapshotId, SnapshotInfo, SnapshotKind};
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
 
@@ -369,147 +369,228 @@ fn restore_counts(changes: &[snapall_core::Change]) -> (usize, usize, usize) {
     )
 }
 
+fn confirm_button(label: &str) -> (Button, String) {
+    (Button::Confirm, format!("Enter: {label}"))
+}
+
+fn cancel_button() -> (Button, String) {
+    (Button::Cancel, "Esc: Cancel".to_owned())
+}
+
+fn close_button() -> (Button, String) {
+    (Button::Cancel, "Esc: Close".to_owned())
+}
+
 fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
-    let confirm = |label: &str| (Button::Confirm, format!("Enter: {label}"));
-    let cancel = (Button::Cancel, "Esc: Cancel".to_owned());
     match modal {
-        Modal::Describe { target, input, error } => {
-            let title = match target {
-                Target::One(config) => format!(" New snapshot of {config} "),
-                Target::All => {
-                    let names: Vec<String> =
-                        state.entries().iter().map(|e| e.name.to_string()).collect();
-                    format!(" New snapshot of ALL configs ({}) ", names.join(", "))
-                }
-            };
-            let mut lines = vec![
-                Line::from("Description (Enter alone uses \"snapall\"):"),
-                Line::from(vec![
-                    Span::styled(input.clone(), Style::new().bold()),
-                    Span::styled("_", Style::new().fg(ACCENT).add_modifier(Modifier::SLOW_BLINK)),
-                ]),
-                Line::from(""),
-            ];
-            if let Some(error) = error {
-                lines.push(Line::styled(error.clone(), Style::new().fg(Color::Red)));
-            }
-            ModalSpec { title, lines, color: ACCENT, width: 64, height: 9, buttons: vec![confirm("Create"), cancel] }
-        }
-        Modal::ConfirmDelete { config, ids } => {
-            let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
-            let lines = vec![
-                Line::from(format!("Delete {} snapshot(s) of {config}?", ids.len())),
-                Line::styled(list.join(", "), Style::new().bold()),
-                Line::from(""),
-                Line::styled("This cannot be undone.", Style::new().fg(Color::Yellow)),
-            ];
-            ModalSpec { title: " Delete ".into(), lines, color: Color::Red, width: 56, height: 9, buttons: vec![confirm("Delete"), cancel] }
-        }
+        Modal::Describe {
+            target,
+            input,
+            error,
+        } => describe_spec(target, input, error.as_deref(), state),
+        Modal::ConfirmDelete { config, ids } => delete_spec(config, ids),
         Modal::Restore {
             config,
             id,
             path,
             stage,
-        } => match stage {
-            RestoreStage::Loading => ModalSpec {
-                title: format!(" Restore {config} to #{id} "),
-                lines: vec![Line::styled("Looking at what would change...", Style::new().fg(DIM))],
-                color: Color::Yellow,
-                width: 72,
-                height: 8,
-                buttons: vec![cancel],
-            },
-            RestoreStage::Failed(error) => ModalSpec {
-                title: format!(" Restore {config} to #{id} "),
-                lines: vec![Line::styled(error.clone(), Style::new().fg(Color::Red))],
-                color: Color::Red,
-                width: 72,
-                height: 9,
-                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
-            },
-            RestoreStage::Ready(preview) if preview.is_system_root && path.is_none() => ModalSpec {
-                title: " Restoring the system itself ".into(),
-                lines: vec![
-                    Line::from(format!("{config} is the system root, so snapall will not put it back while it runs.")),
-                    Line::from(""),
-                    Line::from(state.context.restore_route.clone()),
-                ],
-                color: Color::Yellow,
-                width: 78,
-                height: 14,
-                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
-            },
-            RestoreStage::Ready(preview) if preview.changes.is_empty() => ModalSpec {
-                title: format!(" Restore {config} to #{id} "),
-                lines: vec![Line::from(format!("{config} already matches #{id}: there is nothing to restore."))],
-                color: ACCENT,
-                width: 72,
-                height: 8,
-                buttons: vec![(Button::Cancel, "Esc: Close".to_owned())],
-            },
-            RestoreStage::Ready(preview) => {
-                let (changed, added, removed) = restore_counts(&preview.changes);
-                let mut lines = vec![
-                    Line::from(format!(
-                        "Put {} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
-                        path.as_deref().unwrap_or(config.as_str())
-                    )),
-                    Line::from(""),
-                ];
-                for change in preview.changes.iter().take(6) {
-                    let verb = match change.kind {
-                        ChangeKind::Changed => "revert    ",
-                        ChangeKind::Added => "remove    ",
-                        ChangeKind::Removed => "bring back",
-                    };
-                    lines.push(Line::from(vec![
-                        Span::styled(verb, Style::new().fg(ACCENT)),
-                        Span::raw(format!(" {}", change.path)),
-                    ]));
-                }
-                if preview.changes.len() > 6 {
-                    lines.push(Line::styled(format!("... and {} more", preview.changes.len() - 6), Style::new().fg(DIM)));
-                }
-                lines.push(Line::from(""));
-                lines.push(Line::styled(
-                    "The current state is snapshotted first, so this can be undone.",
-                    Style::new().fg(Color::Yellow),
-                ));
-                ModalSpec {
-                    title: format!(" Restore {config} to #{id} "),
-                    lines,
-                    color: Color::Yellow,
-                    width: 78,
-                    height: 16,
-                    buttons: vec![confirm("Restore"), cancel],
-                }
-            }
-        },
-        Modal::Help => {
-            let rows = [
-                ("up/down  k/j", "move in the focused pane"),
-                ("left/right  h/l  Tab", "switch pane"),
-                ("Home/End  g/G", "first / last"),
-                ("space", "mark a snapshot, then move on"),
-                ("c", "create a snapshot of the selected config"),
-                ("a", "create a snapshot of every config"),
-                ("d", "delete the marked snapshots (or the one under the cursor)"),
-                ("u", "restore the config to the snapshot under the cursor"),
-                ("r", "reload from snapper"),
-                ("q  Ctrl-C", "quit"),
-                ("mouse", "click a row to select, the first column to mark, the wheel to scroll"),
-            ];
-            let lines: Vec<Line> = rows
-                .iter()
-                .map(|(key, what)| {
-                    Line::from(vec![
-                        Span::styled(format!("{key:<22}"), Style::new().fg(ACCENT).bold()),
-                        Span::raw(*what),
-                    ])
-                })
-                .collect();
-            ModalSpec { title: " Keys ".into(), lines, color: ACCENT, width: 84, height: 16, buttons: vec![(Button::Cancel, "Esc: Close".to_owned())] }
+        } => restore_spec(config, *id, path.as_deref(), stage, state),
+        Modal::Help => help_spec(),
+    }
+}
+
+/// The prompt for a new snapshot's description.
+fn describe_spec(target: &Target, input: &str, error: Option<&str>, state: &State) -> ModalSpec {
+    let title = match target {
+        Target::One(config) => format!(" New snapshot of {config} "),
+        Target::All => {
+            let names: Vec<String> = state.entries().iter().map(|e| e.name.to_string()).collect();
+            format!(" New snapshot of ALL configs ({}) ", names.join(", "))
         }
+    };
+    let mut lines = vec![
+        Line::from("Description (Enter alone uses \"snapall\"):"),
+        Line::from(vec![
+            Span::styled(input.to_owned(), Style::new().bold()),
+            Span::styled(
+                "_",
+                Style::new().fg(ACCENT).add_modifier(Modifier::SLOW_BLINK),
+            ),
+        ]),
+        Line::from(""),
+    ];
+    if let Some(error) = error {
+        lines.push(Line::styled(error.to_owned(), Style::new().fg(Color::Red)));
+    }
+    ModalSpec {
+        title,
+        lines,
+        color: ACCENT,
+        width: 64,
+        height: 9,
+        buttons: vec![confirm_button("Create"), cancel_button()],
+    }
+}
+
+fn delete_spec(config: &ConfigName, ids: &[SnapshotId]) -> ModalSpec {
+    let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
+    let lines = vec![
+        Line::from(format!("Delete {} snapshot(s) of {config}?", ids.len())),
+        Line::styled(list.join(", "), Style::new().bold()),
+        Line::from(""),
+        Line::styled("This cannot be undone.", Style::new().fg(Color::Yellow)),
+    ];
+    ModalSpec {
+        title: " Delete ".into(),
+        lines,
+        color: Color::Red,
+        width: 56,
+        height: 9,
+        buttons: vec![confirm_button("Delete"), cancel_button()],
+    }
+}
+
+/// The restore prompt: looking, failed, the system root (refused), nothing to restore, or ready.
+fn restore_spec(
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+    stage: &RestoreStage,
+    state: &State,
+) -> ModalSpec {
+    let title = format!(" Restore {config} to #{id} ");
+    match stage {
+        RestoreStage::Loading => ModalSpec {
+            title,
+            lines: vec![Line::styled(
+                "Looking at what would change...",
+                Style::new().fg(DIM),
+            )],
+            color: Color::Yellow,
+            width: 72,
+            height: 8,
+            buttons: vec![cancel_button()],
+        },
+        RestoreStage::Failed(error) => ModalSpec {
+            title,
+            lines: vec![Line::styled(error.clone(), Style::new().fg(Color::Red))],
+            color: Color::Red,
+            width: 72,
+            height: 9,
+            buttons: vec![close_button()],
+        },
+        RestoreStage::Ready(preview) if preview.is_system_root && path.is_none() => ModalSpec {
+            title: " Restoring the system itself ".into(),
+            lines: vec![
+                Line::from(format!(
+                    "{config} is the system root, so snapall will not put it back while it runs."
+                )),
+                Line::from(""),
+                Line::from(state.context.restore_route.clone()),
+            ],
+            color: Color::Yellow,
+            width: 78,
+            height: 14,
+            buttons: vec![close_button()],
+        },
+        RestoreStage::Ready(preview) if preview.changes.is_empty() => ModalSpec {
+            title,
+            lines: vec![Line::from(format!(
+                "{config} already matches #{id}: there is nothing to restore."
+            ))],
+            color: ACCENT,
+            width: 72,
+            height: 8,
+            buttons: vec![close_button()],
+        },
+        RestoreStage::Ready(preview) => ModalSpec {
+            title,
+            lines: restore_summary(config, id, path, &preview.changes),
+            color: Color::Yellow,
+            width: 78,
+            height: 16,
+            buttons: vec![confirm_button("Restore"), cancel_button()],
+        },
+    }
+}
+
+/// What a restore would do: the counts, the first few paths with a verb each, and the safety net.
+fn restore_summary(
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+    changes: &[snapall_core::Change],
+) -> Vec<Line<'static>> {
+    let (changed, added, removed) = restore_counts(changes);
+    let mut lines = vec![
+        Line::from(format!(
+            "Put {} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
+            path.unwrap_or(config.as_str())
+        )),
+        Line::from(""),
+    ];
+    for change in changes.iter().take(6) {
+        let verb = match change.kind {
+            ChangeKind::Changed => "revert    ",
+            ChangeKind::Added => "remove    ",
+            ChangeKind::Removed => "bring back",
+        };
+        lines.push(Line::from(vec![
+            Span::styled(verb, Style::new().fg(ACCENT)),
+            Span::raw(format!(" {}", change.path)),
+        ]));
+    }
+    if changes.len() > 6 {
+        lines.push(Line::styled(
+            format!("... and {} more", changes.len() - 6),
+            Style::new().fg(DIM),
+        ));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "The current state is snapshotted first, so this can be undone.",
+        Style::new().fg(Color::Yellow),
+    ));
+    lines
+}
+
+/// The key reference.
+fn help_spec() -> ModalSpec {
+    let rows = [
+        ("up/down  k/j", "move in the focused pane"),
+        ("left/right  h/l  Tab", "switch pane"),
+        ("Home/End  g/G", "first / last"),
+        ("space", "mark a snapshot, then move on"),
+        ("c", "create a snapshot of the selected config"),
+        ("a", "create a snapshot of every config"),
+        (
+            "d",
+            "delete the marked snapshots (or the one under the cursor)",
+        ),
+        ("u", "restore the config to the snapshot under the cursor"),
+        ("r", "reload from snapper"),
+        ("q  Ctrl-C", "quit"),
+        (
+            "mouse",
+            "click a row to select, the first column to mark, the wheel to scroll",
+        ),
+    ];
+    let lines: Vec<Line> = rows
+        .iter()
+        .map(|(key, what)| {
+            Line::from(vec![
+                Span::styled(format!("{key:<22}"), Style::new().fg(ACCENT).bold()),
+                Span::raw(*what),
+            ])
+        })
+        .collect();
+    ModalSpec {
+        title: " Keys ".into(),
+        lines,
+        color: ACCENT,
+        width: 84,
+        height: 16,
+        buttons: vec![close_button()],
     }
 }
 
