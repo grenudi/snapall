@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.7.2]
+
+
+### Features
+- Signed package repositories for apt, dnf, zypper and pacman ([#25](https://github.com/grenudi/snapall/pull/25)) ([4b45346])
+
+
+
 ## [0.7.1]
 
 
