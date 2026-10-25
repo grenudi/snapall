@@ -19,7 +19,8 @@ use snapall_core::doctor::{
 use snapall_core::{Event, Observer, SnapshotBackend};
 
 use crate::boot_probe;
-use crate::{emit, emit_json, render};
+use crate::output::{emit, emit_json};
+use crate::render;
 
 /// Gather the facts about this machine.
 pub fn probe(backend: &dyn SnapshotBackend) -> Probe {

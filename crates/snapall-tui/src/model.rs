@@ -472,122 +472,159 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
     }
 }
 
+/// What a prompt becomes after a key, and the work that key starts.
+struct Reaction {
+    /// The prompt as it now is, or `None` if it closes.
+    modal: Option<Modal>,
+    effects: Vec<Effect>,
+}
+
+impl Reaction {
+    /// The prompt stays open, as given (possibly changed by the key).
+    fn stays(modal: Modal) -> Self {
+        Self {
+            modal: Some(modal),
+            effects: Vec::new(),
+        }
+    }
+
+    fn closes() -> Self {
+        Self {
+            modal: None,
+            effects: Vec::new(),
+        }
+    }
+
+    /// The prompt is answered: it closes and the work it asked for starts.
+    fn closes_and_starts(effects: Vec<Effect>) -> Self {
+        Self {
+            modal: None,
+            effects,
+        }
+    }
+}
+
 fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     let Some(modal) = state.modal.take() else {
         return Vec::new();
     };
-    match modal {
-        Modal::Help => Vec::new(),
-        Modal::Describe {
-            target,
-            mut input,
-            error: _,
-        } => match key {
-            Key::Esc | Key::CtrlC => Vec::new(),
-            Key::Backspace => {
-                input.pop();
-                state.modal = Some(Modal::Describe {
-                    target,
-                    input,
-                    error: None,
-                });
-                Vec::new()
-            }
-            Key::Char(c) if !c.is_control() => {
-                if input.chars().count() < Description::MAX_LEN {
-                    input.push(c);
-                }
-                state.modal = Some(Modal::Describe {
-                    target,
-                    input,
-                    error: None,
-                });
-                Vec::new()
-            }
-            Key::Enter => {
-                let description = if input.trim().is_empty() {
-                    Ok(Description::default())
-                } else {
-                    Description::parse(&input)
-                };
-                match description {
-                    Ok(description) => {
-                        let targets = match &target {
-                            Target::One(config) => vec![config.clone()],
-                            Target::All => state.config_names(),
-                        };
-                        state.notice = Some(Notice::Info(format!(
-                            "creating {} snapshot(s)",
-                            targets.len()
-                        )));
-                        vec![Effect::Create {
-                            targets,
-                            description,
-                        }]
-                    }
-                    Err(e) => {
-                        state.modal = Some(Modal::Describe {
-                            target,
-                            input,
-                            error: Some(e.to_string()),
-                        });
-                        Vec::new()
-                    }
-                }
-            }
-            _ => {
-                state.modal = Some(Modal::Describe {
-                    target,
-                    input,
-                    error: None,
-                });
-                Vec::new()
-            }
-        },
+    let reaction = match modal {
+        Modal::Help => Reaction::closes(), // any key closes it
+        Modal::Describe { target, input, .. } => describing(state, key, target, input),
+        Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {
             config,
             id,
             path,
             stage,
-        } => {
-            // Only a prompt with real changes to restore can be confirmed, and the system root only
-            // when it is a single path of it. Anything else is information, and any key closes it.
-            let actionable = matches!(
-                &stage,
-                RestoreStage::Ready(p) if (path.is_some() || !p.is_system_root) && !p.changes.is_empty()
-            );
-            match key {
-                Key::Char('y' | 'Y') | Key::Enter if actionable => {
-                    state.notice = Some(Notice::Info(match &path {
-                        Some(path) => format!("restoring {path} from #{id}"),
-                        None => format!("restoring {config} to #{id}"),
-                    }));
-                    vec![Effect::Restore { config, id, path }]
-                }
-                Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Vec::new(),
-                _ if !actionable && stage != RestoreStage::Loading => Vec::new(),
-                _ => {
-                    state.modal = Some(Modal::Restore {
-                        config,
-                        id,
-                        path,
-                        stage,
-                    });
-                    Vec::new()
-                }
-            }
+        } => confirming_restore(state, key, config, id, path, stage),
+    };
+    state.modal = reaction.modal;
+    reaction.effects
+}
+
+fn describe(target: Target, input: String, error: Option<String>) -> Modal {
+    Modal::Describe {
+        target,
+        input,
+        error,
+    }
+}
+
+/// The prompt for a snapshot's description: type, Backspace, Enter to create, Esc to cancel.
+fn describing(state: &mut State, key: Key, target: Target, mut input: String) -> Reaction {
+    match key {
+        Key::Esc | Key::CtrlC => Reaction::closes(),
+        Key::Enter => create_with(state, target, input),
+        Key::Backspace => {
+            input.pop();
+            Reaction::stays(describe(target, input, None))
         }
-        Modal::ConfirmDelete { config, ids } => match key {
-            Key::Char('y') | Key::Char('Y') | Key::Enter => {
-                state.notice = Some(Notice::Info(format!("deleting {} snapshot(s)", ids.len())));
-                vec![Effect::Delete { config, ids }]
+        Key::Char(c) if !c.is_control() => {
+            if input.chars().count() < Description::MAX_LEN {
+                input.push(c);
             }
-            Key::Char('n') | Key::Char('N') | Key::Esc | Key::CtrlC => Vec::new(),
-            _ => {
-                state.modal = Some(Modal::ConfirmDelete { config, ids });
-                Vec::new()
-            }
-        },
+            Reaction::stays(describe(target, input, None))
+        }
+        _ => Reaction::stays(describe(target, input, None)),
+    }
+}
+
+/// Enter in the description prompt: an empty description means the default one, and one that is not
+/// valid keeps the prompt open and says why.
+fn create_with(state: &mut State, target: Target, input: String) -> Reaction {
+    let description = if input.trim().is_empty() {
+        Ok(Description::default())
+    } else {
+        Description::parse(&input)
+    };
+    match description {
+        Ok(description) => {
+            let targets = match &target {
+                Target::One(config) => vec![config.clone()],
+                Target::All => state.config_names(),
+            };
+            state.notice = Some(Notice::Info(format!(
+                "creating {} snapshot(s)",
+                targets.len()
+            )));
+            Reaction::closes_and_starts(vec![Effect::Create {
+                targets,
+                description,
+            }])
+        }
+        Err(problem) => Reaction::stays(describe(target, input, Some(problem.to_string()))),
+    }
+}
+
+/// Deleting cannot be undone, so it asks: `y` or Enter confirms, `n` or Esc cancels.
+fn confirming_delete(
+    state: &mut State,
+    key: Key,
+    config: ConfigName,
+    ids: Vec<SnapshotId>,
+) -> Reaction {
+    match key {
+        Key::Char('y' | 'Y') | Key::Enter => {
+            state.notice = Some(Notice::Info(format!("deleting {} snapshot(s)", ids.len())));
+            Reaction::closes_and_starts(vec![Effect::Delete { config, ids }])
+        }
+        Key::Char('n' | 'N') | Key::Esc | Key::CtrlC => Reaction::closes(),
+        _ => Reaction::stays(Modal::ConfirmDelete { config, ids }),
+    }
+}
+
+/// The restore prompt. Only a prompt with real changes to restore can be confirmed, and the system
+/// root only when it is a single path of it. Anything else is information, and any key closes it.
+fn confirming_restore(
+    state: &mut State,
+    key: Key,
+    config: ConfigName,
+    id: SnapshotId,
+    path: Option<String>,
+    stage: RestoreStage,
+) -> Reaction {
+    let actionable = matches!(
+        &stage,
+        RestoreStage::Ready(p) if (path.is_some() || !p.is_system_root) && !p.changes.is_empty()
+    );
+    match key {
+        Key::Char('y' | 'Y') | Key::Enter if actionable => {
+            state.notice = Some(Notice::Info(match &path {
+                Some(path) => format!("restoring {path} from #{id}"),
+                None => format!("restoring {config} to #{id}"),
+            }));
+            Reaction::closes_and_starts(vec![Effect::Restore { config, id, path }])
+        }
+        Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Reaction::closes(),
+        // information with nothing to confirm: any key closes it (but not while still looking)
+        _ if !actionable && stage != RestoreStage::Loading => Reaction::closes(),
+        _ => Reaction::stays(Modal::Restore {
+            config,
+            id,
+            path,
+            stage,
+        }),
     }
 }
 

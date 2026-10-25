@@ -24,6 +24,10 @@ case "${1:-}" in
     echo "fixture up: ${configs[*]}"
     ;;
   down)
+    # Every config whose volume is inside the fixture goes, not only the two it creates: a test or a
+    # person may have added more (a `home` config on a nested subvolume, say), and one left behind
+    # points at a path that no longer exists and shows up as an error in every later run.
+    mapfile -t configs < <({ printf '%s\n' "${configs[@]}"; grep -ls "^SUBVOLUME=\"$dir/" /etc/snapper/configs/* 2>/dev/null | xargs -r -n1 basename; } | sort -u)
     for cfg in "${configs[@]}"; do
       # snapper cannot delete a config whose volume is no longer mounted (a fixture left behind
       # by an interrupted run), and would leave it registered: so remove the registration
