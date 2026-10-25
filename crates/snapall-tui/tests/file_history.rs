@@ -359,3 +359,20 @@ fn q_quits_and_a_file_with_no_snapshots_says_so() {
     session.press(Key::Char('q'));
     assert!(session.state.quit);
 }
+
+#[test]
+fn a_file_on_a_separate_subvolume_says_so_instead_of_listing_snapshots_that_cannot_hold_it() {
+    let backend = InMemoryBackend::with_configs(&["root"])
+        .with_root_config("root")
+        .with_separate_subvolume("/mnt/home");
+    let root = ConfigName::parse("root").unwrap();
+    backend.write_file("root", "/mnt/home/u/notes.txt", "mine");
+    snap(&backend, &root, "base");
+    let session = open(&backend, "/mnt/home/u/notes.txt", "root");
+    let text = screen(&session);
+    assert!(text.contains("different subvolume"), "{text}");
+    assert!(
+        !text.contains("did not exist"),
+        "it must not claim the file was absent:\n{text}"
+    );
+}

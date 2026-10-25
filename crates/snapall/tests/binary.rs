@@ -698,3 +698,32 @@ fn a_restore_can_be_logged_and_the_log_says_what_it_restored() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_file_on_another_subvolume_than_the_configs_gets_the_reason_and_the_command_not_a_false_history(
+) {
+    // The user's report: a file in /home, where /home is a separate subvolume and only a config for
+    // `/` exists. /proc stands in for the separate subvolume (another device, under `/` by name).
+    let dir = fake_snapper("othervol");
+    let output = with_fake(&dir, &["--no-dbus", "history", "/proc/self/environ"]);
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    let message = stderr(&output);
+    assert!(
+        message.contains("different subvolume than config `root`"),
+        "{message}"
+    );
+    assert!(
+        message.contains("no snapshot of `root` contains it"),
+        "{message}"
+    );
+    assert!(
+        message.contains("sudo snapper -c proc create-config /proc"),
+        "the command names the subvolume that holds the file: {message}"
+    );
+    assert!(message.contains("TIMELINE_CREATE=no"), "{message}");
+    assert!(
+        !stdout(&output).contains("did not exist"),
+        "it must not claim the file did not exist"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

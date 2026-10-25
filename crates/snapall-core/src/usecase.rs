@@ -277,6 +277,14 @@ pub enum HistoryError {
     BadPath { path: String },
     #[error("no snapper config covers `{path}`: it is not under any config's subvolume")]
     NoConfig { path: String },
+    /// The path is under a config's directory but on another subvolume, which that config's
+    /// snapshots do not include. Saying "did not exist" here would be wrong: it never could have.
+    #[error("`{path}` is on a different subvolume than config `{config}` (`{subvolume}`), so no snapshot of `{config}` contains it")]
+    OtherSubvolume {
+        path: String,
+        config: ConfigName,
+        subvolume: String,
+    },
     #[error(transparent)]
     Backend(#[from] BackendError),
 }
@@ -301,20 +309,41 @@ pub fn config_covering(
             path: path.to_owned(),
         });
     }
-    let mut best: Option<(usize, ConfigName)> = None;
+    // The most specific config whose subvolume really holds the file (by length of mount point),
+    // and, failing that, the most specific one that merely has it under its directory.
+    let mut covering: Option<(usize, ConfigName)> = None;
+    let mut only_by_name: Option<(usize, ConfigName, String)> = None;
     for config in backend.list_configs().map_err(SnapshotError::from)? {
         let subvolume = backend.config_subvolume(&config)?;
-        if under(&subvolume, path) {
-            let length = subvolume.trim_end_matches('/').len();
-            if best.as_ref().is_none_or(|(longest, _)| length > *longest) {
-                best = Some((length, config));
+        if !under(&subvolume, path) {
+            continue;
+        }
+        let length = subvolume.trim_end_matches('/').len();
+        if backend.covers(&config, path)? {
+            if covering
+                .as_ref()
+                .is_none_or(|(longest, _)| length > *longest)
+            {
+                covering = Some((length, config));
             }
+        } else if only_by_name
+            .as_ref()
+            .is_none_or(|(longest, ..)| length > *longest)
+        {
+            only_by_name = Some((length, config, subvolume));
         }
     }
-    best.map(|(_, config)| config)
-        .ok_or_else(|| HistoryError::NoConfig {
+    match (covering, only_by_name) {
+        (Some((_, config)), _) => Ok(config),
+        (None, Some((_, config, subvolume))) => Err(HistoryError::OtherSubvolume {
             path: path.to_owned(),
-        })
+            config,
+            subvolume,
+        }),
+        (None, None) => Err(HistoryError::NoConfig {
+            path: path.to_owned(),
+        }),
+    }
 }
 
 /// How `path` stood in every snapshot of `config`.
@@ -333,6 +362,13 @@ pub fn file_versions_of(
     if !under(&subvolume, path) {
         return Err(HistoryError::NoConfig {
             path: path.to_owned(),
+        });
+    }
+    if !backend.covers(config, path)? {
+        return Err(HistoryError::OtherSubvolume {
+            path: path.to_owned(),
+            config: config.clone(),
+            subvolume,
         });
     }
     Ok(backend.file_versions(config, path)?)
@@ -744,5 +780,58 @@ mod tests {
             file_versions_of(&backend, &home(), "/etc/fstab"),
             Err(HistoryError::NoConfig { .. })
         ));
+    }
+
+    // ---- what a snapshot cannot contain ---------------------------------------------------------
+
+    #[test]
+    fn a_file_on_a_separate_subvolume_is_not_attributed_to_the_config_above_it() {
+        // root is `/`, and /mnt/home is a separate subvolume with no config of its own
+        let backend = InMemoryBackend::with_configs(&["root"])
+            .with_root_config("root")
+            .with_separate_subvolume("/mnt/home");
+        let error = config_covering(&backend, "/mnt/home/u/notes.txt").unwrap_err();
+        assert!(
+            matches!(&error, HistoryError::OtherSubvolume { config, .. } if config.as_str() == "root"),
+            "{error}"
+        );
+        assert!(
+            error
+                .to_string()
+                .contains("no snapshot of `root` contains it"),
+            "{error}"
+        );
+        // a file of the root subvolume itself is still covered by it
+        assert_eq!(
+            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            "root"
+        );
+        // and asking for the history through the config directly says the same, not "did not exist"
+        let direct = file_versions_of(
+            &backend,
+            &ConfigName::parse("root").unwrap(),
+            "/mnt/home/u/notes.txt",
+        );
+        assert!(
+            matches!(direct, Err(HistoryError::OtherSubvolume { .. })),
+            "{direct:?}"
+        );
+    }
+
+    #[test]
+    fn once_the_separate_subvolume_has_its_own_config_that_config_covers_its_files() {
+        let backend = InMemoryBackend::with_configs(&["home", "root"])
+            .with_root_config("root")
+            .with_separate_subvolume("/mnt/home");
+        assert_eq!(
+            config_covering(&backend, "/mnt/home/u/notes.txt")
+                .unwrap()
+                .as_str(),
+            "home"
+        );
+        assert_eq!(
+            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            "root"
+        );
     }
 }

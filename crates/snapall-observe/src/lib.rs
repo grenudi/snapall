@@ -105,6 +105,10 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
         self.inner.config_subvolume(config)
     }
 
+    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
+        self.inner.covers(config, path)
+    }
+
     fn changes_since(
         &self,
         config: &ConfigName,

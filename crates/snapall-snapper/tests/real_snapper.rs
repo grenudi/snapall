@@ -11,8 +11,8 @@
 
 use snapall_core::testing::backend_contract;
 use snapall_core::{
-    file_history, preview_restore, restore_snapshot, snapshot_all, ChangeKind, ConfigName,
-    Description, FileState, RestoreError, SnapshotBackend,
+    config_covering, file_history, preview_restore, restore_snapshot, snapshot_all, ChangeKind,
+    ConfigName, Description, FileState, HistoryError, RestoreError, SnapshotBackend,
 };
 use snapall_snapper::SnapperCli;
 
@@ -223,4 +223,60 @@ fn a_files_history_is_read_from_real_snapshots_and_a_version_can_be_restored() {
         .iter()
         .any(|v| v.snapshot.id == one && v.state == FileState::DeletedSince));
     assert!(file_history(&backend, &base).is_err());
+}
+
+/// The bug a user hit: `/home` is a separate subvolume beside the `/` config, so a snapshot of `/`
+/// holds none of it, and the history of a file there said "did not exist" in every snapshot. On real
+/// Btrfs, a separate subvolume inside a config's subvolume must be told apart from the config's own.
+#[test]
+fn a_separate_subvolume_inside_a_configs_directory_is_not_covered_by_that_config() {
+    if !enabled() {
+        return;
+    }
+    let backend = backend();
+    let config = ConfigName::parse("snapall_it_b").unwrap();
+    let base = backend.config_subvolume(&config).unwrap();
+    let nested = format!("{base}/separate-it");
+    let run = |args: &[&str]| {
+        let status = std::process::Command::new("btrfs")
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success(), "btrfs {args:?}");
+    };
+    run(&["subvolume", "create", &nested]);
+    let inside = format!("{base}/beside-it.txt");
+    let apart = format!("{nested}/notes.txt");
+    std::fs::write(&inside, "in the config's own subvolume").unwrap();
+    std::fs::write(&apart, "in the separate one").unwrap();
+    backend
+        .create_snapshot(
+            &config,
+            &Description::parse("it: with a separate subvolume").unwrap(),
+        )
+        .unwrap();
+
+    // the snapshot really does leave the separate subvolume out, which is the premise
+    assert!(std::fs::read_dir(format!("{base}/.snapshots")).is_ok());
+    assert!(backend.covers(&config, &inside).unwrap());
+    assert!(
+        !backend.covers(&config, &apart).unwrap(),
+        "a nested subvolume is another device"
+    );
+
+    assert_eq!(config_covering(&backend, &inside).unwrap(), config);
+    let error = config_covering(&backend, &apart).unwrap_err();
+    assert!(
+        matches!(error, HistoryError::OtherSubvolume { .. }),
+        "{error}"
+    );
+    let history = file_history(&backend, &apart).unwrap_err();
+    assert!(
+        matches!(history, HistoryError::OtherSubvolume { .. }),
+        "never \"did not exist\": {history}"
+    );
+    assert!(file_history(&backend, &inside).is_ok());
+
+    run(&["subvolume", "delete", &nested]);
+    let _ = std::fs::remove_file(&inside);
 }
