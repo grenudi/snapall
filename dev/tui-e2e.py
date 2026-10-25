@@ -183,6 +183,43 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def points_screen_scenario():
+    """The restore points screen, opened by clicking its footer button: it lists the newest point,
+    says what it would change in each area, and Enter puts both areas back."""
+    fixture = os.environ.get("SNAPALL_FIXTURE", "/tmp/snapall-fixture")
+    a, b = f"{fixture}/mnt/snapall_it_a/screen-e2e.txt", f"{fixture}/mnt/snapall_it_b/screen-e2e.txt"
+    for path, text in ((a, "a, then"), (b, "b, then")):
+        with open(path, "w") as f:
+            f.write(text)
+    made = subprocess.run([BINARY, "--no-dbus", "create", "e2e points screen"], capture_output=True, text=True)
+    check(made.returncode == 0, "one action snapshots every area")
+    with open(a, "w") as f:
+        f.write("a, ruined")
+    os.remove(b)
+
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=5)
+    check("R points" in tui.text() and "q quit" in tui.text(), "all nine footer buttons are on screen, quit included")
+    tui.click_text("R points", offset=0)
+    tui.wait_for("Restore points  (1 of")
+    tui.wait_for("e2e points screen")
+    tui.wait_for("Putting every area back would:")
+    tui.wait_for("snapall_it_a")
+    check("[ Enter: Restore all 2 ]" in tui.text(), "it offers to put both areas back")
+    tui.hover(*tui.find("Enter: Restore all 2"))
+    tui.wait_for("Put every area of the chosen restore point back (not the system)")
+    check(True, "hovering the button explains it, and the prompt leaves that line free")
+    tui.send("enter")
+    tui.wait_for("Put 2 area(s) back to", timeout=10)
+    tui.wait_for("Undo it: restore point")
+    check(open(a).read() == "a, then" and open(b).read() == "b, then", "both areas are back on disk, a deleted file included")
+    tui.send("q")
+    tui.finish()
+    os.remove(a)
+    os.remove(b)
+
+
 def restore_point_scenario():
     """One action snapshots both areas; both are ruined; in the window, `u` on a snapshot of that
     action offers the whole restore point and `A` puts both areas back."""
@@ -522,6 +559,7 @@ def main():
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
+    points_screen_scenario()
     restore_point_scenario()
     protect_scenario()
 
