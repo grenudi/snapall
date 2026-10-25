@@ -53,6 +53,7 @@ fn open<'a>(backend: &'a InMemoryBackend, path: &str, config: &str) -> Session<'
             path: path.to_owned(),
             config: ConfigName::parse(config).unwrap(),
         }),
+        ..UiContext::default()
     };
     Session::with_context(backend, context)
 }
@@ -355,7 +356,7 @@ fn a_file_no_config_covers_shows_the_reason_on_the_screen() {
 fn q_quits_and_a_file_with_no_snapshots_says_so() {
     let backend = InMemoryBackend::with_configs(&["home"]);
     let mut session = open(&backend, FILE, "home");
-    assert!(screen(&session).contains("no snapshots of this config yet"));
+    assert!(screen(&session).contains("no snapshots of this area yet"));
     session.press(Key::Char('q'));
     assert!(session.state.quit);
 }

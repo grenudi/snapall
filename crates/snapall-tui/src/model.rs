@@ -68,6 +68,19 @@ pub struct FileView {
     pub cursor: usize,
 }
 
+/// A part of the disk that has no snapshots yet, offered for protecting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Offer {
+    /// Where it is mounted: `/home`.
+    pub mount_point: String,
+    /// What a person calls it: `Home`.
+    pub title: String,
+    /// What protecting it means, in plain words: what it holds, whether it is worth it, what will and
+    /// will not happen.
+    pub summary: String,
+    pub recommended: bool,
+}
+
 /// What the UI is told about the machine it runs on, once, at the start. The model never reads
 /// the machine; the shell does, and hands over plain text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -79,6 +92,12 @@ pub struct UiContext {
     pub restore_route: String,
     /// Open on this file's history instead of on all configs.
     pub file: Option<FileTarget>,
+    /// The parts of the disk that have no snapshots yet and could have, best first.
+    pub offers: Vec<Offer>,
+    /// Whether snapall may change how snapshots are kept (it was started with `sudo`).
+    pub administrator: bool,
+    /// One line for the footer when something worth protecting is not: it says what to press.
+    pub protect_hint: Option<String>,
 }
 
 /// Something that can be clicked. Each is the mouse spelling of a key.
@@ -95,6 +114,10 @@ pub enum Button {
     Confirm,
     /// The negative button of a prompt (Esc).
     Cancel,
+    /// See what has no snapshots yet and protect it.
+    Protect,
+    /// In a prompt that shows several things one at a time: the next one.
+    Next,
 }
 
 impl Button {
@@ -110,6 +133,8 @@ impl Button {
             Button::Quit => Key::Char('q'),
             Button::Confirm => Key::Enter,
             Button::Cancel => Key::Esc,
+            Button::Protect => Key::Char('p'),
+            Button::Next => Key::Tab,
         }
     }
 }
@@ -164,6 +189,8 @@ pub enum Modal {
     },
     /// The explanation of what snapshots are (page 0) and of the keys (page 1).
     Help { page: usize },
+    /// Offering to protect one of the parts of the disk that have no snapshots yet.
+    Protect { index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,6 +222,11 @@ pub struct State {
     pub file: Option<FileView>,
     /// The button the mouse is over: what it does is written on the footer line while it is.
     pub hover: Option<Button>,
+    /// The parts of the disk still offered for protecting; one leaves the list when it is protected.
+    pub offers: Vec<Offer>,
+    /// A message to show once the list has been reloaded: the reload clears older notices, and a
+    /// confirmation must not be one of them.
+    pub after_reload: Option<Notice>,
 }
 
 impl Default for State {
@@ -213,6 +245,8 @@ impl Default for State {
             context: UiContext::default(),
             file: None,
             hover: None,
+            offers: Vec::new(),
+            after_reload: None,
         }
     }
 }
@@ -225,6 +259,7 @@ impl State {
             cursor: 0,
         });
         Self {
+            offers: context.offers.clone(),
             context,
             file,
             ..Self::default()
@@ -295,6 +330,10 @@ pub enum Effect {
         id: SnapshotId,
         path: Option<String>,
     },
+    /// Start keeping snapshots of the part of the disk at `mount_point`.
+    Protect {
+        mount_point: String,
+    },
     /// Put `config` back to how `id` had it (after a safety snapshot).
     Restore {
         config: ConfigName,
@@ -341,6 +380,11 @@ pub enum Msg {
         result: Result<Vec<FileVersion>, String>,
     },
     ConfigsLoaded(Result<Vec<ConfigName>, String>),
+    /// A part of the disk was protected, or why it could not be (in plain words).
+    Protected {
+        mount_point: String,
+        result: Result<ConfigName, String>,
+    },
     SnapshotsLoaded {
         config: ConfigName,
         result: Result<Vec<SnapshotInfo>, String>,
@@ -371,6 +415,13 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             Vec::new()
         }
         Msg::Key(key) => on_key(state, key),
+        Msg::Protected {
+            mount_point,
+            result,
+        } => {
+            settle(state);
+            on_protected(state, &mount_point, result)
+        }
         Msg::Hover(button) => {
             state.hover = button;
             Vec::new()
@@ -429,7 +480,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return on_modal_key(state, key);
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
-    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u')) {
+    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p')) {
         state.notice = Some(Notice::Info(
             "busy: wait for the current operation to finish".into(),
         ));
@@ -478,6 +529,10 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         Key::Char('a') => open_describe(state, true),
         Key::Char('d') => open_delete(state),
         Key::Char('u') => open_restore(state),
+        Key::Char('p') => {
+            state.modal = Some(Modal::Protect { index: 0 });
+            Vec::new()
+        }
         _ => Vec::new(),
     }
 }
@@ -520,6 +575,7 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     };
     let reaction = match modal {
         Modal::Help { page } => reading_help(key, page),
+        Modal::Protect { index } => protecting(state, key, index),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {
@@ -531,6 +587,63 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     };
     state.modal = reaction.modal;
     reaction.effects
+}
+
+/// The offer to protect a part of the disk: Tab and the arrows go to the next one, Enter protects the
+/// one shown, Esc leaves. Without administrator rights, or with nothing to offer, it only informs.
+fn protecting(state: &mut State, key: Key, index: usize) -> Reaction {
+    let count = state.offers.len();
+    let index = index.min(count.saturating_sub(1));
+    let can_protect = count > 0 && state.context.administrator;
+    match key {
+        Key::Esc | Key::CtrlC | Key::Char('q') => Reaction::closes(),
+        Key::Enter if !can_protect => Reaction::closes(),
+        Key::Enter | Key::Char('y' | 'Y') if can_protect => {
+            let offer = &state.offers[index];
+            state.notice = Some(Notice::Info(format!(
+                "protecting {} ({})",
+                offer.title, offer.mount_point
+            )));
+            let effect = Effect::Protect {
+                mount_point: offer.mount_point.clone(),
+            };
+            Reaction::closes_and_starts(vec![effect])
+        }
+        Key::Tab | Key::Right | Key::Down | Key::Char('j' | 'l') if count > 1 => {
+            Reaction::stays(Modal::Protect {
+                index: (index + 1) % count,
+            })
+        }
+        Key::Left | Key::Up | Key::Char('k' | 'h') if count > 1 => {
+            Reaction::stays(Modal::Protect {
+                index: (index + count - 1) % count,
+            })
+        }
+        _ => Reaction::stays(Modal::Protect { index }),
+    }
+}
+
+fn on_protected(
+    state: &mut State,
+    mount_point: &str,
+    result: Result<ConfigName, String>,
+) -> Vec<Effect> {
+    match result {
+        Ok(_) => {
+            state
+                .offers
+                .retain(|offer| offer.mount_point != mount_point);
+            state.after_reload = Some(Notice::Info(snapall_core::explain::protected_text(
+                mount_point,
+            )));
+            // the new area is in the list from now on, and takes part in "snapshot everything"
+            vec![Effect::LoadConfigs]
+        }
+        Err(why) => {
+            state.notice = Some(Notice::Error(why));
+            Vec::new()
+        }
+    }
 }
 
 /// The help: Enter, Tab or the arrows turn the page, Esc or `q` close it.
@@ -729,7 +842,9 @@ fn toggle_mark(state: &mut State) {
 fn open_describe(state: &mut State, all: bool) -> Vec<Effect> {
     let target = if all {
         if state.entries().is_empty() {
-            state.notice = Some(Notice::Error("no configs to snapshot".into()));
+            state.notice = Some(Notice::Error(
+                "there are no protected areas to snapshot; press p to protect one".into(),
+            ));
             return Vec::new();
         }
         Target::All
@@ -737,7 +852,7 @@ fn open_describe(state: &mut State, all: bool) -> Vec<Effect> {
         match state.selected_config() {
             Some(entry) => Target::One(entry.name.clone()),
             None => {
-                state.notice = Some(Notice::Error("no config selected".into()));
+                state.notice = Some(Notice::Error("no area selected".into()));
                 return Vec::new();
             }
         }
@@ -782,6 +897,7 @@ fn on_configs_loaded(state: &mut State, result: Result<Vec<ConfigName>, String>)
         Err(error) => {
             state.configs = Load::Failed(error.clone());
             state.config_cursor = 0;
+            state.after_reload = None;
             state.notice = Some(Notice::Error(error));
             Vec::new()
         }
@@ -806,11 +922,15 @@ fn on_configs_loaded(state: &mut State, result: Result<Vec<ConfigName>, String>)
             if matches!(state.notice, Some(Notice::Info(_))) {
                 state.notice = None;
             }
+            if let Some(confirmation) = state.after_reload.take() {
+                state.notice = Some(confirmation);
+            }
             if state.entries().is_empty() {
-                state.notice = Some(Notice::Error(
-                    "snapper reports no configs; create one first, for example `snapper -c home create-config /home`"
-                        .into(),
-                ));
+                state.notice = Some(Notice::Error(if state.offers.is_empty() {
+                    "There are no protected areas yet, and snapall found nothing it can protect here: it works with disks formatted as Btrfs.".into()
+                } else {
+                    "There are no protected areas yet, so there is nothing to show. Press p to protect one.".into()
+                }));
             }
             load_selected_if_needed(state)
         }
@@ -1085,7 +1205,7 @@ fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
     match click {
         // A prompt's buttons work only while a prompt is open, and nothing else works then:
         // a click on a button behind a prompt must not be typed into it as a letter.
-        Click::Button(button @ (Button::Confirm | Button::Cancel)) => {
+        Click::Button(button @ (Button::Confirm | Button::Cancel | Button::Next)) => {
             if state.modal.is_some() {
                 on_key(state, button.key())
             } else {

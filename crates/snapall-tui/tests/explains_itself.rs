@@ -134,6 +134,7 @@ fn every_button_a_person_can_click_has_an_explanation_that_fits_the_footer_in_ev
             path: "/mnt/home/a.txt".into(),
             config: ConfigName::parse("home").unwrap(),
         }),
+        ..UiContext::default()
     };
     let session = Session::with_context(&backend, file);
     assert!(view::button_help(Button::Restore, &session.state).contains("this file"));

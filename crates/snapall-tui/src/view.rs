@@ -141,7 +141,7 @@ fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
         }
         Load::Loaded(entries) if entries.is_empty() => {
             frame.render_widget(
-                Paragraph::new("no snapper configs")
+                Paragraph::new("no protected areas yet")
                     .style(Style::new().fg(DIM))
                     .block(block),
                 area,
@@ -273,12 +273,13 @@ fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
 }
 
 /// The footer's buttons, in order: the button, the key it stands for, and its label.
-const ACTIONS: [(Button, &str, &str); 7] = [
+const ACTIONS: [(Button, &str, &str); 8] = [
     (Button::Create, "c", "create"),
     (Button::CreateAll, "a", "all"),
     (Button::Delete, "d", "delete"),
     (Button::Restore, "u", "restore"),
     (Button::Reload, "r", "reload"),
+    (Button::Protect, "p", "protect"),
     (Button::Help, "?", "help"),
     (Button::Quit, "q", "quit"),
 ];
@@ -328,6 +329,10 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Put the files back (how they are now is saved first, so this can be undone)"
         }
         (Some(Modal::Help { .. }), Button::Confirm) => "Show the other page",
+        (Some(Modal::Protect { .. }), Button::Confirm) => {
+            "Set this part of the disk up for snapshots (nothing is copied or moved)"
+        }
+        (Some(Modal::Protect { .. }), Button::Next) => "Show the next part of the disk",
         (Some(_), Button::Cancel) => "Close this without changing anything",
         (Some(_), _) => "",
         (None, Button::Create) => {
@@ -344,9 +349,12 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Go back to the selected snapshot: shows what changes and asks first"
         }
         (None, Button::Reload) => "Look again at which snapshots exist",
+        (None, Button::Protect) => {
+            "See which parts of your disk have no snapshots yet, and protect them"
+        }
         (None, Button::Help) => "Explain what snapshots are and what each key does",
         (None, Button::Quit) => "Close snapall. Nothing is changed",
-        (None, Button::Confirm | Button::Cancel) => "",
+        (None, Button::Confirm | Button::Cancel | Button::Next) => "",
     }
 }
 
@@ -355,7 +363,14 @@ fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
         .hover
         .map(|button| button_help(button, state))
         .filter(|text| !text.is_empty());
-    let notice = match (explanation, &state.notice, &state.context.boot_tip) {
+    // What deserves attention comes before a tip: a part of the disk without snapshots, then the boot menu.
+    let attention = state
+        .context
+        .protect_hint
+        .as_ref()
+        .filter(|_| state.offers.iter().any(|offer| offer.recommended))
+        .or(state.context.boot_tip.as_ref());
+    let notice = match (explanation, &state.notice, attention) {
         // Under the mouse: what the button does.
         (Some(text), _, _) => Span::styled(format!(" {text}"), Style::new().fg(Color::Cyan)),
         (None, Some(Notice::Info(text)), _) => {
@@ -437,6 +452,7 @@ fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
             stage,
         } => restore_spec(config, *id, path.as_deref(), stage, state),
         Modal::Help { page } => help_spec(*page),
+        Modal::Protect { index } => protect_spec(*index, state),
     }
 }
 
@@ -599,6 +615,60 @@ fn restore_summary(
     lines
 }
 
+/// The offer to protect a part of the disk: one at a time, with what it holds and what will happen.
+fn protect_spec(index: usize, state: &State) -> ModalSpec {
+    let count = state.offers.len();
+    let Some(offer) = state.offers.get(index) else {
+        return ModalSpec {
+            title: " Protect ".into(),
+            lines: vec![
+                Line::from("Everything snapall recommends protecting has snapshots already."),
+                Line::from(""),
+                Line::from(explain::NOT_A_BACKUP),
+            ],
+            color: ACCENT,
+            width: 72,
+            height: 10,
+            buttons: vec![close_button()],
+        };
+    };
+    let mut lines: Vec<Line> = offer
+        .summary
+        .lines()
+        .map(|l| Line::from(l.to_owned()))
+        .collect();
+    let mut buttons = Vec::new();
+    if state.context.administrator {
+        buttons.push(confirm_button("Protect it"));
+    } else {
+        lines.push(Line::from(""));
+        lines.push(Line::styled(
+            "To protect it, close this and start snapall with administrator rights:",
+            Style::new().fg(Color::Yellow),
+        ));
+        lines.push(Line::styled(
+            "    sudo snapall tui",
+            Style::new().fg(Color::Yellow).bold(),
+        ));
+    }
+    if count > 1 {
+        buttons.push((Button::Next, "Tab: Next".to_owned()));
+    }
+    buttons.push(if state.context.administrator {
+        cancel_button()
+    } else {
+        close_button()
+    });
+    ModalSpec {
+        title: format!(" Protect  ({} of {count}) ", index + 1),
+        lines,
+        color: Color::Yellow,
+        width: 78,
+        height: 20,
+        buttons,
+    }
+}
+
 /// The help. Page one teaches what snapall is about, for someone who knows nothing of it; page two
 /// says what each key and button does.
 fn help_spec(page: usize) -> ModalSpec {
@@ -652,6 +722,7 @@ fn keys_page() -> Vec<Line<'static>> {
             "u",
             "Restore: go back to the selected snapshot (asks first)",
         ),
+        ("p", "Protect: see what has no snapshots yet, and set it up"),
         ("r", "Look again at which snapshots exist"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
         (
@@ -767,7 +838,7 @@ fn render_file(state: &State, frame: &mut Frame, area: Rect) {
             area,
         ),
         Load::Loaded(list) if list.is_empty() => frame.render_widget(
-            Paragraph::new("no snapshots of this config yet. Press q to quit.")
+            Paragraph::new("no snapshots of this area yet. Press q to quit.")
                 .style(Style::new().fg(DIM))
                 .block(block),
             area,

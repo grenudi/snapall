@@ -266,6 +266,13 @@ fn file_target(
 /// not read the machine itself.
 fn ui_context(ctx: &Context, file: Option<snapall_tui::FileTarget>) -> snapall_tui::UiContext {
     let boot_menu = boot::assess(&boot_probe::system());
+    // What could be protected matters to the whole window, not to one file's history.
+    let facts = setup::gather();
+    let offers = if file.is_some() {
+        Vec::new()
+    } else {
+        setup::offers(ctx.backend, &facts)
+    };
     snapall_tui::UiContext {
         boot_tip: if ctx.hints {
             boot::hint(&boot_menu)
@@ -274,6 +281,9 @@ fn ui_context(ctx: &Context, file: Option<snapall_tui::FileTarget>) -> snapall_t
         },
         restore_route: boot::restore_route(&boot_menu),
         file,
+        protect_hint: setup::hint_for(&offers),
+        offers,
+        administrator: facts.is_root,
     }
 }
 

@@ -14,7 +14,7 @@ use std::process::Command;
 
 use snapall_core::coverage::{self, Area, Worth};
 use snapall_core::explain::{self, Cleanup};
-use snapall_core::{protect_area, ConfigName, SetupError, SnapshotBackend};
+use snapall_core::{protect_area, ConfigName, SnapshotBackend};
 
 use crate::output::emit;
 
@@ -223,23 +223,10 @@ fn offer_protection(
             report.protected_now.push((area.mount_point.clone(), name));
         }
         Err(error) => {
-            let why = plain_reason(&title, &error);
+            let why = explain::failure_text(&title, &error);
             talk.say(&format!("{why}\n"));
             report.failed.push((area.mount_point.clone(), why));
         }
-    }
-}
-
-/// A failure as a person should read it: what went wrong with what, whether anything was changed.
-fn plain_reason(title: &str, error: &SetupError) -> String {
-    match error {
-        SetupError::Failed(reason) => format!(
-            "Could not protect {title}. The reason the system gave: {reason}. Nothing was changed."
-        ),
-        SetupError::LeftBehind { problem, config, .. } => format!(
-            "Protecting {title} stopped half way ({problem}) and the part already done could not be taken back: it is left under the name `{config}`. Please report this at https://github.com/grenudi/snapall/issues."
-        ),
-        other => format!("Could not protect {title}: {other}. Nothing was changed."),
     }
 }
 
@@ -293,6 +280,47 @@ fn say_whats_next(talk: &mut dyn Talk, options: &Options, report: &Report) {
         "  - Or right-click a file in your file manager and choose \"Restore from snapshots\".\n",
     );
     talk.say(&next);
+}
+
+/// The parts of the disk the window offers to protect: the recommended ones first, then the ones that
+/// are up to the person. What is not worth protecting is not offered.
+pub fn offers(backend: &dyn SnapshotBackend, facts: &Facts) -> Vec<snapall_tui::Offer> {
+    let Ok(areas) = find_the_areas(backend, facts) else {
+        return Vec::new();
+    };
+    let mut offers: Vec<snapall_tui::Offer> = areas
+        .iter()
+        .filter(|area| !area.is_protected())
+        .filter_map(|area| {
+            let info = coverage::describe(&area.mount_point);
+            (info.worth != Worth::NotUseful).then(|| snapall_tui::Offer {
+                mount_point: area.mount_point.clone(),
+                title: info.title,
+                summary: explain::protect_summary(&area.mount_point),
+                recommended: info.worth == Worth::Recommended,
+            })
+        })
+        .collect();
+    offers.sort_by_key(|offer| !offer.recommended); // stable: the recommended first, in disk order
+    offers
+}
+
+/// The footer line for when something recommended has no snapshots: what it is and what to press.
+pub fn hint_for(offers: &[snapall_tui::Offer]) -> Option<String> {
+    let titles: Vec<&str> = offers
+        .iter()
+        .filter(|offer| offer.recommended)
+        .map(|offer| offer.title.as_str())
+        .collect();
+    if titles.is_empty() {
+        return None;
+    }
+    let verb = if titles.len() == 1 { "has" } else { "have" };
+    Some(format!(
+        "{} {verb} no snapshots yet. Press p to see what that means and protect {}.",
+        titles.join(" and "),
+        if titles.len() == 1 { "it" } else { "them" }
+    ))
 }
 
 // ---- the real world ---------------------------------------------------------------------------
@@ -726,6 +754,37 @@ mod tests {
                 .contains("Home (/home) is already protected, so there is nothing to set up"),
             "{}",
             person.said
+        );
+    }
+
+    #[test]
+    fn the_window_is_offered_what_is_worth_protecting_best_first_and_a_hint_only_for_the_recommended(
+    ) {
+        let backend = machine();
+        let offered = offers(&backend, &facts(true, Cleanup::On));
+        let titles: Vec<&str> = offered.iter().map(|o| o.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            ["Home"],
+            "the logs are not worth offering and the system is protected"
+        );
+        assert!(offered[0].recommended && offered[0].summary.contains("Protect Home (/home)?"));
+        let hint = hint_for(&offered).unwrap();
+        assert_eq!(
+            hint,
+            "Home has no snapshots yet. Press p to see what that means and protect it."
+        );
+        assert_eq!(hint_for(&[]), None);
+        let optional = snapall_tui::Offer {
+            mount_point: "/srv".into(),
+            title: "Served data".into(),
+            summary: String::new(),
+            recommended: false,
+        };
+        assert_eq!(
+            hint_for(&[optional]),
+            None,
+            "nothing recommended is missing, so no nagging"
         );
     }
 }

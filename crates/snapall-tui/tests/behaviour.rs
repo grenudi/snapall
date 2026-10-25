@@ -224,7 +224,9 @@ fn no_configs_is_explained_not_empty() {
     let mut session = Session::new(&backend);
 
     assert!(session.state.entries().is_empty());
-    assert!(matches!(&session.state.notice, Some(Notice::Error(t)) if t.contains("create-config")));
+    assert!(
+        matches!(&session.state.notice, Some(Notice::Error(t)) if t.contains("no protected areas") && !t.contains("create-config"))
+    );
     press(&mut session, &[Key::Char('c'), Key::Char('a')]);
     assert!(
         session.state.modal.is_none(),

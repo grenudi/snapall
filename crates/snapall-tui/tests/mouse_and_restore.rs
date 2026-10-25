@@ -458,6 +458,7 @@ fn the_system_root_gets_the_supported_route_and_no_way_to_confirm() {
         restore_route:
             "to restore the system: reboot, pick the snapshot, run limine-snapper-restore".into(),
         file: None,
+        ..UiContext::default()
     };
     let mut session = Session::with_context(&backend, context);
     session.press(Key::Right);
@@ -542,6 +543,7 @@ fn the_boot_tip_is_shown_until_a_real_notice_needs_the_line_and_returns_after() 
         boot_tip: Some(tip.into()),
         restore_route: String::new(),
         file: None,
+        ..UiContext::default()
     };
     let mut session = Session::with_context(&backend, context);
     let screen = |s: &Session<'_>| rows(&s.state, 120, 24).join("\n");

@@ -135,8 +135,13 @@ fn errors_and_an_empty_snapper_are_shown_in_words() {
     let backend = InMemoryBackend::with_configs(&[]);
     let session = Session::new(&backend);
     let text = screen(&session, 120, 12);
-    assert!(text.contains("no snapper configs"), "{text}");
-    assert!(text.contains("create-config"), "{text}");
+    assert!(text.contains("no protected areas yet"), "{text}");
+    assert!(
+        text.contains("no protected areas")
+            && !text.contains("create-config")
+            && !text.contains("snapper"),
+        "plain words, no raw command: {text}"
+    );
 }
 
 #[test]

@@ -14,8 +14,8 @@
 use std::collections::VecDeque;
 
 use snapall_core::{
-    delete_snapshot, file_versions_of, plan_snapshots, preview_restore, restore_snapshot, run_plan,
-    snapshots_of, SnapshotBackend, SnapshotError,
+    delete_snapshot, file_versions_of, plan_snapshots, preview_restore, protect_area,
+    restore_snapshot, run_plan, snapshots_of, SnapshotBackend, SnapshotError,
 };
 
 use crate::model::{update, Effect, Key, Msg, State, UiContext};
@@ -74,6 +74,15 @@ impl<'a> Executor<'a> {
                     config,
                     id,
                     path,
+                    result,
+                }
+            }
+            Effect::Protect { mount_point } => {
+                let title = snapall_core::coverage::describe(&mount_point).title;
+                let result = protect_area(backend, &mount_point)
+                    .map_err(|error| snapall_core::explain::failure_text(&title, &error));
+                Msg::Protected {
+                    mount_point,
                     result,
                 }
             }

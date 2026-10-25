@@ -11,6 +11,7 @@
 //! need).
 
 use crate::coverage::{describe, Area, Info, Worth};
+use crate::usecase::SetupError;
 
 /// What a snapshot is, and why it is cheap. Shown first by `snapall setup` and in the TUI's help.
 pub const WHAT_IS_A_SNAPSHOT: &str = "A snapshot is a saved moment of your computer. If an update, a new setting or a mistake breaks something, you can go back to how things were.\n\nA snapshot does not copy your files. The disk only remembers what changes afterwards, so a new snapshot takes almost no space, and it grows only as you change things. That is why it is quick, and why it can be kept for a long time.";
@@ -117,6 +118,43 @@ pub fn protect_offer(mount_point: &str) -> String {
     )
 }
 
+/// The offer for a window that is 24 lines tall: what it holds, whether it is worth it, what will and
+/// will not happen. (How space and cleanup work is in the help and in `snapall setup`.)
+pub fn protect_summary(mount_point: &str) -> String {
+    let info = describe(mount_point);
+    format!(
+        "Protect {title} ({mount_point})?\n\n\
+         It holds {holds}.\n\
+         {verdict}: {reason}.\n\n\
+         What snapall will do:\n  \
+         - make a hidden folder called .snapshots inside {mount_point}, where its snapshots are kept;\n  \
+         - make sure snapshots are taken only when you ask, never on a schedule.\n\n\
+         It does not copy, move or change any of your files, and takes no snapshot yet.",
+        title = info.title,
+        holds = info.holds,
+        reason = info.reason,
+        verdict = match info.worth {
+            Worth::Recommended => "Recommended",
+            Worth::Optional => "Up to you",
+            Worth::NotUseful => "Not recommended",
+        },
+    )
+}
+
+/// A failed attempt to protect an area, as a person should read it: what went wrong with what, and
+/// whether anything was changed.
+pub fn failure_text(title: &str, error: &SetupError) -> String {
+    match error {
+        SetupError::Failed(reason) => format!(
+            "Could not protect {title}. The reason the system gave: {reason}. Nothing was changed."
+        ),
+        SetupError::LeftBehind { problem, config, .. } => format!(
+            "Protecting {title} stopped half way ({problem}) and the part already done could not be taken back: it is left under the name `{config}`. Please report this at https://github.com/grenudi/snapall/issues."
+        ),
+        other => format!("Could not protect {title}: {other}. Nothing was changed."),
+    }
+}
+
 /// What to say after an area was protected.
 pub fn protected_text(mount_point: &str) -> String {
     let info = describe(mount_point);
@@ -173,6 +211,41 @@ mod tests {
                 }),
             );
         }
+    }
+
+    #[test]
+    fn the_short_offer_keeps_what_matters_and_is_short_enough_for_a_small_window() {
+        let offer = protect_summary("/home");
+        for must in [
+            "Protect Home (/home)?",
+            "your own files",
+            "Recommended:",
+            "never on a schedule",
+            "does not copy, move or change any of your files",
+            "takes no snapshot yet",
+        ] {
+            assert!(offer.contains(must), "`{must}` missing:\n{offer}");
+        }
+        assert!(
+            offer.lines().count() <= 13,
+            "{} lines:\n{offer}",
+            offer.lines().count()
+        );
+        assert_plain("short offer", &offer.replace(".snapshots", ""));
+    }
+
+    #[test]
+    fn a_failure_says_what_went_wrong_and_that_nothing_changed() {
+        let error = SetupError::Failed(crate::port::BackendError::NotSupported(
+            "path is not usable".into(),
+        ));
+        let text = failure_text("Home", &error);
+        assert!(
+            text.contains("Could not protect Home")
+                && text.contains("path is not usable")
+                && text.contains("Nothing was changed"),
+            "{text}"
+        );
     }
 
     #[test]

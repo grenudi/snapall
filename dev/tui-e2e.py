@@ -35,6 +35,7 @@ BINARY = sys.argv[1] if len(sys.argv) > 1 else "target/debug/snapall"
 
 KEYS = {
     "enter": b"\r",
+    "tab": b"\t",
     "esc": b"\x1b",
     "up": b"\x1b[A",
     "down": b"\x1b[B",
@@ -180,6 +181,56 @@ def check(condition, message):
     if not condition:
         raise AssertionError(message)
     print(f"  ok  {message}")
+
+
+def protect_scenario():
+    """Protect a part of the disk from inside the window, on a real mounted Btrfs subvolume: the
+    way /home is mounted on a real machine, with no snapper config of its own."""
+    fixture = os.environ.get("SNAPALL_FIXTURE", "/tmp/snapall-fixture")
+    loop = subprocess.run(["losetup", "-j", f"{fixture}/disk.img"], capture_output=True, text=True).stdout.split(":")[0]
+    volume, area = f"{fixture}/mnt/notes-vol", f"{fixture}/notes"
+    subprocess.run(["btrfs", "subvolume", "create", volume], check=True, capture_output=True)
+    os.makedirs(area, exist_ok=True)
+    subprocess.run(["mount", "-o", "subvol=notes-vol", loop, area], check=True)
+    with open(f"{area}/letter.txt", "w") as f:
+        f.write("a file in a part of the disk with no snapshots\n")
+    try:
+        tui = Tui()
+        tui.wait_for("Snapshots of snapall_it_a (")
+        tui.wait_gone("working", timeout=5)  # a person waits for it to finish loading, too
+        tui.send("p")
+        tui.wait_for("Protect  (1 of")
+        # the fixture's own mount is offered too: go round with Tab until it is the one we want
+        for _ in range(4):
+            if "Protect Notes" in tui.text():
+                break
+            tui.send("tab")
+            tui.pump(0.3)
+        screen = tui.text()
+        if "Protect Notes" not in screen:
+            print("--- the screen when the offer was not found ---\n" + screen + "\n-----------------------------------------------")
+        check("Protect Notes" in screen, "the window offers to protect the new part of the disk by name")
+        for must in ("It holds whatever is kept in", "does not copy, move or change any of your files", "never on a schedule"):
+            check(must in screen, f"the offer says: {must}")
+        check("[ Enter: Protect it ]" in screen and "[ Tab: Next ]" in screen, "its buttons are shown")
+        tui.hover(*tui.find("[ Enter: Protect it ]"))
+        tui.wait_for("Set this part of the disk up for snapshots (nothing is copied or moved)")
+        check(True, "hovering Protect it explains what it will do")
+        tui.send("enter")
+        tui.wait_for("Notes (")
+        tui.wait_for("is protected now", timeout=10)
+        check(True, "it confirms in plain words and the confirmation survives the reload")
+        configs = snapper("--jsonout", "list-configs")
+        check(f"{fixture}/notes" in configs, "snapper really has the new area")
+        timeline = [l for l in snapper("-c", "notes", "get-config").splitlines() if "TIMELINE_CREATE" in l][0]
+        check("no" in timeline, "snapshots on a schedule are off for it")
+        check(os.path.exists(f"{area}/.snapshots") and open(f"{area}/letter.txt").read().startswith("a file"), "the hidden folder exists and the file is untouched")
+        tui.send("q")
+        tui.finish()
+    finally:
+        subprocess.run(["snapper", "--no-dbus", "-c", "notes", "delete-config"], capture_output=True)
+        subprocess.run(["umount", area], capture_output=True)
+        subprocess.run(["btrfs", "subvolume", "delete", volume], capture_output=True)
 
 
 def main():
@@ -433,6 +484,8 @@ def main():
     # a file no config covers is an error before the terminal is taken over
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
+
+    protect_scenario()
 
     print("\nTUI end-to-end: all checks passed")
 

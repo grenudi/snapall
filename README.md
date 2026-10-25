@@ -259,7 +259,7 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 
 ## The terminal UI
 
-Configs on the left, the selected config's snapshots on the right, newest first.
+Your protected areas on the left, the selected area's snapshots on the right, newest first. The window explains itself: hover over any button and a sentence on the bottom line says what it does, and `?` opens a two-page help that starts with what a snapshot is. If part of your disk has no snapshots yet (your Home files, usually), the bottom line says so when the window opens, and `p` explains what protecting means and does it, with no command to type.
 
 The packages install a *snapall* entry in your application menu that opens this in a terminal with `sudo`; from a terminal it is `sudo snapall tui`.
 
@@ -268,14 +268,15 @@ The packages install a *snapall* entry in your application menu that opens this 
 | `j` `k` / arrows | move in the focused pane |
 | `h` `l` / `Tab` | switch pane |
 | `space` | mark a snapshot, then move on |
-| `c` | create a snapshot of the selected config (asks for a description) |
-| `a` | create a snapshot of every config |
+| `c` | create a snapshot of the selected area (asks for a short note) |
+| `a` | create a snapshot of every protected area |
+| `p` | protect a part of your disk that has no snapshots yet (explains first, asks, does it) |
 | `d` | delete the marked snapshots, or the one under the cursor (asks to confirm) |
-| `u` | restore the config to the snapshot under the cursor (shows what changes, asks to confirm) |
-| `r` | reload from snapper |
-| `?` / `q` | help / quit |
+| `u` | restore the area to the snapshot under the cursor (shows what changes, asks to confirm) |
+| `r` | look again at which snapshots exist |
+| `?` / `q` | help (two pages; `Esc` closes) / quit |
 
-The mouse works too: click a config or a snapshot to select it, the first column of a snapshot to mark it, the buttons along the bottom and in prompts, and use the wheel over a pane to scroll it. A click goes through exactly the code its key does, so a button that starts work is refused while snapper is busy, just as the key is. The terminal's mouse mode is handed back on every way out, including a signal.
+The mouse works too: click an area or a snapshot to select it, the first column of a snapshot to mark it, the buttons along the bottom and in prompts, and use the wheel over a pane to scroll it. A click goes through exactly the code its key does, so a button that starts work is refused while snapper is busy, just as the key is. The terminal's mouse mode is handed back on every way out, including a signal.
 
 Snapper calls run in the background: the header shows *working* while one is in flight, the screen stays responsive, and keys that would start more work are refused until it finishes. Quitting while work is in flight waits for it to complete.
 
