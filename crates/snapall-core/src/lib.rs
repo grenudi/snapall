@@ -18,6 +18,7 @@ pub mod domain;
 pub mod explain;
 pub mod observe;
 pub mod plan;
+pub mod points;
 pub mod port;
 pub mod usecase;
 
@@ -30,10 +31,14 @@ pub use domain::{
 };
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
+pub use points::{
+    point_of, preview_point, restore_point, restore_points, Member, MemberPreview, MemberReport,
+    MemberResult, MemberView, PointRestore, RestorePoint,
+};
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
-    plan_snapshots, preview_restore, protect_area, restore_snapshot, run_plan, snapshot_all,
-    snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report, RestoreError, Restored,
-    SetupError, SnapshotError,
+    plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,
+    run_plan, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report,
+    RestoreError, Restored, Safety, SetupError, SnapshotError,
 };

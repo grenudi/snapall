@@ -259,20 +259,43 @@ pub fn restore_snapshot(
     id: SnapshotId,
     path: Option<&str>,
 ) -> Result<Restored, RestoreError> {
+    restore_snapshot_with(backend, config, id, path, None)
+}
+
+/// How the snapshot taken just before a restore is named and tagged, when it is one of several taken
+/// by one action (restoring a whole restore point), so that undoing the action is one action too.
+#[derive(Debug, Clone)]
+pub struct Safety {
+    pub point: Point,
+    pub note: Description,
+}
+
+/// [`restore_snapshot`], with the safety snapshot tagged and named as given.
+pub fn restore_snapshot_with(
+    backend: &dyn SnapshotBackend,
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+    safety: Option<&Safety>,
+) -> Result<Restored, RestoreError> {
     let subvolume = checked(backend, config, id, path)?;
     if path.is_none() && is_root(&subvolume) {
         return Err(RestoreError::SystemRoot {
             config: config.clone(),
         });
     }
-    let note = Description::parse(&format!("before restoring #{id}")).map_err(|_| {
-        RestoreError::BadPath {
-            path: format!("#{id}"),
+    let safety_snapshot = match safety {
+        Some(safety) => backend.create_snapshot_in(config, &safety.note, &safety.point),
+        None => {
+            let note = Description::parse(&format!("before restoring #{id}")).map_err(|_| {
+                RestoreError::BadPath {
+                    path: format!("#{id}"),
+                }
+            })?;
+            backend.create_snapshot(config, &note)
         }
-    })?;
-    let safety_snapshot = backend
-        .create_snapshot(config, &note)
-        .map_err(RestoreError::SafetySnapshot)?;
+    }
+    .map_err(RestoreError::SafetySnapshot)?;
     let summary = backend.undo_changes(config, id, path)?;
     Ok(Restored {
         safety_snapshot,
