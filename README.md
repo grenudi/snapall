@@ -29,9 +29,22 @@ $ sudo snapall tui
 
 ## Install and upgrade
 
-snapall drives [snapper](http://snapper.io/), so every package depends on it and installing snapall installs snapper too. Pick your system and paste the block: **the same lines install and upgrade**, because they fetch the newest release and your package manager treats a newer version as an upgrade (you never uninstall first). They are written for bash or zsh and need `curl`. Packages are attached to each [release](https://github.com/grenudi/snapall/releases) and are not signed yet; every release carries signed build provenance, see [docs/verifying.md](docs/verifying.md).
+There are two ways. **Add the package repository** (below, the first block for your system): your package manager then installs snapall and updates it along with everything else, the way you are used to. Or **paste a download block** (the second one): it fetches the newest release by hand, and the same lines install and upgrade. Either way snapall drives [snapper](http://snapper.io/), so every package depends on it and installing snapall installs snapper too. The blocks are written for bash or zsh and need `curl`. Packages are attached to each [release](https://github.com/grenudi/snapall/releases) and are not signed yet; every release carries signed build provenance, see [docs/verifying.md](docs/verifying.md).
 
 ### Debian, Ubuntu, Mint, Pop!_OS, ...
+
+As a repository, so that `sudo apt upgrade` keeps it current:
+
+<!-- snippet:repo-deb -->
+```sh
+command -v curl >/dev/null || sudo apt install -y curl
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://grenudi.github.io/snapall/key.asc | sudo tee /etc/apt/keyrings/snapall.asc >/dev/null
+echo "deb [signed-by=/etc/apt/keyrings/snapall.asc] https://grenudi.github.io/snapall/apt ./" | sudo tee /etc/apt/sources.list.d/snapall.list >/dev/null
+sudo apt update && sudo apt install snapall
+```
+
+Or as a one-off download (the same lines install and upgrade):
 
 <!-- snippet:deb -->
 ```sh
@@ -43,6 +56,16 @@ curl -LO "$url" && sudo apt install "./$(basename "$url")"
 
 ### Fedora
 
+As a repository, so that `sudo dnf upgrade` keeps it current:
+
+<!-- snippet:repo-dnf -->
+```sh
+sudo curl -fsSLo /etc/yum.repos.d/snapall.repo https://grenudi.github.io/snapall/snapall.repo
+sudo dnf install snapall
+```
+
+dnf shows the signing key's fingerprint and asks before importing it: compare it with the one [below](#the-package-repositories). Or as a one-off download:
+
 <!-- snippet:rpm-dnf -->
 ```sh
 cd /tmp
@@ -52,6 +75,16 @@ curl -LO "$url" && sudo dnf install "./$(basename "$url")"
 
 ### openSUSE
 
+As a repository, so that `sudo zypper update` keeps it current:
+
+<!-- snippet:repo-zypper -->
+```sh
+sudo zypper addrepo --refresh https://grenudi.github.io/snapall/snapall.repo
+sudo zypper install snapall
+```
+
+zypper shows the signing key and asks whether to trust it: compare the fingerprint with the one [below](#the-package-repositories). Or as a one-off download:
+
 <!-- snippet:rpm-zypper -->
 ```sh
 cd /tmp
@@ -60,6 +93,18 @@ curl -LO "$url" && sudo zypper install --allow-unsigned-rpm "./$(basename "$url"
 ```
 
 ### Arch, CachyOS, Manjaro, EndeavourOS, ...
+
+As a repository, so that `sudo pacman -Syu` keeps it current (x86_64):
+
+<!-- snippet:repo-pacman -->
+```sh
+curl -fsSL https://grenudi.github.io/snapall/key.asc | sudo pacman-key --add -
+sudo pacman-key --lsign-key 79B4B6BD57666623EAD400B20AE79BC1E50DDD5A
+grep -q '^\[snapall\]' /etc/pacman.conf || printf '\n[snapall]\nSigLevel = Required\nServer = https://grenudi.github.io/snapall/arch/$arch\n' | sudo tee -a /etc/pacman.conf >/dev/null
+sudo pacman -Syu snapall
+```
+
+Or build it from the release's `PKGBUILD` (the same lines install and upgrade):
 
 <!-- snippet:arch -->
 ```sh
@@ -80,6 +125,17 @@ curl -LO "$url" && tar xzf "$(basename "$url")" && cd snapall-v*/ && sudo ./inst
 ```
 
 The tarball carries its own installer, so this snippet does not change when a release adds files: it installs the binary, the man page, completions, the application-menu entry with its icon and the file-manager entries under `/usr/local`. `sudo ./install.sh --uninstall` removes them again; `PREFIX=/usr` and `DESTDIR=...` are honoured. It is a static binary and does not install snapper: `sudo snapall doctor --install` does that where it can, and otherwise prints what to run on your system.
+
+### The package repositories
+
+The repositories at <https://grenudi.github.io/snapall/> hold the release's own packages, unchanged, and their metadata is signed with this key:
+
+```text
+snapall package repository <17498075+grenudi@users.noreply.github.com>
+79B4 B6BD 5766 6623 EAD4 00B2 0AE7 9BC1 E50D DD5A
+```
+
+Check it against what your package manager shows before you trust it. [docs/repositories.md](docs/repositories.md) says what is signed, how long versions are kept, and how the key would be replaced.
 
 ### Nix, NixOS
 

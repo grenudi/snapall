@@ -10,6 +10,8 @@ path = [
   "**/*.md", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.nix",
   "Cargo.lock",
   "flake.lock", "PKGBUILD", "**/PKGBUILD", ".gitignore", "LICENSE",
+  # the repositories' public signing key (an armoured key cannot carry a comment header)
+  "packaging/repo/snapall-repo.asc",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 grenudi"

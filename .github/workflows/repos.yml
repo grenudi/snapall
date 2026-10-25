@@ -1,0 +1,199 @@
+name: Package repositories
+
+# Signed apt, dnf/zypper and pacman repositories on GitHub Pages, rebuilt after every verified
+# release (or by hand), so a package manager can install and update snapall.
+#
+# The signing key is the secret REPO_SIGNING_KEY. It is used in exactly two steps, both through
+# packaging/repo/with-key.sh, which checks its fingerprint first, and neither step builds or runs
+# the project's code: the Arch package is built in an earlier job that has no access to the secret.
+# Pages deploys only from main (the github-pages environment allows nothing else). Nothing is
+# deployed unless packaging/repo/check-site.sh verifies every signature on the assembled site.
+#
+# After the deploy, the README's own repository snippets are run on real systems against the live
+# repositories (the `verify` job).
+
+on:
+  workflow_run:
+    workflows: [Verify release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (default is the latest release)
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-repositories
+  cancel-in-progress: false
+
+env:
+  # Must be the fingerprint of packaging/repo/snapall-repo.asc: check-site.sh fails if it is not.
+  FINGERPRINT: 79B4B6BD57666623EAD400B20AE79BC1E50DDD5A
+
+jobs:
+  tag:
+    name: which release?
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: The release tag to publish, if one was cut
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --tags --force
+          if [ "$EVENT" = workflow_dispatch ]; then
+            tag="${INPUT_TAG:-$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | grep -o '"tag_name": *"snapall-v[0-9.]*"' | grep -o 'snapall-v[0-9.]*')}"
+          else
+            tag="$(git tag --points-at "$HEAD_SHA" | grep -E '^snapall-v[0-9]' | head -n1 || true)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release tag: ${tag:-none (a push that cut no release)}"
+
+  # Built with no access to the signing key: the build runs the project's code and its dependencies'.
+  arch-build:
+    name: build the Arch package
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build it from the release's own PKGBUILD, in an Arch container
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          mkdir -p out
+          cat > build.sh <<'SH'
+          set -euo pipefail
+          pacman -Syu --noconfirm --needed base-devel sudo curl >/dev/null
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          sudo -Hu builder env TAG="$TAG" REPO="$REPO" bash -euo pipefail -c '
+            mkdir ~/b && cd ~/b
+            curl -fsSL -o PKGBUILD "https://github.com/$REPO/releases/download/$TAG/PKGBUILD"
+            makepkg -s --noconfirm'
+          cp /home/builder/b/snapall-[0-9]*.pkg.tar.zst /out/
+          SH
+          docker run --rm -e TAG -e REPO="$GITHUB_REPOSITORY" -v "$PWD/build.sh:/build.sh:ro" -v "$PWD/out:/out" archlinux:latest bash /build.sh
+          ls -l out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: arch-package
+          path: out/*.pkg.tar.zst
+
+  # Signs and indexes the built package. This job has the key and runs only gpg and repo-add.
+  arch-sign:
+    name: sign the Arch repository
+    needs: [tag, arch-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: arch-package
+          path: pkg
+      - name: Sign (this step has the key)
+        env:
+          REPO_SIGNING_KEY: ${{ secrets.REPO_SIGNING_KEY }}
+        run: |
+          mkdir -p arch-out
+          docker run --rm -e REPO_SIGNING_KEY -e FINGERPRINT -v "$PWD:/w" -w /w archlinux:latest bash -euo pipefail -c '
+            pacman -Syu --noconfirm --needed gnupg >/dev/null
+            bash packaging/repo/with-key.sh bash packaging/repo/build-arch.sh arch-out/x86_64 pkg/snapall-[0-9]*.pkg.tar.zst
+            chmod -R a+rX arch-out'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: arch-repo
+          path: arch-out
+
+  publish:
+    name: sign, check and publish
+    needs: [tag, arch-sign]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: arch-repo
+          path: arch-out
+      - name: Tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends apt-utils createrepo-c gnupg rpm python3
+      - name: The packages of the newest releases, exactly as released
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash packaging/test/fetch-release-packages.sh pkgs 3
+      - name: Sign the apt and rpm metadata (this step has the key)
+        env:
+          REPO_SIGNING_KEY: ${{ secrets.REPO_SIGNING_KEY }}
+        run: |
+          bash packaging/repo/with-key.sh bash -euo pipefail -c '
+            bash packaging/repo/build-apt.sh site/apt pkgs/*.deb
+            bash packaging/repo/build-rpm.sh site/rpm pkgs/*.rpm'
+      - name: The front page, the key, and the Arch repository
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          bash packaging/repo/site.sh site README.md "${TAG#snapall-v}"
+          mkdir -p site/arch && cp -r arch-out/. site/arch/
+      - name: Nothing is deployed unless every signature verifies
+        run: bash packaging/repo/check-site.sh site "$FINGERPRINT"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v5
+
+  # The README's repository snippets, on real systems, against what was just published.
+  verify:
+    name: ${{ matrix.name }} (${{ matrix.arch }})
+    needs: [tag, publish]
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Debian,   arch: x86_64,  runner: ubuntu-latest,    image: "debian:stable",       family: deb,    setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Debian,   arch: aarch64, runner: ubuntu-24.04-arm, image: "debian:stable",       family: deb,    setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Ubuntu,   arch: x86_64,  runner: ubuntu-latest,    image: "ubuntu:24.04",        family: deb,    setup: "apt-get update -q && apt-get install -y -q --no-install-recommends curl ca-certificates sudo gawk" }
+          - { name: Fedora,   arch: x86_64,  runner: ubuntu-latest,    image: "fedora:latest",       family: dnf,    setup: "dnf install -y sudo gawk" }
+          - { name: Fedora,   arch: aarch64, runner: ubuntu-24.04-arm, image: "fedora:latest",       family: dnf,    setup: "dnf install -y sudo gawk" }
+          - { name: openSUSE, arch: x86_64,  runner: ubuntu-latest,    image: "opensuse/tumbleweed", family: zypper, setup: "zypper --non-interactive install sudo gawk curl" }
+          - { name: Arch,     arch: x86_64,  runner: ubuntu-latest,    image: "archlinux:latest",    family: pacman, setup: "pacman -Syu --noconfirm --needed sudo curl gawk && pacman-key --init && pacman-key --populate archlinux" }
+    steps:
+      - name: A user's tools
+        run: ${{ matrix.setup }}
+      # zypper reads its answers from a terminal, not a pipe, and CI has none: take the defaults, and
+      # import the repository's key without asking (the test checks the fingerprint it shows).
+      - name: Let zypper answer without a terminal
+        if: matrix.family == 'zypper'
+        run: |
+          mv /usr/bin/zypper /usr/bin/zypper.real
+          printf '#!/bin/sh\nexec /usr/bin/zypper.real --non-interactive --gpg-auto-import-keys "$@"\n' > /usr/bin/zypper
+          chmod +x /usr/bin/zypper
+      - name: Run the README's repository snippet, then update the way a person does
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SCRIPT: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/packaging/test/repo-snippets.sh
+        run: curl -fsSL "$SCRIPT" -o /tmp/repo-snippets.sh && bash /tmp/repo-snippets.sh ${{ matrix.family }}

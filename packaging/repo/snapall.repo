@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 grenudi
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# The snapall repository for dnf (Fedora) and zypper (openSUSE). The repository's metadata is signed
+# and carries every package's checksum, so repo_gpgcheck=1 protects the packages as well.
+[snapall]
+name=snapall
+baseurl=https://grenudi.github.io/snapall/rpm/$basearch
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://grenudi.github.io/snapall/key.asc

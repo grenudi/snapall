@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 status=0
-for id in deb rpm-dnf rpm-zypper arch tarball nix; do
+for id in deb rpm-dnf rpm-zypper arch tarball nix repo-deb repo-dnf repo-zypper repo-pacman; do
   snippet="$(awk -v id="$id" '
     $0 == "<!-- snippet:" id " -->" { want = 1; next }
     want && /^```/ { if (inblock) exit; inblock = 1; next }
