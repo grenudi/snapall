@@ -22,6 +22,7 @@ pub enum Command {
     Changes,
     Restore,
     History,
+    Setup,
     Doctor,
     Completions,
     Man,
@@ -38,6 +39,7 @@ impl Command {
         Command::Changes,
         Command::Restore,
         Command::History,
+        Command::Setup,
         Command::Doctor,
         Command::Completions,
         Command::Man,
@@ -54,6 +56,7 @@ impl Command {
             Command::Changes => "changes",
             Command::Restore => "restore",
             Command::History => "history",
+            Command::Setup => "setup",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -69,13 +72,16 @@ impl Command {
     /// One line for the command list in `--help`.
     pub const fn summary(self) -> &'static str {
         match self {
-            Command::Create => "Take one snapshot of every snapper config (the default command)",
-            Command::List => "List the snapper configs snapall can see",
-            Command::Snapshots => "List the snapshots of one config, or of every config",
-            Command::Delete => "Delete one snapshot of a config",
+            Command::Create => "Take one snapshot of every protected area (the default command)",
+            Command::List => "List the protected areas snapall can see",
+            Command::Snapshots => "List the snapshots of one protected area, or of all of them",
+            Command::Delete => "Delete one snapshot of a protected area",
             Command::Changes => "Show what restoring a snapshot would change",
-            Command::Restore => "Put a config, or one path of it, back to how a snapshot had it",
+            Command::Restore => {
+                "Put a protected area, or one path of it, back to how a snapshot had it"
+            }
             Command::History => "Show how one file stood in each snapshot",
+            Command::Setup => "Protect what has no snapshots yet, explaining each step",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -130,6 +136,7 @@ const OBSERVED: &[Command] = &[
     Command::History,
     Command::Doctor,
     Command::Tui,
+    Command::Setup,
 ];
 
 contract! {
@@ -238,7 +245,7 @@ contract! {
         arg:         Some(Arg { value_name: "CONFIGS", ..Arg::long("only") }),
         group:       "create",
         example:     "snapall create --only root,home",
-        summary:     "Comma-separated configs to snapshot (default: every config). A name snapper does not know is an error.",
+        summary:     "Comma-separated names of the areas to snapshot (default: all of them; `snapall list` shows the names). A name that does not exist is an error.",
         ..Input::EMPTY
     };
 
@@ -247,7 +254,7 @@ contract! {
         key:         "dry_run",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::Restore],
+        subcommands: &[Command::Create, Command::Restore, Command::Setup],
         arg:         Some(Arg::long("dry-run")),
         group:       "create",
         summary:     "Show what would happen without changing anything.",
@@ -269,6 +276,7 @@ contract! {
             Command::Changes,
             Command::Restore,
             Command::History,
+            Command::Setup,
             Command::Doctor,
         ],
         env:         Some(Env::new("SNAPALL_JSON")),
@@ -285,9 +293,9 @@ contract! {
         key:         "snapshots_config",
         ty:          Type::String,
         subcommands: &[Command::Snapshots],
-        arg:         Some(Arg { value_name: "CONFIG", ..Arg::positional(0) }),
+        arg:         Some(Arg { value_name: "AREA", ..Arg::positional(0) }),
         group:       "snapshots",
-        summary:     "List only this config's snapshots (default: every config).",
+        summary:     "List only this area's snapshots (default: all areas).",
         ..Input::EMPTY
     };
 
@@ -299,9 +307,9 @@ contract! {
         ty:          Type::String,
         required:    true,
         subcommands: &[Command::Delete, Command::Changes, Command::Restore],
-        arg:         Some(Arg { value_name: "CONFIG", ..Arg::positional(0) }),
+        arg:         Some(Arg { value_name: "AREA", ..Arg::positional(0) }),
         group:       "snapshot",
-        summary:     "The config the snapshot belongs to (required).",
+        summary:     "The name of the protected area, as `snapall list` shows it (required).",
         ..Input::EMPTY
     };
 
@@ -326,7 +334,7 @@ contract! {
         arg:         Some(Arg { value_name: "PATH", ..Arg::positional(2) }),
         group:       "snapshot",
         example:     "snapall restore home 12 /home/me/notes.txt",
-        summary:     "Only this file or directory (an absolute path inside the config). Default: everything that differs.",
+        summary:     "Only this file or directory (an absolute path inside the area). Default: everything that differs.",
         ..Input::EMPTY
     };
 
@@ -339,7 +347,7 @@ contract! {
         arg:         Some(Arg { value_name: "FILE", ..Arg::positional(0) }),
         group:       "history",
         example:     "snapall history ~/notes.txt",
-        summary:     "The file (required). The config that covers it is found from where it is.",
+        summary:     "The file (required). The protected area it is in is found from where it is.",
         ..Input::EMPTY
     };
 
@@ -351,7 +359,19 @@ contract! {
         arg:         Some(Arg::long("file")),
         group:       "tui",
         example:     "snapall tui --file ~/notes.txt",
-        summary:     "Open on the history of this file, with its versions to restore, instead of on all configs.",
+        summary:     "Open on the history of this file, with its versions to restore, instead of on all areas.",
+        ..Input::EMPTY
+    };
+
+    /// Protect this part of the disk.
+    SETUP_AREA: std::path::PathBuf, Command = Input {
+        key:         "area",
+        ty:          Type::Path,
+        subcommands: &[Command::Setup],
+        arg:         Some(Arg { value_name: "AREA", ..Arg::positional(0) }),
+        group:       "setup",
+        example:     "snapall setup /srv",
+        summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
         ..Input::EMPTY
     };
 
@@ -375,7 +395,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore],
+        subcommands: &[Command::Doctor, Command::Restore, Command::Setup],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",

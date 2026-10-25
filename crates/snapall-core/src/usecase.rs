@@ -7,7 +7,8 @@
 use thiserror::Error;
 
 use crate::domain::{
-    Change, ConfigName, Description, FileVersion, RestoreSummary, SnapshotId, SnapshotInfo,
+    Change, ConfigName, ConfigOption, Description, FileVersion, RestoreSummary, SnapshotId,
+    SnapshotInfo,
 };
 use crate::plan::{plan, Plan, PlanError};
 use crate::port::{BackendError, SnapshotBackend};
@@ -386,6 +387,77 @@ pub fn file_history(
         path: path.to_owned(),
         versions,
     })
+}
+
+/// Why an area could not be protected.
+#[derive(Debug, Error)]
+pub enum SetupError {
+    #[error(transparent)]
+    Snapshot(#[from] SnapshotError),
+    #[error("`{path}` is not an absolute path without `..`")]
+    BadPath { path: String },
+    #[error("{path} is already protected (by `{config}`)")]
+    AlreadyProtected { path: String, config: ConfigName },
+    #[error("no name could be chosen for the area at {path}")]
+    NoName { path: String },
+    /// It failed, and what had been started was undone: the disk is as it was.
+    #[error("{0}")]
+    Failed(BackendError),
+    /// It failed half way and could not be undone: something was left behind, and says what.
+    #[error("setting up {path} failed ({problem}) and the part that was done could not be undone ({undo}): the area is left as `{config}`")]
+    LeftBehind {
+        path: String,
+        config: ConfigName,
+        // boxed: this is the rare case, and two whole errors would make every Result larger
+        problem: Box<BackendError>,
+        undo: Box<BackendError>,
+    },
+}
+
+/// Start protecting the area mounted at `mount_point`: create what snapshots of it are kept in, and
+/// turn off snapshots on a schedule, so that they are taken when the person asks and nothing piles up
+/// on its own. If the second step fails the first is undone, so a half-made area never lingers.
+/// Returns the name it was given.
+pub fn protect_area(
+    backend: &dyn SnapshotBackend,
+    mount_point: &str,
+) -> Result<ConfigName, SetupError> {
+    if !clean(mount_point) {
+        return Err(SetupError::BadPath {
+            path: mount_point.to_owned(),
+        });
+    }
+    let configs = backend.list_configs().map_err(SnapshotError::from)?;
+    for config in &configs {
+        let subvolume = backend
+            .config_subvolume(config)
+            .map_err(SnapshotError::from)?;
+        if subvolume.trim_end_matches('/') == mount_point.trim_end_matches('/') {
+            return Err(SetupError::AlreadyProtected {
+                path: mount_point.to_owned(),
+                config: config.clone(),
+            });
+        }
+    }
+    let name =
+        crate::coverage::suggest_name(mount_point, &configs).ok_or_else(|| SetupError::NoName {
+            path: mount_point.to_owned(),
+        })?;
+    backend
+        .create_config(&name, mount_point)
+        .map_err(SetupError::Failed)?;
+    if let Err(problem) = backend.set_config_option(&name, ConfigOption::TimelineCreate(false)) {
+        return match backend.delete_config(&name) {
+            Ok(()) => Err(SetupError::Failed(problem)),
+            Err(undo) => Err(SetupError::LeftBehind {
+                path: mount_point.to_owned(),
+                config: name,
+                problem: Box::new(problem),
+                undo: Box::new(undo),
+            }),
+        };
+    }
+    Ok(name)
 }
 
 #[cfg(test)]
@@ -833,5 +905,87 @@ mod tests {
             config_covering(&backend, "/etc/fstab").unwrap().as_str(),
             "root"
         );
+    }
+
+    // ---- protecting an area ---------------------------------------------------------------------
+
+    #[test]
+    fn protecting_an_area_sets_it_up_named_after_it_and_stops_snapshots_on_a_schedule() {
+        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let name = protect_area(&backend, "/home").unwrap();
+        assert_eq!(name.as_str(), "home");
+        assert!(backend.list_configs().unwrap().contains(&name));
+        assert_eq!(backend.config_subvolume(&name).unwrap(), "/home");
+        assert_eq!(
+            backend.timeline_create("home"),
+            Some(false),
+            "snapshots happen when asked, not on a schedule"
+        );
+        // the new area takes part in "snapshot everything" straight away
+        let plan = plan_snapshots(&backend, None).unwrap();
+        assert_eq!(plan.targets().len(), 2);
+    }
+
+    #[test]
+    fn an_area_that_is_already_protected_is_refused_and_nothing_changes() {
+        let backend = InMemoryBackend::with_configs(&["root", "home"]).with_root_config("root");
+        let before = backend.list_configs().unwrap();
+        // the in-memory `home` config lives at /mnt/home
+        let error = protect_area(&backend, "/mnt/home/").unwrap_err();
+        assert!(
+            matches!(&error, SetupError::AlreadyProtected { config, .. } if config.as_str() == "home"),
+            "{error}"
+        );
+        assert_eq!(backend.list_configs().unwrap(), before);
+    }
+
+    #[test]
+    fn a_name_that_is_taken_is_not_reused() {
+        // a config called `home` exists for somewhere else
+        let backend = InMemoryBackend::with_configs(&["home"]);
+        let name = protect_area(&backend, "/home").unwrap();
+        assert_eq!(name.as_str(), "home_2");
+    }
+
+    #[test]
+    fn if_the_second_step_fails_the_first_is_undone_so_nothing_half_made_lingers() {
+        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        backend.refuse_option_changes();
+        let error = protect_area(&backend, "/home").unwrap_err();
+        assert!(matches!(error, SetupError::Failed(_)), "{error}");
+        assert_eq!(
+            backend.list_configs().unwrap().len(),
+            1,
+            "the new area was removed again"
+        );
+    }
+
+    #[test]
+    fn if_even_the_undo_fails_what_is_left_behind_is_named() {
+        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        backend.refuse_option_changes();
+        backend.refuse_removals();
+        let error = protect_area(&backend, "/home").unwrap_err();
+        let text = error.to_string();
+        assert!(
+            matches!(&error, SetupError::LeftBehind { config, .. } if config.as_str() == "home"),
+            "{text}"
+        );
+        assert!(
+            text.contains("could not be undone") && text.contains("`home`"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_path_that_could_escape_is_refused_before_anything_is_created() {
+        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        for bad in ["home", "/home/../etc", ""] {
+            assert!(
+                matches!(protect_area(&backend, bad), Err(SetupError::BadPath { .. })),
+                "{bad:?}"
+            );
+        }
+        assert_eq!(backend.list_configs().unwrap().len(), 1);
     }
 }

@@ -178,6 +178,33 @@ pub fn history_json(history: &FileHistory) -> Value {
     json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
 }
 
+pub fn setup_json(report: &crate::setup::Report) -> Value {
+    let worth = |worth: snapall_core::coverage::Worth| match worth {
+        snapall_core::coverage::Worth::Recommended => "recommended",
+        snapall_core::coverage::Worth::Optional => "optional",
+        snapall_core::coverage::Worth::NotUseful => "not_useful",
+    };
+    json!({
+        "dry_run": report.dry_run,
+        "areas": report.areas.iter().map(|a| json!({
+            "mount_point": a.mount_point,
+            "title": a.title,
+            "protected": a.protected_by.is_some(),
+            "config": a.protected_by.as_ref().map(|c| c.as_str()),
+            "worth": worth(a.worth),
+        })).collect::<Vec<_>>(),
+        "protected_now": report.protected_now.iter().map(|(point, name)| json!({"mount_point": point, "config": name.as_str()})).collect::<Vec<_>>(),
+        "declined": report.declined,
+        "failed": report.failed.iter().map(|(what, why)| json!({"what": what, "why": why})).collect::<Vec<_>>(),
+        "cleanup": match report.cleanup {
+            snapall_core::explain::Cleanup::On => "on",
+            snapall_core::explain::Cleanup::Off => "off",
+            snapall_core::explain::Cleanup::Unavailable => "unavailable",
+        },
+        "cleanup_switched_on": report.cleanup_switched_on,
+    })
+}
+
 pub fn doctor(os: &OsRelease, checks: &[Check]) -> String {
     let mut out = format!("system: {}\n", os.display_name());
     for check in checks {

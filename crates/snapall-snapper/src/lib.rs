@@ -20,8 +20,8 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 
 use snapall_core::{
-    BackendError, Change, ChangeKind, ConfigName, Description, FileState, FileVersion,
-    RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
+    BackendError, Change, ChangeKind, ConfigName, ConfigOption, Description, FileState,
+    FileVersion, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 
 const PROGRAM: &str = "snapper";
@@ -286,6 +286,31 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         let range = format!("{id}..0");
         let output = self.run(self.args(&["-c", config.as_str(), "status", range.as_str()]))?;
         parse_status(&output.stdout)
+    }
+
+    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
+        // `subvolume` is absolute (the use case checks), so it can never be read as an option.
+        self.run(self.args(&["-c", name.as_str(), "create-config", subvolume]))
+            .map(|_| ())
+    }
+
+    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
+        self.run(self.args(&["-c", name.as_str(), "delete-config"]))
+            .map(|_| ())
+    }
+
+    fn set_config_option(
+        &self,
+        name: &ConfigName,
+        option: ConfigOption,
+    ) -> Result<(), BackendError> {
+        let setting = match option {
+            ConfigOption::TimelineCreate(on) => {
+                format!("TIMELINE_CREATE={}", if on { "yes" } else { "no" })
+            }
+        };
+        self.run(self.args(&["-c", name.as_str(), "set-config", &setting]))
+            .map(|_| ())
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
@@ -1086,6 +1111,44 @@ mod tests {
         assert!(
             !covers("/proc/self/environ").unwrap(),
             "another device is another subvolume"
+        );
+    }
+
+    // ---- setting an area up ---------------------------------------------------------------------
+
+    #[test]
+    fn an_area_is_set_up_removed_and_adjusted_with_the_exact_commands() {
+        let script = Scripted::new(vec![ok(""), ok(""), ok(""), ok("")]);
+        let backend = SnapperCli::new(&script);
+        backend.create_config(&name("home"), "/home").unwrap();
+        backend
+            .set_config_option(&name("home"), ConfigOption::TimelineCreate(false))
+            .unwrap();
+        backend
+            .set_config_option(&name("home"), ConfigOption::TimelineCreate(true))
+            .unwrap();
+        backend.delete_config(&name("home")).unwrap();
+        let calls = script.calls.borrow();
+        assert_eq!(calls[0], ["-c", "home", "create-config", "/home"]);
+        assert_eq!(calls[1], ["-c", "home", "set-config", "TIMELINE_CREATE=no"]);
+        assert_eq!(
+            calls[2],
+            ["-c", "home", "set-config", "TIMELINE_CREATE=yes"]
+        );
+        assert_eq!(calls[3], ["-c", "home", "delete-config"]);
+    }
+
+    #[test]
+    fn snappers_own_words_come_back_when_setting_an_area_up_fails() {
+        let script = Scripted::new(vec![failed(
+            "Creating config failed (path is not a subvolume).",
+        )]);
+        let error = SnapperCli::new(&script)
+            .create_config(&name("data"), "/data")
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("path is not a subvolume"),
+            "{error}"
         );
     }
 }

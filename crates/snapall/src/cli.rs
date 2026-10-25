@@ -57,6 +57,12 @@ pub enum Request {
     History {
         path: String,
     },
+    /// Protect the parts of the disk that snapshots do not cover yet.
+    Setup {
+        area: Option<String>,
+        yes: bool,
+        dry_run: bool,
+    },
     Doctor {
         install: bool,
         yes: bool,
@@ -166,7 +172,7 @@ fn target(resolution: &Resolution) -> Result<(ConfigName, SnapshotId), UsageErro
         .get_from(resolution)
         .ok_or_else(|| missing(Contract::SNAPSHOT_ID.to_record()))?;
     Ok((
-        parse_config("CONFIG", &config)?,
+        parse_config("AREA", &config)?,
         SnapshotId::new(id).ok_or_else(|| {
             usage_error("ID 0 is the current system, not a snapshot; there is nothing to act on")
         })?,
@@ -357,7 +363,7 @@ fn build_request(
         Command::Snapshots => Request::Snapshots {
             config: Contract::SNAPSHOTS_CONFIG
                 .get_from(resolution)
-                .map(|name| parse_config("CONFIG", &name))
+                .map(|name| parse_config("AREA", &name))
                 .transpose()?,
         },
         Command::Delete => {
@@ -408,6 +414,14 @@ fn build_request(
                 .ok_or_else(|| usage_error("missing required argument <FILE>"))?;
             Request::History { path: utf8(&path)? }
         }
+        Command::Setup => Request::Setup {
+            area: Contract::SETUP_AREA
+                .get_from(resolution)
+                .map(|path| utf8(&path))
+                .transpose()?,
+            yes: flag(&Contract::YES, resolution),
+            dry_run: flag(&Contract::DRY_RUN, resolution),
+        },
         Command::Tui => Request::Tui {
             file: Contract::TUI_FILE
                 .get_from(resolution)
@@ -635,7 +649,7 @@ mod tests {
                 id: SnapshotId::new(12).unwrap(),
             }
         );
-        assert!(err(&["delete"]).contains("missing required argument <CONFIG>"));
+        assert!(err(&["delete"]).contains("missing required argument <AREA>"));
         assert!(err(&["delete", "home"]).contains("missing required argument <ID>"));
         assert!(err(&["delete", "home", "0"]).contains("current system"));
         assert!(err(&["delete", "home", "twelve"]).contains("snapshot_id"));

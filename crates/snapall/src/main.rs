@@ -24,6 +24,7 @@ mod help;
 mod logging;
 mod output;
 mod render;
+mod setup;
 
 use std::process::ExitCode;
 
@@ -117,6 +118,11 @@ fn run(parsed: Parsed) -> Outcome {
             dry_run,
             yes,
         } => commands::restore(&ctx, &config, id, path.as_deref(), dry_run, yes),
+
+        // setting up
+        Request::Setup { area, yes, dry_run } => {
+            commands::setup(&ctx, area.as_deref(), yes, dry_run)
+        }
 
         // helping and showing
         Request::Doctor { install, yes } => doctor::run(&backend, &observer, install, yes, json),

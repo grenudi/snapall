@@ -4,7 +4,7 @@
 
 Before an Arch update, a new desktop theme or a config you are not sure about, add a restore point in one command, try the thing, and put your files back if you do not like it. snapall takes the snapshot of everything you have set up (system and home), lists them in a friendly terminal UI you can drive with the mouse, restores files from them, and deletes the ones you no longer need, so they do not pile up. It is a plug-and-play front end for [snapper](http://snapper.io/) on Btrfs: no configuration of its own, nothing to learn first.
 
-- **One command, everything.** `sudo snapall "before theming"` snapshots every snapper config at once.
+- **One command, everything.** `sudo snapall "before theming"` snapshots every protected area at once (the System, your Home files, and anything else you protect).
 - **A real interface.** `sudo snapall tui`, or the *snapall* icon in your application menu (it opens a terminal and asks for your password). Mouse or keyboard.
 - **Go back.** Restore a file, a folder or your whole home from any snapshot; the state before is snapshotted first, so a restore can be undone. To go back with the *whole system*, boot an earlier snapshot from the boot menu: snapall checks whether your machine has that (Limine or GRUB) and tells you how to get it if not.
 - **Honest about itself.** Snapshots live on the same disk: this is a safety net for experiments, not a backup. `snapall doctor` tells you what is missing before anything goes wrong.
@@ -153,12 +153,13 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 
 | Command | What it does |
 |---|---|
-| `snapall [create] [DESCRIPTION]` | One snapshot of every config (the default). `--only root,home` restricts it, `--dry-run` previews it. |
-| `snapall list` | The configs snapall can see, i.e. exactly what `create` would touch. |
-| `snapall snapshots [CONFIG]` | The snapshots of one config, or of all. |
-| `snapall delete CONFIG ID` | Delete one snapshot. `0` is the current system and is refused. |
-| `snapall changes CONFIG ID [PATH]` | What restoring that snapshot would change: files it would revert, remove or bring back. |
-| `snapall restore CONFIG ID [PATH]` | Put a config (or one path of it) back to how the snapshot had it. Shows what changes and asks first (`--yes` skips the question, `--dry-run` only shows). The state just before is snapshotted first, so a restore can be undone. The system root is refused: see [Restoring](#restoring). |
+| `snapall [create] [DESCRIPTION]` | One snapshot of every protected area (the default). `--only root,home` restricts it, `--dry-run` previews it. |
+| `snapall list` | The protected areas snapall can see, i.e. exactly what `create` would touch. |
+| `snapall setup [AREA]` | Find the parts of your disk that have no snapshots yet (such as your Home files), explain in plain words what protecting them means, ask, and do it. `--dry-run` only explains; `--yes` accepts what snapall recommends. Needs `sudo`. |
+| `snapall snapshots [AREA]` | The snapshots of one protected area, or of all. |
+| `snapall delete AREA ID` | Delete one snapshot. `0` is the current system and is refused. |
+| `snapall changes AREA ID [PATH]` | What restoring that snapshot would change: files it would revert, remove or bring back. |
+| `snapall restore AREA ID [PATH]` | Put a protected area (or one path of it) back to how the snapshot had it. Shows what changes and asks first (`--yes` skips the question, `--dry-run` only shows). The state just before is snapshotted first, so a restore can be undone. The system root is refused: see [Restoring](#restoring). |
 | `snapall doctor [--install]` | Checks that snapper works; with `--install`, installs it with this system's package manager (shows the commands, asks first, needs root). |
 | `snapall tui` | The interactive terminal UI. |
 | `snapall contract` | This program's invocation contract, as [argenv](https://github.com/argenv-opencommons/argenv) JSON. |
@@ -225,19 +226,36 @@ $ jq -c 'select(.level == "error")' /var/log/snapall.jsonl
 
 `--log text|json` writes to stderr: an event stream you route with your environment (a pipe, journald under systemd). `--log-file` appends JSON Lines to a private file instead, which is what you want from cron or a systemd timer. The `tui` owns the terminal, so it logs only to a file. If a log line cannot be written, the operation still happens: losing a log line is better than failing a snapshot.
 
-### What a snapshot contains
+### Getting protected
 
-snapall snapshots **every snapper config**, and a config is one Btrfs subvolume. A snapshot stops at a subvolume boundary, so it contains exactly that subvolume and nothing mounted or nested inside it. On Arch and CachyOS `/` and `/home` are separate subvolumes (`@` and `@home`), so a `root` config holds **none of your files under `/home`**: they need a config of their own. snapall does not invent configs; it uses the ones snapper has, and tells you when your files are left out:
+snapall keeps snapshots for **protected areas**: parts of your disk, such as *System* (`/`) and *Home* (`/home`). A snapshot of one area does not contain the others, so each needs protecting. On Arch and CachyOS your Home files are an area of their own, which means a computer that was only set up for System has **none of your own files protected**, however many snapshots it takes.
+
+snapall finds this out and fixes it, with explanations, so you do not need to know anything beforehand:
 
 ```console
-$ sudo snapall doctor
-warn  home  /home is a separate Btrfs subvolume that no snapper config covers: snapshots of your other configs do not contain your files
-      fix: sudo snapper -c home create-config /home
-           sudo snapper -c home set-config TIMELINE_CREATE=no   (so only snapall makes its snapshots)
-           snapall then snapshots it together with the rest
+$ sudo snapall setup
+A snapshot is a saved moment of your computer. If an update, a new setting or a mistake breaks
+something, you can go back to how things were. ...
+
+The parts of your disk, and whether snapshots are kept for them:
+
+  System (/): protected
+  Home (/home): NOT protected
+      It holds your own files: documents, downloads, pictures, and the settings of your applications.
+      Recommended. Snapshots of the System area do not contain these files, so without this a mistake
+      or a bad change here could not be undone.
+
+Protect Home (/home)?
+  What snapall will do:
+    - make a hidden folder called .snapshots inside /home, where its snapshots will be kept;
+    - make sure snapshots of it are taken only when you ask, never on a schedule, so nothing is
+      taken or piles up on its own.
+  What it will not do: it does not copy, move or change any of your files, and it takes no snapshot yet.
+
+Protect Home now? [Y/n]
 ```
 
-After that one command `sudo snapall` snapshots both, and the file-manager entry and `snapall history` work for files in `/home`. For a file that no snapshot *can* contain, they say so and give the command, instead of listing snapshots that would only ever show it as missing.
+It also tells you whether old snapshots are cleaned up automatically on your computer (a new area keeps the newest 50), and offers to switch that on if it is off. `sudo snapall doctor` warns when a part of your disk that matters has no snapshots, and points at `setup`; `snapall history` and the file-manager entry say the same about a file that no snapshot can contain. Snapshots are not a backup: they live on the same disk.
 
 ## The terminal UI
 

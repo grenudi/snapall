@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-24T20:48:45Z",
+  "generated": "2026-10-25T03:23:47Z",
   "inputs": [
     {
       "allowed": [],
@@ -109,7 +109,8 @@
         "restore",
         "history",
         "doctor",
-        "tui"
+        "tui",
+        "setup"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -140,7 +141,8 @@
         "restore",
         "history",
         "doctor",
-        "tui"
+        "tui",
+        "setup"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -185,7 +187,7 @@
       "subcommands": [
         "create"
       ],
-      "summary": "Comma-separated configs to snapshot (default: every config). A name snapper does not know is an error.",
+      "summary": "Comma-separated names of the areas to snapshot (default: all of them; `snapall list` shows the names). A name that does not exist is an error.",
       "type": "string"
     },
     {
@@ -203,7 +205,8 @@
       "stability": "unknown",
       "subcommands": [
         "create",
-        "restore"
+        "restore",
+        "setup"
       ],
       "summary": "Show what would happen without changing anything.",
       "type": "bool"
@@ -232,6 +235,7 @@
         "changes",
         "restore",
         "history",
+        "setup",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -244,7 +248,7 @@
         "negatable": false,
         "position": 0,
         "repeatable": false,
-        "value_name": "CONFIG"
+        "value_name": "AREA"
       },
       "group": "snapshots",
       "key": "snapshots_config",
@@ -253,7 +257,7 @@
       "subcommands": [
         "snapshots"
       ],
-      "summary": "List only this config's snapshots (default: every config).",
+      "summary": "List only this area's snapshots (default: all areas).",
       "type": "string"
     },
     {
@@ -263,7 +267,7 @@
         "negatable": false,
         "position": 0,
         "repeatable": false,
-        "value_name": "CONFIG"
+        "value_name": "AREA"
       },
       "group": "snapshot",
       "key": "config",
@@ -274,7 +278,7 @@
         "changes",
         "restore"
       ],
-      "summary": "The config the snapshot belongs to (required).",
+      "summary": "The name of the protected area, as `snapall list` shows it (required).",
       "type": "string"
     },
     {
@@ -317,7 +321,7 @@
         "changes",
         "restore"
       ],
-      "summary": "Only this file or directory (an absolute path inside the config). Default: everything that differs.",
+      "summary": "Only this file or directory (an absolute path inside the area). Default: everything that differs.",
       "type": "path"
     },
     {
@@ -337,7 +341,7 @@
       "subcommands": [
         "history"
       ],
-      "summary": "The file (required). The config that covers it is found from where it is.",
+      "summary": "The file (required). The protected area it is in is found from where it is.",
       "type": "path"
     },
     {
@@ -356,7 +360,27 @@
       "subcommands": [
         "tui"
       ],
-      "summary": "Open on the history of this file, with its versions to restore, instead of on all configs.",
+      "summary": "Open on the history of this file, with its versions to restore, instead of on all areas.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "example": "snapall setup /srv",
+      "group": "setup",
+      "key": "area",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "setup"
+      ],
+      "summary": "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
       "type": "path"
     },
     {
@@ -395,7 +419,8 @@
       "stability": "unknown",
       "subcommands": [
         "doctor",
-        "restore"
+        "restore",
+        "setup"
       ],
       "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
       "type": "bool"
@@ -446,5 +471,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.6.0"
+  "source": "snapall@0.8.0"
 }

@@ -646,8 +646,13 @@ fn history_refuses_a_directory_and_a_file_no_config_covers_with_the_reason() {
     let outside = v.run(&v.root, &["--no-dbus", "history", "/etc/hostname"]);
     assert_eq!(outside.status.code(), Some(1));
     assert!(
-        stderr(&outside).contains("no snapper config covers"),
+        stderr(&outside).contains("No snapshot contains /etc/hostname"),
         "{}",
+        stderr(&outside)
+    );
+    assert!(
+        !stderr(&outside).contains("snapper config"),
+        "no jargon: {}",
         stderr(&outside)
     );
 }
@@ -700,27 +705,21 @@ fn a_restore_can_be_logged_and_the_log_says_what_it_restored() {
 }
 
 #[test]
-fn a_file_on_another_subvolume_than_the_configs_gets_the_reason_and_the_command_not_a_false_history(
-) {
+fn a_file_no_snapshot_can_contain_says_so_in_plain_words_and_never_claims_it_did_not_exist() {
     // The user's report: a file in /home, where /home is a separate subvolume and only a config for
     // `/` exists. /proc stands in for the separate subvolume (another device, under `/` by name).
     let dir = fake_snapper("othervol");
     let output = with_fake(&dir, &["--no-dbus", "history", "/proc/self/environ"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     let message = stderr(&output);
+    assert!(message.contains("No snapshot contains /proc/"), "{message}");
     assert!(
-        message.contains("different subvolume than config `root`"),
-        "{message}"
+        message.contains("cannot protect"),
+        "/proc is not a disk snapall can protect: {message}"
     );
-    assert!(
-        message.contains("no snapshot of `root` contains it"),
-        "{message}"
-    );
-    assert!(
-        message.contains("sudo snapper -c proc create-config /proc"),
-        "the command names the subvolume that holds the file: {message}"
-    );
-    assert!(message.contains("TIMELINE_CREATE=no"), "{message}");
+    for jargon in ["snapper", "subvolume", "create-config"] {
+        assert!(!message.contains(jargon), "`{jargon}` in: {message}");
+    }
     assert!(
         !stdout(&output).contains("did not exist"),
         "it must not claim the file did not exist"

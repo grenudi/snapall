@@ -7,7 +7,8 @@
 use thiserror::Error;
 
 use crate::domain::{
-    Change, ConfigName, Description, FileVersion, RestoreSummary, SnapshotId, SnapshotInfo,
+    Change, ConfigName, ConfigOption, Description, FileVersion, RestoreSummary, SnapshotId,
+    SnapshotInfo,
 };
 
 pub trait SnapshotBackend {
@@ -37,6 +38,21 @@ pub trait SnapshotBackend {
         config: &ConfigName,
         id: SnapshotId,
     ) -> Result<Vec<Change>, BackendError>;
+
+    /// Start keeping snapshots of the subvolume at `subvolume` (an absolute path), under `name`.
+    /// Nothing is copied or moved: it creates the place the snapshots will be kept.
+    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError>;
+
+    /// Stop keeping snapshots for `name` and remove its place. For undoing a half-finished
+    /// [`SnapshotBackend::create_config`].
+    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError>;
+
+    /// Choose one of a config's settings.
+    fn set_config_option(
+        &self,
+        name: &ConfigName,
+        option: ConfigOption,
+    ) -> Result<(), BackendError>;
 
     /// Whether `path` is on the config's own subvolume, so that a snapshot of the config contains it.
     ///

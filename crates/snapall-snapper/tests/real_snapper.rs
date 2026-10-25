@@ -11,8 +11,9 @@
 
 use snapall_core::testing::backend_contract;
 use snapall_core::{
-    config_covering, file_history, preview_restore, restore_snapshot, snapshot_all, ChangeKind,
-    ConfigName, Description, FileState, HistoryError, RestoreError, SnapshotBackend,
+    config_covering, file_history, preview_restore, protect_area, restore_snapshot, snapshot_all,
+    ChangeKind, ConfigName, Description, FileState, HistoryError, RestoreError, SetupError,
+    SnapshotBackend,
 };
 use snapall_snapper::SnapperCli;
 
@@ -279,4 +280,96 @@ fn a_separate_subvolume_inside_a_configs_directory_is_not_covered_by_that_config
 
     run(&["subvolume", "delete", &nested]);
     let _ = std::fs::remove_file(&inside);
+}
+
+/// Setting an area up on real Btrfs with real snapper: what it creates, that snapshots on a schedule
+/// end up off, that the new area is found by file lookups, and that a directory that is not a
+/// subvolume fails cleanly and leaves nothing registered.
+#[test]
+fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
+    if !enabled() {
+        return;
+    }
+    let backend = backend();
+    let base = backend
+        .config_subvolume(&ConfigName::parse("snapall_it_b").unwrap())
+        .unwrap();
+    let area = format!("{base}/area-it");
+    let plain = format!("{base}/plain-it");
+    let btrfs = |args: &[&str]| {
+        assert!(
+            std::process::Command::new("btrfs")
+                .args(args)
+                .status()
+                .unwrap()
+                .success(),
+            "btrfs {args:?}"
+        );
+    };
+    btrfs(&["subvolume", "create", &area]);
+    std::fs::create_dir(&plain).unwrap();
+    let before = backend.list_configs().unwrap();
+
+    let name = protect_area(&backend, &area).unwrap();
+    assert_eq!(name.as_str(), "area-it", "named after the directory");
+    assert!(backend.list_configs().unwrap().contains(&name));
+    assert!(
+        std::path::Path::new(&format!("{area}/.snapshots")).exists(),
+        "where the snapshots will be kept"
+    );
+    let settings = String::from_utf8(
+        std::process::Command::new("snapper")
+            .args(["--no-dbus", "-c", name.as_str(), "get-config"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    let timeline = settings
+        .lines()
+        .find(|l| l.contains("TIMELINE_CREATE"))
+        .unwrap();
+    assert!(
+        timeline.contains("no"),
+        "snapshots on a schedule must be off: {timeline}"
+    );
+
+    // it takes part in a file lookup and in a snapshot straight away
+    let file = format!("{area}/notes.txt");
+    std::fs::write(&file, "mine").unwrap();
+    assert_eq!(config_covering(&backend, &file).unwrap(), name);
+    let id = backend
+        .create_snapshot(
+            &name,
+            &Description::parse("it: first snapshot of a new area").unwrap(),
+        )
+        .unwrap();
+    assert!(backend
+        .list_snapshots(&name)
+        .unwrap()
+        .iter()
+        .any(|s| s.id == id));
+
+    // a second attempt is refused, and a plain directory fails with snapper's reason and leaves nothing
+    assert!(matches!(
+        protect_area(&backend, &area),
+        Err(SetupError::AlreadyProtected { .. })
+    ));
+    let error = protect_area(&backend, &plain).unwrap_err();
+    assert!(matches!(error, SetupError::Failed(_)), "{error}");
+    assert!(
+        error.to_string().contains("not a btrfs subvolume"),
+        "{error}"
+    );
+    assert_eq!(
+        backend.list_configs().unwrap().len(),
+        before.len() + 1,
+        "the failed one registered nothing"
+    );
+
+    // undo, as the rollback does (this also removes the snapshots it held: nothing else does)
+    backend.delete_config(&name).unwrap();
+    assert_eq!(backend.list_configs().unwrap(), before);
+    btrfs(&["subvolume", "delete", &area]);
+    std::fs::remove_dir(&plain).unwrap();
 }
