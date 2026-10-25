@@ -38,6 +38,13 @@ pub trait SnapshotBackend {
         id: SnapshotId,
     ) -> Result<Vec<Change>, BackendError>;
 
+    /// Whether `path` is on the config's own subvolume, so that a snapshot of the config contains it.
+    ///
+    /// Being under the subvolume's directory is not enough: a snapshot stops at a subvolume
+    /// boundary, so a file in a separate subvolume that is nested in or mounted over that directory
+    /// (the usual `/home` beside a `/` config) is not in the config's snapshots at all.
+    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError>;
+
     /// How the file at `path` (absolute, inside the config's subvolume) stood in every snapshot of
     /// the config, oldest first, compared with the file as it is now. Read-only. A directory is
     /// [`BackendError::NotSupported`].

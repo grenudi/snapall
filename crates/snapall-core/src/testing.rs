@@ -34,6 +34,9 @@ struct ConfigState {
 struct State {
     configs: BTreeMap<ConfigName, ConfigState>,
     failing: BTreeSet<ConfigName>,
+    /// Directories that are the root of a separate subvolume: not part of any snapshot of a config
+    /// above them, as a separate `/home` is not part of a snapshot of `/`.
+    separate: Vec<String>,
 }
 
 /// A backend that keeps everything in memory. Fast core tests need nothing else.
@@ -71,6 +74,15 @@ impl InMemoryBackend {
         if let Some(entry) = self.lock().configs.get_mut(&name) {
             entry.subvolume = "/".into();
         }
+        self
+    }
+
+    /// Declare `directory` the root of a separate subvolume: everything under it is no longer
+    /// covered by a config whose subvolume is above it.
+    pub fn with_separate_subvolume(self, directory: &str) -> Self {
+        self.lock()
+            .separate
+            .push(directory.trim_end_matches('/').to_owned());
         self
     }
 
@@ -198,6 +210,21 @@ impl SnapshotBackend for InMemoryBackend {
             .get(config)
             .map(|entry| entry.subvolume.clone())
             .ok_or_else(|| BackendError::UnknownConfig(config.clone()))
+    }
+
+    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
+        let state = self.lock();
+        let entry = state
+            .configs
+            .get(config)
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+        let base = entry.subvolume.trim_end_matches('/');
+        let inside = base.is_empty() || path == base || path.starts_with(&format!("{base}/"));
+        // a separate subvolume below the config's own directory takes the path out of its snapshots
+        let cut_off = state.separate.iter().any(|root| {
+            root.len() > base.len() && (path == root || path.starts_with(&format!("{root}/")))
+        });
+        Ok(inside && !cut_off)
     }
 
     fn changes_since(
@@ -396,6 +423,12 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
         "undoing to a snapshot that does not exist must be an error"
     );
     assert!(backend.config_subvolume(&missing).is_err());
+    assert!(
+        backend
+            .covers(existing, &subvolume)
+            .expect("covers succeeds"),
+        "a config covers its own subvolume"
+    );
     // A file's history is read-only too: for a path that was never there, every snapshot says so.
     let never = format!(
         "{}/snapall-contract-never-existed",

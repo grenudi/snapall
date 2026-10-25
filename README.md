@@ -225,7 +225,21 @@ $ jq -c 'select(.level == "error")' /var/log/snapall.jsonl
 
 `--log text|json` writes to stderr: an event stream you route with your environment (a pipe, journald under systemd). `--log-file` appends JSON Lines to a private file instead, which is what you want from cron or a systemd timer. The `tui` owns the terminal, so it logs only to a file. If a log line cannot be written, the operation still happens: losing a log line is better than failing a snapshot.
 
-### The terminal UI
+### What a snapshot contains
+
+snapall snapshots **every snapper config**, and a config is one Btrfs subvolume. A snapshot stops at a subvolume boundary, so it contains exactly that subvolume and nothing mounted or nested inside it. On Arch and CachyOS `/` and `/home` are separate subvolumes (`@` and `@home`), so a `root` config holds **none of your files under `/home`**: they need a config of their own. snapall does not invent configs; it uses the ones snapper has, and tells you when your files are left out:
+
+```console
+$ sudo snapall doctor
+warn  home  /home is a separate Btrfs subvolume that no snapper config covers: snapshots of your other configs do not contain your files
+      fix: sudo snapper -c home create-config /home
+           sudo snapper -c home set-config TIMELINE_CREATE=no   (so only snapall makes its snapshots)
+           snapall then snapshots it together with the rest
+```
+
+After that one command `sudo snapall` snapshots both, and the file-manager entry and `snapall history` work for files in `/home`. For a file that no snapshot *can* contain, they say so and give the command, instead of listing snapshots that would only ever show it as missing.
+
+## The terminal UI
 
 Configs on the left, the selected config's snapshots on the right, newest first.
 

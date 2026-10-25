@@ -404,6 +404,7 @@ mod tests {
             snapper: Err("No such file or directory".into()),
             is_root: Some(false),
             configs: None,
+            subvolumes: Vec::new(),
         };
         let checks = diagnose(&probe);
         let text = doctor(&probe.os, &checks);

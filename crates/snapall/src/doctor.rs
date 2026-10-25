@@ -12,6 +12,7 @@ use std::process::{Command, ExitCode};
 use std::time::Instant;
 
 use snapall_core::boot::{self, BootStatus};
+use snapall_core::coverage;
 use snapall_core::doctor::{
     diagnose, install_plan, worst, Check, InstallPlan, OsRelease, Probe, Status, Step,
 };
@@ -26,6 +27,15 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
     let configs = snapper
         .is_ok()
         .then(|| backend.list_configs().map_err(|e| e.to_string()));
+    // Where each config lives, to see what none of them covers. Unreadable ones are left out: this
+    // only adds a finding, and the configs check already says if listing fails.
+    let subvolumes = match &configs {
+        Some(Ok(names)) => names
+            .iter()
+            .filter_map(|name| backend.config_subvolume(name).ok())
+            .collect(),
+        _ => Vec::new(),
+    };
     Probe {
         os: read_os_release(),
         snapper,
@@ -34,6 +44,7 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
             .and_then(|status| effective_uid(&status))
             .map(|uid| uid == 0),
         configs,
+        subvolumes,
     }
 }
 
@@ -196,8 +207,33 @@ fn boot_menu_check() -> Option<Check> {
     })
 }
 
+/// Is the user's own data left out of every snapshot? A snapshot stops at a subvolume boundary, so
+/// with `/home` as a separate Btrfs subvolume (as on Arch and CachyOS) the config for `/` holds none
+/// of it. A warning, never a failure: nothing is broken, a part of the system is just not protected.
+fn home_check(probe: &Probe) -> Option<Check> {
+    if !matches!(probe.configs, Some(Ok(_))) {
+        return None;
+    }
+    let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").ok()?;
+    let point = coverage::uncovered_home(
+        &coverage::mounts_from_mountinfo(&mountinfo),
+        &probe.subvolumes,
+    )?;
+    Some(Check {
+        name: "home",
+        status: Status::Warn,
+        detail: format!(
+            "{point} is a separate Btrfs subvolume that no snapper config covers: snapshots of your other configs do not contain your files"
+        ),
+        fix: Some(format!(
+            "sudo snapper -c home create-config {point}\n      sudo snapper -c home set-config TIMELINE_CREATE=no   (so only snapall makes its snapshots)\n      snapall then snapshots it together with the rest"
+        )),
+    })
+}
+
 fn emit_report(probe: &Probe, json: bool) -> Result<(), Box<dyn Error>> {
     let mut checks = diagnose(probe);
+    checks.extend(home_check(probe));
     checks.extend(boot_menu_check());
     if json {
         emit_json(&render::doctor_json(&probe.os, &checks))

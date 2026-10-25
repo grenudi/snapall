@@ -288,6 +288,11 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         parse_status(&output.stdout)
     }
 
+    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
+        let subvolume = self.config_subvolume(config)?;
+        same_subvolume(Path::new(&subvolume), Path::new(path))
+    }
+
     fn file_versions(
         &self,
         config: &ConfigName,
@@ -335,6 +340,29 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         let output = self.run(self.args(&rest))?;
         Ok(parse_summary(&output.stdout))
     }
+}
+
+/// The nearest ancestor of `path` that exists, which is where a file that is gone was kept.
+fn nearest_existing(path: &Path) -> Option<&Path> {
+    path.ancestors().find(|ancestor| ancestor.exists())
+}
+
+/// Whether the directory holding `path` is on the same subvolume as `subvolume`. Btrfs gives every
+/// subvolume its own device number, so this is a comparison of those: a subvolume that is nested in
+/// another, or mounted over a directory of it, is told apart from it. The directory is what is
+/// compared (not the file) because that is where the file, a symlink or a deleted file lives.
+fn same_subvolume(subvolume: &Path, path: &Path) -> Result<bool, BackendError> {
+    // The subvolume's own root directory is the subvolume, whatever holds that directory.
+    if path.components().eq(subvolume.components()) {
+        return Ok(true);
+    }
+    let holder = path
+        .parent()
+        .and_then(nearest_existing)
+        .unwrap_or(Path::new("/"));
+    let theirs = fs::metadata(subvolume).map_err(|e| io_error(subvolume, &e))?;
+    let ours = fs::metadata(holder).map_err(|e| io_error(holder, &e))?;
+    Ok(theirs.dev() == ours.dev())
 }
 
 fn io_error(path: &Path, error: &io::Error) -> BackendError {
@@ -1024,6 +1052,40 @@ mod tests {
         assert!(
             error.to_string().contains("snapshot 1 is not at"),
             "{error}"
+        );
+    }
+
+    // ---- which subvolume a file is on -----------------------------------------------------------
+
+    #[test]
+    fn a_file_is_covered_when_its_directory_is_on_the_configs_own_device() {
+        let v = Volume::new("covers");
+        v.live("docs/notes.txt", b"x");
+        let covers = |path: &str| {
+            let configs = format!(
+                r#"{{"configs":[{{"config":"vol","subvolume":"{}"}}]}}"#,
+                v.0.display()
+            );
+            let script = Scripted::new(vec![ok(&configs)]);
+            SnapperCli::new(&script).covers(&name("vol"), path)
+        };
+        assert!(
+            covers(&v.path("docs/notes.txt")).unwrap(),
+            "a file in the subvolume"
+        );
+        assert!(
+            covers(&v.path("docs/deleted-since.txt")).unwrap(),
+            "a deleted file is where its directory is"
+        );
+        assert!(
+            covers(&v.path("no/such/dir/at/all.txt")).unwrap(),
+            "the nearest directory that exists decides"
+        );
+        // /proc is a different device, as a separate Btrfs subvolume is: not covered, though a path
+        // under the subvolume by name would be
+        assert!(
+            !covers("/proc/self/environ").unwrap(),
+            "another device is another subvolume"
         );
     }
 }

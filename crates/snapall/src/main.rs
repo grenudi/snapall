@@ -9,6 +9,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod advice;
 mod ask;
 mod boot_probe;
 mod cli;
@@ -324,7 +325,8 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
             )?)?;
         }
         Request::History { path } => {
-            let found = file_history(&backend, &absolute(&path)?)?;
+            let path = absolute(&path)?;
+            let found = file_history(&backend, &path).map_err(|e| advice::explain(&e, &path))?;
             if json {
                 emit_json(&render::history_json(&found))?;
             } else {
@@ -343,7 +345,8 @@ fn run(parsed: Parsed) -> Result<ExitCode, Box<dyn Error>> {
                     if std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
                         return Err("directories are not supported yet: choose a file".into());
                     }
-                    let config = config_covering(&backend, &path)?;
+                    let config =
+                        config_covering(&backend, &path).map_err(|e| advice::explain(&e, &path))?;
                     Some(snapall_tui::FileTarget { path, config })
                 }
                 None => None,

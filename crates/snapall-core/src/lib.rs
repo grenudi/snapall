@@ -11,6 +11,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod boot;
+pub mod coverage;
 pub mod doctor;
 pub mod domain;
 pub mod observe;
