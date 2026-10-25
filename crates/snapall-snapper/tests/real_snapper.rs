@@ -17,6 +17,51 @@ use snapall_core::{
 };
 use snapall_snapper::SnapperCli;
 
+/// These tests share one filesystem and one list of configs. A test that has a config for a moment
+/// (setting an area up) would be seen, and snapshotted, by the test that snapshots every config, and a
+/// snapshot made while a config is being removed makes the removal fail. They take turns.
+static TAKE_TURNS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn take_turns() -> std::sync::MutexGuard<'static, ()> {
+    // a test that failed must not stop the others from running
+    TAKE_TURNS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Removes what a test made, even when the test fails half way: what is left behind fails every
+/// later run too (`target path already exists`), and hides the first failure under its own.
+struct Cleanup {
+    config: Option<String>,
+    subvolumes: Vec<String>,
+    directories: Vec<String>,
+}
+
+impl Cleanup {
+    fn run(&self) {
+        use std::process::Command;
+        if let Some(config) = &self.config {
+            let _ = Command::new("snapper")
+                .args(["--no-dbus", "-c", config, "delete-config"])
+                .output();
+        }
+        for subvolume in &self.subvolumes {
+            let _ = Command::new("btrfs")
+                .args(["subvolume", "delete", subvolume])
+                .output();
+        }
+        for directory in &self.directories {
+            let _ = std::fs::remove_dir(directory);
+        }
+    }
+}
+
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        self.run();
+    }
+}
+
 fn enabled() -> bool {
     if std::env::var_os("SNAPALL_IT").is_none() {
         eprintln!("skipped: set SNAPALL_IT=1 (see dev/btrfs-fixture.sh)");
@@ -34,6 +79,7 @@ fn contract_holds_against_real_snapper() {
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let config = ConfigName::parse("snapall_it_a").unwrap();
     backend_contract(&backend(), &config);
 }
@@ -43,6 +89,7 @@ fn snapshot_all_covers_every_fixture_config() {
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let report = snapshot_all(
         &backend(),
         None,
@@ -68,6 +115,7 @@ fn restoring_works_end_to_end_on_a_real_filesystem() {
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let backend = backend();
     let config = ConfigName::parse("snapall_it_b").unwrap();
     let base = backend.config_subvolume(&config).unwrap();
@@ -165,6 +213,7 @@ fn a_files_history_is_read_from_real_snapshots_and_a_version_can_be_restored() {
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let backend = backend();
     let config = ConfigName::parse("snapall_it_a").unwrap();
     let base = backend.config_subvolume(&config).unwrap();
@@ -234,10 +283,17 @@ fn a_separate_subvolume_inside_a_configs_directory_is_not_covered_by_that_config
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let backend = backend();
     let config = ConfigName::parse("snapall_it_b").unwrap();
     let base = backend.config_subvolume(&config).unwrap();
     let nested = format!("{base}/separate-it");
+    let _cleanup = Cleanup {
+        config: None,
+        subvolumes: vec![nested.clone()],
+        directories: Vec::new(),
+    };
+    _cleanup.run(); // what an earlier failed run left behind
     let run = |args: &[&str]| {
         let status = std::process::Command::new("btrfs")
             .args(args)
@@ -290,12 +346,19 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
     if !enabled() {
         return;
     }
+    let _turn = take_turns();
     let backend = backend();
     let base = backend
         .config_subvolume(&ConfigName::parse("snapall_it_b").unwrap())
         .unwrap();
     let area = format!("{base}/area-it");
     let plain = format!("{base}/plain-it");
+    let _cleanup = Cleanup {
+        config: Some("area-it".into()),
+        subvolumes: vec![area.clone()],
+        directories: vec![plain.clone()],
+    };
+    _cleanup.run(); // what an earlier failed run left behind
     let btrfs = |args: &[&str]| {
         assert!(
             std::process::Command::new("btrfs")
