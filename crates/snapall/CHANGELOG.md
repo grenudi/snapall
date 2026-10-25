@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.11.0]
+
+
+### Features
+- **tui:** A restore points screen: list them, see what each would change, put all of one back ([#38](https://github.com/grenudi/snapall/pull/38)) ([632ef18])
+
+
+
 ## [0.10.0]
 
 
