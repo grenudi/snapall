@@ -55,7 +55,7 @@ fn the_main_screen_shows_configs_snapshots_and_key_hints() {
     let text = screen(&session, 100, 20);
 
     assert!(text.contains("snapall"), "{text}");
-    assert!(text.contains("Configs"), "{text}");
+    assert!(text.contains("Protected areas"), "{text}");
     assert!(
         text.contains("home  (2)"),
         "loaded counts show in the list\n{text}"
@@ -115,7 +115,7 @@ fn the_all_configs_prompt_names_every_config() {
     let mut session = Session::new(&backend);
     session.press(Key::Char('a'));
     let text = screen(&session, 100, 20);
-    assert!(text.contains("ALL configs (home, root)"), "{text}");
+    assert!(text.contains("ALL protected areas (home, root)"), "{text}");
 }
 
 #[test]

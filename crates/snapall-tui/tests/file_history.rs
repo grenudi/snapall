@@ -97,7 +97,7 @@ fn it_opens_on_the_file_and_says_how_each_snapshot_compares_with_it() {
     assert!(text.contains("history of /mnt/home/notes.txt"), "{text}");
     assert!(text.contains("notes.txt in home"), "{text}");
     assert!(
-        !text.contains("Configs"),
+        !text.contains("Protected areas"),
         "there is no configs pane when opened on a file:\n{text}"
     );
     // newest first, each with the words for how it compares

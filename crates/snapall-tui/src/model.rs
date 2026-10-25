@@ -162,7 +162,8 @@ pub enum Modal {
         path: Option<String>,
         stage: RestoreStage,
     },
-    Help,
+    /// The explanation of what snapshots are (page 0) and of the keys (page 1).
+    Help { page: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,6 +193,8 @@ pub struct State {
     pub context: UiContext,
     /// Set when the UI was opened on one file: the screen is then that file's history.
     pub file: Option<FileView>,
+    /// The button the mouse is over: what it does is written on the footer line while it is.
+    pub hover: Option<Button>,
 }
 
 impl Default for State {
@@ -209,6 +212,7 @@ impl Default for State {
             spinner: 0,
             context: UiContext::default(),
             file: None,
+            hover: None,
         }
     }
 }
@@ -311,6 +315,8 @@ pub enum Msg {
     /// Time passed while work is in flight; animates the indicator.
     Tick,
     Key(Key),
+    /// The mouse moved over a button (or off every button).
+    Hover(Option<Button>),
     /// A left click, resolved by the view.
     Click(Click),
     /// The wheel over a pane: positive moves down.
@@ -365,6 +371,10 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             Vec::new()
         }
         Msg::Key(key) => on_key(state, key),
+        Msg::Hover(button) => {
+            state.hover = button;
+            Vec::new()
+        }
         Msg::Click(click) => on_click(state, click),
         Msg::Scroll { pane, delta } => on_scroll(state, pane, delta),
         Msg::ChangesLoaded { config, id, result } => {
@@ -434,7 +444,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
             Vec::new()
         }
         Key::Char('?') => {
-            state.modal = Some(Modal::Help);
+            state.modal = Some(Modal::Help { page: 0 });
             Vec::new()
         }
         Key::Char('r') => {
@@ -509,7 +519,7 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         return Vec::new();
     };
     let reaction = match modal {
-        Modal::Help => Reaction::closes(), // any key closes it
+        Modal::Help { page } => reading_help(key, page),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {
@@ -522,6 +532,22 @@ fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     state.modal = reaction.modal;
     reaction.effects
 }
+
+/// The help: Enter, Tab or the arrows turn the page, Esc or `q` close it.
+fn reading_help(key: Key, page: usize) -> Reaction {
+    match key {
+        Key::Esc | Key::CtrlC | Key::Char('q') => Reaction::closes(),
+        Key::Enter | Key::Tab | Key::Right | Key::Left | Key::Char(' ' | 'h' | 'l') => {
+            Reaction::stays(Modal::Help {
+                page: (page + 1) % HELP_PAGES,
+            })
+        }
+        _ => Reaction::stays(Modal::Help { page }),
+    }
+}
+
+/// How many pages the help has.
+pub const HELP_PAGES: usize = 2;
 
 fn describe(target: Target, input: String, error: Option<String>) -> Modal {
     Modal::Describe {
@@ -967,7 +993,7 @@ fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
             Vec::new()
         }
         Key::Char('?') => {
-            state.modal = Some(Modal::Help);
+            state.modal = Some(Modal::Help { page: 0 });
             Vec::new()
         }
         Key::Up | Key::Char('k') => {

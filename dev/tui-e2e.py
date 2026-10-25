@@ -134,6 +134,11 @@ class Tui:
         col, row = self.find(needle, nth)
         self.click(col + offset, row)
 
+    def hover(self, col, row):
+        """Move the mouse over a cell (an xterm motion report: button code 35, no button held)."""
+        os.write(self.master, f"\x1b[<35;{col + 1};{row + 1}M".encode())
+        self.pump(0.3)
+
     def wheel(self, col, row, down=True):
         os.write(self.master, f"\x1b[<{65 if down else 64};{col + 1};{row + 1}M".encode())
         self.pump(0.3)
@@ -217,7 +222,7 @@ def main():
     # --- snapshot every config ----------------------------------------------------------
     tui.send("left")
     tui.send("a")
-    tui.wait_for("ALL configs")
+    tui.wait_for("ALL protected areas")
     tui.send("enter")  # empty description -> default
     tui.wait_for("created")
     check("snapall" in listing("snapall_it_a").values(), "config a got the default-described snapshot")
@@ -231,7 +236,7 @@ def main():
     # --- disposability: a termination signal must leave the terminal usable ---------------
     for sig, status in ((signal.SIGTERM, 143), (signal.SIGHUP, 129), (signal.SIGINT, 130)):
         tui = Tui()
-        tui.wait_for("Configs")
+        tui.wait_for("Protected areas")
         code = tui.stop_with(sig)
         name = signal.Signals(sig).name
         check(code == status, f"{name} exits with status {status} (128 + signal), got {code}")
@@ -263,9 +268,10 @@ def main():
     # The operation takes two seconds. The screen must answer within a fraction of that.
     asked = time.time()
     tui.send("?")
-    tui.wait_for("Keys", timeout=1.0)
+    tui.wait_for("What is this?", timeout=1.0)
     check(time.time() - asked < 1.5 and tui.process.poll() is None, "the UI answers a key while snapper is busy (help opened)")
-    tui.send("x")  # any key closes help
+    tui.send("\x1b")  # Esc closes the help
+    tui.wait_gone("What is this?", timeout=2)
 
     tui.send("c")
     tui.wait_for("busy: wait for the current operation")
@@ -297,7 +303,7 @@ def main():
 
     # --- the mouse -----------------------------------------------------------------------------
     tui = Tui()
-    tui.wait_for("Configs")
+    tui.wait_for("Protected areas")
     check(b"\x1b[?1000h" in tui.raw, "mouse capture is switched on while the UI runs")
 
     # A click on a config in the list selects it (the first occurrence is the list, not a title).
@@ -314,11 +320,23 @@ def main():
 
     # A click on a footer button does what its key does: "?" opens the help, any click closes it.
     tui.click_text("? help", offset=0)
-    tui.wait_for("Keys")
-    check("mouse" in tui.text(), "the help explains the mouse")
+    tui.wait_for("What is this?")
+    check("saved moment" in tui.text(), "the help starts by saying what a snapshot is")
+    tui.click_text("[ Enter: Other page ]", offset=4)
+    tui.wait_for("Keys and buttons")
+    check("hover a button to read what it does" in tui.text(), "page two explains the keys and the mouse")
     tui.click_text("[ Esc: Close ]", offset=3)
-    tui.wait_gone("Keys")
+    tui.wait_gone("Keys and buttons")
     check(True, "the prompt's Close button closes it")
+
+    # Hovering a button (a real motion report) says in plain words what it does; leaving clears it.
+    col, row = tui.find("d delete")
+    tui.hover(col + 2, row)
+    tui.wait_for("Delete the marked snapshots for good. Your files are not touched")
+    check(True, "hovering a button explains it")
+    tui.hover(2, 5)
+    tui.wait_gone("for good. Your files are not touched")
+    check(True, "moving away clears the explanation")
 
     # "q quit" quits, and gives the mouse back.
     tui.click_text("q quit", offset=0)
@@ -344,7 +362,7 @@ def main():
     open(added, "w").write("new")
 
     tui = Tui()
-    tui.wait_for("Configs")
+    tui.wait_for("Protected areas")
     tui.wait_for(cfg)
     tui.click_text(cfg, offset=2)
     tui.wait_for(f"Snapshots of {cfg}")
@@ -385,7 +403,7 @@ def main():
     tui.wait_for("e2e file two")
     screen = tui.text()
     check(doc in screen, "the header names the file")
-    check("Configs" not in screen, "there is no configs pane when opened on a file")
+    check("Protected areas" not in screen, "there is no areas pane when opened on a file")
     check(screen.count("differs from now") >= 2, "both snapshots say the file differs from now")
     check(screen.find("e2e file two") < screen.find("e2e file one"), "newest first")
     check(b"\x1b[?1000h" in tui.raw, "the mouse is captured on the file screen too")
@@ -414,7 +432,7 @@ def main():
 
     # a file no config covers is an error before the terminal is taken over
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
-    check(refused.returncode == 1 and "no snapper config covers" in refused.stderr, "a file no config covers is refused with the reason")
+    check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
     print("\nTUI end-to-end: all checks passed")
 

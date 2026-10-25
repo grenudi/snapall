@@ -85,7 +85,7 @@ fn moving_and_reading_stay_available_while_snapper_is_busy() {
     press(&mut state, Key::Tab);
     assert_eq!(state.pending, 1, "navigation starts no work");
     press(&mut state, Key::Char('?'));
-    assert_eq!(state.modal, Some(Modal::Help), "help opens");
+    assert_eq!(state.modal, Some(Modal::Help { page: 0 }), "help opens");
 }
 
 #[test]
