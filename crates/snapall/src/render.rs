@@ -135,7 +135,7 @@ pub fn deleted_json(config: &ConfigName, id: SnapshotId) -> Value {
 pub fn history(history: &FileHistory) -> String {
     let mut out = format!("{}  (config {})\n", history.path, history.config);
     if history.versions.is_empty() {
-        out.push_str("no snapshots of this config yet\n");
+        out.push_str("no snapshots of this area yet\n");
         return out;
     }
     let width = history
@@ -237,7 +237,7 @@ pub fn doctor_json(os: &OsRelease, checks: &[Check]) -> Value {
 
 pub fn dry_run(plan: &Plan, description: &Description) -> String {
     let mut out = format!(
-        "dry run: would snapshot {} config(s) with description \"{description}\"\n",
+        "dry run: would snapshot {} area(s) with description \"{description}\"\n",
         plan.targets().len()
     );
     for config in plan.targets() {
@@ -381,7 +381,7 @@ mod tests {
         let plan = plan_snapshots(&backend, None).unwrap();
         let description = Description::parse("x").unwrap();
         let text = dry_run(&plan, &description);
-        assert!(text.contains("would snapshot 2 config(s)"));
+        assert!(text.contains("would snapshot 2 area(s)"));
         assert!(text.contains("  home\n") && text.contains("  root\n"));
         let value = dry_run_json(&plan, &description);
         assert_eq!(value["would_snapshot"], json!(["home", "root"]));

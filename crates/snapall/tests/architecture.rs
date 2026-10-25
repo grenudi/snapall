@@ -143,3 +143,64 @@ fn nobody_depends_on_a_cli_parser_other_than_argenv() {
         );
     }
 }
+
+/// The production code (comments and `#[cfg(test)]` modules removed) of every crate whose words a
+/// person can read. The snapper adapter is left out: it is where the commands are actually run.
+fn text_a_person_can_read() -> Vec<(String, String)> {
+    let crates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut found = Vec::new();
+    for name in ["snapall", "snapall-core", "snapall-tui", "snapall-observe"] {
+        let mut stack = vec![crates.join(name).join("src")];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    let source = std::fs::read_to_string(&path).unwrap();
+                    let production = source.split("#[cfg(test)]").next().unwrap_or_default();
+                    let code: String = production
+                        .lines()
+                        .filter(|line| !line.trim_start().starts_with("//"))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    found.push((path.display().to_string(), code));
+                }
+            }
+        }
+    }
+    found
+}
+
+/// A person is never told to run a raw `snapper` command: snapall does the setup, and where there is
+/// something to run it is `snapall` itself. Found three times by hand before this existed.
+#[test]
+fn no_message_tells_a_person_to_run_a_raw_snapper_command() {
+    for (file, code) in text_a_person_can_read() {
+        for forbidden in ["snapper -c", "create-config", "set-config"] {
+            assert!(
+                !code.contains(forbidden),
+                "`{forbidden}` in the production code of {file}: a person must never be sent outside snapall"
+            );
+        }
+    }
+}
+
+/// The words snapall teaches are "protected area" and "snapshot". "snapper config" is the name of a
+/// thing inside another program, and nobody reading snapall's output has been told what it is.
+#[test]
+fn no_message_calls_a_protected_area_a_snapper_config() {
+    for (file, code) in text_a_person_can_read() {
+        for forbidden in [
+            "snapper config",
+            "snapper's config",
+            "snapper has no configs",
+            "no configs",
+        ] {
+            assert!(
+                !code.to_lowercase().contains(forbidden),
+                "`{forbidden}` in the production code of {file}"
+            );
+        }
+    }
+}

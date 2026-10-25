@@ -94,7 +94,7 @@ pub enum BackendError {
     },
     #[error("unexpected output from `{program}`: {detail}")]
     UnexpectedOutput { program: String, detail: String },
-    #[error("config `{0}` does not exist")]
+    #[error("`{0}` is not a protected area (`snapall list` shows the ones that exist)")]
     UnknownConfig(ConfigName),
     /// The backend cannot do what was asked of it, and says why.
     #[error("{0}")]
