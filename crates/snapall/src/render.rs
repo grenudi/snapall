@@ -178,6 +178,193 @@ pub fn history_json(history: &FileHistory) -> Value {
     json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
 }
 
+// ---- restore points -----------------------------------------------------------------------------
+
+fn areas_of(point: &snapall_core::RestorePoint) -> String {
+    point
+        .members
+        .iter()
+        .map(|m| m.config.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The restore points, newest first, each with what to type to go back to it.
+pub fn points(points: &[snapall_core::RestorePoint]) -> String {
+    if points.is_empty() {
+        return "No restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is a restore point.\n".to_owned();
+    }
+    let mut out = String::from(
+        "Restore points: the snapshots that one action took together, one in every area.\nPut every area back to one with `sudo snapall restore-all POINT`.\n\n",
+    );
+    let width =
+        |f: &dyn Fn(&snapall_core::RestorePoint) -> usize| points.iter().map(f).max().unwrap_or(0);
+    let w_point = width(&|p| p.point.as_str().len()).max("POINT".len());
+    let w_date = width(&|p| p.date.as_deref().unwrap_or("").len()).max("WHEN".len());
+    let w_areas = width(&|p| areas_of(p).len()).max("AREAS".len());
+    out.push_str(&format!(
+        "{:<w_point$}  {:<w_date$}  {:<w_areas$}  NAME\n",
+        "POINT", "WHEN", "AREAS"
+    ));
+    for p in points {
+        let note = if p.tagged {
+            ""
+        } else {
+            "   (older: matched by name and time)"
+        };
+        out.push_str(&format!(
+            "{:<w_point$}  {:<w_date$}  {:<w_areas$}  {}{note}\n",
+            p.point.as_str(),
+            p.date.as_deref().unwrap_or(""),
+            areas_of(p),
+            p.description
+        ));
+    }
+    out
+}
+
+pub fn points_json(points: &[snapall_core::RestorePoint]) -> Value {
+    json!({ "points": points.iter().map(|p| json!({
+        "point": p.point.as_str(),
+        "description": p.description,
+        "date": p.date,
+        "tagged": p.tagged,
+        "areas": p.members.iter().map(|m| json!({"area": m.config.as_str(), "snapshot": m.id.get()})).collect::<Vec<_>>(),
+    })).collect::<Vec<_>>() })
+}
+
+fn path_counts(changes: &[snapall_core::Change]) -> (usize, usize, usize) {
+    use snapall_core::ChangeKind;
+    let count = |kind: ChangeKind| changes.iter().filter(|c| c.kind == kind).count();
+    (
+        count(ChangeKind::Changed),
+        count(ChangeKind::Added),
+        count(ChangeKind::Removed),
+    )
+}
+
+/// What putting every area of a point back would do, area by area, and why the system is left out.
+pub fn point_preview(
+    point: &snapall_core::RestorePoint,
+    previews: &[snapall_core::MemberPreview],
+    system_route: &str,
+) -> String {
+    use snapall_core::MemberView;
+    let mut out = format!(
+        "Restore point {} ({}), taken {}. Putting every area back would:\n\n",
+        point.point,
+        point.description,
+        point.date.as_deref().unwrap_or("at an unknown time")
+    );
+    let width = previews
+        .iter()
+        .map(|p| p.config.as_str().len())
+        .max()
+        .unwrap_or(0);
+    let mut system = false;
+    for p in previews {
+        let what = match &p.view {
+            MemberView::Changes(c) if c.changes.is_empty() => {
+                "nothing to change: it already matches".to_owned()
+            }
+            MemberView::Changes(c) => {
+                let (changed, added, removed) = path_counts(&c.changes);
+                format!(
+                    "change {} path{}: {changed} reverted, {added} removed, {removed} brought back",
+                    c.changes.len(),
+                    if c.changes.len() == 1 { "" } else { "s" }
+                )
+            }
+            MemberView::SystemRoot => {
+                system = true;
+                "not touched: the running system is not put back while it runs".to_owned()
+            }
+            MemberView::Failed(why) => format!("could not be looked at: {why}"),
+        };
+        out.push_str(&format!("  {:<width$}  {what}\n", p.config.as_str()));
+    }
+    if system {
+        out.push_str(&format!("\nThe system itself: {system_route}\n"));
+    }
+    out
+}
+
+pub fn point_preview_json(
+    point: &snapall_core::RestorePoint,
+    previews: &[snapall_core::MemberPreview],
+) -> Value {
+    use snapall_core::MemberView;
+    json!({
+        "point": point.point.as_str(),
+        "areas": previews.iter().map(|p| match &p.view {
+            MemberView::Changes(c) => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": if c.changes.is_empty() { "unchanged" } else { "change" }, "paths": c.changes.len()}),
+            MemberView::SystemRoot => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": "system"}),
+            MemberView::Failed(why) => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": "error", "error": why}),
+        }).collect::<Vec<_>>(),
+    })
+}
+
+/// What putting a point back did, and the one command that undoes all of it.
+pub fn point_restored(
+    point: &snapall_core::RestorePoint,
+    done: &snapall_core::PointRestore,
+) -> String {
+    use snapall_core::MemberResult;
+    let mut out = format!("Restore point {} ({}):\n\n", point.point, point.description);
+    let width = done
+        .members
+        .iter()
+        .map(|m| m.config.as_str().len())
+        .max()
+        .unwrap_or(0);
+    for m in &done.members {
+        let what = match &m.result {
+            MemberResult::Restored(r) => format!(
+                "put back ({} path{}); the state before is snapshot #{}",
+                r.summary.created + r.summary.modified + r.summary.deleted,
+                if r.summary.created + r.summary.modified + r.summary.deleted == 1 {
+                    ""
+                } else {
+                    "s"
+                },
+                r.safety_snapshot
+            ),
+            MemberResult::AlreadyThere => "already matched: left alone".to_owned(),
+            MemberResult::SystemRoot => {
+                "left alone: the running system is not put back while it runs".to_owned()
+            }
+            MemberResult::Failed(why) => format!("FAILED: {why}"),
+        };
+        out.push_str(&format!("  {:<width$}  {what}\n", m.config.as_str()));
+    }
+    if done.changed_anything() {
+        out.push_str(&format!(
+            "\nTo undo all of this at once: sudo snapall restore-all {}\n",
+            done.safety
+        ));
+    } else {
+        out.push_str("\nNothing was changed.\n");
+    }
+    out
+}
+
+pub fn point_restored_json(
+    point: &snapall_core::RestorePoint,
+    done: &snapall_core::PointRestore,
+) -> Value {
+    use snapall_core::MemberResult;
+    json!({
+        "point": point.point.as_str(),
+        "undo_point": done.changed_anything().then(|| done.safety.as_str().to_owned()),
+        "areas": done.members.iter().map(|m| match &m.result {
+            MemberResult::Restored(r) => json!({"area": m.config.as_str(), "result": "restored", "snapshot": m.id.get(), "safety_snapshot": r.safety_snapshot.get(), "paths": r.summary.created + r.summary.modified + r.summary.deleted}),
+            MemberResult::AlreadyThere => json!({"area": m.config.as_str(), "result": "unchanged", "snapshot": m.id.get()}),
+            MemberResult::SystemRoot => json!({"area": m.config.as_str(), "result": "system", "snapshot": m.id.get()}),
+            MemberResult::Failed(why) => json!({"area": m.config.as_str(), "result": "failed", "snapshot": m.id.get(), "error": why}),
+        }).collect::<Vec<_>>(),
+    })
+}
+
 pub fn setup_json(report: &crate::setup::Report) -> Value {
     let worth = |worth: snapall_core::coverage::Worth| match worth {
         snapall_core::coverage::Worth::Recommended => "recommended",
@@ -446,5 +633,153 @@ mod tests {
         assert_eq!(value["ok"], false);
         assert_eq!(value["checks"][0]["status"], "fail");
         assert_eq!(value["checks"][1]["fix"], "run with sudo");
+    }
+
+    // ---- restore points ------------------------------------------------------------------------
+
+    fn points_fixture() -> (
+        snapall_core::testing::InMemoryBackend,
+        snapall_core::RestorePoint,
+    ) {
+        use snapall_core::testing::InMemoryBackend;
+        let backend =
+            InMemoryBackend::with_configs(&["docs", "home", "root"]).with_root_config("root");
+        backend.write_file("docs", "/mnt/docs/a.txt", "then");
+        backend.write_file("home", "/mnt/home/b.txt", "then");
+        let plan = snapall_core::plan_snapshots(&backend, None).unwrap();
+        let point = snapall_core::Point::parse("20261025T100000Z").unwrap();
+        snapall_core::run_plan(
+            &backend,
+            &plan,
+            &Description::parse("before theming").unwrap(),
+            Some(&point),
+        );
+        let found = snapall_core::restore_points(&snapall_core::all_snapshots(&backend).unwrap());
+        (backend, found.into_iter().next().unwrap())
+    }
+
+    #[test]
+    fn no_restore_points_says_what_makes_one() {
+        let text = points(&[]);
+        assert!(
+            text.contains("No restore points yet") && text.contains("sudo snapall"),
+            "{text}"
+        );
+        assert_eq!(points_json(&[]), json!({"points": []}));
+    }
+
+    #[test]
+    fn restore_points_are_a_table_with_the_command_that_uses_them() {
+        let (_, point) = points_fixture();
+        let text = points(std::slice::from_ref(&point));
+        assert!(text.contains("sudo snapall restore-all POINT"), "{text}");
+        assert!(
+            text.contains("POINT")
+                && text.contains("WHEN")
+                && text.contains("AREAS")
+                && text.contains("NAME"),
+            "{text}"
+        );
+        assert!(
+            text.contains("20261025T100000Z")
+                && text.contains("docs, home, root")
+                && text.contains("before theming"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("matched"),
+            "a tagged point is not marked as a guess: {text}"
+        );
+        let value = points_json(std::slice::from_ref(&point));
+        assert_eq!(value["points"][0]["point"], "20261025T100000Z");
+        assert_eq!(value["points"][0]["tagged"], true);
+        assert_eq!(
+            value["points"][0]["areas"][1],
+            json!({"area": "home", "snapshot": 1})
+        );
+    }
+
+    #[test]
+    fn a_matched_point_is_marked_as_older_and_a_guess() {
+        let (_, mut point) = points_fixture();
+        point.tagged = false;
+        assert!(points(&[point]).contains("older: matched by name and time"));
+    }
+
+    #[test]
+    fn the_preview_says_per_area_what_changes_and_why_the_system_is_left_out() {
+        let (backend, point) = points_fixture();
+        backend.write_file("home", "/mnt/home/b.txt", "ruined");
+        let text = point_preview(
+            &point,
+            &snapall_core::preview_point(&backend, &point),
+            "boot from a live USB",
+        );
+        assert!(
+            text.contains("docs") && text.contains("nothing to change: it already matches"),
+            "{text}"
+        );
+        assert!(
+            text.contains("change 1 path: 1 reverted, 0 removed, 0 brought back"),
+            "{text}"
+        );
+        assert!(
+            text.contains("not touched: the running system is not put back while it runs"),
+            "{text}"
+        );
+        assert!(
+            text.contains("The system itself: boot from a live USB"),
+            "{text}"
+        );
+        let value = point_preview_json(&point, &snapall_core::preview_point(&backend, &point));
+        let actions: Vec<&str> = value["areas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["action"].as_str().unwrap())
+            .collect();
+        assert_eq!(actions, ["unchanged", "change", "system"]);
+    }
+
+    #[test]
+    fn what_was_done_says_each_area_and_the_one_command_that_undoes_all_of_it_only_if_something_changed(
+    ) {
+        let (backend, point) = points_fixture();
+        backend.write_file("home", "/mnt/home/b.txt", "ruined");
+        let done = snapall_core::restore_point(
+            &backend,
+            &point,
+            snapall_core::Point::parse("20261025T110000Z").unwrap(),
+        );
+        let text = point_restored(&point, &done);
+        assert!(
+            text.contains("put back (1 path)")
+                && text.contains("already matched: left alone")
+                && text.contains("left alone: the running system"),
+            "{text}"
+        );
+        assert!(
+            text.contains("To undo all of this at once: sudo snapall restore-all 20261025T110000Z"),
+            "{text}"
+        );
+        assert_eq!(
+            point_restored_json(&point, &done)["undo_point"],
+            "20261025T110000Z"
+        );
+        // nothing differs now, so nothing is done and there is nothing to undo
+        let nothing = snapall_core::restore_point(
+            &backend,
+            &point,
+            snapall_core::Point::parse("20261025T120000Z").unwrap(),
+        );
+        let text = point_restored(&point, &nothing);
+        assert!(
+            text.contains("Nothing was changed.") && !text.contains("To undo"),
+            "{text}"
+        );
+        assert_eq!(
+            point_restored_json(&point, &nothing)["undo_point"],
+            Value::Null
+        );
     }
 }

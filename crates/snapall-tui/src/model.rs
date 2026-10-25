@@ -68,6 +68,35 @@ pub struct FileView {
     pub cursor: usize,
 }
 
+/// The restore point a snapshot belongs to, and what putting all of it back would do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PointOffer {
+    pub point: snapall_core::RestorePoint,
+    pub views: Vec<snapall_core::MemberPreview>,
+}
+
+impl PointOffer {
+    /// How many areas would change.
+    pub fn areas_to_change(&self) -> usize {
+        self.views
+            .iter()
+            .filter(|v| {
+                matches!(&v.view, snapall_core::MemberView::Changes(p) if !p.changes.is_empty())
+            })
+            .count()
+    }
+}
+
+/// What putting a restore point back did, boiled down to what a person is told.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PointOutcome {
+    pub restored: usize,
+    pub unchanged: usize,
+    pub failed: Vec<String>,
+    /// The restore point of the safety snapshots: restoring it undoes everything, if anything changed.
+    pub undo: Option<String>,
+}
+
 /// A part of the disk that has no snapshots yet, offered for protecting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Offer {
@@ -118,6 +147,8 @@ pub enum Button {
     Protect,
     /// In a prompt that shows several things one at a time: the next one.
     Next,
+    /// In the restore prompt: put every area of the snapshot's restore point back.
+    RestoreAll,
 }
 
 impl Button {
@@ -135,6 +166,7 @@ impl Button {
             Button::Cancel => Key::Esc,
             Button::Protect => Key::Char('p'),
             Button::Next => Key::Tab,
+            Button::RestoreAll => Key::Char('A'),
         }
     }
 }
@@ -227,6 +259,8 @@ pub struct State {
     /// A message to show once the list has been reloaded: the reload clears older notices, and a
     /// confirmation must not be one of them.
     pub after_reload: Option<Notice>,
+    /// The restore point of the snapshot the restore prompt is about, once looked up.
+    pub point_offer: Option<(ConfigName, SnapshotId, PointOffer)>,
 }
 
 impl Default for State {
@@ -247,6 +281,7 @@ impl Default for State {
             hover: None,
             offers: Vec::new(),
             after_reload: None,
+            point_offer: None,
         }
     }
 }
@@ -334,6 +369,15 @@ pub enum Effect {
     Protect {
         mount_point: String,
     },
+    /// Is this snapshot part of a restore point, and what would putting all of it back do?
+    LoadPointOffer {
+        config: ConfigName,
+        id: SnapshotId,
+    },
+    /// Put every area of the restore point back.
+    RestorePoint {
+        point: snapall_core::RestorePoint,
+    },
     /// Put `config` back to how `id` had it (after a safety snapshot).
     Restore {
         config: ConfigName,
@@ -380,6 +424,17 @@ pub enum Msg {
         result: Result<Vec<FileVersion>, String>,
     },
     ConfigsLoaded(Result<Vec<ConfigName>, String>),
+    /// The restore point of a snapshot, if it has one with more than one area.
+    PointOfferLoaded {
+        config: ConfigName,
+        id: SnapshotId,
+        offer: Option<PointOffer>,
+    },
+    /// A restore point was put back.
+    PointRestored {
+        point: String,
+        result: Result<PointOutcome, String>,
+    },
     /// A part of the disk was protected, or why it could not be (in plain words).
     Protected {
         mount_point: String,
@@ -415,6 +470,21 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             Vec::new()
         }
         Msg::Key(key) => on_key(state, key),
+        Msg::PointOfferLoaded { config, id, offer } => {
+            settle(state);
+            let asked = matches!(
+                &state.modal,
+                Some(Modal::Restore { config: c, id: i, .. }) if *c == config && *i == id
+            );
+            if asked {
+                state.point_offer = offer.map(|offer| (config, id, offer));
+            }
+            Vec::new()
+        }
+        Msg::PointRestored { point, result } => {
+            settle(state);
+            on_point_restored(state, &point, result)
+        }
         Msg::Protected {
             mount_point,
             result,
@@ -747,6 +817,19 @@ fn confirming_restore(
         &stage,
         RestoreStage::Ready(p) if (path.is_some() || !p.is_system_root) && !p.changes.is_empty()
     );
+    // Every area of the snapshot's restore point, when it has one and any of it would change.
+    if matches!(key, Key::Char('A')) {
+        if let Some((c, i, offer)) = &state.point_offer {
+            if *c == config && *i == id && offer.areas_to_change() > 0 {
+                let (areas, point) = (offer.areas_to_change(), offer.point.clone());
+                state.notice = Some(Notice::Info(format!(
+                    "putting {areas} area(s) back to {}",
+                    point.point
+                )));
+                return Reaction::closes_and_starts(vec![Effect::RestorePoint { point }]);
+            }
+        }
+    }
     match key {
         Key::Char('y' | 'Y') | Key::Enter if actionable => {
             state.notice = Some(Notice::Info(match &path {
@@ -1040,11 +1123,50 @@ fn open_restore(state: &mut State) -> Vec<Effect> {
         path: None,
         stage: RestoreStage::Loading,
     });
-    vec![Effect::LoadChanges {
-        config,
-        id,
-        path: None,
-    }]
+    state.point_offer = None;
+    vec![
+        Effect::LoadChanges {
+            config: config.clone(),
+            id,
+            path: None,
+        },
+        // whether this snapshot is one of several taken together: the prompt offers them all
+        Effect::LoadPointOffer { config, id },
+    ]
+}
+
+/// A restore point was put back (or part of it failed): say what happened, and how to undo it.
+fn on_point_restored(
+    state: &mut State,
+    point: &str,
+    result: Result<PointOutcome, String>,
+) -> Vec<Effect> {
+    match result {
+        Err(why) => {
+            state.notice = Some(Notice::Error(why));
+            Vec::new()
+        }
+        Ok(outcome) if !outcome.failed.is_empty() => {
+            state.notice = Some(Notice::Error(format!(
+                "Put {} area(s) back to {point}, but {} failed: {}",
+                outcome.restored,
+                outcome.failed.len(),
+                outcome.failed.join("; ")
+            )));
+            vec![Effect::LoadConfigs]
+        }
+        Ok(outcome) => {
+            let undo = outcome
+                .undo
+                .map(|undo| format!(" Undo it: restore point {undo}"))
+                .unwrap_or_default();
+            state.after_reload = Some(Notice::Info(format!(
+                "Put {} area(s) back to {point}.{undo}",
+                outcome.restored
+            )));
+            vec![Effect::LoadConfigs]
+        }
+    }
 }
 
 fn on_changes_loaded(
@@ -1205,7 +1327,9 @@ fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
     match click {
         // A prompt's buttons work only while a prompt is open, and nothing else works then:
         // a click on a button behind a prompt must not be typed into it as a letter.
-        Click::Button(button @ (Button::Confirm | Button::Cancel | Button::Next)) => {
+        Click::Button(
+            button @ (Button::Confirm | Button::Cancel | Button::Next | Button::RestoreAll),
+        ) => {
             if state.modal.is_some() {
                 on_key(state, button.key())
             } else {

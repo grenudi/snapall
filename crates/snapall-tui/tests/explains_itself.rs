@@ -216,3 +216,51 @@ fn the_main_screen_calls_the_parts_of_the_disk_protected_areas() {
     );
     assert_plain("main", &text);
 }
+
+/// The line under a prompt is where the mouse-over explanation appears, and the line below it holds
+/// the keys. A prompt tall enough to cover either would hide exactly what a newcomer needs.
+#[test]
+fn no_prompt_covers_the_two_footer_lines_at_24_rows() {
+    let backend = backend();
+    let prompts: [(&str, &[Key]); 6] = [
+        ("snapshot description", &[Key::Char('c')]),
+        ("delete", &[Key::Right, Key::Char('d')]),
+        ("restore", &[Key::Right, Key::Char('u')]),
+        ("help, page 1", &[Key::Char('?')]),
+        ("help, page 2", &[Key::Char('?'), Key::Enter]),
+        ("protect", &[Key::Char('p')]),
+    ];
+    for (name, keys) in prompts {
+        let offers = vec![snapall_tui::Offer {
+            mount_point: "/home".into(),
+            title: "Home".into(),
+            summary: snapall_core::explain::protect_summary("/home"),
+            recommended: true,
+        }];
+        let mut session = Session::with_context(
+            &backend,
+            UiContext {
+                offers,
+                administrator: true,
+                ..UiContext::default()
+            },
+        );
+        for key in keys {
+            session.press(*key);
+        }
+        assert!(session.state.modal.is_some(), "{name}: a prompt is open");
+        // the explanation row has a button's explanation on it
+        session.dispatch(Msg::Hover(Some(Button::Cancel)));
+        let text = screen(&session);
+        let rows: Vec<&str> = text.lines().collect();
+        let (explanation, keys_row) = (rows[22], rows[23]);
+        assert!(
+            keys_row.contains("q quit"),
+            "{name}: the key line is covered:\n{text}"
+        );
+        assert!(
+            explanation.contains("Close this without changing anything"),
+            "{name}: the explanation line is covered:\n{text}"
+        );
+    }
+}

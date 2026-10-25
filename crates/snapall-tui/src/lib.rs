@@ -20,6 +20,6 @@ pub mod session;
 pub mod term;
 pub mod view;
 
-pub use model::{FileTarget, Offer, UiContext};
+pub use model::{FileTarget, Offer, PointOffer, PointOutcome, UiContext};
 pub use session::{Executor, Session};
 pub use term::{run, Exit};

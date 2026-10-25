@@ -11,8 +11,9 @@
 
 use snapall_core::testing::backend_contract;
 use snapall_core::{
-    config_covering, file_history, preview_restore, protect_area, restore_snapshot, snapshot_all,
-    ChangeKind, ConfigName, Description, FileState, HistoryError, Point, RestoreError, SetupError,
+    all_snapshots, config_covering, file_history, fresh_point, preview_restore, protect_area,
+    restore_point, restore_points, restore_snapshot, snapshot_all, ChangeKind, ConfigName,
+    Description, FileState, HistoryError, MemberResult, Point, RestoreError, SetupError,
     SnapshotBackend,
 };
 use snapall_snapper::SnapperCli;
@@ -461,4 +462,90 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
     assert_eq!(backend.list_configs().unwrap(), before);
     btrfs(&["subvolume", "delete", &area]);
     std::fs::remove_dir(&plain).unwrap();
+}
+
+/// The whole restore point round trip on real Btrfs with real snapper: one action snapshots two
+/// areas, both are ruined, one action puts both back, and one action undoes that. Real files in two
+/// real subvolumes, the tag read back from snapper, the safety snapshots found as a point of their own.
+#[test]
+fn a_restore_point_puts_two_real_areas_back_with_one_action_and_that_is_undoable() {
+    if !enabled() {
+        return;
+    }
+    let _turn = take_turns();
+    let backend = backend();
+    let a = ConfigName::parse("snapall_it_a").unwrap();
+    let b = ConfigName::parse("snapall_it_b").unwrap();
+    let (dir_a, dir_b) = (
+        backend.config_subvolume(&a).unwrap(),
+        backend.config_subvolume(&b).unwrap(),
+    );
+    let (file_a, file_b) = (
+        format!("{dir_a}/point-it.txt"),
+        format!("{dir_b}/point-it.txt"),
+    );
+    std::fs::write(&file_a, "a, then").unwrap();
+    std::fs::write(&file_b, "b, then").unwrap();
+
+    let point = fresh_point(&backend, 1_700_000_000);
+    snapshot_all(
+        &backend,
+        Some(&[a.clone(), b.clone()]),
+        &Description::parse("it: a point").unwrap(),
+        Some(&point),
+    )
+    .unwrap();
+    std::fs::write(&file_a, "a, ruined").unwrap();
+    std::fs::remove_file(&file_b).unwrap();
+
+    let found = restore_points(&all_snapshots(&backend).unwrap());
+    let ours = found
+        .iter()
+        .find(|p| p.point == point)
+        .expect("the point is found by its tag, in real snapper's listing");
+    assert!(ours.tagged);
+    let areas: Vec<&str> = ours.members.iter().map(|m| m.config.as_str()).collect();
+    assert!(
+        areas.contains(&"snapall_it_a") && areas.contains(&"snapall_it_b"),
+        "{areas:?}"
+    );
+
+    let safety = fresh_point(&backend, 1_700_000_001);
+    let done = restore_point(&backend, ours, safety.clone());
+    assert!(done.succeeded(), "{done:?}");
+    assert_eq!(std::fs::read_to_string(&file_a).unwrap(), "a, then");
+    assert_eq!(
+        std::fs::read_to_string(&file_b).unwrap(),
+        "b, then",
+        "a deleted file is brought back"
+    );
+
+    // the way back is a restore point too, found the same way
+    let found = restore_points(&all_snapshots(&backend).unwrap());
+    let undo = found
+        .iter()
+        .find(|p| p.point == safety)
+        .expect("the safety snapshots are one point");
+    assert!(
+        undo.description.starts_with("before restoring "),
+        "{}",
+        undo.description
+    );
+    let again = restore_point(&backend, undo, fresh_point(&backend, 1_700_000_002));
+    assert!(
+        again.succeeded()
+            && again
+                .members
+                .iter()
+                .any(|m| matches!(m.result, MemberResult::Restored(_))),
+        "{again:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&file_a).unwrap(),
+        "a, ruined",
+        "back to just before"
+    );
+    assert!(!std::path::Path::new(&file_b).exists());
+
+    let _ = std::fs::remove_file(&file_a);
 }

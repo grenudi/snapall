@@ -333,6 +333,9 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Set this part of the disk up for snapshots (nothing is copied or moved)"
         }
         (Some(Modal::Protect { .. }), Button::Next) => "Show the next part of the disk",
+        (Some(Modal::Restore { .. }), Button::RestoreAll) => {
+            "Put all areas of this restore point back at once (not the system)"
+        }
         (Some(_), Button::Cancel) => "Close this without changing anything",
         (Some(_), _) => "",
         (None, Button::Create) => {
@@ -354,7 +357,7 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
         }
         (None, Button::Help) => "Explain what snapshots are and what each key does",
         (None, Button::Quit) => "Close snapall. Nothing is changed",
-        (None, Button::Confirm | Button::Cancel | Button::Next) => "",
+        (None, Button::Confirm | Button::Cancel | Button::Next | Button::RestoreAll) => "",
     }
 }
 
@@ -511,8 +514,61 @@ fn delete_spec(config: &ConfigName, ids: &[SnapshotId]) -> ModalSpec {
     }
 }
 
-/// The restore prompt: looking, failed, the system root (refused), nothing to restore, or ready.
+/// The restore prompt, and, when the snapshot is one of several taken together, the offer to put all
+/// of them back.
 fn restore_spec(
+    config: &ConfigName,
+    id: SnapshotId,
+    path: Option<&str>,
+    stage: &RestoreStage,
+    state: &State,
+) -> ModalSpec {
+    let spec = restore_stage_spec(config, id, path, stage, state);
+    if !matches!(stage, RestoreStage::Ready(_)) {
+        return spec;
+    }
+    match &state.point_offer {
+        Some((c, i, offer)) if c == config && *i == id && offer.areas_to_change() > 0 => {
+            with_point(spec, offer)
+        }
+        _ => spec,
+    }
+}
+
+/// Add the restore point's offer to a prompt: what the point is, and the button that puts it all back.
+fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) -> ModalSpec {
+    let areas: Vec<&str> = offer
+        .point
+        .members
+        .iter()
+        .map(|m| m.config.as_str())
+        .collect();
+    let k = offer.areas_to_change();
+    spec.lines.push(Line::from(""));
+    spec.lines.push(Line::from(format!(
+        "This snapshot is part of restore point {} ({}), taken in {} areas: {}.",
+        offer.point.point,
+        offer.point.description,
+        areas.len(),
+        areas.join(", ")
+    )));
+    spec.lines.push(Line::styled(
+        format!("Press A to put all {k} that differ back at once."),
+        Style::new().fg(Color::Yellow),
+    ));
+    spec.lines.push(Line::styled(
+        "The running system is left alone.",
+        Style::new().fg(Color::Yellow),
+    ));
+    spec.height += 6;
+    let last = spec.buttons.len().saturating_sub(1);
+    spec.buttons
+        .insert(last, (Button::RestoreAll, format!("A: Restore all {k}")));
+    spec
+}
+
+/// The restore prompt: looking, failed, the system root (refused), nothing to restore, or ready.
+fn restore_stage_spec(
     config: &ConfigName,
     id: SnapshotId,
     path: Option<&str>,
@@ -722,6 +778,7 @@ fn keys_page() -> Vec<Line<'static>> {
             "u",
             "Restore: go back to the selected snapshot (asks first)",
         ),
+        ("A", "In Restore: put its whole restore point back"),
         ("p", "Protect: see what has no snapshots yet, and set it up"),
         ("r", "Look again at which snapshots exist"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
@@ -747,7 +804,13 @@ fn modal_geometry(
     size: Rect,
 ) -> (ModalSpec, Rect, Vec<(Rect, Button, String)>) {
     let spec = modal_spec(modal, state);
-    let area = centered(size, spec.width, spec.height);
+    // A prompt never covers the two footer lines: the one below it explains the button the mouse is
+    // over, and a prompt is exactly where that explanation matters.
+    let above_footer = Rect {
+        height: size.height.saturating_sub(2),
+        ..size
+    };
+    let area = centered(above_footer, spec.width, spec.height);
     let inner = Block::default().borders(Borders::ALL).inner(area);
     // The last inner line holds the buttons; the text above it is cut if the terminal is small.
     let y = inner.y.saturating_add(inner.height.saturating_sub(1));

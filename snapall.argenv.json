@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-25T18:30:58Z",
+  "generated": "2026-10-25T20:01:01Z",
   "inputs": [
     {
       "allowed": [],
@@ -107,6 +107,8 @@
         "delete",
         "changes",
         "restore",
+        "restore-all",
+        "points",
         "history",
         "doctor",
         "tui",
@@ -139,6 +141,8 @@
         "delete",
         "changes",
         "restore",
+        "restore-all",
+        "points",
         "history",
         "doctor",
         "tui",
@@ -206,6 +210,7 @@
       "subcommands": [
         "create",
         "restore",
+        "restore-all",
         "setup"
       ],
       "summary": "Show what would happen without changing anything.",
@@ -234,6 +239,8 @@
         "delete",
         "changes",
         "restore",
+        "restore-all",
+        "points",
         "history",
         "setup",
         "doctor"
@@ -370,6 +377,26 @@
         "negatable": false,
         "position": 0,
         "repeatable": false,
+        "value_name": "POINT"
+      },
+      "example": "snapall restore-all 20261025T181500Z",
+      "group": "restore",
+      "key": "point",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "restore-all"
+      ],
+      "summary": "The restore point to go back to, as `snapall points` shows it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
         "value_name": "AREA"
       },
       "example": "snapall setup /srv",
@@ -420,6 +447,7 @@
       "subcommands": [
         "doctor",
         "restore",
+        "restore-all",
         "setup"
       ],
       "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
@@ -471,5 +499,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.8.0"
+  "source": "snapall@0.9.1"
 }

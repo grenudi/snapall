@@ -32,8 +32,8 @@ pub use domain::{
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
 pub use points::{
-    point_of, preview_point, restore_point, restore_points, Member, MemberPreview, MemberReport,
-    MemberResult, MemberView, PointRestore, RestorePoint,
+    fresh_point, point_of, preview_point, restore_point, restore_points, Member, MemberPreview,
+    MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
 };
 pub use port::{BackendError, SnapshotBackend};
 pub use usecase::{

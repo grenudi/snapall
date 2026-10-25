@@ -22,6 +22,27 @@ use crate::usecase::{preview_restore, restore_snapshot_with, Preview, Restored, 
 /// How far apart, in seconds, snapshots of different areas can be and still count as one action's.
 const MATCH_WINDOW_SECONDS: i64 = 120;
 
+/// A name for the restore point of an action that starts at `seconds`: the time, and if a point of
+/// that name is already in use (two actions in one second) a `-2`, `-3`, ... after it. Two points
+/// sharing a name would be one point, so a restore's safety snapshots could not be told from what
+/// they protect. If the existing points cannot be read, the plain time is used.
+pub fn fresh_point(backend: &dyn SnapshotBackend, seconds: u64) -> Point {
+    let taken: std::collections::BTreeSet<String> = crate::usecase::all_snapshots(backend)
+        .map(|all| {
+            all.iter()
+                .flat_map(|(_, snapshots)| snapshots.iter())
+                .filter_map(|snapshot| snapshot.point.as_ref().map(ToString::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    let base = compact_utc(seconds);
+    std::iter::once(base.clone())
+        .chain((2..).map(|n| format!("{base}-{n}")))
+        .find(|candidate| !taken.contains(candidate))
+        .and_then(|candidate| Point::parse(&candidate).ok())
+        .unwrap_or_else(|| Point::at(seconds))
+}
+
 /// One area's snapshot in a restore point.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Member {
@@ -584,6 +605,39 @@ mod tests {
             backend.read_file("docs", "/mnt/docs/a.txt").as_deref(),
             Some("docs, ruined"),
             "a failed safety snapshot means nothing was changed"
+        );
+    }
+
+    #[test]
+    fn two_actions_in_the_same_second_get_different_points_so_a_safety_net_is_never_its_own_target()
+    {
+        let backend = InMemoryBackend::with_configs(&["docs", "home"]);
+        let plan = plan_snapshots(&backend, None).unwrap();
+        let note = Description::parse("x").unwrap();
+        let mut names = Vec::new();
+        for _ in 0..3 {
+            let point = fresh_point(&backend, 1_700_000_000);
+            run_plan(&backend, &plan, &note, Some(&point));
+            names.push(point.to_string());
+        }
+        assert_eq!(
+            names,
+            [
+                "20231114T221320Z",
+                "20231114T221320Z-2",
+                "20231114T221320Z-3"
+            ]
+        );
+        let all = crate::usecase::all_snapshots(&backend).unwrap();
+        assert_eq!(
+            restore_points(&all).len(),
+            3,
+            "three separate points, not one merged one"
+        );
+        // a different second is untouched by the earlier ones
+        assert_eq!(
+            fresh_point(&backend, 1_700_000_001).to_string(),
+            "20231114T221321Z"
         );
     }
 

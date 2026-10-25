@@ -15,7 +15,7 @@ use argenv_resolve::{
     lint, EnvSource, Finding, Input, InputResolveDefaultExt, InputResolveExt, Invocation,
     LintPolicy, Record, Resolution, Severity, Source,
 };
-use snapall_core::{ConfigName, Description, SnapshotId};
+use snapall_core::{ConfigName, Description, Point, SnapshotId};
 
 use std::path::PathBuf;
 
@@ -52,6 +52,14 @@ pub enum Request {
         path: Option<String>,
         dry_run: bool,
         yes: bool,
+    },
+    /// Every restore point.
+    Points,
+    /// Put every area back to one restore point.
+    RestoreAll {
+        point: Point,
+        yes: bool,
+        dry_run: bool,
     },
     /// How one file stood in each snapshot.
     History {
@@ -414,6 +422,17 @@ fn build_request(
                 .ok_or_else(|| usage_error("missing required argument <FILE>"))?;
             Request::History { path: utf8(&path)? }
         }
+        Command::Points => Request::Points,
+        Command::RestoreAll => Request::RestoreAll {
+            point: {
+                let raw = Contract::RESTORE_POINT
+                    .get_from(resolution)
+                    .ok_or_else(|| usage_error("missing required argument <POINT>"))?;
+                Point::parse(&raw).map_err(|e| usage_error(format!("POINT: {e}")))?
+            },
+            yes: flag(&Contract::YES, resolution),
+            dry_run: flag(&Contract::DRY_RUN, resolution),
+        },
         Command::Setup => Request::Setup {
             area: Contract::SETUP_AREA
                 .get_from(resolution)

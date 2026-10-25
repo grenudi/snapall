@@ -11,9 +11,10 @@ use std::process::ExitCode;
 
 use snapall_core::boot;
 use snapall_core::{
-    all_snapshots, config_covering, delete_snapshot, file_history, plan_snapshots, preview_restore,
-    restore_snapshot, run_plan, snapshots_of, ConfigName, Description, Point, Preview,
-    RestoreError, SnapshotBackend, SnapshotId,
+    all_snapshots, config_covering, delete_snapshot, file_history, fresh_point, plan_snapshots,
+    preview_point, preview_restore, restore_point, restore_points, restore_snapshot, run_plan,
+    snapshots_of, ConfigName, Description, MemberView, Point, Preview, RestoreError, RestorePoint,
+    SnapshotBackend, SnapshotId,
 };
 
 use crate::output::{Outcome, Show};
@@ -77,7 +78,7 @@ pub fn create(
         );
     }
     // every snapshot of this one action is the same restore point
-    let point = Point::at(unix_now());
+    let point = fresh_point(ctx.backend, unix_now());
     let report = run_plan(ctx.backend, &plan, description, Some(&point));
     ctx.show
         .result(render::report(&report), render::report_json(&report))?;
@@ -122,6 +123,96 @@ pub fn restore(
         render::restored(config, id, &done),
         render::restored_json(config, id, &done),
     )
+}
+
+/// The restore points: the snapshots that one action took together.
+pub fn points(ctx: &Context) -> Outcome {
+    let found = restore_points(&all_snapshots(ctx.backend)?);
+    ctx.show
+        .result(render::points(&found), render::points_json(&found))
+}
+
+/// Put every area back to one restore point with a single action: shows what would change in each,
+/// asks first (unless told not to), takes a safety snapshot per area (all one restore point, so
+/// that undoing this is one action too) and reports each area. The running system is left alone.
+pub fn restore_all(ctx: &Context, wanted: &Point, dry_run: bool, yes: bool) -> Outcome {
+    let found = restore_points(&all_snapshots(ctx.backend)?);
+    let point = the_point_named(&found, wanted)?;
+    let previews = preview_point(ctx.backend, point);
+    let route = boot::restore_route(&boot::assess(&boot_probe::system()));
+    let anything_to_change = previews
+        .iter()
+        .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()));
+    if dry_run || !anything_to_change {
+        return ctx.show.result(
+            render::point_preview(point, &previews, &route),
+            render::point_preview_json(point, &previews),
+        );
+    }
+    match point_confirmation(yes, point, &previews, &route) {
+        Confirmation::Given => {}
+        Confirmation::NoTerminalToAskOn => return Ok(ExitCode::from(2)),
+        Confirmation::Declined => return Ok(ExitCode::FAILURE),
+    }
+    let done = restore_point(ctx.backend, point, fresh_point(ctx.backend, unix_now()));
+    ctx.show.result(
+        render::point_restored(point, &done),
+        render::point_restored_json(point, &done),
+    )?;
+    Ok(if done.succeeded() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
+
+fn the_point_named<'a>(
+    found: &'a [RestorePoint],
+    wanted: &Point,
+) -> Result<&'a RestorePoint, Box<dyn Error>> {
+    found.iter().find(|p| p.point == *wanted).ok_or_else(|| {
+        if found.is_empty() {
+            "There are no restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is one.".into()
+        } else {
+            format!("`{wanted}` is not a restore point. `snapall points` lists them.").into()
+        }
+    })
+}
+
+/// Putting areas back changes files, so the person is asked, unless they said `--yes`.
+fn point_confirmation(
+    yes: bool,
+    point: &RestorePoint,
+    previews: &[snapall_core::MemberPreview],
+    route: &str,
+) -> Confirmation {
+    if yes {
+        return Confirmation::Given;
+    }
+    if !ask::can_ask() {
+        eprintln!(
+            "snapall: restore-all changes files and there is no terminal to ask on; \
+             look first with --dry-run, then pass --yes"
+        );
+        return Confirmation::NoTerminalToAskOn;
+    }
+    eprint!("{}", render::point_preview(point, previews, route));
+    let areas = previews
+        .iter()
+        .filter(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
+        .count();
+    let question = format!(
+        "Put {areas} area{} back to restore point {}? Each one's current state is snapshotted first, so this can be undone.",
+        if areas == 1 { "" } else { "s" },
+        point.point
+    );
+    match ask::yes_no(&question) {
+        Ok(true) => Confirmation::Given,
+        _ => {
+            eprintln!("snapall: not restoring");
+            Confirmation::Declined
+        }
+    }
 }
 
 fn show_changes(ctx: &Context, config: &ConfigName, id: SnapshotId, preview: &Preview) -> Outcome {
