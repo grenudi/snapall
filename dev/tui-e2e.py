@@ -183,9 +183,17 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def clear_journal():
+    """Start a journey from a journal with nothing in it: what snapall has done is remembered across runs."""
+    for leftover in ("/var/lib/snapall/journal.jsonl", "/var/lib/snapall/journal.jsonl.1"):
+        if os.path.exists(leftover):
+            os.remove(leftover)
+
+
 def tabs_scenario():
     """The tab bar and the status bar in a real terminal: a click on a tab, a click on a status item,
     the Health tab's verdict, and the Activity tab recording a real snapshot."""
+    clear_journal()
     tui = Tui()
     tui.wait_for("Snapshots of snapall_it_a (")
     tui.wait_gone("working", timeout=6)
@@ -206,7 +214,7 @@ def tabs_scenario():
     tui.wait_for("What this means")
     check(True, "clicking a status item goes to the Health tab")
     tui.send("3")
-    tui.wait_for("What snapall did in this window")
+    tui.wait_for("What snapall did, from this window and from commands")
     check("Nothing yet" in tui.text(), "the Activity tab starts empty and says what fills it")
     tui.send("a")
     tui.send("enter")
@@ -253,6 +261,56 @@ def jobs_and_quotas_scenario():
     tui.send("esc")
     tui.wait_gone("snapall will switch counting")  # the prompt's own sentence; the row's explanation stays
     check("Counting the room snapshots take: off" in tui.text(), "cancelling changed nothing")
+    tui.send("q")
+    tui.finish()
+
+
+def journal_scenario():
+    """What snapall did is remembered: a command's change shows in the window next to the window's own,
+    both are in `snapall activity`, and a command killed mid-change shows as STOPPED."""
+    clear_journal()
+    made = subprocess.run([BINARY, "--no-dbus", "create", "from a command"], capture_output=True, text=True)
+    check(made.returncode == 0, "a command takes a snapshot")
+
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.send("3")
+    tui.wait_for("(command)")
+    check("Took a snapshot of snapall_it_a, snapall_it_b (command)" in tui.text(),
+          "the window shows what a command did, and says it was a command")
+    tui.send("1")
+    tui.send("a")
+    tui.send("enter")
+    time.sleep(0.6)  # let the snapshot be taken
+    tui.wait_gone("working", timeout=10)
+    tui.send("3")
+    tui.wait_for("done")
+    text = tui.text()
+    check(text.count("Took a snapshot of snapall_it_a, snapall_it_b") >= 2, "the window's own change is listed beside the command's")
+    tui.send("q")
+    tui.finish()
+
+    listed = subprocess.run([BINARY, "--no-dbus", "activity"], capture_output=True, text=True).stdout
+    check("window" in listed and "command" in listed, "`snapall activity` lists both, whichever made them")
+
+    # a command killed in the middle of a slow change
+    shim = tempfile.mkdtemp(prefix="slow-snapper-")
+    real = shutil.which("snapper")
+    with open(f"{shim}/snapper", "w") as handle:
+        handle.write("#!/bin/sh\ncase \" $* \" in *\" create \"*) sleep 4;; esac\n" + f'exec {real} "$@"\n')
+    os.chmod(f"{shim}/snapper", 0o755)
+    env = dict(os.environ, PATH=f"{shim}:{os.environ['PATH']}")
+    killed = subprocess.Popen([BINARY, "--no-dbus", "create", "cut short"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1.2)
+    killed.kill()
+    killed.wait()
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.send("3")
+    tui.wait_for("STOPPED")
+    check("stopped before it could say how it ended" in tui.text().replace("\n", " ") or "STOPPED" in tui.text(),
+          "a command killed mid-change is shown as STOPPED, not forgotten and not still running")
     tui.send("q")
     tui.finish()
 
@@ -634,6 +692,7 @@ def main():
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
     tabs_scenario()
+    journal_scenario()
     jobs_and_quotas_scenario()
     points_screen_scenario()
     restore_point_scenario()

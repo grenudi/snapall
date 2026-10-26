@@ -158,7 +158,7 @@ fn the_health_report_is_asked_for_after_the_first_screen_and_never_blocks_the_ke
     let mut state = State::default();
     assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
     let effects = update(&mut state, Msg::ConfigsLoaded(Ok(vec![])));
-    assert_eq!(effects, [Effect::LoadHealth]);
+    assert_eq!(effects, [Effect::LoadHealth, Effect::LoadHistory]);
     assert!(
         update(&mut state, Msg::ConfigsLoaded(Ok(vec![]))).is_empty(),
         "and only once"

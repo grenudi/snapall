@@ -178,6 +178,68 @@ pub fn history_json(history: &FileHistory) -> Value {
     json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
 }
 
+// ---- activity ---------------------------------------------------------------------------------
+
+fn took_words(took_ms: Option<u64>) -> String {
+    match took_ms {
+        None => String::new(),
+        Some(ms) if ms < 1000 => format!(" ({ms} ms)"),
+        Some(ms) => format!(" ({:.1} s)", ms as f64 / 1000.0),
+    }
+}
+
+/// What snapall did, one line each, newest first; a change that failed or was cut short says why beneath.
+pub fn activity(entries: &[snapall_core::JournalEntry]) -> String {
+    use snapall_core::{JournalStatus, Source};
+    if entries.is_empty() {
+        return "Nothing has been recorded yet: taking, deleting or restoring a snapshot is.\n"
+            .to_owned();
+    }
+    let mut out = String::new();
+    for entry in entries {
+        let when = entry
+            .finished_at
+            .as_deref()
+            .or(entry.started_at.as_deref())
+            .unwrap_or("-");
+        let origin = match entry.source {
+            Some(Source::Window) => "window",
+            Some(Source::Command) => "command",
+            None => "-",
+        };
+        out.push_str(&format!(
+            "{when:<19}  {:<8} {origin:<8} {}{}\n",
+            entry.status.word(),
+            entry.what,
+            took_words(entry.took_ms)
+        ));
+        if matches!(
+            entry.status,
+            JournalStatus::Failed | JournalStatus::Interrupted
+        ) {
+            out.push_str(&format!("                     {}\n", entry.detail));
+        }
+    }
+    out
+}
+
+pub fn activity_json(entries: &[snapall_core::JournalEntry]) -> Value {
+    json!(entries
+        .iter()
+        .map(|entry| json!({
+            "id": entry.id,
+            "what": entry.what,
+            "status": entry.status.word().to_lowercase(),
+            "source": entry.source.map(snapall_core::Source::word),
+            "started_at": entry.started_at,
+            "finished_at": entry.finished_at,
+            "took_ms": entry.took_ms,
+            "detail": entry.detail,
+            "pid": entry.pid,
+        }))
+        .collect::<Vec<_>>())
+}
+
 // ---- health -------------------------------------------------------------------------------------
 
 fn level_mark(level: snapall_core::Level) -> &'static str {

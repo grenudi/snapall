@@ -86,6 +86,15 @@ pub trait SystemProbe {
 
     /// Take the right to make a change; `Busy` says who has it. Reading never needs it.
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy>;
+
+    /// Remember an event of a change (see [`crate::journal`]). A machine that cannot remember says
+    /// nothing; failing to remember never stops a change.
+    fn record(&self, _event: &crate::journal::Event) {}
+
+    /// What snapall has done, newest first, whichever snapall did it; at most `limit` changes.
+    fn history(&self, _limit: usize) -> Vec<crate::journal::Entry> {
+        Vec::new()
+    }
 }
 
 /// What a job's unit file says about it, as written.

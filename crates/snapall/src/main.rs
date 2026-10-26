@@ -100,6 +100,7 @@ fn run(parsed: Parsed) -> Outcome {
         Request::List => commands::list(&ctx),
         Request::Points => commands::points(&ctx),
         Request::Health => commands::health(&ctx),
+        Request::Activity => commands::activity(&ctx),
         Request::Quotas { state, yes } => commands::quotas(&ctx, state.as_deref(), yes),
         Request::Snapshots { config } => commands::snapshots(&ctx, config),
         Request::History { path } => commands::history(&ctx, &path),

@@ -57,6 +57,8 @@ pub enum Request {
     Points,
     /// How protection stands: room used, cleanup, services.
     Health,
+    /// What snapall has done, newest first.
+    Activity,
     /// How the disk counts the room snapshots take; with `on` or `off`, switch it.
     Quotas {
         state: Option<String>,
@@ -431,6 +433,7 @@ fn build_request(
         }
         Command::Points => Request::Points,
         Command::Health => Request::Health,
+        Command::Activity => Request::Activity,
         Command::Quotas => Request::Quotas {
             state: Contract::QUOTAS_STATE.get_from(resolution),
             yes: flag(&Contract::YES, resolution),

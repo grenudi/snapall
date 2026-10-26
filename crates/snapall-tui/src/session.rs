@@ -20,7 +20,7 @@ use snapall_core::{
     SystemProbe,
 };
 
-use crate::changes::{describe_change, describe_now, how_it_went, outcome_of};
+use crate::changes::{describe_change, describe_now, how_it_went, new_id, outcome_of};
 use crate::model::{update, Effect, Finished, Key, Msg, PointOffer, State, UiContext};
 use crate::tabs::health::HealthData;
 
@@ -55,10 +55,11 @@ impl<'a> Executor<'a> {
         };
         let present = describe_now(&effect).unwrap_or_default();
         // one change at a time across every snapall: a second one is told who has the right, and waits
-        let _hold = match self.system.hold_changes(&what) {
+        let _hold = match self.system.hold_changes(&present) {
             Ok(hold) => hold,
             Err(busy) => {
                 return Msg::Finished(Box::new(Finished {
+                    id: new_id(),
                     outcome: Err(busy.to_string()),
                     what,
                     present,
@@ -68,10 +69,26 @@ impl<'a> Executor<'a> {
                 }));
             }
         };
+        let id = new_id();
+        self.system.record(&snapall_core::JournalEvent::Started {
+            id: id.clone(),
+            at: self.system.local_time().unwrap_or_default(),
+            what: what.clone(),
+            source: snapall_core::Source::Window,
+            pid: std::process::id(),
+        });
         let started = std::time::Instant::now();
         let msg = self.perform(effect);
+        let outcome = how_it_went(&msg);
+        self.system.record(&snapall_core::JournalEvent::Finished {
+            id: id.clone(),
+            at: self.system.local_time().unwrap_or_default(),
+            outcome: outcome.clone(),
+            took_ms: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        });
         Msg::Finished(Box::new(Finished {
-            outcome: how_it_went(&msg),
+            id,
+            outcome,
             what,
             present,
             took: started.elapsed(),
@@ -83,6 +100,7 @@ impl<'a> Executor<'a> {
     fn perform(&self, effect: Effect) -> Msg {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
+            Effect::LoadHistory => Msg::HistoryLoaded(self.system.history(200)),
             Effect::LoadHealth => Msg::HealthLoaded(
                 gather(backend, self.system)
                     .map(|facts| {

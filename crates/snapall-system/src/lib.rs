@@ -9,6 +9,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod journal;
 mod lock;
 mod quotas;
 mod units;
@@ -24,6 +25,7 @@ use snapall_core::{
 #[derive(Debug, Clone, Default)]
 pub struct LinuxSystem {
     lock_path: Option<PathBuf>,
+    journal_path: Option<PathBuf>,
 }
 
 /// Where the lock is kept: `/run` is emptied at every start, so a crash cannot leave it for ever.
@@ -38,7 +40,22 @@ impl LinuxSystem {
     pub fn with_lock_path(path: PathBuf) -> Self {
         Self {
             lock_path: Some(path),
+            ..Self::default()
         }
+    }
+
+    /// Keep the journal somewhere else (for tests).
+    pub fn with_journal_path(path: PathBuf) -> Self {
+        Self {
+            journal_path: Some(path),
+            ..Self::default()
+        }
+    }
+
+    fn journal_path(&self) -> PathBuf {
+        self.journal_path
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(journal::PATH))
     }
 
     fn lock_path(&self) -> PathBuf {
@@ -101,6 +118,14 @@ impl SystemProbe for LinuxSystem {
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy> {
         let since = self.local_time().unwrap_or_default();
         lock::hold(&self.lock_path(), doing, &since)
+    }
+
+    fn record(&self, event: &snapall_core::JournalEvent) {
+        journal::append(&self.journal_path(), event);
+    }
+
+    fn history(&self, limit: usize) -> Vec<snapall_core::JournalEntry> {
+        journal::history(&self.journal_path(), limit, lock::is_running_snapall)
     }
 }
 

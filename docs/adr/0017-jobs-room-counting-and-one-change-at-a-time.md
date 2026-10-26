@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 17. Background jobs from one catalogue, room counting, and one change at a time
 
-Status: accepted. Parts 1, 2, 3 (reading), 7, 8 and 9 are built; the rest is designed here and staged.
+Status: accepted. Parts 1, 2, 3 (reading), 6, 7, 8 and 9 are built; the rest is designed here and staged.
 
 ## Context
 
@@ -67,9 +67,11 @@ Stopping protection deletes that area's snapshots (verified on real snapper), so
 and a count of what will be lost; and it is **refused for the system area**, whose history is what the boot
 menu is built from. Not built.
 
-### 6. Activity beyond this window, and 10–12. Jobs that outlive the window
+### 6. Activity beyond this window: built. And 10–12, jobs that outlive the window: staged
 
-These three are one design question, and I would not answer it with a resident daemon.
+**Built (6): the journal.** Every change writes an event when it takes the change lock and another when it ends, whichever snapall makes it (the window, or a command), to one append-only file of JSON lines under `/var/lib/snapall`. Folding the two gives running, done, failed or **stopped**: a change that started and whose process is gone without having said how it ended (the program was killed, the computer switched off) is shown as stopped, with what to do next, instead of vanishing or looking as if it were still running. The Activity tab and `snapall activity` read it, so history reaches back across sessions and shows what commands did. A line is written in one call so two programs cannot spoil each other's lines; the file is rotated when it grows; a line that cannot be read is skipped, and failing to remember never stops a change. Checked on real Btrfs, with a command killed by `kill -9` mid-change.
+
+The journal is also the foundation of 10–12 below, which are one design question, and I would not answer it with a resident daemon.
 
 A resident privileged daemon (a socket, a protocol, a queue) would satisfy the request, but it is a new
 always-running attack surface, a second code path next to the one used today, and a thing to keep alive

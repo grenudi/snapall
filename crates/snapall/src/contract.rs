@@ -27,6 +27,7 @@ pub enum Command {
     Points,
     History,
     Health,
+    Activity,
     Quotas,
     Setup,
     Doctor,
@@ -48,6 +49,7 @@ impl Command {
         Command::Points,
         Command::History,
         Command::Health,
+        Command::Activity,
         Command::Quotas,
         Command::Setup,
         Command::Doctor,
@@ -71,6 +73,7 @@ impl Command {
             Command::Setup => "setup",
             Command::Health => "health",
             Command::Quotas => "quotas",
+            Command::Activity => "activity",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -103,6 +106,9 @@ impl Command {
             Command::Health => "Show whether protection is working, and how much room it takes",
             Command::Quotas => {
                 "Show how the disk counts the room snapshots take, and switch it on or off"
+            }
+            Command::Activity => {
+                "Show what snapall has done, including earlier sessions, newest first"
             }
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
@@ -306,6 +312,7 @@ contract! {
             Command::History,
             Command::Setup,
             Command::Health,
+            Command::Activity,
             Command::Quotas,
             Command::Doctor,
         ],

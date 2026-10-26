@@ -38,7 +38,7 @@ fn state_in(stat: &str) -> Option<char> {
 /// unless its command line plainly shows it is something else (a pid can be reused). A command line that
 /// is empty, which the kernel reports for a moment while a process is starting a program, or cannot be
 /// read, is not that: it is no reason to take a lock from a process that may be about to need it.
-fn is_running_snapall(pid: u32) -> bool {
+pub(crate) fn is_running_snapall(pid: u32) -> bool {
     let Ok(stat) = fs::read_to_string(format!("/proc/{pid}/stat")) else {
         return false; // no such process
     };

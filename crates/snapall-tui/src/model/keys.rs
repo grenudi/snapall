@@ -12,7 +12,12 @@ pub(crate) fn on_tab_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
     if let Key::Char(c) = key {
         if let Some(tab) = Tab::from_key(c) {
             state.tab = tab;
-            return Some(Vec::new());
+            // another snapall may have done something since: read the journal again
+            return Some(if tab == Tab::Activity {
+                vec![Effect::LoadHistory]
+            } else {
+                Vec::new()
+            });
         }
     }
     let own = match state.tab {
@@ -58,7 +63,7 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
-            vec![Effect::LoadConfigs, Effect::LoadHealth]
+            vec![Effect::LoadConfigs, Effect::LoadHealth, Effect::LoadHistory]
         }
         Key::Tab => {
             state.focus = match state.focus {
@@ -252,7 +257,11 @@ pub(crate) fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
         _ if state.modal.is_some() => Vec::new(),
         Click::Tab(tab) => {
             state.tab = tab;
-            Vec::new()
+            if tab == Tab::Activity {
+                vec![Effect::LoadHistory]
+            } else {
+                Vec::new()
+            }
         }
         Click::Chip(topic) => {
             state.tab = Tab::Health;
