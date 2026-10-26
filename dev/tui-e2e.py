@@ -374,6 +374,15 @@ def limits_scenario():
         return next((line.split("|")[1].strip() for line in out.splitlines() if line.split("|")[0].strip() == name), None)
 
     check(config("NUMBER_LIMIT") == "50", "snapper starts with its own default")
+    try:
+        _limits_journey(config)
+    finally:
+        # the fixture is shared with other tests, which expect snapper's own defaults: put them back
+        subprocess.run(["snapper", "--no-dbus", "-c", "snapall_it_a", "set-config", "NUMBER_LIMIT=50", "NUMBER_MIN_AGE=1800"], capture_output=True)
+    check(config("NUMBER_LIMIT") == "50" and config("NUMBER_MIN_AGE") == "1800", "and the area's settings are put back as they were")
+
+
+def _limits_journey(config):
     tui = Tui()
     tui.wait_for("Snapshots of snapall_it_a (")
     tui.wait_gone("working", timeout=6)
