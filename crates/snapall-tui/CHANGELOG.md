@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.14.0]
+
+
+### Features
+- Background jobs from one catalogue, room counting and one change at a time ([#46](https://github.com/grenudi/snapall/pull/46)) ([669e86d])
+
+
+### Refactoring
+- **tui:** Split the window by concern, and keep it that way ([#44](https://github.com/grenudi/snapall/pull/44)) ([8bc8e23])
+
+
+
 ## [0.13.0]
 
 
