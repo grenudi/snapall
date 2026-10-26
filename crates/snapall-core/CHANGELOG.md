@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.16.0]
+
+
+### Features
+- Changes that outlive the window, with progress, a safe stop and a running item on the status bar ([#49](https://github.com/grenudi/snapall/pull/49)) ([81adcc4])
+
+
+
 ## [0.15.0]
 
 
