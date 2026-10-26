@@ -292,7 +292,7 @@ To undo all of this at once: sudo snapall restore-all 20261025T190200Z
 
 ## The terminal UI
 
-Your protected areas on the left, the selected area's snapshots on the right, newest first. The window explains itself: hover over any button and a sentence on the bottom line says what it does, and `?` opens a two-page help that starts with what a snapshot is. If part of your disk has no snapshots yet (your Home files, usually), the bottom line says so when the window opens, and `p` explains what protecting means and does it, with no command to type.
+Your protected areas on the left, the selected area's snapshots on the right, newest first. The window has three views, chosen with `1`, `2`, `3` or a click on the tab bar: **Snapshots**, **Health** (is protection working, how much room it takes, what to do about anything that needs it) and **Activity** (what snapall did in this window and how it went, with the reason when something failed). Under every view a status bar shows the numbers that matter (snapshots, the room they hold, how full the disk is, whether old ones are cleaned up) and each item is clickable: it takes you to the row that explains it. The window explains itself: hover over any button and a sentence on the bottom line says what it does, and `?` opens a two-page help that starts with what a snapshot is. If part of your disk has no snapshots yet (your Home files, usually), the bottom line says so when the window opens, and `p` explains what protecting means and does it, with no command to type.
 
 The packages install a *snapall* entry in your application menu that opens this in a terminal with `sudo`; from a terminal it is `sudo snapall tui`.
 

@@ -17,24 +17,31 @@ use snapall_core::{ChangeKind, ConfigName, FileState, SnapshotId, SnapshotInfo, 
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
 
-const ACCENT: Color = Color::Cyan;
-const DIM: Color = Color::DarkGray;
+use crate::tab::Tab;
+use crate::theme::{ACCENT, DIM};
+use crate::{status_bar, tabs};
 
 /// Where everything is, for a terminal of this size. Drawing and clicking both start here, so a
 /// click can only ever land on what was drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Areas {
+    /// The tab bar.
     pub header: Rect,
+    /// Everything between the tab bar and the status bar.
+    pub body: Rect,
     pub configs: Rect,
     pub snapshots: Rect,
+    /// The status bar, under every view.
+    pub status: Rect,
     pub notice: Rect,
     pub keys: Rect,
 }
 
 pub fn areas(size: Rect) -> Areas {
-    let [header, body, footer] = Layout::vertical([
+    let [header, body, status, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(3),
+        Constraint::Length(1),
         Constraint::Length(2),
     ])
     .areas(size);
@@ -44,8 +51,10 @@ pub fn areas(size: Rect) -> Areas {
         Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(footer);
     Areas {
         header,
+        body,
         configs,
         snapshots,
+        status,
         notice,
         keys,
     }
@@ -74,12 +83,16 @@ pub fn layout(state: &State, size: Rect) -> Areas {
 pub fn render(state: &State, frame: &mut Frame) {
     let areas = layout(state, frame.area());
     render_header(state, frame, areas.header);
-    if state.file.is_some() {
-        render_file(state, frame, areas.snapshots);
-    } else {
-        render_configs(state, frame, areas.configs);
-        render_snapshots(state, frame, areas.snapshots);
+    match (state.file.is_some(), state.tab) {
+        (true, _) => render_file(state, frame, areas.snapshots),
+        (false, Tab::Snapshots) => {
+            render_configs(state, frame, areas.configs);
+            render_snapshots(state, frame, areas.snapshots);
+        }
+        (false, Tab::Health) => tabs::health::render(state, frame, areas.body),
+        (false, Tab::Activity) => tabs::activity::render(state, frame, areas.body),
     }
+    status_bar::render(state, frame, areas.status);
     render_footer(state, frame, &areas);
 
     if let Some(modal) = &state.modal {
@@ -87,17 +100,67 @@ pub fn render(state: &State, frame: &mut Frame) {
     }
 }
 
-fn render_header(state: &State, frame: &mut Frame, area: Rect) {
-    let mut spans = vec![
-        Span::styled(" snapall ", Style::new().fg(Color::Black).bg(ACCENT).bold()),
-        Span::styled(
-            match &state.file {
-                Some(view) => format!("  history of {}", view.target.path),
-                None => "  snapshots of your computer".to_owned(),
+/// The brand badge that opens the header: the tabs start after it.
+const BRAND_WIDTH: u16 = 9;
+
+fn tab_label(tab: Tab) -> String {
+    format!(" {} {} ", tab.key(), tab.title())
+}
+
+/// Each tab's name in the header and the cells it covers. What does not fit is not drawn.
+pub fn tab_rects(header: Rect) -> Vec<(Rect, Tab)> {
+    let mut x = header.x.saturating_add(BRAND_WIDTH).saturating_add(1);
+    let mut out = Vec::new();
+    for tab in Tab::ALL {
+        let width = u16::try_from(tab_label(tab).chars().count()).unwrap_or(u16::MAX);
+        if x.saturating_add(width) > header.x.saturating_add(header.width) {
+            break;
+        }
+        out.push((
+            Rect {
+                x,
+                y: header.y,
+                width,
+                height: 1.min(header.height),
             },
+            tab,
+        ));
+        x = x.saturating_add(width).saturating_add(1);
+    }
+    out
+}
+
+fn tab_spans(state: &State) -> Vec<Span<'static>> {
+    let mut spans = vec![Span::raw(" ")];
+    for (_, tab) in tab_rects(Rect {
+        x: 0,
+        y: 0,
+        width: u16::MAX,
+        height: 1,
+    }) {
+        let style = if tab == state.tab {
+            Style::new().fg(Color::Black).bg(Color::White).bold()
+        } else {
+            Style::new().fg(DIM)
+        };
+        spans.push(Span::styled(tab_label(tab), style));
+        spans.push(Span::raw(" "));
+    }
+    spans
+}
+
+fn render_header(state: &State, frame: &mut Frame, area: Rect) {
+    let mut spans = vec![Span::styled(
+        " snapall ",
+        Style::new().fg(Color::Black).bg(ACCENT).bold(),
+    )];
+    match &state.file {
+        Some(view) => spans.push(Span::styled(
+            format!("  history of {}", view.target.path),
             Style::new().fg(DIM),
-        ),
-    ];
+        )),
+        None => spans.extend(tab_spans(state)),
+    }
     if state.pending > 0 {
         // Work is in flight on the worker thread: say so, and keep the screen moving.
         const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
@@ -930,7 +993,7 @@ fn modal_geometry(
     // A prompt never covers the two footer lines: the one below it explains the button the mouse is
     // over, and a prompt is exactly where that explanation matters.
     let above_footer = Rect {
-        height: size.height.saturating_sub(2),
+        height: size.height.saturating_sub(3),
         ..size
     };
     let area = centered(above_footer, spec.width, spec.height);
@@ -1113,11 +1176,35 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
             .map(|(_, button, _)| Click::Button(button));
     }
     let areas = layout(state, size);
+    if state.file.is_none() {
+        if let Some((_, tab)) = tab_rects(areas.header)
+            .into_iter()
+            .find(|(rect, _)| contains(*rect, col, row))
+        {
+            return Some(Click::Tab(tab));
+        }
+    }
+    if let Some(data) = &state.health.data {
+        if let Some((_, topic)) = status_bar::chip_rects(areas.status, &data.report.chips)
+            .into_iter()
+            .find(|(rect, _)| contains(*rect, col, row))
+        {
+            return Some(Click::Chip(topic));
+        }
+    }
     if let Some((_, button, _, _)) = footer_buttons(areas.keys, state.file.is_some())
         .into_iter()
         .find(|(rect, _, _, _)| contains(*rect, col, row))
     {
         return Some(Click::Button(button));
+    }
+    if state.file.is_none() && state.tab != Tab::Snapshots {
+        let index = match state.tab {
+            Tab::Health => tabs::health::row_at(state, areas.body, row),
+            Tab::Activity => tabs::activity::row_at(state, areas.body, row),
+            Tab::Snapshots => None,
+        };
+        return index.map(|index| Click::TabRow { index });
     }
     let block = Block::default().borders(Borders::ALL);
     let configs = block.inner(areas.configs);

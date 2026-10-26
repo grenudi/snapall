@@ -40,6 +40,18 @@ impl SystemProbe for LinuxSystem {
     fn file_exists(&self, path: &str) -> bool {
         Path::new(path).exists()
     }
+
+    fn enable_job(&self, unit: &str) -> Result<(), String> {
+        let output = Command::new("systemctl")
+            .args(["enable", "--now", unit])
+            .output()
+            .map_err(|e| format!("systemctl could not be run: {e}"))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+        }
+    }
 }
 
 /// What a program printed, if it ran and succeeded.

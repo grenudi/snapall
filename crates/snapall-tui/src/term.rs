@@ -50,7 +50,11 @@ const TICK: Duration = Duration::from_millis(100);
 /// stopping a unit or an ssh session dropping would leave the user's terminal in raw mode on the
 /// alternate screen. A signal does not wait for work in flight; leaving the scope does join the
 /// worker, which finishes only the single snapper call it is in.
-pub fn run(backend: &(dyn SnapshotBackend + Sync), context: UiContext) -> io::Result<Exit> {
+pub fn run(
+    backend: &(dyn SnapshotBackend + Sync),
+    system: &(dyn snapall_core::SystemProbe + Sync),
+    context: UiContext,
+) -> io::Result<Exit> {
     // Registered before the terminal is touched, so there is no window where a signal kills a
     // process that has already changed the terminal.
     let received = Arc::new(AtomicUsize::new(0));
@@ -70,7 +74,7 @@ pub fn run(backend: &(dyn SnapshotBackend + Sync), context: UiContext) -> io::Re
     let result = thread::scope(|scope| {
         let (effect_tx, effect_rx) = mpsc::channel::<Effect>();
         let (result_tx, result_rx) = mpsc::channel::<Msg>();
-        let executor = Executor::new(backend);
+        let executor = Executor::new(backend).with_system(system);
         scope.spawn(move || {
             for effect in effect_rx {
                 if result_tx.send(executor.execute(effect)).is_err() {

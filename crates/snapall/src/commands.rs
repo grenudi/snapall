@@ -341,7 +341,7 @@ pub fn tui(ctx: &Context, file: Option<&str>) -> Outcome {
         .map(|named| file_target(ctx.backend, named))
         .transpose()?;
     let context = ui_context(ctx, target);
-    match snapall_tui::run(ctx.backend, context)? {
+    match snapall_tui::run(ctx.backend, &snapall_system::LinuxSystem, context)? {
         snapall_tui::Exit::Quit => Ok(ExitCode::SUCCESS),
         // Exit as a signalled process would, once the terminal is back to normal.
         snapall_tui::Exit::Signal(signal) => {
