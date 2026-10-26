@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.17.0]
+
+
+### Features
+- Groups of areas, to snapshot together under a name ([#51](https://github.com/grenudi/snapall/pull/51)) ([64860d4])
+
+
+
 ## [0.16.0]
 
 
