@@ -395,7 +395,7 @@ def _limits_journey(config):
             break
         tui.send("down")
         tui.pump(0.15)
-    check("change how many it keeps" in words(tui), "the area's row says what Enter does")
+    check("change what it keeps" in words(tui), "the area's row says what Enter does")
     tui.send("enter")
     tui.wait_for("What Snapall_it_a keeps")
     tui.wait_until(lambda: "Nothing would be removed" in words(tui), "the preview")
@@ -417,6 +417,60 @@ def _limits_journey(config):
     check(config("NUMBER_LIMIT") == "1" and config("NUMBER_MIN_AGE") == "0", "snapper now holds the new numbers")
     tui.send("q")
     tui.finish()
+
+
+def stop_protecting_scenario():
+    """Stopping the protection of an area, from the keyboard: the plan is shown in words, the name must be
+    typed, and then the area's snapshots are really gone while its files stay. It changes the shared fixture,
+    so it runs last and puts the area back whatever happens."""
+    fixture = os.environ.get("SNAPALL_FIXTURE", "/tmp/snapall-fixture")
+    area_dir = f"{fixture}/mnt/snapall_it_b"
+
+    def configs():
+        out = subprocess.run(["snapper", "--no-dbus", "list-configs", "--columns", "config"], capture_output=True, text=True).stdout
+        return [line.strip() for line in out.splitlines()[2:] if line.strip()]
+
+    marker = f"{area_dir}/keep-me.txt"
+    with open(marker, "w") as handle:
+        handle.write("my file")
+    try:
+        tui = Tui()
+        tui.wait_for("Snapshots of snapall_it_a (")
+        tui.wait_gone("working", timeout=6)
+        tui.wait_for("cleanup", timeout=8)
+        tui.send("2")
+        tui.wait_for("What this means")
+        for _ in range(14):
+            chosen = [line for line in tui.text().splitlines() if " > " in line]
+            if chosen and "Snapall_it_b (" in chosen[0]:
+                break
+            tui.send("down")
+            tui.pump(0.15)
+        check("U: stop protecting it" in words(tui), "the area's row says how to stop protecting it")
+        tui.send("U")
+        tui.wait_for("Stop protecting snapall_it_b?")
+        tui.wait_until(lambda: "will be deleted for good" in words(tui), "the plan")
+        text = words(tui)
+        check("deleted for good" in text and "files in it" in text and "cannot be undone" in text, "it says what goes, what stays and that it cannot be undone")
+        check("type its name (snapall_it_b)" in text, "it asks for the name")
+        check("q quit" in tui.text().splitlines()[-1], "the prompt leaves the key line alone")
+        tui.send("enter")
+        tui.wait_for("Type its name exactly")
+        check("snapall_it_b" in configs(), "Enter alone changed nothing")
+        tui.type("snapall_it_b")
+        tui.send("enter")
+        tui.wait_until(lambda: "no longer protected" in words(tui), "it to be done", timeout=12)
+        check("snapall_it_b" not in configs() and "snapall_it_a" in configs(), "the area is no longer protected and the other still is")
+        check(open(marker).read() == "my file", "its own files are untouched")
+        tui.send("q")
+        tui.finish()
+    finally:
+        # the fixture is shared with the Rust tests that follow, which expect both areas protected
+        if "snapall_it_b" not in configs():
+            subprocess.run(["snapper", "--no-dbus", "-c", "snapall_it_b", "create-config", area_dir], capture_output=True)
+        if os.path.exists(marker):
+            os.remove(marker)
+    check("snapall_it_b" in configs(), "and the area is protected again for what follows")
 
 
 def jobs_and_quotas_scenario():
@@ -897,6 +951,7 @@ def main():
     points_screen_scenario()
     restore_point_scenario()
     protect_scenario()
+    stop_protecting_scenario()
 
     print("\nTUI end-to-end: all checks passed")
 

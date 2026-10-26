@@ -40,6 +40,8 @@ pub struct Row {
     pub detail: String,
     /// What Enter does on this row, if anything.
     pub action: RowAction,
+    /// The area this row is about, if it is one: what `U` (stop protecting) acts on.
+    pub area: Option<snapall_core::ConfigName>,
 }
 
 /// What Enter does on a row.
@@ -80,6 +82,7 @@ pub(crate) fn finding_rows(report: &Health) -> Vec<Row> {
             label: finding.headline.clone(),
             detail: finding.why.clone(),
             action: finding.remedy.map_or(RowAction::Nothing, RowAction::Fix),
+            area: None,
         })
         .collect()
 }
@@ -120,6 +123,7 @@ pub(crate) fn space_row(area: &AreaFacts) -> Row {
             .map_or(RowAction::Nothing, |_| {
                 RowAction::EditLimits(area.config.clone())
             }),
+        area: Some(area.config.clone()),
     }
 }
 
@@ -183,6 +187,7 @@ pub(crate) fn room_row(facts: &Facts) -> Option<Row> {
         label: format!("Counting the room snapshots take: {word}"),
         detail: room_counting_text(mode),
         action,
+        area: None,
     })
 }
 
@@ -266,5 +271,6 @@ pub(crate) fn job_row(facts: &Facts, job: &Job) -> Row {
         label: format!("{} ({}): {word}", job.title, job.unit),
         detail,
         action: RowAction::ControlJob(*job),
+        area: None,
     }
 }

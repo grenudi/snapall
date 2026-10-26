@@ -194,7 +194,7 @@ pub struct Restored {
     pub summary: RestoreSummary,
 }
 
-fn is_root(subvolume: &str) -> bool {
+pub(crate) fn is_root(subvolume: &str) -> bool {
     subvolume.trim_end_matches('/').is_empty()
 }
 

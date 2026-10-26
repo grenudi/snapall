@@ -71,6 +71,7 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saved the groups of areas".to_owned(),
+        Effect::StopProtecting { config } => format!("Stopped protecting {config}"),
         Effect::SetLimits { config, .. } => {
             format!("Changed how many snapshots {config} keeps")
         }
@@ -185,6 +186,7 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switching on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saving the groups of areas".to_owned(),
+        Effect::StopProtecting { config } => format!("Stopping protection of {config}"),
         Effect::SetLimits { config, .. } => {
             format!("Changing how many snapshots {config} keeps")
         }
@@ -282,6 +284,9 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
         Msg::JobControlled { result, .. } => result.clone().map(|()| String::new()),
         Msg::GroupsSaved { result, .. } => result.clone().map(|()| String::new()),
         Msg::LimitsSet { result, .. } => result.clone().map(|()| String::new()),
+        Msg::ProtectionStopped { result, .. } => {
+            result.clone().map(|n| format!("{n} snapshots deleted"))
+        }
         Msg::QuotasSet {
             turn_on: true,
             result,

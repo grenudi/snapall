@@ -377,6 +377,61 @@ pub fn activity(ctx: &Context) -> Outcome {
         .result(render::activity(&entries), render::activity_json(&entries))
 }
 
+/// Stop protecting an area: every snapshot of it is deleted for good, its own files are not touched. It
+/// always says what that means first; on a terminal it needs the area's name typed out, in a script `--yes`;
+/// `--dry-run` only says. The system area is refused.
+pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, yes: bool) -> Outcome {
+    use snapall_core::unprotect::{plan, stop_protecting};
+    use snapall_core::SystemProbe;
+    let config = ConfigName::parse(area)?;
+    let system = snapall_system::LinuxSystem::new();
+    let groups = system.groups()?;
+    let plan = plan(ctx.backend, &groups, &config)?;
+    eprintln!(
+        "{}
+",
+        plan.words().join(
+            "
+"
+        )
+    );
+    if dry_run {
+        return ctx.show.result(
+            "Dry run: nothing was changed.
+"
+            .to_owned(),
+            serde_json::json!({ "area": area, "snapshots": plan.snapshots, "changed": false }),
+        );
+    }
+    if !yes {
+        if !ask::can_ask() {
+            eprintln!("snapall: this deletes snapshots for good and there is no terminal to ask on: read the above, then pass --yes");
+            return Ok(ExitCode::from(2));
+        }
+        if !ask::typed("This cannot be undone.", config.as_str())? {
+            eprintln!("snapall: nothing changed");
+            return Ok(ExitCode::FAILURE);
+        }
+    }
+    let title = snapall_core::coverage::describe(&plan.subvolume).title;
+    let change = Change::begin(
+        &format!("Stopping protection of {title}"),
+        &format!("Stopped protecting {title}"),
+        None,
+    )?;
+    let result = stop_protecting(ctx.backend, &plan).map_err(|e| e.to_string());
+    change.end(result.clone().map(|n| format!("{n} snapshots deleted")));
+    let deleted = result?;
+    ctx.show.result(
+        format!(
+            "{title} is no longer protected. {deleted} snapshot{} deleted; its files are untouched.
+",
+            if deleted == 1 { " was" } else { "s were" }
+        ),
+        serde_json::json!({ "area": area, "snapshots_deleted": deleted, "changed": true }),
+    )
+}
+
 /// What was asked for, as typed: each may be absent.
 pub struct LimitsWanted<'a> {
     pub keep: Option<&'a str>,

@@ -75,6 +75,12 @@ pub enum Request {
         cleanup: Option<String>,
         yes: bool,
     },
+    /// Stop protecting an area (deletes its snapshots).
+    Unprotect {
+        area: String,
+        dry_run: bool,
+        yes: bool,
+    },
     /// Ask a running change to stop after the area it is on.
     Cancel {
         job: String,
@@ -457,6 +463,15 @@ fn build_request(
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
+        Command::Unprotect => Request::Unprotect {
+            area: Contract::UNPROTECT_AREA
+                .get_from(resolution)
+                .ok_or_else(|| {
+                    usage_error("AREA is required: which area to stop protecting".to_owned())
+                })?,
+            dry_run: flag(&Contract::DRY_RUN, resolution),
+            yes: flag(&Contract::YES, resolution),
+        },
         Command::Limits => Request::Limits {
             area: Contract::LIMITS_AREA
                 .get_from(resolution)

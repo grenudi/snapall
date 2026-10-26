@@ -122,6 +122,31 @@ impl<'a> Executor<'a> {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
             Effect::LoadGroups => Msg::GroupsLoaded(self.system.groups()),
+            Effect::LoadUnprotectPlan { config } => {
+                let plan = self
+                    .system
+                    .groups()
+                    .map_err(|why| why.to_string())
+                    .and_then(|groups| {
+                        snapall_core::unprotect::plan(backend, &groups, &config)
+                            .map_err(|e| e.to_string())
+                    });
+                Msg::UnprotectPlanLoaded { config, plan }
+            }
+            Effect::StopProtecting { config } => {
+                // worked out again now, not trusted from when the prompt opened
+                let result = self
+                    .system
+                    .groups()
+                    .map_err(|why| why.to_string())
+                    .and_then(|groups| {
+                        let plan = snapall_core::unprotect::plan(backend, &groups, &config)
+                            .map_err(|e| e.to_string())?;
+                        snapall_core::unprotect::stop_protecting(backend, &plan)
+                            .map_err(|e| e.to_string())
+                    });
+                Msg::ProtectionStopped { config, result }
+            }
             Effect::LoadLimitsData { config } => match backend.list_snapshots(&config) {
                 Ok(snapshots) => Msg::LimitsData { config, snapshots },
                 Err(error) => Msg::LimitsSet {

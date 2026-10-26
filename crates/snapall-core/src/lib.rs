@@ -27,6 +27,7 @@ pub mod points;
 pub mod port;
 pub mod services;
 pub mod system;
+pub mod unprotect;
 pub mod usecase;
 
 #[cfg(any(test, feature = "testing"))]

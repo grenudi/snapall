@@ -78,9 +78,31 @@ pub fn on_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
         Key::Home => state.health.cursor = 0,
         Key::End | Key::Char('G') => state.health.cursor = last,
         Key::Enter => return Some(act_on_chosen(state)),
+        // stopping protection is a key of its own, never the Enter that a row means for something milder
+        Key::Char('U') => return Some(stop_protecting_the_chosen(state)),
         _ => return None,
     }
     Some(Vec::new())
+}
+
+/// `U` on an area's row opens the question before it stops being protected; on any other row it says what
+/// it is for.
+fn stop_protecting_the_chosen(state: &mut State) -> Vec<Effect> {
+    let area = state
+        .health
+        .rows()
+        .into_iter()
+        .nth(state.health.cursor)
+        .and_then(|row| row.area);
+    match area {
+        Some(config) => crate::model::open_unprotect(state, config),
+        None => {
+            state.notice = Some(Notice::Info(
+                "U stops protecting an area: choose one of the areas under Space first".into(),
+            ));
+            Vec::new()
+        }
+    }
 }
 
 /// Enter on a row: do what it offers, or open the controls it leads to.
@@ -228,7 +250,9 @@ fn render_detail(state: &State, frame: &mut Frame, area: Rect, rows: &[Row]) {
         }
         RowAction::CountRoom(false) => Some("Enter: switch room counting off (it explains first)"),
         RowAction::ControlJob(_) => Some("Enter: the commands that check on it and control it"),
-        RowAction::EditLimits(_) => Some("Enter: change how many it keeps, and when the oldest go"),
+        RowAction::EditLimits(_) => {
+            Some("Enter: change what it keeps   U: stop protecting it (deletes its snapshots)")
+        }
     });
     // what Enter does is the one line that must never be cut off by a long explanation: it has its own
     let (text_area, hint_area) = if hint.is_some() && area.height > 2 {
