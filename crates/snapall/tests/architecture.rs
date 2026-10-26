@@ -75,12 +75,12 @@ fn the_observability_adapter_depends_on_the_core_and_serialization_only() {
 }
 
 #[test]
-fn the_system_adapter_depends_on_the_core_alone() {
-    // It asks the machine questions the core states; it needs nothing but the core's words for them.
+fn the_system_adapter_depends_on_the_core_and_serialization_only() {
+    // It asks the machine questions the core states, and writes the journal as JSON lines.
     let deps = normal_deps("snapall-system");
     assert_eq!(
         deps,
-        set(&["snapall-core"]),
+        set(&["snapall-core", "serde_json"]),
         "unexpected dependencies: {deps:?}"
     );
 }

@@ -17,6 +17,7 @@ pub mod doctor;
 pub mod domain;
 pub mod explain;
 pub mod health;
+pub mod journal;
 pub mod observe;
 pub mod plan;
 pub mod points;
@@ -35,6 +36,7 @@ pub use domain::{
 pub use health::{
     assess, gather, AreaFacts, Chip, Facts, Finding, Health, Level, Remedy, Topic, Verdict,
 };
+pub use journal::{Entry as JournalEntry, Event as JournalEvent, Source, Status as JournalStatus};
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
 pub use points::{

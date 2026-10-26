@@ -40,6 +40,8 @@ pub enum Effect {
     },
     /// Look at how protection stands: the report the status bar and the Health tab are made from.
     LoadHealth,
+    /// Read what snapall has done, from the journal: whatever snapall did it, in whichever session.
+    LoadHistory,
     /// Do something to a background job (a unit name from the catalogue).
     ControlJob {
         unit: String,
@@ -123,6 +125,8 @@ pub enum Msg {
     },
     /// A change was not made because another snapall is making one; the reason says who.
     Refused(String),
+    /// What snapall has done, newest first, as the journal remembers it.
+    HistoryLoaded(Vec<snapall_core::JournalEntry>),
     /// How protection stands, or why that could not be found out.
     HealthLoaded(Result<Box<HealthData>, String>),
     /// Automatic cleanup was switched on, or why it could not be.
@@ -164,6 +168,8 @@ pub enum Msg {
 /// what came of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finished {
+    /// Which change it is in the journal.
+    pub id: String,
     pub what: String,
     /// The same, in the present tense, as it was announced while it was being done.
     pub present: String,
@@ -171,4 +177,12 @@ pub struct Finished {
     pub took: Duration,
     pub at: Option<String>,
     pub msg: Msg,
+}
+
+impl Effect {
+    /// Looking at how protection stands, and reading what was done: refreshes on the side. They are
+    /// neither work that blocks the keys that start work, nor something the screen announces.
+    pub fn is_background(&self) -> bool {
+        matches!(self, Effect::LoadHealth | Effect::LoadHistory)
+    }
 }

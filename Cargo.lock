@@ -508,6 +508,7 @@ dependencies = [
 name = "snapall-system"
 version = "0.14.0"
 dependencies = [
+ "serde_json",
  "snapall-core",
 ]
 

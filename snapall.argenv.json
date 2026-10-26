@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-26T10:31:38Z",
+  "generated": "2026-10-26T15:37:54Z",
   "inputs": [
     {
       "allowed": [],
@@ -248,6 +248,7 @@
         "history",
         "setup",
         "health",
+        "activity",
         "quotas",
         "doctor"
       ],
@@ -526,5 +527,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.13.0"
+  "source": "snapall@0.14.0"
 }

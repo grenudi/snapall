@@ -91,6 +91,21 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
     })
 }
 
+/// A name for one change that no other is likely to have: the program making it, when, and which of its
+/// changes it is.
+pub(crate) fn new_id() -> String {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static COUNT: AtomicU32 = AtomicU32::new(0);
+    let milliseconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis());
+    format!(
+        "{}-{milliseconds}-{}",
+        std::process::id(),
+        COUNT.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
 /// What a change is called while it is being done: the same changes as [`describe_change`], in the
 /// present tense, for the line that says what the window is doing and for how long.
 pub(crate) fn describe_now(effect: &Effect) -> Option<String> {

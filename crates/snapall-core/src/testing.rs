@@ -600,6 +600,7 @@ pub struct FakeSystem {
     actions: std::sync::Mutex<Vec<(String, crate::services::JobAction)>>,
     quotas: std::sync::Mutex<Option<crate::system::QuotaMode>>,
     busy: Option<crate::system::Busy>,
+    journal: std::sync::Mutex<Vec<crate::journal::Event>>,
 }
 
 impl FakeSystem {
@@ -673,6 +674,20 @@ impl FakeSystem {
             since: Some("12:03:00".to_owned()),
         });
         self
+    }
+
+    /// An event already in the journal, as if an earlier snapall had written it. A process id of 0 is a
+    /// process that is gone.
+    pub fn with_event(self, event: crate::journal::Event) -> Self {
+        if let Ok(mut journal) = self.journal.lock() {
+            journal.push(event);
+        }
+        self
+    }
+
+    /// Everything recorded so far, in order.
+    pub fn events(&self) -> Vec<crate::journal::Event> {
+        self.journal.lock().map(|j| j.clone()).unwrap_or_default()
     }
 
     /// Everything done to jobs, in order.
@@ -775,5 +790,18 @@ impl crate::system::SystemProbe for FakeSystem {
             Some(busy) => Err(busy.clone()),
             None => Ok(Box::new(())),
         }
+    }
+
+    fn record(&self, event: &crate::journal::Event) {
+        if let Ok(mut journal) = self.journal.lock() {
+            journal.push(event.clone());
+        }
+    }
+
+    fn history(&self, limit: usize) -> Vec<crate::journal::Entry> {
+        let events = self.events();
+        let mut entries = crate::journal::fold(&events, |pid| pid != 0);
+        entries.truncate(limit);
+        entries
     }
 }

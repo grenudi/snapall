@@ -44,12 +44,13 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
     if first_screen_arrived && !state.health_asked {
         state.health_asked = true;
         effects.push(Effect::LoadHealth);
+        effects.push(Effect::LoadHistory);
     }
     // looking at how protection stands is a refresh on the side: it is neither work that blocks the keys
     // that start work, nor something the screen announces
     state.pending += effects
         .iter()
-        .filter(|effect| !matches!(effect, Effect::LoadHealth))
+        .filter(|effect| !effect.is_background())
         .count();
     state
         .doing
@@ -107,6 +108,10 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             });
             Vec::new()
         }
+        Msg::HistoryLoaded(entries) => {
+            state.activity.merge_history(&entries);
+            Vec::new()
+        }
         Msg::Refused(why) => {
             settle(state);
             state.notice = Some(Notice::Error(why));
@@ -140,6 +145,7 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
         }
         Msg::Finished(done) => {
             let Finished {
+                id,
                 what,
                 present,
                 outcome,
@@ -151,15 +157,23 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             if let Some(at) = state.doing.iter().position(|doing| *doing == present) {
                 state.doing.remove(at);
             }
+            let (status, detail) = match outcome {
+                Ok(done) => (snapall_core::JournalStatus::Done, done),
+                Err(why) => (snapall_core::JournalStatus::Failed, why),
+            };
             state.activity.record(Activity {
+                id: Some(id),
                 at,
                 what,
-                outcome,
-                took,
+                status,
+                detail,
+                took: Some(took),
+                source: Some(snapall_core::Source::Window),
             });
             // what changed may change how protection stands: look again
             let mut effects = handle(state, msg);
             effects.push(Effect::LoadHealth);
+            effects.push(Effect::LoadHistory);
             effects
         }
         Msg::Tick => {
