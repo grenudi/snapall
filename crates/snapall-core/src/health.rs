@@ -12,9 +12,10 @@
 use crate::calendar::seconds_from_snapper_date;
 use crate::coverage::describe;
 use crate::domain::{ConfigName, Retention, SnapshotInfo};
-use crate::explain::{cleanup_from, cleanup_text, Cleanup};
+use crate::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup, Limit};
 use crate::port::{BackendError, SnapshotBackend};
-use crate::system::{DiskUsage, ServiceState, SystemProbe};
+use crate::services::{self, Job};
+use crate::system::{DiskUsage, QuotaMode, ServiceState, SystemProbe, UnitDetails};
 
 // ---- what is known ------------------------------------------------------------------------------
 
@@ -32,6 +33,8 @@ pub struct AreaFacts {
     pub measured_bytes: Option<u64>,
     pub retention: Option<Retention>,
     pub disk: Option<DiskUsage>,
+    /// How the disk holding it counts room.
+    pub quotas: QuotaMode,
 }
 
 impl AreaFacts {
@@ -46,16 +49,60 @@ impl AreaFacts {
     }
 }
 
+/// A background job, as the machine reports it and as its unit file describes it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobFacts {
+    pub job: Job,
+    pub state: ServiceState,
+    pub details: Option<UnitDetails>,
+}
+
 /// Everything the report is made from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Facts {
     /// The local time, as snapper writes dates, if it could be read.
     pub now: Option<String>,
     pub areas: Vec<AreaFacts>,
-    pub cleanup_timer: ServiceState,
-    pub boot_menu_sync: ServiceState,
+    /// Every job in the catalogue (`services::ALL`).
+    pub jobs: Vec<JobFacts>,
     /// The boot menu is kept in step by a snapper plugin instead of a background job.
     pub boot_menu_plugin: bool,
+}
+
+impl Facts {
+    pub fn job(&self, job: &Job) -> Option<&JobFacts> {
+        self.jobs.iter().find(|facts| facts.job.unit == job.unit)
+    }
+
+    /// How the job stands; a job that is not here is not installed.
+    pub fn state_of(&self, job: &Job) -> ServiceState {
+        self.job(job)
+            .map(|facts| facts.state.clone())
+            .unwrap_or_default()
+    }
+
+    /// When the job runs, in words, as its own unit file says.
+    pub fn schedule_of(&self, job: &Job) -> Vec<String> {
+        self.job(job)
+            .and_then(|facts| facts.details.as_ref())
+            .map(UnitDetails::schedule)
+            .unwrap_or_default()
+    }
+
+    /// What each area keeps, and protects from cleanup: its real settings.
+    pub fn cleanup_limits(&self) -> Vec<Limit> {
+        self.areas
+            .iter()
+            .filter_map(|area| {
+                let retention = area.retention.as_ref()?;
+                Some(Limit {
+                    area: area.title(),
+                    keep: retention.keep,
+                    min_age_seconds: retention.min_age_seconds,
+                })
+            })
+            .collect()
+    }
 }
 
 // ---- what it means ------------------------------------------------------------------------------
@@ -85,6 +132,8 @@ pub enum Topic {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Remedy {
     SwitchOnCleanup,
+    /// Switch on counting the room snapshots take.
+    CountRoom,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,10 +217,8 @@ fn the_disk(facts: &Facts) -> Option<Finding> {
 }
 
 fn cleanup_state(facts: &Facts) -> Cleanup {
-    cleanup_from(
-        facts.cleanup_timer.enabled.as_deref(),
-        facts.cleanup_timer.active.as_deref(),
-    )
+    let timer = facts.state_of(&services::CLEANUP);
+    cleanup_from(timer.enabled.as_deref(), timer.active.as_deref())
 }
 
 fn automatic_cleanup(facts: &Facts) -> Option<Finding> {
@@ -193,7 +240,11 @@ fn automatic_cleanup(facts: &Facts) -> Option<Finding> {
         level,
         topic: Topic::Cleanup,
         headline: headline.to_owned(),
-        why: cleanup_text(state).to_owned(),
+        why: cleanup_text(
+            state,
+            &facts.schedule_of(&services::CLEANUP),
+            &facts.cleanup_limits(),
+        ),
         remedy,
     })
 }
@@ -227,13 +278,18 @@ fn areas_over_their_limit(facts: &Facts) -> Option<Finding> {
 }
 
 fn space_not_measured(facts: &Facts) -> Option<Finding> {
-    let unmeasured = facts.areas.iter().any(|area| area.measured_bytes.is_none());
-    (unmeasured && !facts.areas.is_empty()).then(|| Finding {
+    let unmeasured = facts
+        .areas
+        .iter()
+        .find(|area| area.measured_bytes.is_none())?;
+    let mode = unmeasured.quotas;
+    Some(Finding {
         level: Level::Note,
         topic: Topic::Space,
         headline: "The room each snapshot takes is not measured".to_owned(),
-        why: "The disk's filesystem only counts it when a feature called quotas is switched on. snapall does not switch it on for you, because it can slow some operations down. Until then you see how many snapshots there are, and how full the disk is overall.".to_owned(),
-        remedy: None,
+        why: room_counting_text(mode),
+        // only the full kind can answer the question, so only that is offered
+        remedy: (mode == QuotaMode::Off).then_some(Remedy::CountRoom),
     })
 }
 
@@ -283,7 +339,7 @@ fn areas_gone_quiet(facts: &Facts) -> Vec<Finding> {
 
 /// The tool that puts snapshots into the boot menu is installed but not working.
 fn the_boot_menu(facts: &Facts) -> Option<Finding> {
-    let sync = &facts.boot_menu_sync;
+    let sync = &facts.state_of(&services::BOOT_MENU);
     let installed_but_idle = sync.is_installed() && !sync.is_running() && !facts.boot_menu_plugin;
     installed_but_idle.then(|| Finding {
         level: Level::Attention,
@@ -425,8 +481,14 @@ pub fn gather(
     Ok(Facts {
         now: system.local_time(),
         areas,
-        cleanup_timer: system.service("snapper-cleanup.timer"),
-        boot_menu_sync: system.service("limine-snapper-sync.service"),
+        jobs: services::ALL
+            .iter()
+            .map(|job| JobFacts {
+                job: *job,
+                state: system.service(job.unit),
+                details: system.unit_details(job.unit),
+            })
+            .collect(),
         boot_menu_plugin: system.file_exists("/usr/lib/snapper/plugins/10-limine-snapper-sync"),
     })
 }
@@ -441,6 +503,7 @@ fn area_facts(
     Some(AreaFacts {
         retention: backend.retention(&config).ok(),
         disk: system.disk_usage(&subvolume),
+        quotas: system.quota_mode(&subvolume),
         oldest: snapshots.iter().filter_map(|s| s.date.clone()).min(),
         newest: snapshots.iter().filter_map(|s| s.date.clone()).max(),
         measured_bytes: measured_bytes(&snapshots),
@@ -495,6 +558,7 @@ mod tests {
                 size: 100,
                 used: used_percent,
             }),
+            quotas: QuotaMode::Off,
         }
     }
 
@@ -513,10 +577,23 @@ mod tests {
                 area("root", "/", 3, "2026-10-25 09:00:00", 40),
                 area("home", "/home", 2, "2026-10-24 09:00:00", 40),
             ],
-            cleanup_timer: running("enabled", "active"),
-            boot_menu_sync: ServiceState::default(),
+            jobs: vec![job_facts(&services::CLEANUP, "enabled", "active")],
             boot_menu_plugin: false,
         }
+    }
+
+    fn job_facts(job: &Job, enabled: &str, active: &str) -> JobFacts {
+        JobFacts {
+            job: *job,
+            state: running(enabled, active),
+            details: None,
+        }
+    }
+
+    /// Say how one job stands on this machine, adding it if it was not there.
+    fn set_job(facts: &mut Facts, job: &Job, enabled: &str, active: &str) {
+        facts.jobs.retain(|existing| existing.job.unit != job.unit);
+        facts.jobs.push(job_facts(job, enabled, active));
     }
 
     fn headlines(health: &Health) -> Vec<&str> {
@@ -596,7 +673,7 @@ mod tests {
     fn cleanup_that_is_off_says_so_offers_to_switch_it_on_and_is_never_called_on_when_merely_enabled(
     ) {
         let mut facts = healthy();
-        facts.cleanup_timer = running("disabled", "inactive");
+        set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
         let health = assess(&facts);
         let finding = health
             .findings
@@ -614,7 +691,7 @@ mod tests {
             .any(|c| c.label == "cleanup off" && c.level == Level::Attention));
 
         // enabled but not running is not "on": nothing is cleaning anything
-        facts.cleanup_timer = running("enabled", "inactive");
+        set_job(&mut facts, &services::CLEANUP, "enabled", "inactive");
         let health = assess(&facts);
         let finding = health
             .findings
@@ -639,7 +716,7 @@ mod tests {
                 .any(|h| h.contains("More snapshots than the limit")),
             "cleanup is running"
         );
-        facts.cleanup_timer = running("disabled", "inactive");
+        set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
         let health = assess(&facts);
         assert!(
             headlines(&health)
@@ -734,7 +811,7 @@ mod tests {
                 .any(|h| h.contains("boot menu")),
             "not installed: nothing to say"
         );
-        facts.boot_menu_sync = running("enabled", "inactive");
+        set_job(&mut facts, &services::BOOT_MENU, "enabled", "inactive");
         let health = assess(&facts);
         let finding = health
             .findings
@@ -750,7 +827,7 @@ mod tests {
             .iter()
             .any(|h| h.contains("boot menu")));
         facts.boot_menu_plugin = false;
-        facts.boot_menu_sync = running("enabled", "active");
+        set_job(&mut facts, &services::BOOT_MENU, "enabled", "active");
         assert!(
             !headlines(&assess(&facts))
                 .iter()
@@ -762,7 +839,7 @@ mod tests {
     #[test]
     fn the_status_bar_ends_with_how_many_things_need_attention_and_a_click_goes_to_the_worst() {
         let mut facts = healthy();
-        facts.cleanup_timer = running("disabled", "inactive");
+        set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
         facts.areas[1].disk = Some(DiskUsage {
             size: 100,
             used: 90,
@@ -786,7 +863,7 @@ mod tests {
     #[test]
     fn everything_it_says_is_in_words_a_newcomer_was_told() {
         let mut facts = healthy();
-        facts.cleanup_timer = running("disabled", "inactive");
+        set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
         facts.areas[1].snapshots = 61;
         facts.areas[1].disk = Some(DiskUsage {
             size: 100,
@@ -795,7 +872,7 @@ mod tests {
         facts.areas[1].retention.as_mut().unwrap().on_a_schedule = true;
         facts.areas[0].snapshots = 0;
         facts.areas[0].newest = None;
-        facts.boot_menu_sync = running("enabled", "inactive");
+        set_job(&mut facts, &services::BOOT_MENU, "enabled", "inactive");
         for finding in assess(&facts).findings {
             // the one tool name a person must type is allowed to contain the word snapper
             let text = format!("{} {}", finding.headline, finding.why)
@@ -845,7 +922,7 @@ mod tests {
         );
         assert_eq!(home.disk.map(|d| d.percent_used()), Some(30));
         assert_eq!(home.retention.as_ref().and_then(|r| r.keep), Some(50));
-        assert!(facts.boot_menu_plugin && facts.cleanup_timer.is_running());
+        assert!(facts.boot_menu_plugin && facts.state_of(&services::CLEANUP).is_running());
         assert_eq!(assess(&facts).verdict.text, "All good");
     }
 }

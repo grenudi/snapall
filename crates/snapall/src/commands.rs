@@ -128,7 +128,7 @@ pub fn restore(
 /// How protection stands: whether it is working, the room it takes, whether old snapshots are cleaned
 /// up, and what to do about anything that is not. It exits with failure only for what needs doing now.
 pub fn health(ctx: &Context) -> Outcome {
-    let facts = gather(ctx.backend, &snapall_system::LinuxSystem)?;
+    let facts = gather(ctx.backend, &snapall_system::LinuxSystem::new())?;
     let report = assess(&facts);
     ctx.show.result(
         render::health(&facts, &report),
@@ -341,7 +341,7 @@ pub fn tui(ctx: &Context, file: Option<&str>) -> Outcome {
         .map(|named| file_target(ctx.backend, named))
         .transpose()?;
     let context = ui_context(ctx, target);
-    match snapall_tui::run(ctx.backend, &snapall_system::LinuxSystem, context)? {
+    match snapall_tui::run(ctx.backend, &snapall_system::LinuxSystem::new(), context)? {
         snapall_tui::Exit::Quit => Ok(ExitCode::SUCCESS),
         // Exit as a signalled process would, once the terminal is back to normal.
         snapall_tui::Exit::Signal(signal) => {

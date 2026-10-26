@@ -7,13 +7,17 @@
 mod delete;
 mod describe;
 mod help;
+mod job;
 mod points;
 mod protect;
+mod quotas;
 mod restore;
 
 pub(crate) use delete::*;
 pub(crate) use describe::*;
 pub(crate) use help::*;
+pub(crate) use job::*;
 pub(crate) use points::*;
 pub(crate) use protect::*;
+pub(crate) use quotas::*;
 pub(crate) use restore::*;

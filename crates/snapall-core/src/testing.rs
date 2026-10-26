@@ -587,15 +587,19 @@ mod tests {
     }
 }
 
-/// A machine whose answers are set by the test: how full its disk is, which jobs run, what time it is.
+/// A machine whose answers are set by the test: how full its disk is, which jobs run, what time it is,
+/// how room is counted, who else is making a change.
 #[derive(Default)]
 pub struct FakeSystem {
     disk: Option<crate::system::DiskUsage>,
     services: std::sync::Mutex<BTreeMap<String, crate::system::ServiceState>>,
+    details: BTreeMap<String, crate::system::UnitDetails>,
     time: Option<String>,
     files: Vec<String>,
     refuse_jobs: bool,
-    enabled: std::sync::Mutex<Vec<String>>,
+    actions: std::sync::Mutex<Vec<(String, crate::services::JobAction)>>,
+    quotas: std::sync::Mutex<Option<crate::system::QuotaMode>>,
+    busy: Option<crate::system::Busy>,
 }
 
 impl FakeSystem {
@@ -626,6 +630,22 @@ impl FakeSystem {
         }
     }
 
+    /// What the unit file of `unit` says about it.
+    pub fn with_unit_file(mut self, unit: &str, description: &str, timer: &[(&str, &str)]) -> Self {
+        self.details.insert(
+            unit.to_owned(),
+            crate::system::UnitDetails {
+                file: Some(format!("/usr/lib/systemd/system/{unit}")),
+                description: Some(description.to_owned()),
+                timer: timer
+                    .iter()
+                    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                    .collect(),
+            },
+        );
+        self
+    }
+
     pub fn at(mut self, time: &str) -> Self {
         self.time = Some(time.to_owned());
         self
@@ -637,12 +657,36 @@ impl FakeSystem {
         self
     }
 
+    /// How the disk counts room (default: not at all).
+    pub fn with_quotas(self, mode: crate::system::QuotaMode) -> Self {
+        if let Ok(mut quotas) = self.quotas.lock() {
+            *quotas = Some(mode);
+        }
+        self
+    }
+
+    /// Another snapall is making a change.
+    pub fn busy_with(mut self, doing: &str) -> Self {
+        self.busy = Some(crate::system::Busy {
+            pid: 4242,
+            doing: doing.to_owned(),
+            since: Some("12:03:00".to_owned()),
+        });
+        self
+    }
+
+    /// Everything done to jobs, in order.
+    pub fn job_actions(&self) -> Vec<(String, crate::services::JobAction)> {
+        self.actions.lock().map(|a| a.clone()).unwrap_or_default()
+    }
+
     /// The jobs that were switched on, in order.
     pub fn jobs_switched_on(&self) -> Vec<String> {
-        self.enabled
-            .lock()
-            .map(|jobs| jobs.clone())
-            .unwrap_or_default()
+        self.job_actions()
+            .into_iter()
+            .filter(|(_, action)| *action == crate::services::JobAction::EnableNow)
+            .map(|(unit, _)| unit)
+            .collect()
     }
 
     pub fn with_file(mut self, path: &str) -> Self {
@@ -676,16 +720,60 @@ impl crate::system::SystemProbe for FakeSystem {
         self.files.iter().any(|f| f == path)
     }
 
-    fn enable_job(&self, unit: &str) -> Result<(), String> {
+    fn unit_details(&self, unit: &str) -> Option<crate::system::UnitDetails> {
+        self.details.get(unit).cloned()
+    }
+
+    fn control_job(&self, unit: &str, action: crate::services::JobAction) -> Result<(), String> {
+        use crate::services::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
         if self.refuse_jobs {
             return Err("Access denied".to_owned());
         }
-        self.enabled
-            .lock()
-            .map_err(|e| e.to_string())?
-            .push(unit.to_owned());
-        // as the real thing: it is enabled and running from now on
-        self.set_service(unit, "enabled", "active");
+        if let Ok(mut actions) = self.actions.lock() {
+            actions.push((unit.to_owned(), action));
+        }
+        // as the real thing: each action leaves the job in the state it names
+        let current = self.service(unit);
+        let enabled = current
+            .enabled
+            .clone()
+            .unwrap_or_else(|| "disabled".to_owned());
+        let (enabled, active) = match action {
+            EnableNow => ("enabled".to_owned(), "active"),
+            DisableNow => ("disabled".to_owned(), "inactive"),
+            Start | Restart => (enabled, "active"),
+            Stop => (enabled, "inactive"),
+        };
+        self.set_service(unit, &enabled, active);
         Ok(())
+    }
+
+    fn quota_mode(&self, _path: &str) -> crate::system::QuotaMode {
+        self.quotas
+            .lock()
+            .ok()
+            .and_then(|mode| *mode)
+            .unwrap_or(crate::system::QuotaMode::Off)
+    }
+
+    fn set_quotas(&self, _path: &str, on: bool) -> Result<(), String> {
+        if self.refuse_jobs {
+            return Err("Access denied".to_owned());
+        }
+        if let Ok(mut quotas) = self.quotas.lock() {
+            *quotas = Some(if on {
+                crate::system::QuotaMode::Full
+            } else {
+                crate::system::QuotaMode::Off
+            });
+        }
+        Ok(())
+    }
+
+    fn hold_changes(&self, _doing: &str) -> Result<crate::system::Hold, crate::system::Busy> {
+        match &self.busy {
+            Some(busy) => Err(busy.clone()),
+            None => Ok(Box::new(())),
+        }
     }
 }

@@ -14,7 +14,7 @@ use std::process::Command;
 
 use snapall_core::coverage::{self, Area, Worth};
 use snapall_core::explain::{self, Cleanup};
-use snapall_core::{protect_area, ConfigName, SnapshotBackend};
+use snapall_core::{protect_area, ConfigName, SnapshotBackend, SystemProbe};
 
 use crate::output::emit;
 
@@ -24,6 +24,8 @@ pub struct Facts {
     pub mountinfo: String,
     pub is_root: bool,
     pub cleanup: Cleanup,
+    /// When the cleanup job runs, in words, from its unit file; empty if that is not known.
+    pub cleanup_schedule: Vec<String>,
 }
 
 pub struct Options {
@@ -96,7 +98,7 @@ pub fn run(
     for area in to_protect {
         offer_protection(backend, talk, options, &area, &mut report);
     }
-    offer_cleanup(talk, options, facts.cleanup, &mut report);
+    offer_cleanup(talk, options, facts, &limits_of(backend), &mut report);
     say_whats_next(talk, options, &report);
     Ok(report)
 }
@@ -129,6 +131,25 @@ fn area_report(area: &Area) -> AreaReport {
         protected_by: area.protected_by.clone(),
         worth: info.worth,
     }
+}
+
+/// What each area keeps and protects from cleanup: its real settings, read from snapper.
+fn limits_of(backend: &dyn SnapshotBackend) -> Vec<explain::Limit> {
+    let Ok(configs) = backend.list_configs() else {
+        return Vec::new();
+    };
+    configs
+        .iter()
+        .filter_map(|config| {
+            let subvolume = backend.config_subvolume(config).ok()?;
+            let retention = backend.retention(config).ok()?;
+            Some(explain::Limit {
+                area: coverage::describe(&subvolume).title,
+                keep: retention.keep,
+                min_age_seconds: retention.min_age_seconds,
+            })
+        })
+        .collect()
 }
 
 fn explain_the_basics(talk: &mut dyn Talk) {
@@ -230,12 +251,25 @@ fn offer_protection(
     }
 }
 
-fn offer_cleanup(talk: &mut dyn Talk, options: &Options, state: Cleanup, report: &mut Report) {
-    talk.say(&format!("{}\n", explain::cleanup_text(state)));
+fn offer_cleanup(
+    talk: &mut dyn Talk,
+    options: &Options,
+    facts: &Facts,
+    limits: &[explain::Limit],
+    report: &mut Report,
+) {
+    let state = facts.cleanup;
+    talk.say(&format!(
+        "{}\n",
+        explain::cleanup_text(state, &facts.cleanup_schedule, limits)
+    ));
     if state != Cleanup::Off {
         return;
     }
-    talk.say(&format!("{}\n", explain::CLEANUP_OFFER));
+    talk.say(&format!(
+        "{}\n",
+        explain::cleanup_offer(&facts.cleanup_schedule, limits)
+    ));
     if options.dry_run {
         return;
     }
@@ -340,6 +374,10 @@ pub fn gather() -> Facts {
         mountinfo: std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default(),
         is_root: crate::doctor::effective_uid(&status) == Some(0),
         cleanup: explain::cleanup_from(enabled.as_deref(), active.as_deref()),
+        cleanup_schedule: snapall_system::LinuxSystem::new()
+            .unit_details(snapall_core::services::CLEANUP.unit)
+            .map(|details| details.schedule())
+            .unwrap_or_default(),
     }
 }
 
@@ -449,6 +487,7 @@ mod tests {
             mountinfo: MOUNTINFO.into(),
             is_root,
             cleanup,
+            cleanup_schedule: Vec::new(),
         }
     }
     fn options() -> Options {
@@ -700,6 +739,7 @@ mod tests {
             mountinfo: MOUNTINFO.into(),
             is_root: true,
             cleanup: Cleanup::On,
+            cleanup_schedule: Vec::new(),
         };
         let both = InMemoryBackend::with_configs(&[]);
         both.create_config(&ConfigName::parse("root").unwrap(), "/")
@@ -722,6 +762,7 @@ mod tests {
             mountinfo: MOUNTINFO.into(),
             is_root: true,
             cleanup: Cleanup::On,
+            cleanup_schedule: Vec::new(),
         };
         let both = InMemoryBackend::with_configs(&[]);
         both.create_config(&ConfigName::parse("root").unwrap(), "/")

@@ -138,6 +138,10 @@ pub enum Modal {
     Protect { index: usize },
     /// The restore points, one chosen: what putting it back would do, and the way to do it.
     Points { index: usize },
+    /// One background job: what it is, how to check on it, and the keys that control it.
+    Job { unit: String },
+    /// Asking before switching the counting of room on or off for the disk.
+    Quotas { turn_on: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

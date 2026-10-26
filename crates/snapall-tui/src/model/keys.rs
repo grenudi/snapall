@@ -149,6 +149,8 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         Modal::Help { page } => reading_help(key, page),
         Modal::Protect { index } => protecting(state, key, index),
         Modal::Points { index } => browsing_points(state, key, index),
+        Modal::Job { unit } => controlling_job(state, key, unit),
+        Modal::Quotas { turn_on } => confirming_quotas(state, key, turn_on),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {

@@ -54,6 +54,19 @@ impl<'a> Executor<'a> {
         let Some(what) = describe_change(&effect) else {
             return self.perform(effect);
         };
+        // one change at a time across every snapall: a second one is told who has the right, and waits
+        let _hold = match self.system.hold_changes(&what) {
+            Ok(hold) => hold,
+            Err(busy) => {
+                return Msg::Finished(Box::new(Finished {
+                    outcome: Err(busy.to_string()),
+                    what,
+                    took: std::time::Duration::ZERO,
+                    at: self.system.local_time(),
+                    msg: Msg::Refused(busy.to_string()),
+                }));
+            }
+        };
         let started = std::time::Instant::now();
         let msg = self.perform(effect);
         Msg::Finished(Box::new(Finished {
@@ -76,9 +89,25 @@ impl<'a> Executor<'a> {
                     })
                     .map_err(|error| error.to_string()),
             ),
-            Effect::SwitchOnCleanup => {
-                Msg::CleanupSwitched(self.system.enable_job("snapper-cleanup.timer"))
+            Effect::ControlJob { unit, action } => {
+                let result = self.system.control_job(&unit, action);
+                Msg::JobControlled {
+                    unit,
+                    action,
+                    result,
+                }
             }
+            Effect::SetQuotas { turn_on, paths } => {
+                // the disks may be one or several; asking again of one that is already so is harmless
+                let result = paths
+                    .iter()
+                    .try_for_each(|path| self.system.set_quotas(path, turn_on));
+                Msg::QuotasSet { turn_on, result }
+            }
+            Effect::SwitchOnCleanup => Msg::CleanupSwitched(self.system.control_job(
+                snapall_core::services::CLEANUP.unit,
+                snapall_core::JobAction::EnableNow,
+            )),
             Effect::LoadConfigs => {
                 Msg::ConfigsLoaded(backend.list_configs().map_err(|e| e.to_string()))
             }
@@ -315,6 +344,23 @@ fn describe_change(effect: &Effect) -> Option<String> {
             format!("Protected {title} ({mount_point})")
         }
         Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
+        Effect::ControlJob { unit, action } => {
+            use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
+            let did = match action {
+                EnableNow => "Switched on",
+                DisableNow => "Switched off",
+                Start => "Started",
+                Stop => "Stopped",
+                Restart => "Restarted",
+            };
+            format!("{did} {}", crate::model::job_title(unit))
+        }
+        Effect::SetQuotas { turn_on, .. } => {
+            format!(
+                "Switched room counting {}",
+                if *turn_on { "on" } else { "off" }
+            )
+        }
         _ => return None,
     })
 }
@@ -390,6 +436,14 @@ fn how_it_went(msg: &Msg) -> Result<String, String> {
             result: Err(why), ..
         }
         | Msg::CleanupSwitched(Err(why)) => Err(why.clone()),
+        Msg::JobControlled { result, .. } => result.clone().map(|()| String::new()),
+        Msg::QuotasSet {
+            turn_on: true,
+            result,
+        } => result
+            .clone()
+            .map(|()| "The disk is building its tally in the background".to_owned()),
+        Msg::QuotasSet { result, .. } => result.clone().map(|()| String::new()),
         Msg::Protected { result, .. } => result
             .as_ref()
             .map(|_| "It has snapshots from now on.".to_owned())

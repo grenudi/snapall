@@ -71,6 +71,12 @@ fn troubled() -> FakeSystem {
         .with_disk(100, 91)
         .at("2026-01-02 12:00:00")
         .with_service("snapper-cleanup.timer", "disabled", "inactive")
+        // what the machine's own unit file says about the job: its words and its schedule come from here
+        .with_unit_file(
+            snapall_core::services::CLEANUP.unit,
+            "Daily Cleanup of Snapper Snapshots",
+            &[("OnBootSec", "10m"), ("OnUnitActiveSec", "1d")],
+        )
 }
 
 fn as_administrator() -> UiContext {
@@ -137,9 +143,14 @@ fn the_health_tab_leads_with_the_verdict_and_what_needs_a_look_and_the_numbers_a
     session.press(Key::End);
     let bottom = flat(&screen(&session));
     for must in [
-        "Automatic cleanup",
-        "Boot menu",
-        "Boot menu: not used on this computer",
+        "Background jobs",
+        "Cleaning up old snapshots (snapper-cleanup.timer): off",
+        // the real name and words, from the catalogue and the machine's own unit file
+        "snapper-cleanup.timer",
+        "Daily Cleanup of Snapper Snapshots",
+        // the schedule is the unit file's, not typed into the text
+        "10 minutes after the computer starts, then again 1 day after each run starts",
+        "Enter: the commands that check on it and control it",
     ] {
         assert!(
             bottom.contains(must),
@@ -148,8 +159,8 @@ fn the_health_tab_leads_with_the_verdict_and_what_needs_a_look_and_the_numbers_a
         );
     }
     assert!(
-        bottom.contains("Your snapshots are not listed in a boot menu"),
-        "the chosen row is explained"
+        !bottom.contains("once a day") && !bottom.contains("keeps the newest 50"),
+        "no value is typed into the text: {bottom}"
     );
 }
 

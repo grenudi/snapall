@@ -268,23 +268,46 @@ pub fn health(facts: &snapall_core::Facts, report: &snapall_core::Health) -> Str
         ));
     }
     out.push_str("\nBackground jobs:\n");
-    let cleanup = match snapall_core::explain::cleanup_from(
-        facts.cleanup_timer.enabled.as_deref(),
-        facts.cleanup_timer.active.as_deref(),
-    ) {
-        snapall_core::explain::Cleanup::On => "on",
-        snapall_core::explain::Cleanup::Off => "off",
-        snapall_core::explain::Cleanup::Unavailable => "could not be found out",
-    };
-    let boot = match (&facts.boot_menu_sync, facts.boot_menu_plugin) {
-        (_, true) => "kept up to date by a plugin",
-        (sync, false) if sync.is_running() => "running",
-        (sync, false) if sync.is_installed() => "installed but not running",
-        _ => "not used on this computer",
-    };
-    out.push_str(&format!(
-        "  cleaning up old snapshots   {cleanup}\n  the boot menu following snapshots   {boot}\n"
-    ));
+    for job in &facts.jobs {
+        let plugin =
+            job.job.unit == snapall_core::services::BOOT_MENU.unit && facts.boot_menu_plugin;
+        if !job.state.is_installed()
+            && !plugin
+            && job.job.unit != snapall_core::services::CLEANUP.unit
+        {
+            continue; // not on this computer: nothing to say
+        }
+        let word = if plugin {
+            "kept up to date by a plugin"
+        } else {
+            job.state.words()
+        };
+        let when = job
+            .details
+            .as_ref()
+            .map(|d| d.schedule().join(", "))
+            .filter(|w| !w.is_empty());
+        out.push_str(&format!(
+            "  {}: {word}\n      {}",
+            job.job.title, job.job.unit
+        ));
+        if let Some(description) = job.details.as_ref().and_then(|d| d.description.as_deref()) {
+            out.push_str(&format!(" (\"{description}\")"));
+        }
+        if let Some(when) = when {
+            out.push_str(&format!(", runs {when}"));
+        }
+        out.push('\n');
+    }
+    if let Some(area) = facts.areas.first() {
+        let word = match area.quotas {
+            snapall_core::QuotaMode::Off => "off",
+            snapall_core::QuotaMode::Full => "on",
+            snapall_core::QuotaMode::Simple => "on, the simple kind",
+            snapall_core::QuotaMode::Unknown => "could not be found out",
+        };
+        out.push_str(&format!("\nCounting the room snapshots take: {word}\n"));
+    }
     out
 }
 
