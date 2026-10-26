@@ -14,7 +14,7 @@ use std::sync::Mutex;
 
 use crate::domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, Point,
-    RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
+    RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 use crate::port::{BackendError, SnapshotBackend};
 
@@ -112,6 +112,7 @@ impl InMemoryBackend {
             cleanup: Some("number".into()),
             description: description.as_str().to_owned(),
             point,
+            used_bytes: None,
         });
         Ok(id)
     }
@@ -303,6 +304,24 @@ impl SnapshotBackend for InMemoryBackend {
             ConfigOption::TimelineCreate(on) => entry.timeline_create = on,
         }
         Ok(())
+    }
+
+    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
+        let state = self.lock();
+        let entry = state
+            .configs
+            .get(config)
+            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+        // what a new snapper config starts with
+        Ok(Retention {
+            keep: Some(50),
+            keep_important: Some(10),
+            min_age_seconds: Some(1800),
+            cleanup: true,
+            on_a_schedule: entry.timeline_create,
+            space_limit: Some(0.5),
+            quotas: false,
+        })
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
@@ -565,5 +584,71 @@ mod tests {
     fn in_memory_backend_satisfies_the_contract() {
         let backend = InMemoryBackend::with_configs(&["root"]);
         backend_contract(&backend, &ConfigName::parse("root").unwrap());
+    }
+}
+
+/// A machine whose answers are set by the test: how full its disk is, which jobs run, what time it is.
+#[derive(Default)]
+pub struct FakeSystem {
+    disk: Option<crate::system::DiskUsage>,
+    services: BTreeMap<String, crate::system::ServiceState>,
+    time: Option<String>,
+    files: Vec<String>,
+}
+
+impl FakeSystem {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Every disk is this full.
+    pub fn with_disk(mut self, size: u64, used: u64) -> Self {
+        self.disk = Some(crate::system::DiskUsage { size, used });
+        self
+    }
+
+    pub fn with_service(mut self, unit: &str, enabled: &str, active: &str) -> Self {
+        self.services.insert(
+            unit.to_owned(),
+            crate::system::ServiceState {
+                enabled: Some(enabled.to_owned()),
+                active: Some(active.to_owned()),
+            },
+        );
+        self
+    }
+
+    pub fn at(mut self, time: &str) -> Self {
+        self.time = Some(time.to_owned());
+        self
+    }
+
+    pub fn with_file(mut self, path: &str) -> Self {
+        self.files.push(path.to_owned());
+        self
+    }
+}
+
+impl crate::system::SystemProbe for FakeSystem {
+    fn disk_usage(&self, _path: &str) -> Option<crate::system::DiskUsage> {
+        self.disk
+    }
+
+    fn service(&self, unit: &str) -> crate::system::ServiceState {
+        self.services
+            .get(unit)
+            .cloned()
+            .unwrap_or(crate::system::ServiceState {
+                enabled: Some("not-found".to_owned()),
+                active: Some("inactive".to_owned()),
+            })
+    }
+
+    fn local_time(&self) -> Option<String> {
+        self.time.clone()
+    }
+
+    fn file_exists(&self, path: &str) -> bool {
+        self.files.iter().any(|f| f == path)
     }
 }

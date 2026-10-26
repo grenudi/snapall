@@ -178,6 +178,141 @@ pub fn history_json(history: &FileHistory) -> Value {
     json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
 }
 
+// ---- health -------------------------------------------------------------------------------------
+
+fn level_mark(level: snapall_core::Level) -> &'static str {
+    use snapall_core::Level;
+    match level {
+        Level::Problem => "!!",
+        Level::Attention => "! ",
+        Level::Note => "- ",
+        Level::Good => "ok",
+    }
+}
+
+fn level_word(level: snapall_core::Level) -> &'static str {
+    use snapall_core::Level;
+    match level {
+        Level::Problem => "problem",
+        Level::Attention => "attention",
+        Level::Note => "note",
+        Level::Good => "good",
+    }
+}
+
+fn topic_word(topic: snapall_core::Topic) -> &'static str {
+    use snapall_core::Topic;
+    match topic {
+        Topic::Space => "space",
+        Topic::Cleanup => "cleanup",
+        Topic::BootMenu => "boot-menu",
+        Topic::Snapshots => "snapshots",
+    }
+}
+
+/// Words broken into lines of at most `width`, each after the first indented.
+fn wrapped(text: &str, width: usize, indent: &str) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if !line.is_empty() && line.len() + 1 + word.len() > width {
+            lines.push(std::mem::take(&mut line));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+    }
+    lines.push(line);
+    lines.join(&format!("\n{indent}"))
+}
+
+/// What is wrong, if anything, and what to do; then the numbers behind it.
+pub fn health(facts: &snapall_core::Facts, report: &snapall_core::Health) -> String {
+    use snapall_core::Remedy;
+    let mut out = format!("Health: {}\n", report.verdict.text);
+    for finding in &report.findings {
+        out.push_str(&format!(
+            "\n  {}  {}\n      {}\n",
+            level_mark(finding.level),
+            finding.headline,
+            wrapped(&finding.why, 70, "      ")
+        ));
+        if let Some(Remedy::SwitchOnCleanup) = finding.remedy {
+            out.push_str("      To fix it: sudo snapall setup (it offers to switch cleanup on)\n");
+        }
+    }
+    out.push_str("\nThe areas:\n");
+    for area in &facts.areas {
+        let room = area
+            .measured_bytes
+            .map_or("room not measured".to_owned(), |b| {
+                format!("{} held", snapall_core::health::format_bytes(b))
+            });
+        let disk = area.disk.map_or(String::new(), |d| {
+            format!("   disk {}% full", d.percent_used())
+        });
+        let keeps = area
+            .retention
+            .as_ref()
+            .and_then(|r| r.keep)
+            .map_or(String::new(), |k| format!("   keeps the newest {k}"));
+        out.push_str(&format!(
+            "  {} ({})\n      {} snapshot{}, {room}{disk}{keeps}\n      newest: {}   kept in {}\n",
+            area.title(),
+            area.subvolume,
+            area.snapshots,
+            if area.snapshots == 1 { "" } else { "s" },
+            area.newest.as_deref().unwrap_or("none yet"),
+            area.lives_in()
+        ));
+    }
+    out.push_str("\nBackground jobs:\n");
+    let cleanup = match snapall_core::explain::cleanup_from(
+        facts.cleanup_timer.enabled.as_deref(),
+        facts.cleanup_timer.active.as_deref(),
+    ) {
+        snapall_core::explain::Cleanup::On => "on",
+        snapall_core::explain::Cleanup::Off => "off",
+        snapall_core::explain::Cleanup::Unavailable => "could not be found out",
+    };
+    let boot = match (&facts.boot_menu_sync, facts.boot_menu_plugin) {
+        (_, true) => "kept up to date by a plugin",
+        (sync, false) if sync.is_running() => "running",
+        (sync, false) if sync.is_installed() => "installed but not running",
+        _ => "not used on this computer",
+    };
+    out.push_str(&format!(
+        "  cleaning up old snapshots   {cleanup}\n  the boot menu following snapshots   {boot}\n"
+    ));
+    out
+}
+
+pub fn health_json(facts: &snapall_core::Facts, report: &snapall_core::Health) -> Value {
+    json!({
+        "verdict": {"level": level_word(report.verdict.level), "text": report.verdict.text},
+        "findings": report.findings.iter().map(|f| json!({
+            "level": level_word(f.level),
+            "topic": topic_word(f.topic),
+            "headline": f.headline,
+            "why": f.why,
+            "can_fix": f.remedy.is_some(),
+        })).collect::<Vec<_>>(),
+        "status": report.chips.iter().map(|c| json!({"label": c.label, "level": level_word(c.level), "topic": topic_word(c.topic)})).collect::<Vec<_>>(),
+        "areas": facts.areas.iter().map(|a| json!({
+            "area": a.config.as_str(),
+            "path": a.subvolume,
+            "snapshots": a.snapshots,
+            "oldest": a.oldest,
+            "newest": a.newest,
+            "bytes_held": a.measured_bytes,
+            "kept_in": a.lives_in(),
+            "disk_percent_used": a.disk.map(|d| d.percent_used()),
+            "keeps": a.retention.as_ref().and_then(|r| r.keep),
+        })).collect::<Vec<_>>(),
+    })
+}
+
 // ---- restore points -----------------------------------------------------------------------------
 
 fn areas_of(point: &snapall_core::RestorePoint) -> String {
@@ -277,14 +412,19 @@ pub fn point_preview(
             }
             MemberView::SystemRoot => {
                 system = true;
-                "not touched: the running system is not put back while it runs".to_owned()
+                format!(
+                    "not touched: the running system is not put back while it runs (its snapshot in this point is #{})",
+                    p.id
+                )
             }
             MemberView::Failed(why) => format!("could not be looked at: {why}"),
         };
         out.push_str(&format!("  {:<width$}  {what}\n", p.config.as_str()));
     }
     if system {
-        out.push_str(&format!("\nThe system itself: {system_route}\n"));
+        out.push_str(&format!(
+            "\nThe system itself: {system_route}\n\nTo bring the system back as well, do that first, then run restore-all with this point again: the system will already match, and the other areas follow.\n"
+        ));
     }
     out
 }
@@ -331,7 +471,10 @@ pub fn point_restored(
             ),
             MemberResult::AlreadyThere => "already matched: left alone".to_owned(),
             MemberResult::SystemRoot => {
-                "left alone: the running system is not put back while it runs".to_owned()
+                format!(
+                "left alone: the running system is not put back while it runs (its snapshot in this point is #{})",
+                m.id
+            )
             }
             MemberResult::Failed(why) => format!("FAILED: {why}"),
         };

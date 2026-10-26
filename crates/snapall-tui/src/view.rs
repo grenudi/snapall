@@ -761,7 +761,10 @@ fn points_spec(index: usize, state: &State) -> ModalSpec {
                         format!("change {} path(s): {changed} reverted, {added} removed, {removed} brought back", p.changes.len())
                     }
                     snapall_core::MemberView::SystemRoot => {
-                        "left alone: the running system is not put back".to_owned()
+                        format!(
+                            "left alone: the running system is not put back (its snapshot here is #{})",
+                            view.id
+                        )
                     }
                     snapall_core::MemberView::Failed(why) => {
                         format!("could not be looked at: {why}")

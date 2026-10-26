@@ -34,7 +34,8 @@ snapall (binary: argenv CLI, wiring, rendering)
    ├── snapall-tui ───────▶ snapall-core     (+ ratatui, signal-hook)
    ├── snapall-observe ───▶ snapall-core     (+ serde_json)
    ├── snapall-snapper ───▶ snapall-core     (+ serde_json)
+   ├── snapall-system ────▶ snapall-core     (nothing else: df, systemctl, date)
    └────────────────────────▶ snapall-core     (no I/O, no parser, no terminal, no clock)
 ```
 
-Dependencies point inward. `snapall-core` knows nothing about snapper, JSON, processes, terminals, clocks or the command line, and the four outer crates never see each other; they meet only in the binary.
+Dependencies point inward. `snapall-core` knows nothing about snapper, JSON, processes, terminals, clocks or the command line, and the outer crates never see each other; they meet only in the binary.

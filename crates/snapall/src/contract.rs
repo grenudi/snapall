@@ -26,6 +26,7 @@ pub enum Command {
     RestoreAll,
     Points,
     History,
+    Health,
     Setup,
     Doctor,
     Completions,
@@ -45,6 +46,7 @@ impl Command {
         Command::RestoreAll,
         Command::Points,
         Command::History,
+        Command::Health,
         Command::Setup,
         Command::Doctor,
         Command::Completions,
@@ -65,6 +67,7 @@ impl Command {
             Command::Points => "points",
             Command::History => "history",
             Command::Setup => "setup",
+            Command::Health => "health",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -94,6 +97,7 @@ impl Command {
             }
             Command::Points => "List the restore points: the snapshots one action took together",
             Command::Setup => "Protect what has no snapshots yet, explaining each step",
+            Command::Health => "Show whether protection is working, and how much room it takes",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -151,6 +155,7 @@ const OBSERVED: &[Command] = &[
     Command::Doctor,
     Command::Tui,
     Command::Setup,
+    Command::Health,
 ];
 
 contract! {
@@ -293,6 +298,7 @@ contract! {
             Command::Points,
             Command::History,
             Command::Setup,
+            Command::Health,
             Command::Doctor,
         ],
         env:         Some(Env::new("SNAPALL_JSON")),

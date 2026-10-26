@@ -476,6 +476,7 @@ dependencies = [
  "snapall-core",
  "snapall-observe",
  "snapall-snapper",
+ "snapall-system",
  "snapall-tui",
 ]
 
@@ -500,6 +501,13 @@ version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
+ "snapall-core",
+]
+
+[[package]]
+name = "snapall-system"
+version = "0.11.0"
+dependencies = [
  "snapall-core",
 ]
 

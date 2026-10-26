@@ -75,6 +75,17 @@ fn the_observability_adapter_depends_on_the_core_and_serialization_only() {
 }
 
 #[test]
+fn the_system_adapter_depends_on_the_core_alone() {
+    // It asks the machine questions the core states; it needs nothing but the core's words for them.
+    let deps = normal_deps("snapall-system");
+    assert_eq!(
+        deps,
+        set(&["snapall-core"]),
+        "unexpected dependencies: {deps:?}"
+    );
+}
+
+#[test]
 fn the_tui_depends_on_the_core_and_the_terminal_library_only() {
     let deps = normal_deps("snapall-tui");
     assert!(
@@ -93,6 +104,7 @@ fn drivers_and_adapters_never_know_each_other() {
         "snapall-snapper",
         "snapall-tui",
         "snapall-observe",
+        "snapall-system",
     ] {
         let deps = normal_deps(library);
         for forbidden in [
@@ -100,6 +112,7 @@ fn drivers_and_adapters_never_know_each_other() {
             "snapall-tui",
             "snapall-snapper",
             "snapall-observe",
+            "snapall-system",
         ] {
             if forbidden != library {
                 assert!(
@@ -118,6 +131,7 @@ fn only_the_binary_may_know_argenv() {
         "snapall-snapper",
         "snapall-tui",
         "snapall-observe",
+        "snapall-system",
     ] {
         let deps = normal_deps(library);
         assert!(
@@ -135,6 +149,7 @@ fn nobody_depends_on_a_cli_parser_other_than_argenv() {
         "snapall-snapper",
         "snapall-tui",
         "snapall-observe",
+        "snapall-system",
         "snapall",
     ] {
         assert!(

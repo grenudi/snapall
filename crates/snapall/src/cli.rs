@@ -55,6 +55,8 @@ pub enum Request {
     },
     /// Every restore point.
     Points,
+    /// How protection stands: room used, cleanup, services.
+    Health,
     /// Put every area back to one restore point.
     RestoreAll {
         point: Point,
@@ -423,6 +425,7 @@ fn build_request(
             Request::History { path: utf8(&path)? }
         }
         Command::Points => Request::Points,
+        Command::Health => Request::Health,
         Command::RestoreAll => Request::RestoreAll {
             point: {
                 let raw = Contract::RESTORE_POINT

@@ -7,8 +7,8 @@
 use thiserror::Error;
 
 use crate::domain::{
-    Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, SnapshotId,
-    SnapshotInfo,
+    Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, Retention,
+    SnapshotId, SnapshotInfo,
 };
 
 pub trait SnapshotBackend {
@@ -62,6 +62,9 @@ pub trait SnapshotBackend {
         name: &ConfigName,
         option: ConfigOption,
     ) -> Result<(), BackendError>;
+
+    /// How the area's snapshots are kept and cleaned up.
+    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError>;
 
     /// Whether `path` is on the config's own subvolume, so that a snapshot of the config contains it.
     ///
