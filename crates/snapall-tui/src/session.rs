@@ -14,28 +14,71 @@
 use std::collections::VecDeque;
 
 use snapall_core::{
-    all_snapshots, delete_snapshot, file_versions_of, fresh_point, plan_snapshots, point_of,
-    preview_point, preview_restore, protect_area, restore_point, restore_points, restore_snapshot,
-    run_plan, snapshots_of, SnapshotBackend, SnapshotError,
+    all_snapshots, assess, delete_snapshot, file_versions_of, fresh_point, gather, plan_snapshots,
+    point_of, preview_point, preview_restore, protect_area, restore_point, restore_points,
+    restore_snapshot, run_plan, snapshots_of, NoSystem, SnapshotBackend, SnapshotError,
+    SystemProbe,
 };
 
-use crate::model::{update, Effect, Key, Msg, PointOffer, PointOutcome, State, UiContext};
+use crate::model::{
+    update, Effect, Finished, Key, Msg, PointOffer, PointOutcome, State, UiContext,
+};
+use crate::tabs::health::HealthData;
 
 /// Performs effects. `Sync` is required of the backend so one executor can serve a worker thread.
 #[derive(Clone, Copy)]
 pub struct Executor<'a> {
     backend: &'a (dyn SnapshotBackend + Sync),
+    system: &'a (dyn SystemProbe + Sync),
 }
+
+/// A machine that can be asked nothing, for an executor that was not given one.
+static UNKNOWN_MACHINE: NoSystem = NoSystem;
 
 impl<'a> Executor<'a> {
     pub fn new(backend: &'a (dyn SnapshotBackend + Sync)) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            system: &UNKNOWN_MACHINE,
+        }
     }
 
-    /// Perform one effect. Always answers with exactly one message.
+    /// The machine to ask about disks, background jobs and the time.
+    pub fn with_system(self, system: &'a (dyn SystemProbe + Sync)) -> Self {
+        Self { system, ..self }
+    }
+
+    /// Perform one effect. Always answers with exactly one message: for a change, that message wrapped
+    /// with what it was, how it went, when and for how long, which is what the Activity tab shows.
     pub fn execute(&self, effect: Effect) -> Msg {
+        let Some(what) = describe_change(&effect) else {
+            return self.perform(effect);
+        };
+        let started = std::time::Instant::now();
+        let msg = self.perform(effect);
+        Msg::Finished(Box::new(Finished {
+            outcome: how_it_went(&msg),
+            what,
+            took: started.elapsed(),
+            at: self.system.local_time(),
+            msg,
+        }))
+    }
+
+    fn perform(&self, effect: Effect) -> Msg {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
+            Effect::LoadHealth => Msg::HealthLoaded(
+                gather(backend, self.system)
+                    .map(|facts| {
+                        let report = assess(&facts);
+                        Box::new(HealthData { facts, report })
+                    })
+                    .map_err(|error| error.to_string()),
+            ),
+            Effect::SwitchOnCleanup => {
+                Msg::CleanupSwitched(self.system.enable_job("snapper-cleanup.timer"))
+            }
             Effect::LoadConfigs => {
                 Msg::ConfigsLoaded(backend.list_configs().map_err(|e| e.to_string()))
             }
@@ -165,10 +208,23 @@ impl<'a> Session<'a> {
 
     /// A session for a machine the shell has already looked at.
     pub fn with_context(backend: &'a (dyn SnapshotBackend + Sync), context: UiContext) -> Self {
-        let mut session = Self {
-            state: State::with_context(context),
-            executor: Executor::new(backend),
-        };
+        Self::start(State::with_context(context), Executor::new(backend))
+    }
+
+    /// A session on a machine that can answer questions about its disk, its jobs and its clock.
+    pub fn with_system(
+        backend: &'a (dyn SnapshotBackend + Sync),
+        system: &'a (dyn SystemProbe + Sync),
+        context: UiContext,
+    ) -> Self {
+        Self::start(
+            State::with_context(context),
+            Executor::new(backend).with_system(system),
+        )
+    }
+
+    fn start(state: State, executor: Executor<'a>) -> Self {
+        let mut session = Self { state, executor };
         session.dispatch(Msg::Start);
         session
     }
@@ -213,5 +269,131 @@ fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
             })
             .collect(),
         undo: done.changed_anything().then(|| done.safety.to_string()),
+    }
+}
+
+/// What an effect that changes something is called in the Activity tab; `None` for one that only looks.
+fn describe_change(effect: &Effect) -> Option<String> {
+    let plural = |n: usize| if n == 1 { "" } else { "s" };
+    Some(match effect {
+        Effect::Create { targets, .. } => format!(
+            "Took a snapshot of {}",
+            targets
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Effect::Delete { config, ids } => {
+            format!(
+                "Deleted {} snapshot{} of {config}",
+                ids.len(),
+                plural(ids.len())
+            )
+        }
+        Effect::Restore {
+            config,
+            id,
+            path: Some(path),
+            ..
+        } => {
+            format!("Restored {path} from snapshot #{id} of {config}")
+        }
+        Effect::Restore {
+            config,
+            id,
+            path: None,
+            ..
+        } => {
+            format!("Put {config} back to snapshot #{id}")
+        }
+        Effect::RestorePoint { point } => {
+            format!("Put every area back to restore point {}", point.point)
+        }
+        Effect::Protect { mount_point } => {
+            let title = snapall_core::coverage::describe(mount_point).title;
+            format!("Protected {title} ({mount_point})")
+        }
+        Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
+        _ => return None,
+    })
+}
+
+/// How a change went, from the message that says so: what came of it, or why it failed.
+fn how_it_went(msg: &Msg) -> Result<String, String> {
+    let failures = |pairs: Vec<(String, &Result<String, String>)>| -> Vec<String> {
+        pairs
+            .into_iter()
+            .filter_map(|(what, result)| result.as_ref().err().map(|why| format!("{what}: {why}")))
+            .collect()
+    };
+    match msg {
+        Msg::Created(results) => {
+            let each: Vec<(String, Result<String, String>)> = results
+                .iter()
+                .map(|(config, result)| {
+                    (
+                        config.to_string(),
+                        result
+                            .as_ref()
+                            .map(|id| format!("#{id}"))
+                            .map_err(Clone::clone),
+                    )
+                })
+                .collect();
+            let failed = failures(
+                each.iter()
+                    .map(|(name, result)| (name.clone(), result))
+                    .collect(),
+            );
+            if failed.is_empty() {
+                Ok(format!(
+                    "{} snapshot{} taken",
+                    results.len(),
+                    if results.len() == 1 { "" } else { "s" }
+                ))
+            } else {
+                Err(failed.join("; "))
+            }
+        }
+        Msg::Deleted { results, .. } => {
+            let failed: Vec<String> = results
+                .iter()
+                .filter_map(|(id, result)| result.as_ref().err().map(|why| format!("#{id}: {why}")))
+                .collect();
+            if failed.is_empty() {
+                Ok(String::new())
+            } else {
+                Err(failed.join("; "))
+            }
+        }
+        Msg::Restored { result, .. } => result
+            .as_ref()
+            .map(|done| format!("How it was before is snapshot #{}", done.safety_snapshot))
+            .map_err(Clone::clone),
+        Msg::PointRestored {
+            result: Ok(outcome),
+            ..
+        } if outcome.failed.is_empty() => Ok(format!(
+            "{} area{} put back.{}",
+            outcome.restored,
+            if outcome.restored == 1 { "" } else { "s" },
+            outcome.undo.as_ref().map_or(String::new(), |undo| format!(
+                " To undo it: restore point {undo}"
+            ))
+        )),
+        Msg::PointRestored {
+            result: Ok(outcome),
+            ..
+        } => Err(outcome.failed.join("; ")),
+        Msg::PointRestored {
+            result: Err(why), ..
+        }
+        | Msg::CleanupSwitched(Err(why)) => Err(why.clone()),
+        Msg::Protected { result, .. } => result
+            .as_ref()
+            .map(|_| "It has snapshots from now on.".to_owned())
+            .map_err(Clone::clone),
+        _ => Ok(String::new()),
     }
 }

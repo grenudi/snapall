@@ -262,6 +262,7 @@ fn escape_changes_nothing_and_the_button_works_by_mouse_with_its_explanation_on_
 fn like_every_action_that_starts_work_it_is_refused_while_snapall_is_busy() {
     let mut state = State::with_context(context(true, two_offers()));
     update(&mut state, Msg::Start);
+    update(&mut state, Msg::HealthLoaded(Err(String::new())));
     assert_eq!(state.pending, 1);
     update(&mut state, Msg::Key(Key::Char('p')));
     assert!(state.modal.is_none(), "busy: no prompt opens");

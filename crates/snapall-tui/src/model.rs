@@ -8,7 +8,11 @@
 //! the *effects* the shell should perform; the shell reports what happened as new messages.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
+use crate::tab::Tab;
+use crate::tabs::activity::{Activity, ActivityTab};
+use crate::tabs::health::{HealthData, HealthTab};
 use snapall_core::{
     ConfigName, Description, FileState, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
 };
@@ -187,6 +191,14 @@ pub enum Click {
     Mark {
         index: usize,
     },
+    /// A name in the tab bar.
+    Tab(Tab),
+    /// An item of the status bar: goes to the Health tab, at the row that explains it.
+    Chip(snapall_core::Topic),
+    /// A row of the Health or Activity tab, whichever is showing.
+    TabRow {
+        index: usize,
+    },
 }
 
 /// Where a restore prompt is: looking at what would change, ready, or unable to.
@@ -270,6 +282,10 @@ pub struct State {
     pub points: Option<Vec<snapall_core::RestorePoint>>,
     /// What putting the chosen restore point back would do.
     pub point_preview: Option<PointOffer>,
+    /// Which view is showing.
+    pub tab: Tab,
+    pub health: HealthTab,
+    pub activity: ActivityTab,
 }
 
 impl Default for State {
@@ -293,6 +309,9 @@ impl Default for State {
             point_offer: None,
             points: None,
             point_preview: None,
+            tab: Tab::Snapshots,
+            health: HealthTab::default(),
+            activity: ActivityTab::default(),
         }
     }
 }
@@ -389,6 +408,10 @@ pub enum Effect {
     RestorePoint {
         point: snapall_core::RestorePoint,
     },
+    /// Look at how protection stands: the report the status bar and the Health tab are made from.
+    LoadHealth,
+    /// Switch automatic cleanup on.
+    SwitchOnCleanup,
     /// Look up every restore point.
     LoadPoints,
     /// What would putting this restore point back do?
@@ -447,6 +470,13 @@ pub enum Msg {
         id: SnapshotId,
         offer: Option<PointOffer>,
     },
+    /// How protection stands, or why that could not be found out.
+    HealthLoaded(Result<Box<HealthData>, String>),
+    /// Automatic cleanup was switched on, or why it could not be.
+    CleanupSwitched(Result<(), String>),
+    /// What the shell did for a message that changed something: what it was, how it went, when and
+    /// for how long. The message it describes is inside, and is handled as if it had arrived alone.
+    Finished(Box<Finished>),
     /// Every restore point, or why they could not be looked up.
     PointsLoaded(Result<Vec<snapall_core::RestorePoint>, String>),
     /// What putting one restore point back would do.
@@ -477,15 +507,83 @@ pub enum Msg {
 /// Every effect returned counts as pending until its result message arrives; every result
 /// message settles one. That bookkeeping lives here, not in the shell, so it is tested like
 /// everything else.
+/// A change that was made, as the shell reports it: for the Activity tab, around the message that says
+/// what came of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Finished {
+    pub what: String,
+    pub outcome: Result<String, String>,
+    pub took: Duration,
+    pub at: Option<String>,
+    pub msg: Msg,
+}
+
 pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
-    let effects = match msg {
+    let effects = handle(state, msg);
+    state.pending += effects.len();
+    effects
+}
+
+/// What one message does. The work it starts is counted once, by [`update`], however many messages were
+/// unwrapped on the way.
+fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
+    match msg {
         Msg::Start => match &state.file {
-            Some(view) => vec![Effect::LoadFileVersions {
-                config: view.target.config.clone(),
-                path: view.target.path.clone(),
-            }],
-            None => vec![Effect::LoadConfigs],
+            Some(view) => vec![
+                Effect::LoadFileVersions {
+                    config: view.target.config.clone(),
+                    path: view.target.path.clone(),
+                },
+                Effect::LoadHealth,
+            ],
+            None => vec![Effect::LoadConfigs, Effect::LoadHealth],
         },
+        Msg::HealthLoaded(result) => {
+            settle(state);
+            match result {
+                Ok(data) => {
+                    state.health.data = Some(*data);
+                    state.health.error = None;
+                    state.health.keep_cursor_in_range();
+                }
+                Err(why) => state.health.error = Some(why),
+            }
+            Vec::new()
+        }
+        Msg::CleanupSwitched(result) => {
+            settle(state);
+            match result {
+                Ok(()) => {
+                    state.notice = Some(Notice::Info("Automatic cleanup is on.".into()));
+                    vec![Effect::LoadHealth]
+                }
+                Err(why) => {
+                    state.notice = Some(Notice::Error(format!(
+                        "Could not switch automatic cleanup on: {why}"
+                    )));
+                    Vec::new()
+                }
+            }
+        }
+        Msg::Finished(done) => {
+            let Finished {
+                what,
+                outcome,
+                took,
+                at,
+                msg,
+            } = *done;
+            state.activity.record(Activity {
+                at,
+                what,
+                outcome,
+                took,
+            });
+            // what changed may change how protection stands: look again
+            let mut effects = handle(state, msg);
+            effects.push(Effect::LoadHealth);
+            effects
+        }
         Msg::Tick => {
             state.spinner = state.spinner.wrapping_add(1);
             Vec::new()
@@ -570,14 +668,36 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
             settle(state);
             on_deleted(state, &config, results)
         }
-    };
-    state.pending += effects.len();
-    effects
+    }
 }
 
 /// One result came back. A result nobody asked for does not push the count below zero.
 fn settle(state: &mut State) {
     state.pending = state.pending.saturating_sub(1);
+}
+
+/// Switching tabs (1, 2, 3) and the keys of the tab that is showing. `None` is a key the window itself
+/// handles, whatever is showing: quit, help, take a snapshot of everything, protect, restore points.
+fn on_tab_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
+    if let Key::Char(c) = key {
+        if let Some(tab) = Tab::from_key(c) {
+            state.tab = tab;
+            return Some(Vec::new());
+        }
+    }
+    let own = match state.tab {
+        Tab::Snapshots => return None,
+        Tab::Health => crate::tabs::health::on_key(state, key),
+        Tab::Activity => crate::tabs::activity::on_key(state, key),
+    };
+    // The snapshot lists are not showing, so the keys that act on them do nothing here.
+    own.or_else(|| {
+        matches!(
+            key,
+            Key::Tab | Key::Left | Key::Right | Key::Char('h' | 'l' | 'c' | 'd' | 'u' | ' ')
+        )
+        .then(Vec::new)
+    })
 }
 
 fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
@@ -594,6 +714,9 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
     if state.file.is_some() {
         return on_file_key(state, key);
     }
+    if let Some(effects) = on_tab_key(state, key) {
+        return effects;
+    }
     match key {
         Key::CtrlC | Key::Char('q') => {
             state.quit = true;
@@ -605,7 +728,7 @@ fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
-            vec![Effect::LoadConfigs]
+            vec![Effect::LoadConfigs, Effect::LoadHealth]
         }
         Key::Tab => {
             state.focus = match state.focus {
@@ -1465,6 +1588,25 @@ fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
             }
         }
         _ if state.modal.is_some() => Vec::new(),
+        Click::Tab(tab) => {
+            state.tab = tab;
+            Vec::new()
+        }
+        Click::Chip(topic) => {
+            state.tab = Tab::Health;
+            state.health.select_topic(topic);
+            Vec::new()
+        }
+        Click::TabRow { index } => {
+            match state.tab {
+                Tab::Health if index < state.health.rows().len() => state.health.cursor = index,
+                Tab::Activity if index < state.activity.entries.len() => {
+                    state.activity.cursor = index;
+                }
+                _ => {}
+            }
+            Vec::new()
+        }
         Click::Button(button) => on_key(state, button.key()),
         Click::Row { index, .. } if state.file.is_some() => {
             let count = state.displayed_versions().len();

@@ -246,6 +246,7 @@ fn confirm_and_cancel_do_nothing_when_no_prompt_is_open() {
 fn a_button_that_starts_work_is_refused_while_snapper_is_busy_exactly_like_its_key() {
     let mut state = State::default();
     update(&mut state, Msg::Start);
+    update(&mut state, Msg::HealthLoaded(Err(String::new())));
     assert_eq!(state.pending, 1);
     update(&mut state, Msg::Click(Click::Button(Button::Create)));
     assert!(state.modal.is_none(), "busy: no prompt opens");

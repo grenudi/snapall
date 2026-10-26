@@ -8,7 +8,8 @@
 //!
 //! * [`model`]: all behaviour. `update(state, msg) -> effects` is a pure function with no
 //!   terminal, no clock and no I/O, so every key sequence is a unit test.
-//! * [`view`]: `render(state, frame)` only draws.
+//! * [`view`]: `render(state, frame)` only draws; [`tabs`] and [`status_bar`] draw the Health and
+//!   Activity views and the bar under every view, each with its own keys and state.
 //! * [`session`]: the shell that runs effects against a `SnapshotBackend` and feeds the
 //!   results back as messages.
 //! * [`term`]: the terminal, key translation and the event loop.
@@ -17,9 +18,14 @@
 
 pub mod model;
 pub mod session;
+pub mod status_bar;
+pub mod tab;
+pub mod tabs;
 pub mod term;
+pub mod theme;
 pub mod view;
 
 pub use model::{FileTarget, Offer, PointOffer, PointOutcome, UiContext};
 pub use session::{Executor, Session};
+pub use tab::Tab;
 pub use term::{run, Exit};

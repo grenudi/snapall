@@ -41,7 +41,7 @@ pub use points::{
     MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
 };
 pub use port::{BackendError, SnapshotBackend};
-pub use system::{DiskUsage, ServiceState, SystemProbe};
+pub use system::{DiskUsage, NoSystem, ServiceState, SystemProbe};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
     plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,

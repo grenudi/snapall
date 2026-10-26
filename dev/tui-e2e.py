@@ -183,6 +183,38 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def tabs_scenario():
+    """The tab bar and the status bar in a real terminal: a click on a tab, a click on a status item,
+    the Health tab's verdict, and the Activity tab recording a real snapshot."""
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    screen = tui.text()
+    check("1 Snapshots" in screen and "2 Health" in screen and "3 Activity" in screen, "the tab bar names every view")
+    check(" snapshot" in tui.text().splitlines()[-3], "the status bar is under the view and counts the snapshots")
+    tui.click_text("2 Health", offset=2)
+    tui.wait_for("Health: ")
+    tui.wait_for("What this means")
+    check(" snapshot" in tui.text().splitlines()[-3], "the status bar is still there on the Health tab")
+    check("Space" in tui.text() or "Needs a look" in tui.text() or "Good to know" in tui.text(), "the Health tab lists what it found")
+    tui.send("1")
+    tui.wait_for("Protected areas")
+    col, row = tui.find("snapshots")
+    check(row == len(tui.text().splitlines()) - 3, "the first 'snapshots' on the status line is the count")
+    tui.click_text(tui.text().splitlines()[-3].strip().split(" | ")[0], offset=1)
+    tui.wait_for("What this means")
+    check(True, "clicking a status item goes to the Health tab")
+    tui.send("3")
+    tui.wait_for("What snapall did in this window")
+    check("Nothing yet" in tui.text(), "the Activity tab starts empty and says what fills it")
+    tui.send("a")
+    tui.send("enter")
+    tui.wait_for("Took a snapshot of snapall_it_a, snapall_it_b", timeout=10)
+    check("done" in tui.text(), "a real snapshot is recorded as done")
+    tui.send("q")
+    tui.finish()
+
+
 def points_screen_scenario():
     """The restore points screen, opened by clicking its footer button: it lists the newest point,
     says what it would change in each area, and Enter puts both areas back."""
@@ -559,6 +591,7 @@ def main():
     refused = subprocess.run([BINARY, "--no-dbus", "history", "/etc/hostname"], capture_output=True, text=True)
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
+    tabs_scenario()
     points_screen_scenario()
     restore_point_scenario()
     protect_scenario()

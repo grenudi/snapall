@@ -19,7 +19,7 @@ use crate::system::{DiskUsage, ServiceState, SystemProbe};
 // ---- what is known ------------------------------------------------------------------------------
 
 /// What is known about one protected area.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AreaFacts {
     pub config: ConfigName,
     /// The directory it protects: `/`, `/home`.
@@ -47,7 +47,7 @@ impl AreaFacts {
 }
 
 /// Everything the report is made from.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Facts {
     /// The local time, as snapper writes dates, if it could be read.
     pub now: Option<String>,
@@ -87,7 +87,7 @@ pub enum Remedy {
     SwitchOnCleanup,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub level: Level,
     pub topic: Topic,
@@ -98,20 +98,20 @@ pub struct Finding {
 }
 
 /// One item of the status bar: what it says, how it stands, and where a click goes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chip {
     pub label: String,
     pub level: Level,
     pub topic: Topic,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Verdict {
     pub level: Level,
     pub text: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Health {
     pub verdict: Verdict,
     /// Most urgent first.
@@ -471,7 +471,7 @@ mod tests {
             min_age_seconds: Some(1800),
             cleanup: true,
             on_a_schedule: false,
-            space_limit: Some(0.5),
+            space_limit_permille: Some(500),
             quotas: false,
         }
     }

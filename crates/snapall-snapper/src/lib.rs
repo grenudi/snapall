@@ -1231,9 +1231,9 @@ mod tests {
             (Some(50), Some(10), Some(1800))
         );
         assert!(found.cleanup && !found.on_a_schedule && !found.quotas);
-        assert_eq!(found.space_limit, Some(0.5));
+        assert_eq!(found.space_limit_permille, Some(500));
         let empty = Retention::from_settings(&std::collections::BTreeMap::new());
-        assert_eq!((empty.keep, empty.space_limit), (None, None));
+        assert_eq!((empty.keep, empty.space_limit_permille), (None, None));
         assert!(!empty.cleanup, "an absent switch is not read as on");
     }
 }

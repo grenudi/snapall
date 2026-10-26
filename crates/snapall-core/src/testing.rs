@@ -319,7 +319,7 @@ impl SnapshotBackend for InMemoryBackend {
             min_age_seconds: Some(1800),
             cleanup: true,
             on_a_schedule: entry.timeline_create,
-            space_limit: Some(0.5),
+            space_limit_permille: Some(500),
             quotas: false,
         })
     }
@@ -591,9 +591,11 @@ mod tests {
 #[derive(Default)]
 pub struct FakeSystem {
     disk: Option<crate::system::DiskUsage>,
-    services: BTreeMap<String, crate::system::ServiceState>,
+    services: std::sync::Mutex<BTreeMap<String, crate::system::ServiceState>>,
     time: Option<String>,
     files: Vec<String>,
+    refuse_jobs: bool,
+    enabled: std::sync::Mutex<Vec<String>>,
 }
 
 impl FakeSystem {
@@ -607,20 +609,40 @@ impl FakeSystem {
         self
     }
 
-    pub fn with_service(mut self, unit: &str, enabled: &str, active: &str) -> Self {
-        self.services.insert(
-            unit.to_owned(),
-            crate::system::ServiceState {
-                enabled: Some(enabled.to_owned()),
-                active: Some(active.to_owned()),
-            },
-        );
+    pub fn with_service(self, unit: &str, enabled: &str, active: &str) -> Self {
+        self.set_service(unit, enabled, active);
         self
+    }
+
+    fn set_service(&self, unit: &str, enabled: &str, active: &str) {
+        if let Ok(mut services) = self.services.lock() {
+            services.insert(
+                unit.to_owned(),
+                crate::system::ServiceState {
+                    enabled: Some(enabled.to_owned()),
+                    active: Some(active.to_owned()),
+                },
+            );
+        }
     }
 
     pub fn at(mut self, time: &str) -> Self {
         self.time = Some(time.to_owned());
         self
+    }
+
+    /// Starting a background job is refused, as it is without administrator rights.
+    pub fn refusing_jobs(mut self) -> Self {
+        self.refuse_jobs = true;
+        self
+    }
+
+    /// The jobs that were switched on, in order.
+    pub fn jobs_switched_on(&self) -> Vec<String> {
+        self.enabled
+            .lock()
+            .map(|jobs| jobs.clone())
+            .unwrap_or_default()
     }
 
     pub fn with_file(mut self, path: &str) -> Self {
@@ -635,13 +657,15 @@ impl crate::system::SystemProbe for FakeSystem {
     }
 
     fn service(&self, unit: &str) -> crate::system::ServiceState {
-        self.services
-            .get(unit)
-            .cloned()
-            .unwrap_or(crate::system::ServiceState {
-                enabled: Some("not-found".to_owned()),
-                active: Some("inactive".to_owned()),
-            })
+        let known = self
+            .services
+            .lock()
+            .ok()
+            .and_then(|services| services.get(unit).cloned());
+        known.unwrap_or(crate::system::ServiceState {
+            enabled: Some("not-found".to_owned()),
+            active: Some("inactive".to_owned()),
+        })
     }
 
     fn local_time(&self) -> Option<String> {
@@ -650,5 +674,18 @@ impl crate::system::SystemProbe for FakeSystem {
 
     fn file_exists(&self, path: &str) -> bool {
         self.files.iter().any(|f| f == path)
+    }
+
+    fn enable_job(&self, unit: &str) -> Result<(), String> {
+        if self.refuse_jobs {
+            return Err("Access denied".to_owned());
+        }
+        self.enabled
+            .lock()
+            .map_err(|e| e.to_string())?
+            .push(unit.to_owned());
+        // as the real thing: it is enabled and running from now on
+        self.set_service(unit, "enabled", "active");
+        Ok(())
     }
 }

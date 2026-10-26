@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 16. Health and Activity: one place to see whether protection is working
 
-Status: accepted (the foundation is built; the window's tabs follow)
+Status: accepted and built
 
 ## Context
 
@@ -29,15 +29,19 @@ they fill the disk? What did snapall just do?* Those answers are scattered over 
 
 ### Names (what a person reads)
 
-Four tabs: **Snapshots** (today's screen), **Restore points**, **Health**, **Activity**.
-Health has four sections: **Space**, **Automatic cleanup**, **Services**, **Boot menu**. Its first line
+Three tabs: **Snapshots** (today's screen), **Health**, **Activity**. A tab shows the *state* of things;
+what *changes* things (take, delete, restore, protect, restore points) is a prompt that opens over any
+tab. So restore points stayed the `R` prompt, like Protect: it is something you do, not somewhere you
+look.
+Health groups what it lists as **Needs a look**, **Good to know**, **Space**, **Automatic cleanup** and
+**Boot menu**. Its first line
 is a verdict (*All good* or *N things need attention*) followed by what to do, most urgent first: the
 screen is useful before it is read in full. "Metrics" is what it holds; "Health" is what it is for.
 
 ### Layout (80x24)
 
 ```
- Snapshots | Restore points | Health | Activity            <- tabs (1 to 4, or click)
+ Snapshots | Health | Activity                              <- tabs (1 to 3, or click)
  ...                                                        <- the tab's content
  41 snapshots | 3.2 GiB | disk 62% | cleanup on | boot ok   <- status bar, every tab, each clickable
  (what the mouse is over, or the last message)
@@ -77,3 +81,13 @@ prompt never covers the three lines below the content.
 - The status bar and the tab share one report, so a chip and its explanation cannot drift apart.
 - Not decided here: changing retention from the window (the first action will be switching cleanup on,
   which `setup` already does).
+
+## What was built, and what was not
+
+Built: the three tabs, the status bar on every view (each item a click to its explanation), the Health
+tab's rows and explanations with one action (switch automatic cleanup on), and the Activity record
+(what was done, whether it worked, how long it took, and the reason when it did not).
+
+Not built: changing retention limits from the window; a persistent activity log (the tab says
+`--log-file` is the one); and the split of `model.rs` and `view.rs` into one module per concern, which
+the new tabs avoided adding to but did not yet perform on the old code.

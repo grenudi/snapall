@@ -54,4 +54,35 @@ pub trait SystemProbe {
     fn local_time(&self) -> Option<String>;
 
     fn file_exists(&self, path: &str) -> bool;
+
+    /// Switch a background job on and start it now (`systemctl enable --now`). It needs administrator
+    /// rights, and says why in plain words when it cannot.
+    fn enable_job(&self, unit: &str) -> Result<(), String>;
+}
+
+/// A machine that can be asked nothing: every answer is "unknown". What the window uses where no real
+/// machine is given, so that it still shows what snapper reports.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoSystem;
+
+impl SystemProbe for NoSystem {
+    fn disk_usage(&self, _path: &str) -> Option<DiskUsage> {
+        None
+    }
+
+    fn service(&self, _unit: &str) -> ServiceState {
+        ServiceState::default()
+    }
+
+    fn local_time(&self) -> Option<String> {
+        None
+    }
+
+    fn file_exists(&self, _path: &str) -> bool {
+        false
+    }
+
+    fn enable_job(&self, _unit: &str) -> Result<(), String> {
+        Err("this computer cannot be asked to start background jobs".to_owned())
+    }
 }

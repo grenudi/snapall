@@ -18,6 +18,7 @@ fn name(s: &str) -> ConfigName {
 fn busy() -> State {
     let mut state = State::default();
     update(&mut state, Msg::Start);
+    update(&mut state, Msg::HealthLoaded(Err(String::new())));
     let effects = update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
     assert_eq!(effects, [Effect::LoadSnapshots(name("home"))]);
     assert_eq!(state.pending, 1);
@@ -29,9 +30,15 @@ fn press(state: &mut State, key: Key) -> Vec<Effect> {
 }
 
 #[test]
-fn starting_asks_for_the_configs_and_counts_it_as_pending() {
+fn starting_asks_for_the_areas_and_for_how_protection_stands_and_counts_both_as_pending() {
     let mut state = State::default();
-    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
+    assert_eq!(
+        update(&mut state, Msg::Start),
+        [Effect::LoadConfigs, Effect::LoadHealth]
+    );
+    assert_eq!(state.pending, 2);
+    // each answer settles its own
+    update(&mut state, Msg::HealthLoaded(Err("not measured".into())));
     assert_eq!(state.pending, 1);
 }
 
@@ -39,6 +46,7 @@ fn starting_asks_for_the_configs_and_counts_it_as_pending() {
 fn a_result_settles_one_pending_effect_and_may_ask_for_more() {
     let mut state = State::default();
     update(&mut state, Msg::Start);
+    update(&mut state, Msg::HealthLoaded(Err(String::new())));
     assert_eq!(state.pending, 1);
     // The config list came back (-1) and asks for the first config's snapshots (+1).
     update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
@@ -125,6 +133,7 @@ fn quitting_while_busy_is_recorded_and_the_work_in_flight_is_still_counted() {
 fn a_prompt_opened_before_the_work_began_can_still_be_cancelled() {
     let mut state = State::default();
     update(&mut state, Msg::Start);
+    update(&mut state, Msg::HealthLoaded(Err(String::new())));
     update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
     update(
         &mut state,
