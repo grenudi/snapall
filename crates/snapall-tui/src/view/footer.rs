@@ -104,6 +104,23 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
     }
 }
 
+/// What is being done and for how long; after a few seconds, that it can take a while and that waiting
+/// is safe. `None` when nothing that changes anything is in flight.
+pub(crate) fn busy_line(state: &State) -> Option<String> {
+    let doing = state.doing.first()?;
+    let seconds = state.busy_ticks / 10;
+    let lead = if state.quit {
+        "Closing as soon as this has finished: "
+    } else {
+        ""
+    };
+    Some(if seconds >= 5 {
+        format!("{lead}This can take a while; waiting is safe. {doing} ({seconds} s)")
+    } else {
+        format!("{lead}{doing}... {seconds} s")
+    })
+}
+
 pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
     let explanation = state
         .hover
@@ -119,11 +136,16 @@ pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
     let notice = match (explanation, &state.notice, attention) {
         // Under the mouse: what the button does.
         (Some(text), _, _) => Span::styled(format!(" {text}"), Style::new().fg(Color::Cyan)),
-        (None, Some(Notice::Info(text)), _) => {
-            Span::styled(format!(" {text}"), Style::new().fg(Color::Green))
-        }
         (None, Some(Notice::Error(text)), _) => {
             Span::styled(format!(" {text}"), Style::new().fg(Color::Red))
+        }
+        // Work in flight: what is being done and for how long, and after a while that waiting is safe.
+        (None, _, _) if busy_line(state).is_some() => Span::styled(
+            format!(" {}", busy_line(state).unwrap_or_default()),
+            Style::new().fg(Color::Yellow),
+        ),
+        (None, Some(Notice::Info(text)), _) => {
+            Span::styled(format!(" {text}"), Style::new().fg(Color::Green))
         }
         // The tip stays until something else needs the line.
         (None, None, Some(tip)) => Span::styled(format!(" {tip}"), Style::new().fg(Color::Yellow)),

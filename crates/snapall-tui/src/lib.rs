@@ -16,6 +16,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod changes;
 pub mod model;
 pub mod session;
 pub mod status_bar;

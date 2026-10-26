@@ -30,16 +30,17 @@ fn press(state: &mut State, key: Key) -> Vec<Effect> {
 }
 
 #[test]
-fn starting_asks_for_the_areas_and_for_how_protection_stands_and_counts_both_as_pending() {
+fn starting_asks_for_the_areas_first_and_how_protection_stands_only_after_the_first_screen_has_its_data(
+) {
     let mut state = State::default();
-    assert_eq!(
-        update(&mut state, Msg::Start),
-        [Effect::LoadConfigs, Effect::LoadHealth]
-    );
-    assert_eq!(state.pending, 2);
-    // each answer settles its own
-    update(&mut state, Msg::HealthLoaded(Err("not measured".into())));
+    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
+    // the areas are work in flight; the health report loads on the side and does not count
     assert_eq!(state.pending, 1);
+    update(&mut state, Msg::HealthLoaded(Err("not measured".into())));
+    assert_eq!(
+        state.pending, 1,
+        "its arrival settles nothing, it was never counted"
+    );
 }
 
 #[test]
@@ -78,7 +79,7 @@ fn starting_more_work_is_refused_while_snapper_is_busy() {
         assert!(state.modal.is_none(), "{key} must not open a prompt");
         assert_eq!(state.pending, 1, "{key} must not start work");
         assert!(
-            matches!(&state.notice, Some(Notice::Info(t)) if t.contains("busy")),
+            matches!(&state.notice, Some(Notice::Error(t)) if t.contains("busy")),
             "{key}: {:?}",
             state.notice
         );
@@ -147,4 +148,27 @@ fn a_prompt_opened_before_the_work_began_can_still_be_cancelled() {
     press(&mut state, Key::Esc);
     assert!(state.modal.is_none());
     assert_eq!(state.pending, 0);
+}
+
+#[test]
+fn the_health_report_is_asked_for_after_the_first_screen_and_never_blocks_the_keys_that_start_work()
+{
+    // The worker does one thing at a time, so a status refresh queued before the first screen's data
+    // would delay it: the report is asked for only once that data has arrived.
+    let mut state = State::default();
+    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
+    let effects = update(&mut state, Msg::ConfigsLoaded(Ok(vec![])));
+    assert_eq!(effects, [Effect::LoadHealth]);
+    assert!(
+        update(&mut state, Msg::ConfigsLoaded(Ok(vec![]))).is_empty(),
+        "and only once"
+    );
+    // it is on its way, and it is not work: nothing that starts work is refused for it
+    assert_eq!(state.pending, 0);
+    let refused = press(&mut state, Key::Char('r'));
+    assert!(
+        !format!("{:?}", state.notice).contains("busy"),
+        "{:?} {refused:?}",
+        state.notice
+    );
 }

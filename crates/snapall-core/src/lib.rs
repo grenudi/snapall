@@ -21,6 +21,7 @@ pub mod observe;
 pub mod plan;
 pub mod points;
 pub mod port;
+pub mod services;
 pub mod system;
 pub mod usecase;
 
@@ -41,7 +42,10 @@ pub use points::{
     MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
 };
 pub use port::{BackendError, SnapshotBackend};
-pub use system::{DiskUsage, NoSystem, ServiceState, SystemProbe};
+pub use services::{Command, Job, JobAction};
+pub use system::{
+    Busy, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, SystemProbe, UnitDetails,
+};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
     plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,

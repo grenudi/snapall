@@ -40,6 +40,21 @@ impl ServiceState {
     pub fn is_running(&self) -> bool {
         self.active.as_deref() == Some("active")
     }
+
+    /// How it stands, in a word or two for a person.
+    pub fn words(&self) -> &'static str {
+        match (
+            self.is_installed(),
+            self.is_running(),
+            self.enabled.as_deref(),
+        ) {
+            (false, ..) => "not installed",
+            (true, true, Some("disabled")) => "running, but not at start",
+            (true, true, _) => "on",
+            (true, false, Some("disabled")) => "off",
+            (true, false, _) => "enabled but not running",
+        }
+    }
 }
 
 pub trait SystemProbe {
@@ -55,10 +70,86 @@ pub trait SystemProbe {
 
     fn file_exists(&self, path: &str) -> bool;
 
-    /// Switch a background job on and start it now (`systemctl enable --now`). It needs administrator
-    /// rights, and says why in plain words when it cannot.
-    fn enable_job(&self, unit: &str) -> Result<(), String>;
+    /// What a job's unit file says about it, if it can be found.
+    fn unit_details(&self, unit: &str) -> Option<UnitDetails>;
+
+    /// Do something to a background job. It needs administrator rights, and says why in plain words
+    /// when it cannot.
+    fn control_job(&self, unit: &str, action: crate::services::JobAction) -> Result<(), String>;
+
+    /// How the disk holding `path` counts the room snapshots take.
+    fn quota_mode(&self, path: &str) -> QuotaMode;
+
+    /// Switch room counting on or off for the disk holding `path`. It applies to the whole disk, not
+    /// to one area, and needs administrator rights.
+    fn set_quotas(&self, path: &str, on: bool) -> Result<(), String>;
+
+    /// Take the right to make a change; `Busy` says who has it. Reading never needs it.
+    fn hold_changes(&self, doing: &str) -> Result<Hold, Busy>;
 }
+
+/// What a job's unit file says about it, as written.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UnitDetails {
+    /// Where the unit file is.
+    pub file: Option<String>,
+    /// How the unit describes itself (`Description=`).
+    pub description: Option<String>,
+    /// Its timer settings (`OnBootSec=10m`) as key and value, in the order they apply.
+    pub timer: Vec<(String, String)>,
+}
+
+impl UnitDetails {
+    /// When it runs, in words.
+    pub fn schedule(&self) -> Vec<String> {
+        crate::services::schedule_words(&self.timer)
+    }
+}
+
+/// How a disk counts the room snapshots take.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuotaMode {
+    /// Not counted: the room a snapshot holds is not known.
+    Off,
+    /// Fully counted: what each snapshot alone holds is known, at a cost when snapshots are deleted.
+    Full,
+    /// The cheap kind (kernel 6.7 and later): room is charged to whoever wrote it first, so what a
+    /// snapshot holds is not known either.
+    Simple,
+    /// Could not be found out.
+    Unknown,
+}
+
+/// Another snapall is making a change, so this one must wait.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Busy {
+    pub pid: u32,
+    /// What it is doing, as it said when it started.
+    pub doing: String,
+    /// When it started, if known.
+    pub since: Option<String>,
+}
+
+impl std::fmt::Display for Busy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Another snapall is making a change right now ({}",
+            self.doing
+        )?;
+        if let Some(since) = &self.since {
+            write!(f, ", since {since}")?;
+        }
+        write!(
+            f,
+            ", process {}). Wait for it to finish, then try again.",
+            self.pid
+        )
+    }
+}
+
+/// Held while a change is made; letting go of it lets the next one start.
+pub type Hold = Box<dyn std::any::Any + Send>;
 
 /// A machine that can be asked nothing: every answer is "unknown". What the window uses where no real
 /// machine is given, so that it still shows what snapper reports.
@@ -82,7 +173,23 @@ impl SystemProbe for NoSystem {
         false
     }
 
-    fn enable_job(&self, _unit: &str) -> Result<(), String> {
-        Err("this computer cannot be asked to start background jobs".to_owned())
+    fn unit_details(&self, _unit: &str) -> Option<UnitDetails> {
+        None
+    }
+
+    fn control_job(&self, _unit: &str, _action: crate::services::JobAction) -> Result<(), String> {
+        Err("this computer cannot be asked to control background jobs".to_owned())
+    }
+
+    fn quota_mode(&self, _path: &str) -> QuotaMode {
+        QuotaMode::Unknown
+    }
+
+    fn set_quotas(&self, _path: &str, _on: bool) -> Result<(), String> {
+        Err("this computer cannot be asked to change how room is counted".to_owned())
+    }
+
+    fn hold_changes(&self, _doing: &str) -> Result<Hold, Busy> {
+        Ok(Box::new(()))
     }
 }

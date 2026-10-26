@@ -38,6 +38,17 @@ pub(crate) fn restore_counts(changes: &[snapall_core::Change]) -> (usize, usize,
     )
 }
 
+/// How many screen rows these lines take inside a prompt of `width`, counting the wrapping of long ones:
+/// a prompt sized by its number of lines alone is cut off as soon as one of them wraps.
+pub(crate) fn rows_needed(lines: &[Line], width: u16) -> u16 {
+    let inner = usize::from(width.saturating_sub(2)).max(1);
+    let rows: usize = lines
+        .iter()
+        .map(|line| line.width().div_ceil(inner).max(1))
+        .sum();
+    u16::try_from(rows).unwrap_or(u16::MAX)
+}
+
 pub(crate) fn confirm_button(label: &str) -> (Button, String) {
     (Button::Confirm, format!("Enter: {label}"))
 }
@@ -67,6 +78,8 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
         Modal::Help { page } => help_spec(*page),
         Modal::Protect { index } => protect_spec(*index, state),
         Modal::Points { index } => points_spec(*index, state),
+        Modal::Job { unit } => job_spec(unit, state),
+        Modal::Quotas { turn_on } => quotas_spec(*turn_on, state),
     }
 }
 

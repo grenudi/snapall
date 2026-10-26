@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-26T06:04:09Z",
+  "generated": "2026-10-26T10:31:38Z",
   "inputs": [
     {
       "allowed": [],
@@ -113,7 +113,8 @@
         "doctor",
         "tui",
         "setup",
-        "health"
+        "health",
+        "quotas"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -148,7 +149,8 @@
         "doctor",
         "tui",
         "setup",
-        "health"
+        "health",
+        "quotas"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -246,6 +248,7 @@
         "history",
         "setup",
         "health",
+        "quotas",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -416,6 +419,26 @@
     {
       "allowed": [],
       "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "STATE"
+      },
+      "example": "sudo snapall quotas on",
+      "group": "quotas",
+      "key": "state",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "quotas"
+      ],
+      "summary": "`on` or `off`. Without it, only shows how the disk counts room now and what switching it would mean.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
         "arity": 0,
         "long": "install",
         "negatable": false,
@@ -451,7 +474,8 @@
         "doctor",
         "restore",
         "restore-all",
-        "setup"
+        "setup",
+        "quotas"
       ],
       "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
       "type": "bool"
@@ -502,5 +526,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.12.0"
+  "source": "snapall@0.13.0"
 }

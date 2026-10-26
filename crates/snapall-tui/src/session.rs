@@ -20,9 +20,8 @@ use snapall_core::{
     SystemProbe,
 };
 
-use crate::model::{
-    update, Effect, Finished, Key, Msg, PointOffer, PointOutcome, State, UiContext,
-};
+use crate::changes::{describe_change, describe_now, how_it_went, outcome_of};
+use crate::model::{update, Effect, Finished, Key, Msg, PointOffer, State, UiContext};
 use crate::tabs::health::HealthData;
 
 /// Performs effects. `Sync` is required of the backend so one executor can serve a worker thread.
@@ -54,11 +53,27 @@ impl<'a> Executor<'a> {
         let Some(what) = describe_change(&effect) else {
             return self.perform(effect);
         };
+        let present = describe_now(&effect).unwrap_or_default();
+        // one change at a time across every snapall: a second one is told who has the right, and waits
+        let _hold = match self.system.hold_changes(&what) {
+            Ok(hold) => hold,
+            Err(busy) => {
+                return Msg::Finished(Box::new(Finished {
+                    outcome: Err(busy.to_string()),
+                    what,
+                    present,
+                    took: std::time::Duration::ZERO,
+                    at: self.system.local_time(),
+                    msg: Msg::Refused(busy.to_string()),
+                }));
+            }
+        };
         let started = std::time::Instant::now();
         let msg = self.perform(effect);
         Msg::Finished(Box::new(Finished {
             outcome: how_it_went(&msg),
             what,
+            present,
             took: started.elapsed(),
             at: self.system.local_time(),
             msg,
@@ -76,9 +91,25 @@ impl<'a> Executor<'a> {
                     })
                     .map_err(|error| error.to_string()),
             ),
-            Effect::SwitchOnCleanup => {
-                Msg::CleanupSwitched(self.system.enable_job("snapper-cleanup.timer"))
+            Effect::ControlJob { unit, action } => {
+                let result = self.system.control_job(&unit, action);
+                Msg::JobControlled {
+                    unit,
+                    action,
+                    result,
+                }
             }
+            Effect::SetQuotas { turn_on, paths } => {
+                // the disks may be one or several; asking again of one that is already so is harmless
+                let result = paths
+                    .iter()
+                    .try_for_each(|path| self.system.set_quotas(path, turn_on));
+                Msg::QuotasSet { turn_on, result }
+            }
+            Effect::SwitchOnCleanup => Msg::CleanupSwitched(self.system.control_job(
+                snapall_core::services::CLEANUP.unit,
+                snapall_core::JobAction::EnableNow,
+            )),
             Effect::LoadConfigs => {
                 Msg::ConfigsLoaded(backend.list_configs().map_err(|e| e.to_string()))
             }
@@ -249,151 +280,4 @@ fn unix_now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs())
-}
-
-/// What a person is told about putting a restore point back, from what happened to each area.
-fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
-    use snapall_core::MemberResult;
-    let count = |wanted: fn(&MemberResult) -> bool| {
-        done.members.iter().filter(|m| wanted(&m.result)).count()
-    };
-    PointOutcome {
-        restored: count(|r| matches!(r, MemberResult::Restored(_))),
-        unchanged: count(|r| matches!(r, MemberResult::AlreadyThere)),
-        failed: done
-            .members
-            .iter()
-            .filter_map(|m| match &m.result {
-                MemberResult::Failed(why) => Some(format!("{}: {why}", m.config)),
-                _ => None,
-            })
-            .collect(),
-        undo: done.changed_anything().then(|| done.safety.to_string()),
-    }
-}
-
-/// What an effect that changes something is called in the Activity tab; `None` for one that only looks.
-fn describe_change(effect: &Effect) -> Option<String> {
-    let plural = |n: usize| if n == 1 { "" } else { "s" };
-    Some(match effect {
-        Effect::Create { targets, .. } => format!(
-            "Took a snapshot of {}",
-            targets
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-        Effect::Delete { config, ids } => {
-            format!(
-                "Deleted {} snapshot{} of {config}",
-                ids.len(),
-                plural(ids.len())
-            )
-        }
-        Effect::Restore {
-            config,
-            id,
-            path: Some(path),
-            ..
-        } => {
-            format!("Restored {path} from snapshot #{id} of {config}")
-        }
-        Effect::Restore {
-            config,
-            id,
-            path: None,
-            ..
-        } => {
-            format!("Put {config} back to snapshot #{id}")
-        }
-        Effect::RestorePoint { point } => {
-            format!("Put every area back to restore point {}", point.point)
-        }
-        Effect::Protect { mount_point } => {
-            let title = snapall_core::coverage::describe(mount_point).title;
-            format!("Protected {title} ({mount_point})")
-        }
-        Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
-        _ => return None,
-    })
-}
-
-/// How a change went, from the message that says so: what came of it, or why it failed.
-fn how_it_went(msg: &Msg) -> Result<String, String> {
-    let failures = |pairs: Vec<(String, &Result<String, String>)>| -> Vec<String> {
-        pairs
-            .into_iter()
-            .filter_map(|(what, result)| result.as_ref().err().map(|why| format!("{what}: {why}")))
-            .collect()
-    };
-    match msg {
-        Msg::Created(results) => {
-            let each: Vec<(String, Result<String, String>)> = results
-                .iter()
-                .map(|(config, result)| {
-                    (
-                        config.to_string(),
-                        result
-                            .as_ref()
-                            .map(|id| format!("#{id}"))
-                            .map_err(Clone::clone),
-                    )
-                })
-                .collect();
-            let failed = failures(
-                each.iter()
-                    .map(|(name, result)| (name.clone(), result))
-                    .collect(),
-            );
-            if failed.is_empty() {
-                Ok(format!(
-                    "{} snapshot{} taken",
-                    results.len(),
-                    if results.len() == 1 { "" } else { "s" }
-                ))
-            } else {
-                Err(failed.join("; "))
-            }
-        }
-        Msg::Deleted { results, .. } => {
-            let failed: Vec<String> = results
-                .iter()
-                .filter_map(|(id, result)| result.as_ref().err().map(|why| format!("#{id}: {why}")))
-                .collect();
-            if failed.is_empty() {
-                Ok(String::new())
-            } else {
-                Err(failed.join("; "))
-            }
-        }
-        Msg::Restored { result, .. } => result
-            .as_ref()
-            .map(|done| format!("How it was before is snapshot #{}", done.safety_snapshot))
-            .map_err(Clone::clone),
-        Msg::PointRestored {
-            result: Ok(outcome),
-            ..
-        } if outcome.failed.is_empty() => Ok(format!(
-            "{} area{} put back.{}",
-            outcome.restored,
-            if outcome.restored == 1 { "" } else { "s" },
-            outcome.undo.as_ref().map_or(String::new(), |undo| format!(
-                " To undo it: restore point {undo}"
-            ))
-        )),
-        Msg::PointRestored {
-            result: Ok(outcome),
-            ..
-        } => Err(outcome.failed.join("; ")),
-        Msg::PointRestored {
-            result: Err(why), ..
-        }
-        | Msg::CleanupSwitched(Err(why)) => Err(why.clone()),
-        Msg::Protected { result, .. } => result
-            .as_ref()
-            .map(|_| "It has snapshots from now on.".to_owned())
-            .map_err(Clone::clone),
-        _ => Ok(String::new()),
-    }
 }

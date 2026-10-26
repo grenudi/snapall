@@ -28,6 +28,15 @@ pub struct Context<'a> {
     pub hints: bool,
 }
 
+/// The right to make a change. Only one snapall makes a change at a time, and a second is told who has
+/// the right and what for, instead of racing it. Reading never needs it.
+fn changing(what: &str) -> Result<snapall_core::Hold, Box<dyn Error>> {
+    use snapall_core::SystemProbe;
+    snapall_system::LinuxSystem::new()
+        .hold_changes(what)
+        .map_err(|busy| busy.to_string().into())
+}
+
 // ---- reading ---------------------------------------------------------------------------------
 
 pub fn list(ctx: &Context) -> Outcome {
@@ -77,6 +86,7 @@ pub fn create(
             render::dry_run_json(&plan, description),
         );
     }
+    let _hold = changing("taking a snapshot")?;
     // every snapshot of this one action is the same restore point
     let point = fresh_point(ctx.backend, unix_now());
     let report = run_plan(ctx.backend, &plan, description, Some(&point));
@@ -90,6 +100,7 @@ pub fn create(
 }
 
 pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId) -> Outcome {
+    let _hold = changing(&format!("deleting snapshot #{id} of {config}"))?;
     delete_snapshot(ctx.backend, config, id)?;
     ctx.show.result(
         render::deleted(config, id),
@@ -118,6 +129,7 @@ pub fn restore(
         Confirmation::NoTerminalToAskOn => return Ok(ExitCode::from(2)),
         Confirmation::Declined => return Ok(ExitCode::FAILURE),
     }
+    let _hold = changing(&format!("restoring {config}"))?;
     let done = restore_snapshot(ctx.backend, config, id, path)?;
     ctx.show.result(
         render::restored(config, id, &done),
@@ -128,7 +140,7 @@ pub fn restore(
 /// How protection stands: whether it is working, the room it takes, whether old snapshots are cleaned
 /// up, and what to do about anything that is not. It exits with failure only for what needs doing now.
 pub fn health(ctx: &Context) -> Outcome {
-    let facts = gather(ctx.backend, &snapall_system::LinuxSystem)?;
+    let facts = gather(ctx.backend, &snapall_system::LinuxSystem::new())?;
     let report = assess(&facts);
     ctx.show.result(
         render::health(&facts, &report),
@@ -139,6 +151,88 @@ pub fn health(ctx: &Context) -> Outcome {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes
+/// how the whole disk works, so it explains what it gives and costs and asks first.
+pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
+    use snapall_core::explain::room_counting_text;
+    use snapall_core::{QuotaMode, SystemProbe};
+    let system = snapall_system::LinuxSystem::new();
+    let facts = gather(ctx.backend, &system)?;
+    let Some(first) = facts.areas.first() else {
+        return Err(
+            "nothing is protected yet, so there is nothing to count: run `snapall setup`".into(),
+        );
+    };
+    let mode = first.quotas;
+    let word = match mode {
+        QuotaMode::Off => "off",
+        QuotaMode::Full => "on",
+        QuotaMode::Simple => "on, the simple kind",
+        QuotaMode::Unknown => "could not be found out",
+    };
+    let Some(wanted) = wanted else {
+        return ctx.show.result(
+            format!(
+                "Counting the room snapshots take: {word}\n\n{}\n",
+                room_counting_text(mode)
+            ),
+            serde_json::json!({ "counting": word, "explanation": room_counting_text(mode) }),
+        );
+    };
+    let turn_on = match wanted {
+        "on" => true,
+        "off" => false,
+        other => return Err(format!("`{other}` is not `on` or `off`").into()),
+    };
+    if mode == QuotaMode::Simple && turn_on {
+        return Err("the disk counts room the simple way, and snapall cannot switch it to the full kind in place".into());
+    }
+    if (turn_on && mode == QuotaMode::Full) || (!turn_on && mode == QuotaMode::Off) {
+        return ctx.show.result(
+            format!("Counting the room snapshots take is already {word}.\n"),
+            serde_json::json!({ "counting": word, "changed": false }),
+        );
+    }
+    let areas: Vec<String> = facts
+        .areas
+        .iter()
+        .map(snapall_core::AreaFacts::title)
+        .collect();
+    if !yes {
+        if !ask::can_ask() {
+            eprintln!("snapall: this changes how the whole disk works and there is no terminal to ask on; read `snapall quotas`, then pass --yes");
+            return Ok(ExitCode::from(2));
+        }
+        eprintln!("{}\n", room_counting_text(mode));
+        let question = format!(
+            "Switch counting {} for the disk{} holding {}?",
+            if turn_on { "on" } else { "off" },
+            if areas.len() == 1 { "" } else { "s" },
+            areas.join(", ")
+        );
+        if !ask::yes_no(&question)? {
+            eprintln!("snapall: nothing changed");
+            return Ok(ExitCode::FAILURE);
+        }
+    }
+    let _hold = changing("changing how room is counted")?;
+    for area in &facts.areas {
+        system.set_quotas(&area.subvolume, turn_on)?;
+    }
+    ctx.show.result(
+        format!(
+            "Counting the room snapshots take is now {}.{}\n",
+            if turn_on { "on" } else { "off" },
+            if turn_on {
+                " The disk builds its tally in the background; figures appear as it finishes."
+            } else {
+                ""
+            }
+        ),
+        serde_json::json!({ "counting": if turn_on { "on" } else { "off" }, "changed": true }),
+    )
 }
 
 /// The restore points: the snapshots that one action took together.
@@ -170,6 +264,10 @@ pub fn restore_all(ctx: &Context, wanted: &Point, dry_run: bool, yes: bool) -> O
         Confirmation::NoTerminalToAskOn => return Ok(ExitCode::from(2)),
         Confirmation::Declined => return Ok(ExitCode::FAILURE),
     }
+    let _hold = changing(&format!(
+        "putting every area back to restore point {}",
+        point.point
+    ))?;
     let done = restore_point(ctx.backend, point, fresh_point(ctx.backend, unix_now()));
     ctx.show.result(
         render::point_restored(point, &done),
@@ -213,6 +311,7 @@ fn point_confirmation(
         return Confirmation::NoTerminalToAskOn;
     }
     eprint!("{}", render::point_preview(point, previews, route));
+    eprintln!("\n{}\n", snapall_core::explain::RESTORE_CAUTION);
     let areas = previews
         .iter()
         .filter(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
@@ -280,6 +379,7 @@ fn confirmation(
         return Ok(Confirmation::NoTerminalToAskOn);
     }
     eprint!("{}", render::changes(config, id, preview));
+    eprintln!("\n{}\n", snapall_core::explain::RESTORE_CAUTION);
     let count = preview.changes.len();
     let paths = if count == 1 { "path" } else { "paths" };
     let question = format!(
@@ -314,6 +414,11 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
         yes,
         dry_run: dry_run || (json && !yes),
     };
+    let _hold = if options.dry_run {
+        None
+    } else {
+        Some(changing("protecting a part of the disk")?)
+    };
     let facts = setup::gather();
     let report = if json {
         setup::run(ctx.backend, &facts, &mut setup::Quiet, &options)?
@@ -341,7 +446,7 @@ pub fn tui(ctx: &Context, file: Option<&str>) -> Outcome {
         .map(|named| file_target(ctx.backend, named))
         .transpose()?;
     let context = ui_context(ctx, target);
-    match snapall_tui::run(ctx.backend, &snapall_system::LinuxSystem, context)? {
+    match snapall_tui::run(ctx.backend, &snapall_system::LinuxSystem::new(), context)? {
         snapall_tui::Exit::Quit => Ok(ExitCode::SUCCESS),
         // Exit as a signalled process would, once the terminal is back to normal.
         snapall_tui::Exit::Signal(signal) => {

@@ -40,6 +40,16 @@ pub enum Effect {
     },
     /// Look at how protection stands: the report the status bar and the Health tab are made from.
     LoadHealth,
+    /// Do something to a background job (a unit name from the catalogue).
+    ControlJob {
+        unit: String,
+        action: snapall_core::JobAction,
+    },
+    /// Switch counting the room snapshots take on or off, for the disks holding these paths.
+    SetQuotas {
+        turn_on: bool,
+        paths: Vec<String>,
+    },
     /// Switch automatic cleanup on.
     SwitchOnCleanup,
     /// Look up every restore point.
@@ -100,6 +110,19 @@ pub enum Msg {
         id: SnapshotId,
         offer: Option<PointOffer>,
     },
+    /// A background job was controlled, or why it could not be.
+    JobControlled {
+        unit: String,
+        action: snapall_core::JobAction,
+        result: Result<(), String>,
+    },
+    /// Counting room was switched, or why it could not be.
+    QuotasSet {
+        turn_on: bool,
+        result: Result<(), String>,
+    },
+    /// A change was not made because another snapall is making one; the reason says who.
+    Refused(String),
     /// How protection stands, or why that could not be found out.
     HealthLoaded(Result<Box<HealthData>, String>),
     /// Automatic cleanup was switched on, or why it could not be.
@@ -142,6 +165,8 @@ pub enum Msg {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finished {
     pub what: String,
+    /// The same, in the present tense, as it was announced while it was being done.
+    pub present: String,
     pub outcome: Result<String, String>,
     pub took: Duration,
     pub at: Option<String>,

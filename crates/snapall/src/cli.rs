@@ -57,6 +57,11 @@ pub enum Request {
     Points,
     /// How protection stands: room used, cleanup, services.
     Health,
+    /// How the disk counts the room snapshots take; with `on` or `off`, switch it.
+    Quotas {
+        state: Option<String>,
+        yes: bool,
+    },
     /// Put every area back to one restore point.
     RestoreAll {
         point: Point,
@@ -426,6 +431,10 @@ fn build_request(
         }
         Command::Points => Request::Points,
         Command::Health => Request::Health,
+        Command::Quotas => Request::Quotas {
+            state: Contract::QUOTAS_STATE.get_from(resolution),
+            yes: flag(&Contract::YES, resolution),
+        },
         Command::RestoreAll => Request::RestoreAll {
             point: {
                 let raw = Contract::RESTORE_POINT

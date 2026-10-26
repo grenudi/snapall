@@ -8,14 +8,18 @@ mod delete;
 mod describe;
 mod frame;
 mod help;
+mod job;
 mod points;
 mod protect;
+mod quotas;
 mod restore;
 
 pub(crate) use delete::*;
 pub(crate) use describe::*;
 pub(crate) use frame::*;
 pub(crate) use help::*;
+pub(crate) use job::*;
 pub(crate) use points::*;
 pub(crate) use protect::*;
+pub(crate) use quotas::*;
 pub(crate) use restore::*;

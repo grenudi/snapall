@@ -156,6 +156,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall [create] [DESCRIPTION]` | One snapshot of every protected area (the default). `--only root,home` restricts it, `--dry-run` previews it. |
 | `snapall list` | The protected areas snapall can see, i.e. exactly what `create` would touch. |
 | `snapall health` | Whether protection is working: a verdict first, then what to do about anything that needs it (cleanup off, a disk nearly full, new snapshots not reaching the boot menu), then the numbers: snapshots per area, the room they hold (when measurable), how full the disk is, and which background jobs run. `--json` for scripts; exits 1 only for what needs doing now. |
+| `snapall quotas [on\|off]` | How the disk counts the room snapshots take, what that gives and costs, and the switch for it. Switching changes how the whole disk works, so it explains and asks first (`--yes` to skip). |
 | `snapall points` | The restore points: the snapshots that one action took together, one in every area. |
 | `snapall restore-all POINT` | Put **every** area back to one restore point with a single action. Shows what changes in each, asks first (`--yes` skips the question, `--dry-run` only shows), takes a safety snapshot per area, and prints the one command that undoes all of it. The running system is left alone. |
 | `snapall setup [AREA]` | Find the parts of your disk that have no snapshots yet (such as your Home files), explain in plain words what protecting them means, ask, and do it. `--dry-run` only explains; `--yes` accepts what snapall recommends. Needs `sudo`. |
@@ -265,6 +266,22 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 `snapall health` answers the questions you have once protection is set up: *is it working, how much room do the snapshots take, will old ones be cleaned up or will they fill the disk?* It starts with a verdict (*All good*, or *2 things need attention*), then says what to do about each thing, most urgent first, and then shows the numbers behind it.
 
 Some figures cannot be known, and it says so instead of guessing. The room each snapshot holds is only counted by the disk's filesystem when a feature called *quotas* is on; without it you see snapshot counts and how full the disk is overall, and the report says why. "Cleanup on" means snapper's cleanup job is switched on **and running**, not merely enabled. ([ADR 16](docs/adr/0016-health-and-activity.md) records what can be measured and how the screen is laid out.)
+
+### Background jobs
+
+The Health tab also lists the background jobs that do the work in the dark (cleaning up old snapshots, taking them on a schedule, keeping the boot menu up to date), each with its real name on your computer, whether it is running, and **when it runs, as its own unit file says**. Press Enter on one for the commands that check on it and control it, each beside the key that does the same: its state, its log, run it now, switch it on or off, start, stop, restart.
+
+### Counting the room snapshots take
+
+Out of the box the disk does not count how much room each snapshot holds. Switching that on (`snapall quotas on`, or Enter on that row in the Health tab; the filesystem calls it *quotas*) lets snapall show what each snapshot costs, and lets cleanup act on room as well as on numbers. The price is a tally the disk keeps up to date, which is known to slow some operations down, deleting snapshots most of all, and building it once takes a while on a big disk. It applies to the whole disk and can be switched off again. With few snapshots, and no need to see their size, leaving it off is the better choice. snapall offers only the full kind: the newer *simple* kind charges room to whoever wrote it first, so it cannot say what a *snapshot* holds.
+
+## Before you restore
+
+Restoring an area puts back **everything in it**, including what programs keep there: settings, saved sessions, databases and logs. A program that is still open can write its own copy over what you restored. So close the programs that use those files first, and if one file or folder is all you need, restore just that.
+
+Btrfs gives a structural remedy: **a snapshot stops at a subvolume boundary**. Data that should never roll back (caches, virtual machines, containers, logs) belongs in subvolumes of its own, and a restore of the area around them leaves them alone.
+
+Only one snapall makes a change at a time, whether in the window or on the command line: a second is told who is making one and what it is doing, and reading is never blocked. This guards snapall from snapall; snapper and other tools do not know of it.
 
 ## Going back to one moment
 
