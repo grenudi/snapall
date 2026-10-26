@@ -219,3 +219,29 @@ fn no_message_calls_a_protected_area_a_snapper_config() {
         }
     }
 }
+
+/// A file that runs past a few hundred lines is doing more than one thing. The window was once two files
+/// of 1,662 and 1,251 lines; each is now a module per concern, and this keeps it that way.
+#[test]
+fn no_file_of_the_window_grows_back_into_a_wall() {
+    const LIMIT: usize = 450;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../snapall-tui/src");
+    let mut stack = vec![root];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let source = std::fs::read_to_string(&path).unwrap();
+                let code = source.split("#[cfg(test)]").next().unwrap_or_default();
+                assert!(
+                    code.lines().count() <= LIMIT,
+                    "{} has {} lines of code (the limit is {LIMIT}): split it by concern",
+                    path.display(),
+                    code.lines().count()
+                );
+            }
+        }
+    }
+}
