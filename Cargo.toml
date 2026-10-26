@@ -4,6 +4,7 @@ members = [
     "crates/snapall-core",
     "crates/snapall-observe",
     "crates/snapall-snapper",
+    "crates/snapall-system",
     "crates/snapall-tui",
     "crates/snapall",
 ]
@@ -19,6 +20,7 @@ license = "GPL-3.0-or-later"
 [workspace.dependencies]
 snapall-core = { path = "crates/snapall-core", version = "0.11.0" }
 snapall-observe = { path = "crates/snapall-observe", version = "0.11.0" }
+snapall-system = { path = "crates/snapall-system", version = "0.11.0" }
 snapall-snapper = { path = "crates/snapall-snapper", version = "0.11.0" }
 snapall-tui = { path = "crates/snapall-tui", version = "0.11.0" }
 thiserror = "2"

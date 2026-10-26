@@ -16,10 +16,12 @@ pub mod coverage;
 pub mod doctor;
 pub mod domain;
 pub mod explain;
+pub mod health;
 pub mod observe;
 pub mod plan;
 pub mod points;
 pub mod port;
+pub mod system;
 pub mod usecase;
 
 #[cfg(any(test, feature = "testing"))]
@@ -27,7 +29,10 @@ pub mod testing;
 
 pub use domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
-    Point, RestoreSummary, SnapshotId, SnapshotInfo, SnapshotKind,
+    Point, RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
+};
+pub use health::{
+    assess, gather, AreaFacts, Chip, Facts, Finding, Health, Level, Remedy, Topic, Verdict,
 };
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
@@ -36,6 +41,7 @@ pub use points::{
     MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
 };
 pub use port::{BackendError, SnapshotBackend};
+pub use system::{DiskUsage, ServiceState, SystemProbe};
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
     plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,

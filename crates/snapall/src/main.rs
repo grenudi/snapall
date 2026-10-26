@@ -99,6 +99,7 @@ fn run(parsed: Parsed) -> Outcome {
         // looking
         Request::List => commands::list(&ctx),
         Request::Points => commands::points(&ctx),
+        Request::Health => commands::health(&ctx),
         Request::Snapshots { config } => commands::snapshots(&ctx, config),
         Request::History { path } => commands::history(&ctx, &path),
         Request::Changes { config, id, path } => {

@@ -21,7 +21,8 @@ use std::path::Path;
 
 use snapall_core::{
     BackendError, Change, ChangeKind, ConfigName, ConfigOption, Description, FileState,
-    FileVersion, Point, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo, SnapshotKind,
+    FileVersion, Point, RestoreSummary, Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
+    SnapshotKind,
 };
 
 const PROGRAM: &str = "snapper";
@@ -182,6 +183,9 @@ struct SnapshotRow {
     /// What was stored with the snapshot (`null` when nothing was).
     #[serde(default)]
     userdata: Option<std::collections::BTreeMap<String, String>>,
+    /// The bytes only this snapshot holds: reported when Btrfs quotas are on, `null` otherwise.
+    #[serde(rename = "used-space", default)]
+    used_space: Option<u64>,
 }
 
 /// The key a snapshot's tag is stored under: snapper keeps free `key=value` pairs with a snapshot.
@@ -231,6 +235,7 @@ fn snapshot_from_row(row: SnapshotRow) -> Result<Option<SnapshotInfo>, BackendEr
             .as_ref()
             .and_then(|data| data.get(POINT_KEY))
             .and_then(|value| Point::parse(value).ok()),
+        used_bytes: row.used_space,
     }))
 }
 
@@ -346,6 +351,14 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         };
         self.run(self.args(&["-c", name.as_str(), "set-config", &setting]))
             .map(|_| ())
+    }
+
+    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
+        let output = self.run(self.args(&["--jsonout", "-c", config.as_str(), "get-config"]))?;
+        let settings: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&output.stdout)
+                .map_err(|e| unexpected(format!("get-config: {e}")))?;
+        Ok(Retention::from_settings(&settings))
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
@@ -1185,5 +1198,42 @@ mod tests {
             error.to_string().contains("path is not a subvolume"),
             "{error}"
         );
+    }
+
+    // ---- space and retention ---------------------------------------------------------------------
+
+    #[test]
+    fn a_snapshots_measured_size_is_read_when_quotas_report_it_and_absent_when_they_do_not() {
+        let listing = r#"{"home":[
+            {"number":0,"type":"single","description":"current","userdata":null,"used-space":null},
+            {"number":1,"type":"single","cleanup":"number","description":"with quotas","userdata":null,"used-space":3018752},
+            {"number":2,"type":"single","cleanup":"number","description":"without","userdata":null,"used-space":null}]}"#;
+        let script = Scripted::new(vec![ok(listing)]);
+        let snapshots = SnapperCli::new(&script)
+            .list_snapshots(&name("home"))
+            .unwrap();
+        assert_eq!(snapshots[0].used_bytes, Some(3_018_752));
+        assert_eq!(snapshots[1].used_bytes, None, "not measured is not zero");
+    }
+
+    #[test]
+    fn retention_is_read_from_snappers_settings_and_what_it_does_not_report_stays_unknown() {
+        let settings = r#"{"NUMBER_CLEANUP":"yes","NUMBER_LIMIT":"50","NUMBER_LIMIT_IMPORTANT":"10",
+            "NUMBER_MIN_AGE":"1800","TIMELINE_CREATE":"no","SPACE_LIMIT":"0.5","QGROUP":""}"#;
+        let script = Scripted::new(vec![ok(settings)]);
+        let found = SnapperCli::new(&script).retention(&name("home")).unwrap();
+        assert_eq!(
+            script.calls.borrow()[0],
+            ["--jsonout", "-c", "home", "get-config"]
+        );
+        assert_eq!(
+            (found.keep, found.keep_important, found.min_age_seconds),
+            (Some(50), Some(10), Some(1800))
+        );
+        assert!(found.cleanup && !found.on_a_schedule && !found.quotas);
+        assert_eq!(found.space_limit, Some(0.5));
+        let empty = Retention::from_settings(&std::collections::BTreeMap::new());
+        assert_eq!((empty.keep, empty.space_limit), (None, None));
+        assert!(!empty.cleanup, "an absent switch is not read as on");
     }
 }

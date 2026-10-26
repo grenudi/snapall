@@ -11,10 +11,10 @@ use std::process::ExitCode;
 
 use snapall_core::boot;
 use snapall_core::{
-    all_snapshots, config_covering, delete_snapshot, file_history, fresh_point, plan_snapshots,
-    preview_point, preview_restore, restore_point, restore_points, restore_snapshot, run_plan,
-    snapshots_of, ConfigName, Description, MemberView, Point, Preview, RestoreError, RestorePoint,
-    SnapshotBackend, SnapshotId,
+    all_snapshots, assess, config_covering, delete_snapshot, file_history, fresh_point, gather,
+    plan_snapshots, preview_point, preview_restore, restore_point, restore_points,
+    restore_snapshot, run_plan, snapshots_of, ConfigName, Description, Level, MemberView, Point,
+    Preview, RestoreError, RestorePoint, SnapshotBackend, SnapshotId,
 };
 
 use crate::output::{Outcome, Show};
@@ -123,6 +123,22 @@ pub fn restore(
         render::restored(config, id, &done),
         render::restored_json(config, id, &done),
     )
+}
+
+/// How protection stands: whether it is working, the room it takes, whether old snapshots are cleaned
+/// up, and what to do about anything that is not. It exits with failure only for what needs doing now.
+pub fn health(ctx: &Context) -> Outcome {
+    let facts = gather(ctx.backend, &snapall_system::LinuxSystem)?;
+    let report = assess(&facts);
+    ctx.show.result(
+        render::health(&facts, &report),
+        render::health_json(&facts, &report),
+    )?;
+    Ok(if report.verdict.level == Level::Problem {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
 }
 
 /// The restore points: the snapshots that one action took together.

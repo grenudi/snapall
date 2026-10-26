@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use snapall_core::{
     BackendError, Change, ConfigName, ConfigOption, Description, Event, FileVersion, Observer,
-    Point, RestoreSummary, SnapshotBackend, SnapshotId, SnapshotInfo,
+    Point, RestoreSummary, Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
 pub use clock::rfc3339_utc;
@@ -169,6 +169,10 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
         self.audited(name, option.describe(), || {
             self.inner.set_config_option(name, option)
         })
+    }
+
+    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
+        self.inner.retention(config)
     }
 
     fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {

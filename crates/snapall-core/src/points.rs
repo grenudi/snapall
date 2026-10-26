@@ -327,6 +327,7 @@ mod tests {
             cleanup: Some("number".into()),
             description: description.into(),
             point: point.map(|p| Point::parse(p).unwrap()),
+            used_bytes: None,
         }
     }
 

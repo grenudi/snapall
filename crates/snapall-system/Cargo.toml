@@ -1,0 +1,15 @@
+[package]
+name = "snapall-system"
+description = "snapall adapter for the system port: how full a disk is, which background jobs run, what time it is."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+snapall-core.workspace = true
+
+[lints]
+workspace = true

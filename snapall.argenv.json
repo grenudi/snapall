@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-25T20:01:01Z",
+  "generated": "2026-10-26T05:15:04Z",
   "inputs": [
     {
       "allowed": [],
@@ -112,7 +112,8 @@
         "history",
         "doctor",
         "tui",
-        "setup"
+        "setup",
+        "health"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -146,7 +147,8 @@
         "history",
         "doctor",
         "tui",
-        "setup"
+        "setup",
+        "health"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -243,6 +245,7 @@
         "points",
         "history",
         "setup",
+        "health",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -499,5 +502,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.9.1"
+  "source": "snapall@0.11.0"
 }

@@ -549,3 +549,69 @@ fn a_restore_point_puts_two_real_areas_back_with_one_action_and_that_is_undoable
 
     let _ = std::fs::remove_file(&file_a);
 }
+
+/// Real snapper reports what the health screen is built on: an area's retention settings, and, only when
+/// Btrfs quotas are on, the bytes each snapshot alone holds (a deleted 3 MB file shows up as 3 MB).
+#[test]
+fn real_snapper_reports_retention_and_measures_a_snapshots_room_only_with_quotas() {
+    if !enabled() {
+        return;
+    }
+    let _turn = take_turns();
+    let backend = backend();
+    let a = ConfigName::parse("snapall_it_a").unwrap();
+    let dir = backend.config_subvolume(&a).unwrap();
+    let mount = std::path::Path::new(&dir)
+        .parent()
+        .unwrap()
+        .display()
+        .to_string();
+
+    let retention = backend.retention(&a).unwrap();
+    assert_eq!(retention.keep, Some(50), "snapper's default for a new area");
+    assert!(
+        retention.cleanup && retention.min_age_seconds == Some(1800),
+        "{retention:?}"
+    );
+
+    let btrfs = |args: &[&str]| {
+        let _ = std::process::Command::new("btrfs").args(args).output();
+    };
+    btrfs(&["quota", "disable", &mount]);
+    let file = format!("{dir}/room-it.bin");
+    std::fs::write(&file, vec![7u8; 3_000_000]).unwrap();
+    let before = backend
+        .create_snapshot(&a, &Description::parse("it: room, no quotas").unwrap())
+        .unwrap();
+    let unmeasured = backend.list_snapshots(&a).unwrap();
+    assert_eq!(
+        unmeasured
+            .iter()
+            .find(|s| s.id == before)
+            .unwrap()
+            .used_bytes,
+        None,
+        "not measured is not zero"
+    );
+
+    // The file is in that snapshot too, and room two snapshots share is held by neither alone (which is
+    // what "exclusive" means), so it goes before the one that is measured.
+    backend.delete_snapshot(&a, before).unwrap();
+    // deleting is lazy: wait until the cleaner has really let go of it
+    btrfs(&["subvolume", "sync", &mount]);
+    btrfs(&["quota", "enable", &mount]);
+    btrfs(&["quota", "rescan", "-w", &mount]);
+    let id = backend
+        .create_snapshot(&a, &Description::parse("it: room, quotas on").unwrap())
+        .unwrap();
+    std::fs::remove_file(&file).unwrap();
+    btrfs(&["filesystem", "sync", &mount]);
+    btrfs(&["quota", "rescan", "-w", &mount]);
+    let measured = backend.list_snapshots(&a).unwrap();
+    let held = measured.iter().find(|s| s.id == id).unwrap().used_bytes;
+    btrfs(&["quota", "disable", &mount]);
+    assert!(
+        held.is_some_and(|bytes| bytes >= 2_900_000),
+        "the deleted 3 MB file is held by the snapshot alone: {held:?}"
+    );
+}
