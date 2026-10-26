@@ -102,6 +102,22 @@ fn run(parsed: Parsed) -> Outcome {
         Request::Health => commands::health(&ctx),
         Request::Activity => commands::activity(&ctx),
         Request::Cancel { job } => commands::cancel(&ctx, &job),
+        Request::Limits {
+            area,
+            keep,
+            min_age,
+            cleanup,
+            yes,
+        } => commands::limits(
+            &ctx,
+            &area,
+            commands::LimitsWanted {
+                keep: keep.as_deref(),
+                min_age: min_age.as_deref(),
+                cleanup: cleanup.as_deref(),
+            },
+            yes,
+        ),
         Request::Groups {
             action,
             name,

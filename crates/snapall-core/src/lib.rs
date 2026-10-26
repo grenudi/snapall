@@ -20,6 +20,7 @@ pub mod explain;
 pub mod groups;
 pub mod health;
 pub mod journal;
+pub mod limits;
 pub mod observe;
 pub mod plan;
 pub mod points;
@@ -43,6 +44,9 @@ pub use health::{
 pub use journal::{
     Entry as JournalEntry, Event as JournalEvent, Outcome as JournalOutcome,
     Progress as JournalProgress, Source, Status as JournalStatus,
+};
+pub use limits::{
+    preview as preview_limits, preview_words as limits_words, Limits, Preview as LimitsPreview,
 };
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};

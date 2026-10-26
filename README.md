@@ -158,6 +158,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall health` | Whether protection is working: a verdict first, then what to do about anything that needs it (cleanup off, a disk nearly full, new snapshots not reaching the boot menu), then the numbers: snapshots per area, the room they hold (when measurable), how full the disk is, and which background jobs run. `--json` for scripts; exits 1 only for what needs doing now. |
 | `snapall quotas [on\|off]` | How the disk counts the room snapshots take, what that gives and costs, and the switch for it. Switching changes how the whole disk works, so it explains and asks first (`--yes` to skip). |
 | `snapall activity` | What snapall has done, newest first: from the window and from commands, in this and earlier sessions, and how each went. `--json` for scripts. It is kept in a small journal under `/var/lib/snapall`. |
+| `snapall limits AREA [--keep N] [--min-age MINUTES] [--cleanup on\|off]` | How many snapshots an area keeps and when its oldest go. Without options it shows them and what the next cleanup would remove; with options it changes them, and says first what that would remove (`--yes` to go ahead without being asked). |
 | `snapall groups [add NAME AREAS\|remove NAME]` | Name a set of your areas, such as `theming`, so that one snapshot can take just those: `snapall create --group theming`. Without an action it lists them. `all` is always there and means every protected area. |
 | `snapall cancel CHANGE` | Ask a running change (`snapall activity --json` gives its name) to stop. It finishes the area it is on and then stops, never in the middle of one, so nothing is left half-done. |
 | `snapall points` | The restore points: the snapshots that one action took together, one in every area. |
@@ -269,6 +270,12 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 `snapall health` answers the questions you have once protection is set up: *is it working, how much room do the snapshots take, will old ones be cleaned up or will they fill the disk?* It starts with a verdict (*All good*, or *2 things need attention*), then says what to do about each thing, most urgent first, and then shows the numbers behind it.
 
 Some figures cannot be known, and it says so instead of guessing. The room each snapshot holds is only counted by the disk's filesystem when a feature called *quotas* is on; without it you see snapshot counts and how full the disk is overall, and the report says why. "Cleanup on" means snapper's cleanup job is switched on **and running**, not merely enabled. ([ADR 16](docs/adr/0016-health-and-activity.md) records what can be measured and how the screen is laid out.)
+
+### How many snapshots an area keeps
+
+Automatic cleanup removes the oldest snapshots of an area once it has more than it is set to keep, and never one younger than a set age. In the Health tab, **Enter on an area** opens its settings (or `snapall limits AREA` on the command line): *keep the newest N*, *never remove one younger than M minutes*, and whether cleanup runs for the area at all.
+
+Lowering how many are kept is the one change here that destroys something, since a removed snapshot cannot be brought back, so the editor **shows what it would remove before it does anything**: "at the next cleanup 5 of the 8 snapshots that cleanup looks after would be removed, the oldest first". A change that would remove something asks twice. The preview is checked against snapper's own cleanup (it said none would go and none did; then it said five and five did). It can only be as exact as the dates it is given, and says "up to" when it is not.
 
 ### Groups of areas
 

@@ -67,6 +67,14 @@ pub enum Request {
         name: Option<String>,
         areas: Option<String>,
     },
+    /// How many snapshots an area keeps: show it, or change it.
+    Limits {
+        area: String,
+        keep: Option<String>,
+        min_age: Option<String>,
+        cleanup: Option<String>,
+        yes: bool,
+    },
     /// Ask a running change to stop after the area it is on.
     Cancel {
         job: String,
@@ -449,6 +457,15 @@ fn build_request(
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
+        Command::Limits => Request::Limits {
+            area: Contract::LIMITS_AREA
+                .get_from(resolution)
+                .ok_or_else(|| usage_error("AREA is required: which area".to_owned()))?,
+            keep: Contract::LIMITS_KEEP.get_from(resolution),
+            min_age: Contract::LIMITS_MIN_AGE.get_from(resolution),
+            cleanup: Contract::LIMITS_CLEANUP.get_from(resolution),
+            yes: flag(&Contract::YES, resolution),
+        },
         Command::Groups => Request::Groups {
             action: Contract::GROUPS_ACTION.get_from(resolution),
             name: Contract::GROUPS_NAME.get_from(resolution),

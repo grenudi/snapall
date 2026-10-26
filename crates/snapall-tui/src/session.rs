@@ -122,6 +122,20 @@ impl<'a> Executor<'a> {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
             Effect::LoadGroups => Msg::GroupsLoaded(self.system.groups()),
+            Effect::LoadLimitsData { config } => match backend.list_snapshots(&config) {
+                Ok(snapshots) => Msg::LimitsData { config, snapshots },
+                Err(error) => Msg::LimitsSet {
+                    config,
+                    result: Err(error.to_string()),
+                },
+            },
+            Effect::SetLimits { config, options } => {
+                let result = options
+                    .iter()
+                    .try_for_each(|option| backend.set_config_option(&config, *option))
+                    .map_err(|error| error.to_string());
+                Msg::LimitsSet { config, result }
+            }
             Effect::SaveGroups { groups } => {
                 let result = self.system.save_groups(&groups);
                 Msg::GroupsSaved { groups, result }

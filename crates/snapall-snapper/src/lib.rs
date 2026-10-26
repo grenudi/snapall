@@ -348,6 +348,11 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
             ConfigOption::TimelineCreate(on) => {
                 format!("TIMELINE_CREATE={}", if on { "yes" } else { "no" })
             }
+            ConfigOption::KeepNewest(count) => format!("NUMBER_LIMIT={count}"),
+            ConfigOption::NeverRemoveYoungerThan(seconds) => format!("NUMBER_MIN_AGE={seconds}"),
+            ConfigOption::CleanupOfSnapshots(on) => {
+                format!("NUMBER_CLEANUP={}", if on { "yes" } else { "no" })
+            }
         };
         self.run(self.args(&["-c", name.as_str(), "set-config", &setting]))
             .map(|_| ())

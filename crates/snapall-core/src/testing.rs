@@ -30,6 +30,9 @@ struct ConfigState {
     saved: BTreeMap<u64, BTreeMap<String, String>>,
     /// Whether snapshots are taken on a schedule, as snapper does for a new config.
     timeline_create: bool,
+    keep: u32,
+    min_age: u64,
+    cleanup: bool,
 }
 
 #[derive(Default)]
@@ -67,6 +70,9 @@ impl InMemoryBackend {
                         files: BTreeMap::new(),
                         saved: BTreeMap::new(),
                         timeline_create: true,
+                        keep: 50,
+                        min_age: 1800,
+                        cleanup: true,
                     },
                 );
             }
@@ -270,6 +276,9 @@ impl SnapshotBackend for InMemoryBackend {
                 files: BTreeMap::new(),
                 saved: BTreeMap::new(),
                 timeline_create: true,
+                keep: 50,
+                min_age: 1800,
+                cleanup: true,
             },
         );
         Ok(())
@@ -302,6 +311,9 @@ impl SnapshotBackend for InMemoryBackend {
             .ok_or_else(|| BackendError::UnknownConfig(name.clone()))?;
         match option {
             ConfigOption::TimelineCreate(on) => entry.timeline_create = on,
+            ConfigOption::KeepNewest(count) => entry.keep = count,
+            ConfigOption::NeverRemoveYoungerThan(seconds) => entry.min_age = seconds,
+            ConfigOption::CleanupOfSnapshots(on) => entry.cleanup = on,
         }
         Ok(())
     }
@@ -314,10 +326,10 @@ impl SnapshotBackend for InMemoryBackend {
             .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
         // what a new snapper config starts with
         Ok(Retention {
-            keep: Some(50),
+            keep: Some(entry.keep),
             keep_important: Some(10),
-            min_age_seconds: Some(1800),
-            cleanup: true,
+            min_age_seconds: Some(entry.min_age),
+            cleanup: entry.cleanup,
             on_a_schedule: entry.timeline_create,
             space_limit_permille: Some(500),
             quotas: false,

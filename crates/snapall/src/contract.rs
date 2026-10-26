@@ -29,6 +29,7 @@ pub enum Command {
     Health,
     Activity,
     Groups,
+    Limits,
     Cancel,
     Quotas,
     Setup,
@@ -53,6 +54,7 @@ impl Command {
         Command::Health,
         Command::Activity,
         Command::Groups,
+        Command::Limits,
         Command::Cancel,
         Command::Quotas,
         Command::Setup,
@@ -80,6 +82,7 @@ impl Command {
             Command::Activity => "activity",
             Command::Cancel => "cancel",
             Command::Groups => "groups",
+            Command::Limits => "limits",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -117,6 +120,7 @@ impl Command {
                 "Show what snapall has done, including earlier sessions, newest first"
             }
             Command::Cancel => "Ask a running change to stop after the area it is on",
+            Command::Limits => "Show or change how many snapshots an area keeps",
             Command::Groups => "Name sets of areas, such as theming, to take snapshots of together",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
@@ -177,6 +181,7 @@ const OBSERVED: &[Command] = &[
     Command::Setup,
     Command::Health,
     Command::Quotas,
+    Command::Limits,
 ];
 
 contract! {
@@ -322,6 +327,7 @@ contract! {
             Command::Health,
             Command::Activity,
             Command::Groups,
+            Command::Limits,
             Command::Cancel,
             Command::Quotas,
             Command::Doctor,
@@ -431,6 +437,56 @@ contract! {
         group:       "setup",
         example:     "snapall setup /srv",
         summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+        ..Input::EMPTY
+    };
+
+    // ---- limits -------------------------------------------------------------------------
+
+    /// Which area.
+    LIMITS_AREA: String, Command = Input {
+        key:         "limits_area",
+        ty:          Type::String,
+        subcommands: &[Command::Limits],
+        arg:         Some(Arg { value_name: "AREA", ..Arg::positional(0) }),
+        group:       "limits",
+        example:     "snapall limits home --keep 30",
+        summary:     "The area, as `snapall list` names it (required).",
+        ..Input::EMPTY
+    };
+
+    /// How many to keep.
+    LIMITS_KEEP: String, Command = Input {
+        key:         "keep",
+        ty:          Type::String,
+        subcommands: &[Command::Limits],
+        arg:         Some(Arg::long("keep")),
+        group:       "limits",
+        example:     "snapall limits home --keep 30",
+        summary:     "How many of the snapshots that cleanup looks after to keep: the newest this many stay, the older ones go at the next cleanup.",
+        ..Input::EMPTY
+    };
+
+    /// How young is too young to remove.
+    LIMITS_MIN_AGE: String, Command = Input {
+        key:         "min_age",
+        ty:          Type::String,
+        subcommands: &[Command::Limits],
+        arg:         Some(Arg::long("min-age")),
+        group:       "limits",
+        example:     "snapall limits home --min-age 60",
+        summary:     "Minutes: cleanup never removes a snapshot younger than this, however many there are.",
+        ..Input::EMPTY
+    };
+
+    /// Whether cleanup runs for this area.
+    LIMITS_CLEANUP: String, Command = Input {
+        key:         "limits_cleanup",
+        ty:          Type::String,
+        subcommands: &[Command::Limits],
+        arg:         Some(Arg::long("cleanup")),
+        group:       "limits",
+        example:     "snapall limits home --cleanup off",
+        summary:     "`on` or `off`: whether cleanup removes anything of this area at all.",
         ..Input::EMPTY
     };
 
@@ -544,7 +600,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas],
+        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",

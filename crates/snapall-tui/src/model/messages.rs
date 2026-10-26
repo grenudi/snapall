@@ -42,6 +42,15 @@ pub enum Effect {
     LoadHealth,
     /// Read the groups of areas the person made.
     LoadGroups,
+    /// Read an area's snapshots, for the preview of what new limits would remove.
+    LoadLimitsData {
+        config: ConfigName,
+    },
+    /// Change how many an area keeps, and when its oldest go (only the settings that differ).
+    SetLimits {
+        config: ConfigName,
+        options: Vec<snapall_core::ConfigOption>,
+    },
     /// Keep these groups (it replaces the file).
     SaveGroups {
         groups: snapall_core::Groups,
@@ -135,6 +144,16 @@ pub enum Msg {
     },
     /// A change was not made because another snapall is making one; the reason says who.
     Refused(String),
+    /// An area's snapshots, for the preview.
+    LimitsData {
+        config: ConfigName,
+        snapshots: Vec<snapall_core::SnapshotInfo>,
+    },
+    /// The limits were changed, or why they could not be.
+    LimitsSet {
+        config: ConfigName,
+        result: Result<(), String>,
+    },
     /// The groups, or why they could not be read.
     GroupsLoaded(Result<snapall_core::Groups, String>),
     /// The groups were kept, or why they could not be.
@@ -214,7 +233,10 @@ impl Effect {
     pub fn is_background(&self) -> bool {
         matches!(
             self,
-            Effect::LoadHealth | Effect::LoadHistory | Effect::LoadGroups
+            Effect::LoadHealth
+                | Effect::LoadHistory
+                | Effect::LoadGroups
+                | Effect::LoadLimitsData { .. }
         )
     }
 }

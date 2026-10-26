@@ -43,7 +43,7 @@ pub struct Row {
 }
 
 /// What Enter does on a row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RowAction {
     Nothing,
     /// Something snapall can do about a finding.
@@ -52,6 +52,8 @@ pub enum RowAction {
     ControlJob(Job),
     /// Switch counting the room snapshots take on (`true`) or off (`false`).
     CountRoom(bool),
+    /// Change how many snapshots this area keeps, and when its oldest are removed.
+    EditLimits(snapall_core::ConfigName),
 }
 
 /// Everything the tab lists, in the order it is shown.
@@ -110,7 +112,14 @@ pub(crate) fn space_row(area: &AreaFacts) -> Row {
             area.subvolume
         ),
         detail: space_detail(area, &snapshots),
-        action: RowAction::Nothing,
+        // what it keeps can be changed, if snapper said what it keeps
+        action: area
+            .retention
+            .as_ref()
+            .and_then(snapall_core::Limits::from_retention)
+            .map_or(RowAction::Nothing, |_| {
+                RowAction::EditLimits(area.config.clone())
+            }),
     }
 }
 

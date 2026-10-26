@@ -71,6 +71,9 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saved the groups of areas".to_owned(),
+        Effect::SetLimits { config, .. } => {
+            format!("Changed how many snapshots {config} keeps")
+        }
         Effect::ControlJob { unit, action } => {
             use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
             let did = match action {
@@ -182,6 +185,9 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switching on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saving the groups of areas".to_owned(),
+        Effect::SetLimits { config, .. } => {
+            format!("Changing how many snapshots {config} keeps")
+        }
         Effect::ControlJob { unit, action } => {
             let doing = match action {
                 EnableNow => "Switching on",
@@ -275,6 +281,7 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
         | Msg::CleanupSwitched(Err(why)) => Err(why.clone()),
         Msg::JobControlled { result, .. } => result.clone().map(|()| String::new()),
         Msg::GroupsSaved { result, .. } => result.clone().map(|()| String::new()),
+        Msg::LimitsSet { result, .. } => result.clone().map(|()| String::new()),
         Msg::QuotasSet {
             turn_on: true,
             result,
