@@ -182,6 +182,26 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             });
             Vec::new()
         }
+        Msg::LimitsData { config, snapshots } => {
+            if let Some(Modal::Limits(editor)) = &mut state.modal {
+                if editor.config == config {
+                    editor.snapshots = Some(snapshots);
+                }
+            }
+            Vec::new()
+        }
+        Msg::LimitsSet { config, result } => {
+            settle(state);
+            state.notice = Some(match result {
+                Ok(()) => Notice::Info(format!(
+                    "{config} now keeps what you set. It takes effect at the next cleanup."
+                )),
+                Err(why) => {
+                    Notice::Error(format!("Could not change the limits of {config}: {why}"))
+                }
+            });
+            Vec::new()
+        }
         Msg::GroupsLoaded(result) => {
             match result {
                 Ok(groups) => {

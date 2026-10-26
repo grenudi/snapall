@@ -108,6 +108,7 @@ fn act_on_chosen(state: &mut State) -> Vec<Effect> {
             state.modal = Some(Modal::Quotas { turn_on: false });
             Vec::new()
         }
+        RowAction::EditLimits(config) => crate::model::open_limits(state, config),
         RowAction::ControlJob(job) => {
             state.modal = Some(Modal::Job {
                 unit: job.unit.to_owned(),
@@ -227,6 +228,7 @@ fn render_detail(state: &State, frame: &mut Frame, area: Rect, rows: &[Row]) {
         }
         RowAction::CountRoom(false) => Some("Enter: switch room counting off (it explains first)"),
         RowAction::ControlJob(_) => Some("Enter: the commands that check on it and control it"),
+        RowAction::EditLimits(_) => Some("Enter: change how many it keeps, and when the oldest go"),
     });
     // what Enter does is the one line that must never be cut off by a long explanation: it has its own
     let (text_area, hint_area) = if hint.is_some() && area.height > 2 {

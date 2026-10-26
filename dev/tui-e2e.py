@@ -366,6 +366,50 @@ def groups_scenario():
     tui.finish()
 
 
+def limits_scenario():
+    """How many an area keeps, from the Health tab: the editor shows what a change would remove, a change that
+    removes something asks twice, and snapper then really holds the new numbers."""
+    def config(name):
+        out = subprocess.run(["snapper", "--no-dbus", "-c", "snapall_it_a", "get-config"], capture_output=True, text=True).stdout
+        return next((line.split("|")[1].strip() for line in out.splitlines() if line.split("|")[0].strip() == name), None)
+
+    check(config("NUMBER_LIMIT") == "50", "snapper starts with its own default")
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.wait_for("cleanup", timeout=8)
+    tui.send("2")
+    tui.wait_for("What this means")
+    for _ in range(14):
+        chosen = [line for line in tui.text().splitlines() if " > " in line]
+        if chosen and "Snapall_it_a (" in chosen[0]:
+            break
+        tui.send("down")
+        tui.pump(0.15)
+    check("change how many it keeps" in words(tui), "the area's row says what Enter does")
+    tui.send("enter")
+    tui.wait_for("What Snapall_it_a keeps")
+    tui.wait_until(lambda: "Nothing would be removed" in words(tui), "the preview")
+    check("Keep the newest [ 50 ] snapshots" in words(tui), "the editor shows what snapper has now")
+    check("q quit" in tui.text().splitlines()[-1], "the editor leaves the key line alone")
+    tui.send("down")
+    for _ in range(30):
+        tui.send("left")  # 30 minutes of protection -> none
+    tui.send("up")
+    for _ in range(49):
+        tui.send("left")  # keep 50 -> 1
+    tui.wait_until(lambda: "removed, the oldest first" in words(tui), "what would go")
+    check("cannot be brought back" in words(tui), "it says a removed snapshot cannot be brought back")
+    tui.send("enter")
+    tui.wait_for("Press Enter again to apply this")
+    check(config("NUMBER_LIMIT") == "50", "the first Enter changes nothing")
+    tui.send("enter")
+    tui.wait_until(lambda: "takes effect at the next cleanup" in words(tui), "the change to be applied", timeout=12)
+    check(config("NUMBER_LIMIT") == "1" and config("NUMBER_MIN_AGE") == "0", "snapper now holds the new numbers")
+    tui.send("q")
+    tui.finish()
+
+
 def jobs_and_quotas_scenario():
     """The Health tab's two prompts in a real terminal: a background job's controls (its real name and
     every command made from it) and the question about counting room (its price, and a way out)."""
@@ -836,6 +880,7 @@ def main():
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
     tabs_scenario()
+    limits_scenario()
     groups_scenario()
     journal_scenario()
     runner_scenario()

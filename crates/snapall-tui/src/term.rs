@@ -209,6 +209,8 @@ pub fn translate(event: KeyEvent) -> Option<Key> {
         KeyCode::Right => Key::Right,
         KeyCode::Home => Key::Home,
         KeyCode::End => Key::End,
+        KeyCode::PageUp => Key::PageUp,
+        KeyCode::PageDown => Key::PageDown,
         KeyCode::Tab | KeyCode::BackTab => Key::Tab,
         KeyCode::Enter => Key::Enter,
         KeyCode::Esc => Key::Esc,

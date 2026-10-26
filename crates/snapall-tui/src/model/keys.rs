@@ -162,6 +162,7 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         Modal::Quotas { turn_on } => confirming_quotas(state, key, turn_on),
         Modal::StopChange { id, what } => confirming_stop(state, key, id, what),
         Modal::Groups(screen) => managing_groups(state, key, screen),
+        Modal::Limits(editor) => editing_limits(state, key, editor),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {

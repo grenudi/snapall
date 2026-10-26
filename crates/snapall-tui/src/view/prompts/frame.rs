@@ -82,6 +82,7 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
         Modal::Quotas { turn_on } => quotas_spec(*turn_on, state),
         Modal::StopChange { what, .. } => stop_spec(what),
         Modal::Groups(screen) => groups_spec(screen, state),
+        Modal::Limits(editor) => limits_spec(editor, state),
     }
 }
 

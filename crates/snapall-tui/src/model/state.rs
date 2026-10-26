@@ -115,6 +115,24 @@ pub enum Target {
     Group(snapall_core::GroupName),
 }
 
+/// The editor of how many snapshots an area keeps and when its oldest go: what is being set, and what
+/// that would do to the snapshots there are.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LimitsEditor {
+    pub config: ConfigName,
+    /// What snapper has now.
+    pub before: snapall_core::Limits,
+    /// What is being set.
+    pub limits: snapall_core::Limits,
+    /// Which of the three is chosen: 0 how many, 1 how young, 2 whether cleanup runs.
+    pub field: usize,
+    /// The area's snapshots, for the preview, once they have arrived.
+    pub snapshots: Option<Vec<snapall_core::SnapshotInfo>>,
+    /// Enter was pressed on a change that would remove snapshots: the next one applies it.
+    pub armed: bool,
+    pub error: Option<String>,
+}
+
 /// Where the groups prompt is: the list of them, naming a new one, or choosing the areas of one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GroupsScreen {
@@ -165,6 +183,8 @@ pub enum Modal {
     Quotas { turn_on: bool },
     /// The groups of areas: see them, make one, change one, take one away.
     Groups(GroupsScreen),
+    /// How many snapshots an area keeps, and when its oldest are removed.
+    Limits(LimitsEditor),
     /// Asking before a running change is asked to stop.
     StopChange { id: String, what: String },
 }

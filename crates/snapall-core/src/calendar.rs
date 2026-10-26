@@ -74,9 +74,34 @@ pub fn seconds_from_snapper_date(text: &str) -> Option<i64> {
     valid.then(|| days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second)
 }
 
+/// Snapper's `2026-10-25 18:15:00` for those seconds: the way back from [`seconds_from_snapper_date`].
+pub fn snapper_date_from_seconds(seconds: i64) -> String {
+    let (days, in_day) = (seconds.div_euclid(86_400), seconds.rem_euclid(86_400));
+    let (year, month, day) = civil_from_days(days);
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02}",
+        in_day / 3600,
+        in_day % 3600 / 60,
+        in_day % 60
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_date_survives_the_trip_to_seconds_and_back() {
+        for text in [
+            "2026-10-25 18:15:00",
+            "1970-01-01 00:00:00",
+            "2000-02-29 23:59:59",
+            "2038-01-19 03:14:07",
+        ] {
+            let seconds = seconds_from_snapper_date(text).unwrap();
+            assert_eq!(snapper_date_from_seconds(seconds), text);
+        }
+    }
 
     #[test]
     fn seconds_become_a_name_across_years_leaps_and_the_epoch() {

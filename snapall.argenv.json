@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-26T21:47:13Z",
+  "generated": "2026-10-26T22:20:51Z",
   "inputs": [
     {
       "allowed": [],
@@ -114,7 +114,8 @@
         "tui",
         "setup",
         "health",
-        "quotas"
+        "quotas",
+        "limits"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -150,7 +151,8 @@
         "tui",
         "setup",
         "health",
-        "quotas"
+        "quotas",
+        "limits"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -250,6 +252,7 @@
         "health",
         "activity",
         "groups",
+        "limits",
         "cancel",
         "quotas",
         "doctor"
@@ -418,6 +421,83 @@
       ],
       "summary": "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
       "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "example": "snapall limits home --keep 30",
+      "group": "limits",
+      "key": "limits_area",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "The area, as `snapall list` names it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "keep",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --keep 30",
+      "group": "limits",
+      "key": "keep",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "How many of the snapshots that cleanup looks after to keep: the newest this many stay, the older ones go at the next cleanup.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "min-age",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --min-age 60",
+      "group": "limits",
+      "key": "min_age",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "Minutes: cleanup never removes a snapshot younger than this, however many there are.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "cleanup",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --cleanup off",
+      "group": "limits",
+      "key": "limits_cleanup",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "`on` or `off`: whether cleanup removes anything of this area at all.",
+      "type": "string"
     },
     {
       "allowed": [],
@@ -597,7 +677,8 @@
         "restore",
         "restore-all",
         "setup",
-        "quotas"
+        "quotas",
+        "limits"
       ],
       "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
       "type": "bool"
@@ -648,5 +729,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.16.0"
+  "source": "snapall@0.17.0"
 }

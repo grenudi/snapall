@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 17. Background jobs from one catalogue, room counting, and one change at a time
 
-Status: accepted. Parts 1, 2, 3 (reading), 4, 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
+Status: accepted. Parts 1, 2, 3, 4, 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
 
 ## Context
 
@@ -48,9 +48,7 @@ Built: the description of automatic cleanup is made from the schedule in the uni
 real limits and minimum age (it used to say "50" and "once a day" in text). A test changes the inputs and
 checks that the text changes with them, and that when nothing is known nothing is invented.
 
-Not built: editing the limits from the window. Design: a prompt per area, through the same port that
-already sets snapper options, showing what the change would mean before it is made ("it would remove 12
-snapshots at the next cleanup").
+Built: editing them, in the Health tab (Enter on an area) and with `snapall limits`. Three settings (how many to keep, the age under which nothing goes, and whether cleanup runs), changed through the same port method that already sets snapper's options. Lowering how many are kept is the only change in snapall that destroys something later, by someone else's hand (snapper's daily cleanup), so it is **previewed**: a pure function says how many snapshots the next cleanup would remove, from the snapshots that cleanup looks after, the oldest beyond the limit, sparing those younger than the age. It was checked against snapper's own cleanup on real Btrfs, in both cases. A change that would remove something asks twice; one that removes nothing is applied at once; keeping none is refused (switch cleanup off instead). Only the limit for the snapshots snapall takes (`NUMBER_LIMIT`) is edited, not snapper's separate limit for ones marked important.
 
 ### 4. Groups of areas: built
 

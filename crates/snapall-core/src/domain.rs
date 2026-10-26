@@ -349,6 +349,13 @@ pub enum ConfigOption {
     /// Whether snapper takes snapshots by itself on a schedule (hourly, daily, ...). snapall turns
     /// it off for what it sets up: snapshots happen when you ask, so nothing piles up on its own.
     TimelineCreate(bool),
+    /// How many of the snapshots that cleanup looks after are kept (`NUMBER_LIMIT`): the newest this
+    /// many stay, the older ones are removed at the next cleanup.
+    KeepNewest(u32),
+    /// Nothing younger than this many seconds is ever removed by cleanup (`NUMBER_MIN_AGE`).
+    NeverRemoveYoungerThan(u64),
+    /// Whether cleanup removes anything of this area at all (`NUMBER_CLEANUP`).
+    CleanupOfSnapshots(bool),
 }
 
 impl ConfigOption {
@@ -357,6 +364,13 @@ impl ConfigOption {
         match self {
             ConfigOption::TimelineCreate(on) => {
                 format!("snapshots on a schedule: {}", if on { "on" } else { "off" })
+            }
+            ConfigOption::KeepNewest(count) => format!("keep the newest {count}"),
+            ConfigOption::NeverRemoveYoungerThan(seconds) => {
+                format!("never remove one younger than {seconds} seconds")
+            }
+            ConfigOption::CleanupOfSnapshots(on) => {
+                format!("cleanup of snapshots: {}", if on { "on" } else { "off" })
             }
         }
     }
