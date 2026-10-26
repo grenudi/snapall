@@ -28,6 +28,7 @@ pub enum Command {
     History,
     Health,
     Activity,
+    Cancel,
     Quotas,
     Setup,
     Doctor,
@@ -50,6 +51,7 @@ impl Command {
         Command::History,
         Command::Health,
         Command::Activity,
+        Command::Cancel,
         Command::Quotas,
         Command::Setup,
         Command::Doctor,
@@ -74,6 +76,7 @@ impl Command {
             Command::Health => "health",
             Command::Quotas => "quotas",
             Command::Activity => "activity",
+            Command::Cancel => "cancel",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -110,6 +113,7 @@ impl Command {
             Command::Activity => {
                 "Show what snapall has done, including earlier sessions, newest first"
             }
+            Command::Cancel => "Ask a running change to stop after the area it is on",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -313,6 +317,7 @@ contract! {
             Command::Setup,
             Command::Health,
             Command::Activity,
+            Command::Cancel,
             Command::Quotas,
             Command::Doctor,
         ],
@@ -421,6 +426,32 @@ contract! {
         group:       "setup",
         example:     "snapall setup /srv",
         summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+        ..Input::EMPTY
+    };
+
+    // ---- running changes ----------------------------------------------------------------
+
+    /// The name this change has in the journal.
+    JOB: String, Command = Input {
+        key:         "job",
+        ty:          Type::String,
+        subcommands: &[Command::Create, Command::RestoreAll],
+        arg:         Some(Arg::long("job")),
+        group:       "create",
+        example:     "snapall create --job nightly-1",
+        summary:     "Name this change in the journal, so that `snapall cancel NAME` can ask it to stop. snapall gives its own name when the window starts a change in the background.",
+        ..Input::EMPTY
+    };
+
+    /// Which change to ask to stop.
+    CANCEL_JOB: String, Command = Input {
+        key:         "change",
+        ty:          Type::String,
+        subcommands: &[Command::Cancel],
+        arg:         Some(Arg { value_name: "CHANGE", ..Arg::positional(0) }),
+        group:       "cancel",
+        example:     "snapall cancel 4242-1793029083222-c",
+        summary:     "The name of the change, as `snapall activity --json` shows it (required).",
         ..Input::EMPTY
     };
 

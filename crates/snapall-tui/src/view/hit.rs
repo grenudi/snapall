@@ -58,13 +58,11 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
             return Some(Click::Tab(tab));
         }
     }
-    if let Some(data) = &state.health.data {
-        if let Some((_, topic)) = status_bar::chip_rects(areas.status, &data.report.chips)
-            .into_iter()
-            .find(|(rect, _)| contains(*rect, col, row))
-        {
-            return Some(Click::Chip(topic));
-        }
+    if let Some((_, topic)) = status_bar::chip_rects(areas.status, &status_bar::chips(state))
+        .into_iter()
+        .find(|(rect, _)| contains(*rect, col, row))
+    {
+        return Some(Click::Chip(topic));
     }
     if let Some((_, button, _, _)) = footer_buttons(areas.keys, state.file.is_some())
         .into_iter()

@@ -87,6 +87,31 @@ pub trait SystemProbe {
     /// Take the right to make a change; `Busy` says who has it. Reading never needs it.
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy>;
 
+    /// Whether a change can be handed to a process that goes on without this one.
+    fn can_run_in_background(&self) -> bool {
+        false
+    }
+
+    /// Run `snapall` with these arguments, detached from this program: it goes on if this program ends.
+    /// `id` names the change in the journal; the program given the arguments writes its events itself.
+    fn start_in_background(&self, _id: &str, _arguments: &[String]) -> Result<(), String> {
+        Err("this computer cannot run changes in the background".to_owned())
+    }
+
+    /// Ask the change `id` to stop after the step it is on. It is only a request: the change looks for it
+    /// between its steps, never in the middle of one.
+    fn request_stop(&self, _id: &str) -> Result<(), String> {
+        Err("this computer cannot be asked to stop a change".to_owned())
+    }
+
+    /// The request to stop `id` is answered, or moot: forget it.
+    fn clear_stop(&self, _id: &str) {}
+
+    /// Whether a stop was asked of the change `id`.
+    fn stop_requested(&self, _id: &str) -> bool {
+        false
+    }
+
     /// Remember an event of a change (see [`crate::journal`]). A machine that cannot remember says
     /// nothing; failing to remember never stops a change.
     fn record(&self, _event: &crate::journal::Event) {}

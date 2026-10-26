@@ -101,6 +101,7 @@ fn run(parsed: Parsed) -> Outcome {
         Request::Points => commands::points(&ctx),
         Request::Health => commands::health(&ctx),
         Request::Activity => commands::activity(&ctx),
+        Request::Cancel { job } => commands::cancel(&ctx, &job),
         Request::Quotas { state, yes } => commands::quotas(&ctx, state.as_deref(), yes),
         Request::Snapshots { config } => commands::snapshots(&ctx, config),
         Request::History { path } => commands::history(&ctx, &path),
@@ -113,7 +114,8 @@ fn run(parsed: Parsed) -> Outcome {
             only,
             description,
             dry_run,
-        } => commands::create(&ctx, only.as_deref(), &description, dry_run),
+            job,
+        } => commands::create(&ctx, only.as_deref(), &description, dry_run, job.as_deref()),
         Request::Delete { config, id } => commands::delete(&ctx, &config, id),
         Request::Restore {
             config,
@@ -127,7 +129,8 @@ fn run(parsed: Parsed) -> Outcome {
             point,
             yes,
             dry_run,
-        } => commands::restore_all(&ctx, &point, dry_run, yes),
+            job,
+        } => commands::restore_all(&ctx, &point, dry_run, yes, job.as_deref()),
 
         // setting up
         Request::Setup { area, yes, dry_run } => {

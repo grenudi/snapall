@@ -9,7 +9,9 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
-use snapall_core::{plan_snapshots, run_plan, Description, JournalEvent, Source, SystemProbe};
+use snapall_core::{
+    plan_snapshots, run_plan, Description, JournalEvent, JournalOutcome, Source, SystemProbe,
+};
 use snapall_tui::model::Key;
 use snapall_tui::{view, Session, UiContext};
 
@@ -69,7 +71,7 @@ fn ended(id: &str, day: &str, outcome: Result<&str, &str>) -> JournalEvent {
     JournalEvent::Finished {
         id: id.into(),
         at: format!("{day} 09:30:04"),
-        outcome: outcome.map(str::to_owned).map_err(str::to_owned),
+        outcome: outcome.map(str::to_owned).map_err(str::to_owned).into(),
         took_ms: 4000,
     }
 }
@@ -124,7 +126,10 @@ fn a_change_made_now_is_recorded_once_and_shown_once_whichever_way_it_is_read() 
         (a, *source, what.as_str()),
         (b, Source::Window, "Took a snapshot of home, root")
     );
-    assert_eq!(outcome.as_deref(), Ok("2 snapshots taken"));
+    assert_eq!(
+        outcome,
+        &JournalOutcome::Done("2 snapshots taken".to_owned())
+    );
 
     session.press(Key::Char('3'));
     session.press(Key::Char('1'));
@@ -178,7 +183,7 @@ fn a_failure_keeps_its_reason_in_the_record() {
         system.events().iter().any(|e| matches!(
             e,
             JournalEvent::Finished {
-                outcome: Err(_),
+                outcome: JournalOutcome::Failed(_),
                 ..
             }
         )),

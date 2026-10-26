@@ -183,6 +183,13 @@ def check(condition, message):
     print(f"  ok  {message}")
 
 
+def words(tui):
+    """The screen as plain words: box lines removed, so that a sentence that wraps inside a prompt reads
+    as one."""
+    cleaned = "".join(" " if c in "│┃┌┐└┘╭╮╰╯─━┏┓┗┛" else c for c in tui.text())
+    return " ".join(cleaned.split())
+
+
 def clear_journal():
     """Start a journey from a journal with nothing in it: what snapall has done is remembered across runs."""
     for leftover in ("/var/lib/snapall/journal.jsonl", "/var/lib/snapall/journal.jsonl.1"):
@@ -222,6 +229,80 @@ def tabs_scenario():
     check("done" in tui.text(), "a real snapshot is recorded as done")
     tui.send("q")
     tui.finish()
+
+
+def runner_scenario():
+    """A change of several areas runs in a process of its own: the window can be closed while it runs, it
+    carries on, its progress and its end are in the record, and a second one is stopped from the window."""
+    clear_journal()
+    shim = tempfile.mkdtemp(prefix="slow-snapper-")
+    real = shutil.which("snapper")
+    with open(f"{shim}/snapper", "w") as handle:
+        handle.write("#!/bin/sh\ncase \" $* \" in *\" create \"*) sleep 2;; esac\n" + f'exec {real} "$@"\n')
+    os.chmod(f"{shim}/snapper", 0o755)
+    env = dict(os.environ, PATH=f"{shim}:{os.environ['PATH']}")
+
+    def activity():
+        return subprocess.run([BINARY, "--no-dbus", "activity"], capture_output=True, text=True, env=env).stdout
+
+    # An earlier step killed a command in the middle of a slow snapshot; the slow stand-in for snapper it
+    # was running goes on for a few seconds after that and then takes the snapshot. Wait for it, so that
+    # it is not counted as this journey's.
+    for _ in range(30):
+        if subprocess.run(["pgrep", "-f", "slow-snapper-"], capture_output=True).returncode != 0:
+            break
+        time.sleep(0.5)
+    before = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
+    tui = Tui(extra_path=shim)
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.send("a")
+    tui.send("enter")
+    tui.wait_for("started in the background", timeout=6)
+    check("goes on if you close the window" in tui.text().replace("\n", " ") or "started in the background" in tui.text(),
+          "the window says the change was handed to the background")
+    check("working" not in tui.text().splitlines()[0], "handing it over is not 'working': the window stays free")
+    tui.send("q")
+    tui.finish()
+    check(True, "the window closed while the change was still to be done")
+
+    deadline = time.time() + 12
+    seen_running = False
+    while time.time() < deadline:
+        out = activity()
+        if "running" in out:
+            seen_running = True
+        if "done" in out and "running" not in out:
+            break
+        time.sleep(0.4)
+    check(seen_running, "the change was seen running after the window was gone")
+    out = activity()
+    check("done" in out and "window" in out and "Took a snapshot of snapall_it_a, snapall_it_b" in out,
+          "it finished by itself and the record says the window started it")
+    after = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
+    check(after == (before[0] + 1, before[1] + 1), f"both areas got their snapshot, without the window (before {before}, after {after})")
+
+    # a second one, stopped from the window
+    tui = Tui(extra_path=shim)
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.send("a")
+    tui.send("enter")
+    tui.wait_for("started in the background", timeout=6)
+    tui.wait_for("1 running", timeout=6)
+    check(True, "the status bar says one change is running")
+    tui.send("3")
+    tui.wait_for("running", timeout=6)
+    tui.send("x")
+    tui.wait_for("Stop it after this area?", timeout=4)
+    check("never stopped in the middle of an area" in words(tui), "stopping says what it means before it asks")
+    tui.send("enter")
+    tui.wait_for("CANCELLED", timeout=12)
+    check("stopped on request after 1 of 2 areas" in words(tui), "it stopped between areas and says how far it got")
+    tui.send("q")
+    tui.finish()
+    after_stop = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
+    check(after_stop == (after[0] + 1, after[1]), "one area had its snapshot, the other was never begun")
 
 
 def jobs_and_quotas_scenario():
@@ -343,8 +424,8 @@ def points_screen_scenario():
     tui.wait_for("Put every area of the chosen restore point back (not the system)")
     check(True, "hovering the button explains it, and the prompt leaves that line free")
     tui.send("enter")
-    tui.wait_for("Put 2 area(s) back to", timeout=10)
-    tui.wait_for("Undo it: restore point")
+    tui.wait_for("started in the background", timeout=6)
+    tui.wait_for("To undo it: restore point", timeout=15)
     check(open(a).read() == "a, then" and open(b).read() == "b, then", "both areas are back on disk, a deleted file included")
     tui.send("q")
     tui.finish()
@@ -379,8 +460,8 @@ def restore_point_scenario():
     tui.wait_for("Put all areas of this restore point back at once (not the system)")
     check(True, "hovering the button explains it, and the prompt does not cover that line")
     tui.send("A")
-    tui.wait_for("Put 2 area(s) back to", timeout=10)
-    tui.wait_for("Undo it: restore point")
+    tui.wait_for("started in the background", timeout=6)
+    tui.wait_for("To undo it: restore point", timeout=15)
     check(True, "it confirms in plain words and names the way back")
     check(open(a).read() == "a, then" and open(b).read() == "b, then", "both areas are really back on disk, a deleted file included")
     tui.send("q")
@@ -481,7 +562,9 @@ def main():
     tui.send("a")
     tui.wait_for("ALL protected areas")
     tui.send("enter")  # empty description -> default
-    tui.wait_for("created")
+    # several areas: handed to a process of its own, which the window follows until it ends
+    tui.wait_for("started in the background", timeout=6)
+    tui.wait_for(": done", timeout=15)
     check("snapall" in listing("snapall_it_a").values(), "config a got the default-described snapshot")
     after_b = listing("snapall_it_b")
     check(len(after_b) == len(before_b) + 1 and "snapall" in after_b.values(), "config b got one too")
@@ -693,6 +776,7 @@ def main():
 
     tabs_scenario()
     journal_scenario()
+    runner_scenario()
     jobs_and_quotas_scenario()
     points_screen_scenario()
     restore_point_scenario()

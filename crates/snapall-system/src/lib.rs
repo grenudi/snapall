@@ -12,6 +12,7 @@
 mod journal;
 mod lock;
 mod quotas;
+mod runner;
 mod units;
 
 use std::path::{Path, PathBuf};
@@ -26,6 +27,8 @@ use snapall_core::{
 pub struct LinuxSystem {
     lock_path: Option<PathBuf>,
     journal_path: Option<PathBuf>,
+    stop_directory: Option<PathBuf>,
+    program: Option<PathBuf>,
 }
 
 /// Where the lock is kept: `/run` is emptied at every start, so a crash cannot leave it for ever.
@@ -49,6 +52,30 @@ impl LinuxSystem {
         Self {
             journal_path: Some(path),
             ..Self::default()
+        }
+    }
+
+    /// Keep stop requests somewhere else, and start changes with another program (for tests).
+    pub fn with_runner(stop_directory: PathBuf, program: PathBuf) -> Self {
+        Self {
+            stop_directory: Some(stop_directory),
+            program: Some(program),
+            ..Self::default()
+        }
+    }
+
+    fn stop_directory(&self) -> PathBuf {
+        self.stop_directory
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(runner::STOP_DIRECTORY))
+    }
+
+    fn program(&self) -> Result<PathBuf, String> {
+        match &self.program {
+            Some(program) => Ok(program.clone()),
+            None => {
+                std::env::current_exe().map_err(|e| format!("cannot find itself to start: {e}"))
+            }
         }
     }
 
@@ -118,6 +145,26 @@ impl SystemProbe for LinuxSystem {
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy> {
         let since = self.local_time().unwrap_or_default();
         lock::hold(&self.lock_path(), doing, &since)
+    }
+
+    fn can_run_in_background(&self) -> bool {
+        true
+    }
+
+    fn start_in_background(&self, id: &str, arguments: &[String]) -> Result<(), String> {
+        runner::start(&self.program()?, id, arguments)
+    }
+
+    fn request_stop(&self, id: &str) -> Result<(), String> {
+        runner::request_stop(&self.stop_directory(), id)
+    }
+
+    fn stop_requested(&self, id: &str) -> bool {
+        runner::stop_requested(&self.stop_directory(), id)
+    }
+
+    fn clear_stop(&self, id: &str) {
+        runner::clear_stop(&self.stop_directory(), id);
     }
 
     fn record(&self, event: &snapall_core::JournalEvent) {

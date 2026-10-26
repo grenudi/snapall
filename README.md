@@ -158,6 +158,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall health` | Whether protection is working: a verdict first, then what to do about anything that needs it (cleanup off, a disk nearly full, new snapshots not reaching the boot menu), then the numbers: snapshots per area, the room they hold (when measurable), how full the disk is, and which background jobs run. `--json` for scripts; exits 1 only for what needs doing now. |
 | `snapall quotas [on\|off]` | How the disk counts the room snapshots take, what that gives and costs, and the switch for it. Switching changes how the whole disk works, so it explains and asks first (`--yes` to skip). |
 | `snapall activity` | What snapall has done, newest first: from the window and from commands, in this and earlier sessions, and how each went. `--json` for scripts. It is kept in a small journal under `/var/lib/snapall`. |
+| `snapall cancel CHANGE` | Ask a running change (`snapall activity --json` gives its name) to stop. It finishes the area it is on and then stops, never in the middle of one, so nothing is left half-done. |
 | `snapall points` | The restore points: the snapshots that one action took together, one in every area. |
 | `snapall restore-all POINT` | Put **every** area back to one restore point with a single action. Shows what changes in each, asks first (`--yes` skips the question, `--dry-run` only shows), takes a safety snapshot per area, and prints the one command that undoes all of it. The running system is left alone. |
 | `snapall setup [AREA]` | Find the parts of your disk that have no snapshots yet (such as your Home files), explain in plain words what protecting them means, ask, and do it. `--dry-run` only explains; `--yes` accepts what snapall recommends. Needs `sudo`. |
@@ -267,6 +268,12 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 `snapall health` answers the questions you have once protection is set up: *is it working, how much room do the snapshots take, will old ones be cleaned up or will they fill the disk?* It starts with a verdict (*All good*, or *2 things need attention*), then says what to do about each thing, most urgent first, and then shows the numbers behind it.
 
 Some figures cannot be known, and it says so instead of guessing. The room each snapshot holds is only counted by the disk's filesystem when a feature called *quotas* is on; without it you see snapshot counts and how full the disk is overall, and the report says why. "Cleanup on" means snapper's cleanup job is switched on **and running**, not merely enabled. ([ADR 16](docs/adr/0016-health-and-activity.md) records what can be measured and how the screen is laid out.)
+
+### Changes that outlive the window
+
+A change of several areas (a snapshot of everything, a restore point put back) is handed to a `snapall` process of its own. **Closing the window does not stop it**, and reopening the window, or running `snapall activity`, shows it still running with how far it has come ("step 2 of 3: home"), and then how it ended. The status bar shows how many are running; click it to go to them. In the Activity tab, `x` on a running change asks it to stop: it finishes the area it is on, then stops, and says how far it got.
+
+Where systemd is running the process is started through `systemd-run`, so the system keeps its log under the unit `snapall-job-NAME`; elsewhere it is a process of its own. A change of one area takes a moment and is done in the window.
 
 ### Background jobs
 

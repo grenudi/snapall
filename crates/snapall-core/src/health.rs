@@ -126,6 +126,8 @@ pub enum Topic {
     Cleanup,
     BootMenu,
     Snapshots,
+    /// Changes that are running now: not a finding, but an item of the status bar like the others.
+    Jobs,
 }
 
 /// Something snapall can do about a finding.

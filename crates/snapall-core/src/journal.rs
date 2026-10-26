@@ -35,6 +35,26 @@ impl Source {
     }
 }
 
+/// How a change ended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Outcome {
+    /// It went through; what came of it.
+    Done(String),
+    /// It did not; why.
+    Failed(String),
+    /// It was stopped on request, between steps; how far it had got.
+    Cancelled(String),
+}
+
+impl From<Result<String, String>> for Outcome {
+    fn from(result: Result<String, String>) -> Self {
+        match result {
+            Ok(done) => Outcome::Done(done),
+            Err(why) => Outcome::Failed(why),
+        }
+    }
+}
+
 /// One line of the journal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -48,11 +68,21 @@ pub enum Event {
         /// The process making it, so that a change whose process is gone can be told from one that runs.
         pid: u32,
     },
+    /// A step of a change that has several is about to begin: how far it has come.
+    Progress {
+        id: String,
+        at: String,
+        /// Steps finished so far.
+        done: u32,
+        /// Steps in all.
+        of: u32,
+        /// What the step that begins now is about.
+        area: String,
+    },
     Finished {
         id: String,
         at: String,
-        /// What came of it, or why it failed.
-        outcome: Result<String, String>,
+        outcome: Outcome,
         took_ms: u64,
     },
 }
@@ -60,7 +90,9 @@ pub enum Event {
 impl Event {
     pub fn id(&self) -> &str {
         match self {
-            Event::Started { id, .. } | Event::Finished { id, .. } => id,
+            Event::Started { id, .. } | Event::Progress { id, .. } | Event::Finished { id, .. } => {
+                id
+            }
         }
     }
 }
@@ -71,6 +103,8 @@ pub enum Status {
     Running,
     Done,
     Failed,
+    /// It was stopped on request, between steps, and says how far it had got.
+    Cancelled,
     /// It started and its process is gone without having said how it ended.
     Interrupted,
 }
@@ -82,14 +116,26 @@ impl Status {
             Status::Running => "running",
             Status::Done => "done",
             Status::Failed => "FAILED",
+            Status::Cancelled => "CANCELLED",
             Status::Interrupted => "STOPPED",
         }
     }
 }
 
+/// How far a change with several steps has come.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Progress {
+    pub done: u32,
+    pub of: u32,
+    /// What the step now being taken is about.
+    pub area: String,
+}
+
 /// A change, as the journal tells it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// How far it has come, while it runs and a step reported it.
+    pub progress: Option<Progress>,
     pub id: String,
     pub what: String,
     pub source: Option<Source>,
@@ -123,6 +169,7 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
                 what: what.clone(),
                 source: Some(*source),
                 pid: Some(*pid),
+                progress: None,
                 started_at: Some(at.clone()),
                 finished_at: None,
                 status: Status::Running,
@@ -131,6 +178,15 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
             }),
             // a repeated start of the same change changes nothing
             (Event::Started { .. }, Some(_)) => {}
+            (Event::Progress { done, of, area, .. }, Some(index)) => {
+                entries[index].progress = Some(Progress {
+                    done: *done,
+                    of: *of,
+                    area: area.clone(),
+                });
+            }
+            // a step of a change whose start is gone says nothing worth showing
+            (Event::Progress { .. }, None) => {}
             (
                 Event::Finished {
                     id,
@@ -147,6 +203,7 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
                         what: "An earlier change".to_owned(),
                         source: None,
                         pid: None,
+                        progress: None,
                         started_at: None,
                         finished_at: None,
                         status: Status::Running,
@@ -159,15 +216,20 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
                 entry.finished_at = Some(at.clone());
                 entry.took_ms = Some(*took_ms);
                 match outcome {
-                    Ok(done) => {
+                    Outcome::Done(done) => {
                         entry.status = Status::Done;
                         entry.detail.clone_from(done);
                     }
-                    Err(why) => {
+                    Outcome::Failed(why) => {
                         entry.status = Status::Failed;
                         entry.detail.clone_from(why);
                     }
+                    Outcome::Cancelled(how_far) => {
+                        entry.status = Status::Cancelled;
+                        entry.detail.clone_from(how_far);
+                    }
                 }
+                entry.progress = None;
             }
         }
     }
@@ -199,7 +261,7 @@ mod tests {
         Event::Finished {
             id: id.into(),
             at: "2026-10-25 18:15:03".into(),
-            outcome: outcome.map(str::to_owned).map_err(str::to_owned),
+            outcome: outcome.map(str::to_owned).map_err(str::to_owned).into(),
             took_ms: 3000,
         }
     }

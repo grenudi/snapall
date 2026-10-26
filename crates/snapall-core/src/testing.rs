@@ -601,6 +601,9 @@ pub struct FakeSystem {
     quotas: std::sync::Mutex<Option<crate::system::QuotaMode>>,
     busy: Option<crate::system::Busy>,
     journal: std::sync::Mutex<Vec<crate::journal::Event>>,
+    background: bool,
+    started: std::sync::Mutex<Vec<(String, Vec<String>)>>,
+    stops: std::sync::Mutex<Vec<String>>,
 }
 
 impl FakeSystem {
@@ -674,6 +677,22 @@ impl FakeSystem {
             since: Some("12:03:00".to_owned()),
         });
         self
+    }
+
+    /// This machine can hand a change to a process that goes on without the window.
+    pub fn running_in_the_background(mut self) -> Self {
+        self.background = true;
+        self
+    }
+
+    /// What was handed to the background, in order: the change's name and the arguments.
+    pub fn handed_to_the_background(&self) -> Vec<(String, Vec<String>)> {
+        self.started.lock().map(|s| s.clone()).unwrap_or_default()
+    }
+
+    /// The changes that were asked to stop, in order.
+    pub fn stops_asked(&self) -> Vec<String> {
+        self.stops.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
     /// An event already in the journal, as if an earlier snapall had written it. A process id of 0 is a
@@ -790,6 +809,33 @@ impl crate::system::SystemProbe for FakeSystem {
             Some(busy) => Err(busy.clone()),
             None => Ok(Box::new(())),
         }
+    }
+
+    fn can_run_in_background(&self) -> bool {
+        self.background
+    }
+
+    fn start_in_background(&self, id: &str, arguments: &[String]) -> Result<(), String> {
+        if self.refuse_jobs {
+            return Err("Access denied".to_owned());
+        }
+        if let Ok(mut started) = self.started.lock() {
+            started.push((id.to_owned(), arguments.to_vec()));
+        }
+        Ok(())
+    }
+
+    fn request_stop(&self, id: &str) -> Result<(), String> {
+        if let Ok(mut stops) = self.stops.lock() {
+            stops.push(id.to_owned());
+        }
+        Ok(())
+    }
+
+    fn stop_requested(&self, id: &str) -> bool {
+        self.stops
+            .lock()
+            .is_ok_and(|stops| stops.iter().any(|stop| stop == id))
     }
 
     fn record(&self, event: &crate::journal::Event) {

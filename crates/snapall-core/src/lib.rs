@@ -12,6 +12,7 @@
 
 pub mod boot;
 pub mod calendar;
+pub mod course;
 pub mod coverage;
 pub mod doctor;
 pub mod domain;
@@ -29,6 +30,7 @@ pub mod usecase;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use course::{Course, Unattended};
 pub use domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
     Point, RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
@@ -36,12 +38,15 @@ pub use domain::{
 pub use health::{
     assess, gather, AreaFacts, Chip, Facts, Finding, Health, Level, Remedy, Topic, Verdict,
 };
-pub use journal::{Entry as JournalEntry, Event as JournalEvent, Source, Status as JournalStatus};
+pub use journal::{
+    Entry as JournalEntry, Event as JournalEvent, Outcome as JournalOutcome,
+    Progress as JournalProgress, Source, Status as JournalStatus,
+};
 pub use observe::{Event, Observer, Silent};
 pub use plan::{plan, Plan, PlanError};
 pub use points::{
-    fresh_point, point_of, preview_point, restore_point, restore_points, Member, MemberPreview,
-    MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
+    fresh_point, point_of, preview_point, restore_point, restore_point_along, restore_points,
+    Member, MemberPreview, MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
 };
 pub use port::{BackendError, SnapshotBackend};
 pub use services::{Command, Job, JobAction};
@@ -51,6 +56,6 @@ pub use system::{
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
     plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,
-    run_plan, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome, Preview, Report,
-    RestoreError, Restored, Safety, SetupError, SnapshotError,
+    run_plan, run_plan_along, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome,
+    Preview, Report, RestoreError, Restored, Safety, SetupError, SnapshotError,
 };

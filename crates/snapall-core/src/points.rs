@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 
 use crate::calendar::{compact_utc, seconds_from_snapper_date};
+use crate::course::{Course, Unattended};
 use crate::domain::{ConfigName, Description, Point, SnapshotId, SnapshotInfo, SnapshotKind};
 use crate::port::SnapshotBackend;
 use crate::usecase::{preview_restore, restore_snapshot_with, Preview, Restored, Safety};
@@ -246,6 +247,9 @@ pub struct PointRestore {
     /// The restore point of the snapshots taken just before: restoring *it* undoes all of this.
     pub safety: Point,
     pub members: Vec<MemberReport>,
+    /// It was stopped, on request, before every area had its turn: the areas in `members` are done and
+    /// the rest were left as they are.
+    pub stopped: bool,
 }
 
 impl PointRestore {
@@ -273,40 +277,58 @@ pub fn restore_point(
     point: &RestorePoint,
     safety: Point,
 ) -> PointRestore {
+    restore_point_along(backend, point, safety, &Unattended)
+}
+
+/// [`restore_point`] following a [`Course`]: told before each area, and stoppable between them (never in
+/// the middle of one). Stopped, the areas already put back stay put back, and `stopped` says so.
+pub fn restore_point_along(
+    backend: &dyn SnapshotBackend,
+    point: &RestorePoint,
+    safety: Point,
+    course: &dyn Course,
+) -> PointRestore {
     let note = Description::parse(&format!("before restoring {}", point.point)).unwrap_or_default();
     let tagging = Safety {
         point: safety.clone(),
         note,
     };
-    let members = point
-        .members
-        .iter()
-        .map(|member| {
-            let result = match preview_restore(backend, &member.config, member.id, None) {
-                Err(error) => MemberResult::Failed(error.to_string()),
-                Ok(preview) if preview.is_system_root => MemberResult::SystemRoot,
-                Ok(preview) if preview.changes.is_empty() => MemberResult::AlreadyThere,
-                Ok(_) => {
-                    match restore_snapshot_with(
-                        backend,
-                        &member.config,
-                        member.id,
-                        None,
-                        Some(&tagging),
-                    ) {
-                        Ok(restored) => MemberResult::Restored(restored),
-                        Err(error) => MemberResult::Failed(error.to_string()),
-                    }
+    let total = point.members.len();
+    let mut members = Vec::with_capacity(total);
+    let mut stopped = false;
+    for (done, member) in point.members.iter().enumerate() {
+        if !course.proceed(done, total, member.config.as_str()) {
+            stopped = true;
+            break;
+        }
+        let result = match preview_restore(backend, &member.config, member.id, None) {
+            Err(error) => MemberResult::Failed(error.to_string()),
+            Ok(preview) if preview.is_system_root => MemberResult::SystemRoot,
+            Ok(preview) if preview.changes.is_empty() => MemberResult::AlreadyThere,
+            Ok(_) => {
+                match restore_snapshot_with(
+                    backend,
+                    &member.config,
+                    member.id,
+                    None,
+                    Some(&tagging),
+                ) {
+                    Ok(restored) => MemberResult::Restored(restored),
+                    Err(error) => MemberResult::Failed(error.to_string()),
                 }
-            };
-            MemberReport {
-                config: member.config.clone(),
-                id: member.id,
-                result,
             }
-        })
-        .collect();
-    PointRestore { safety, members }
+        };
+        members.push(MemberReport {
+            config: member.config.clone(),
+            id: member.id,
+            result,
+        });
+    }
+    PointRestore {
+        safety,
+        members,
+        stopped,
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-26T15:37:54Z",
+  "generated": "2026-10-26T17:03:46Z",
   "inputs": [
     {
       "allowed": [],
@@ -249,6 +249,7 @@
         "setup",
         "health",
         "activity",
+        "cancel",
         "quotas",
         "doctor"
       ],
@@ -421,6 +422,46 @@
       "allowed": [],
       "arg": {
         "arity": 1,
+        "long": "job",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall create --job nightly-1",
+      "group": "create",
+      "key": "job",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "restore-all"
+      ],
+      "summary": "Name this change in the journal, so that `snapall cancel NAME` can ask it to stop. snapall gives its own name when the window starts a change in the background.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CHANGE"
+      },
+      "example": "snapall cancel 4242-1793029083222-c",
+      "group": "cancel",
+      "key": "change",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "cancel"
+      ],
+      "summary": "The name of the change, as `snapall activity --json` shows it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
         "negatable": false,
         "position": 0,
         "repeatable": false,
@@ -527,5 +568,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.14.0"
+  "source": "snapall@0.15.0"
 }

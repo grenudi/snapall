@@ -80,6 +80,7 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
         Modal::Points { index } => points_spec(*index, state),
         Modal::Job { unit } => job_spec(unit, state),
         Modal::Quotas { turn_on } => quotas_spec(*turn_on, state),
+        Modal::StopChange { what, .. } => stop_spec(what),
     }
 }
 

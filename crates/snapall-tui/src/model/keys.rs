@@ -156,6 +156,7 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         Modal::Points { index } => browsing_points(state, key, index),
         Modal::Job { unit } => controlling_job(state, key, unit),
         Modal::Quotas { turn_on } => confirming_quotas(state, key, turn_on),
+        Modal::StopChange { id, what } => confirming_stop(state, key, id, what),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {
@@ -262,6 +263,17 @@ pub(crate) fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
             } else {
                 Vec::new()
             }
+        }
+        Click::Chip(snapall_core::Topic::Jobs) => {
+            // what is running is in Activity, with the first of it chosen
+            state.tab = Tab::Activity;
+            state.activity.cursor = state
+                .activity
+                .entries
+                .iter()
+                .position(|entry| entry.status == snapall_core::JournalStatus::Running)
+                .unwrap_or(0);
+            vec![Effect::LoadHistory]
         }
         Click::Chip(topic) => {
             state.tab = Tab::Health;

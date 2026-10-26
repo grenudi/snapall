@@ -142,12 +142,22 @@ pub enum Modal {
     Job { unit: String },
     /// Asking before switching the counting of room on or off for the disk.
     Quotas { turn_on: bool },
+    /// Asking before a running change is asked to stop.
+    StopChange { id: String, what: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Notice {
     Info(String),
     Error(String),
+}
+
+/// A change this window handed to the background: its name, and how many times the journal was read
+/// without it appearing there (a change that never reports is eventually let go of).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Watched {
+    pub id: String,
+    pub unseen: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +179,11 @@ pub struct State {
     pub spinner: usize,
     /// The report of how protection stands has been asked for once the first screen had its data.
     pub health_asked: bool,
+    /// Changes this window handed to the background and has not seen end: it follows them, and looks
+    /// at the lists again when they have.
+    pub watching: Vec<Watched>,
+    /// Ticks since the journal was last looked at while something runs.
+    pub poll_ticks: u32,
     /// What the changes in flight are, in the present tense: what the screen says is being done.
     pub doing: Vec<String>,
     /// How many ticks (a tenth of a second each) work has been in flight without a pause.
@@ -210,6 +225,8 @@ impl Default for State {
             pending: 0,
             spinner: 0,
             health_asked: false,
+            watching: Vec::new(),
+            poll_ticks: 0,
             doing: Vec::new(),
             busy_ticks: 0,
             context: UiContext::default(),
@@ -228,6 +245,18 @@ impl Default for State {
 }
 
 impl State {
+    /// Whether something is going on that the window must keep an eye on: work in flight, a change it
+    /// handed to the background, or anything the journal says is running. The clock ticks while it is so.
+    pub fn is_following_something(&self) -> bool {
+        self.pending > 0
+            || !self.watching.is_empty()
+            || self
+                .activity
+                .entries
+                .iter()
+                .any(|entry| entry.status == snapall_core::JournalStatus::Running)
+    }
+
     pub fn with_context(context: UiContext) -> Self {
         let file = context.file.clone().map(|target| FileView {
             target,
