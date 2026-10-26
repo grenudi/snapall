@@ -39,3 +39,26 @@ snapall (binary: argenv CLI, wiring, rendering)
 ```
 
 Dependencies point inward. `snapall-core` knows nothing about snapper, JSON, processes, terminals, clocks or the command line, and the outer crates never see each other; they meet only in the binary.
+
+## The window, module by module
+
+`snapall-tui` is the functional core and imperative shell in miniature, and each file says one thing:
+
+```
+model/            what the window does (pure: no terminal, no clock, no I/O)
+   input.rs         a key, a click, a button
+   state.rs         what it knows
+   messages.rs      what it asks the shell to do, and what the shell reports back
+   keys.rs          what each key and click means
+   lists.rs file.rs the arrival of the lists; the file-history screen
+   prompts/         one module per prompt: describe, delete, restore, points, protect, help
+tabs/             the Health and Activity tabs: each owns its state, keys and drawing
+status_bar.rs     the line under every view
+view/             drawing only: the frame, the tab bar, the lists, the footer, where a click lands,
+                  and prompts/ (one module per prompt's drawing)
+session.rs        the shell: performs effects, stamps changes for the Activity tab
+term.rs           the terminal: keys in, frames out, a worker thread for slow calls
+```
+
+A test fails if any file of the window grows past 450 lines of code: a file that long is doing more than one thing.
+

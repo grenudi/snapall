@@ -89,5 +89,7 @@ tab's rows and explanations with one action (switch automatic cleanup on), and t
 (what was done, whether it worked, how long it took, and the reason when it did not).
 
 Not built: changing retention limits from the window; a persistent activity log (the tab says
-`--log-file` is the one); and the split of `model.rs` and `view.rs` into one module per concern, which
-the new tabs avoided adding to but did not yet perform on the old code.
+`--log-file` is the one).
+
+Done afterwards, as a pure move checked by the same tests: `model.rs` (1,662 lines) and `view.rs`
+(1,251) became modules of at most a few hundred lines each, one per concern (see ARCHITECTURE.md).
