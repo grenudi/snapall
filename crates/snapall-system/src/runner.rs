@@ -55,12 +55,15 @@ pub fn systemd_is_running() -> bool {
     Path::new("/run/systemd/system").exists()
 }
 
-/// The command that starts `program` with `arguments` as a change of its own.
+/// The command that starts `program` with `arguments` as a change of its own. Under systemd it is a unit
+/// that runs with the same `PATH` as the program that asked for it: a change must run the same programs the
+/// window runs, not whatever the service manager happens to find.
 pub fn command_line(
     program: &Path,
     id: &str,
     arguments: &[String],
     with_systemd: bool,
+    path: Option<&str>,
 ) -> (String, Vec<String>) {
     let program = program.display().to_string();
     // the options come first and the name with them: whatever follows a `--` is free text, and must
@@ -78,9 +81,12 @@ pub fn command_line(
             "--no-block".to_owned(),
             format!("--unit=snapall-job-{id}"),
             "--setenv=SNAPALL_SOURCE=window".to_owned(),
-            "--".to_owned(),
-            program,
         ];
+        if let Some(path) = path {
+            line.push(format!("--setenv=PATH={path}"));
+        }
+        line.push("--".to_owned());
+        line.push(program);
         line.extend(all);
         ("systemd-run".to_owned(), line)
     } else {
@@ -88,34 +94,54 @@ pub fn command_line(
     }
 }
 
+/// Start the change so that it goes on without this program: through systemd where that works, and as a
+/// process of its own where it does not (no systemd, or no right to ask it). Starting it some way is better
+/// than refusing.
 pub fn start(program: &Path, id: &str, arguments: &[String]) -> Result<(), String> {
     if !safe(id) {
         return Err(format!("`{id}` is not the name of a change"));
     }
-    let with_systemd = systemd_is_running() && which("systemd-run");
-    let (name, line) = command_line(program, id, arguments, with_systemd);
-    let mut command = Command::new(&name);
-    command
-        .args(&line)
+    if systemd_is_running()
+        && which("systemd-run")
+        && start_in_systemd(program, id, arguments).is_ok()
+    {
+        return Ok(());
+    }
+    start_as_process(program, id, arguments)
+}
+
+fn start_in_systemd(program: &Path, id: &str, arguments: &[String]) -> Result<(), String> {
+    let path = std::env::var("PATH").ok();
+    let (name, line) = command_line(program, id, arguments, true, path.as_deref());
+    let status = Command::new(name)
+        .args(line)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        // a process group of its own: closing the terminal does not reach it
-        .process_group(0);
-    if !with_systemd {
-        command.env("SNAPALL_SOURCE", "window");
+        .status()
+        .map_err(|e| format!("could not run systemd-run: {e}"))?;
+    status
+        .success()
+        .then_some(())
+        .ok_or_else(|| "systemd-run did not start it".to_owned())
+}
+
+/// A process of its own, in a group of its own: closing the terminal does not reach it, and it goes on when
+/// this program ends.
+pub fn start_as_process(program: &Path, id: &str, arguments: &[String]) -> Result<(), String> {
+    if !safe(id) {
+        return Err(format!("`{id}` is not the name of a change"));
     }
-    let mut child = command
+    let (name, line) = command_line(program, id, arguments, false, None);
+    let mut child = Command::new(&name)
+        .args(&line)
+        .env("SNAPALL_SOURCE", "window")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
         .spawn()
         .map_err(|e| format!("could not start it: {e}"))?;
-    if with_systemd {
-        // systemd-run hands the work over and returns: its own failure is worth knowing
-        let status = child.wait().map_err(|e| e.to_string())?;
-        return status
-            .success()
-            .then_some(())
-            .ok_or_else(|| "systemd-run did not start it".to_owned());
-    }
     // not waited for: it is a process of its own now. A thread collects it so no zombie remains.
     std::thread::spawn(move || {
         let _ = child.wait();
@@ -167,7 +193,8 @@ mod tests {
         let args: Vec<String> = ["create", "--only", "home", "before theming"]
             .map(String::from)
             .to_vec();
-        let (program, line) = command_line(Path::new("/usr/bin/snapall"), "9-1-w", &args, false);
+        let (program, line) =
+            command_line(Path::new("/usr/bin/snapall"), "9-1-w", &args, false, None);
         assert_eq!(program, "/usr/bin/snapall");
         assert_eq!(
             line,
@@ -185,7 +212,7 @@ mod tests {
         let dashed: Vec<String> = ["create", "--only", "home", "--", "--weird"]
             .map(String::from)
             .to_vec();
-        let (_, line) = command_line(Path::new("/usr/bin/snapall"), "9-1-w", &dashed, false);
+        let (_, line) = command_line(Path::new("/usr/bin/snapall"), "9-1-w", &dashed, false, None);
         assert_eq!(
             line,
             [
@@ -206,7 +233,13 @@ mod tests {
         let args: Vec<String> = ["restore-all", "20261025T181500Z", "--yes"]
             .map(String::from)
             .to_vec();
-        let (program, line) = command_line(Path::new("/usr/bin/snapall"), "9-1-w", &args, true);
+        let (program, line) = command_line(
+            Path::new("/usr/bin/snapall"),
+            "9-1-w",
+            &args,
+            true,
+            Some("/opt/bin:/usr/bin"),
+        );
         assert_eq!(program, "systemd-run");
         assert_eq!(
             &line[..4],
@@ -248,7 +281,8 @@ mod tests {
         )
         .unwrap();
         fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-        start(&script, "7-1-w", &["create".to_owned()]).unwrap();
+        // as a process of its own whatever this machine's init is: the test must not depend on it
+        start_as_process(&script, "7-1-w", &["create".to_owned()]).unwrap();
         assert!(
             !marker.exists(),
             "start returns at once, it does not wait for the change"
