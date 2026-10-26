@@ -20,7 +20,7 @@ use snapall_core::{
     SystemProbe,
 };
 
-use crate::changes::{describe_change, how_it_went, outcome_of};
+use crate::changes::{describe_change, describe_now, how_it_went, outcome_of};
 use crate::model::{update, Effect, Finished, Key, Msg, PointOffer, State, UiContext};
 use crate::tabs::health::HealthData;
 
@@ -53,6 +53,7 @@ impl<'a> Executor<'a> {
         let Some(what) = describe_change(&effect) else {
             return self.perform(effect);
         };
+        let present = describe_now(&effect).unwrap_or_default();
         // one change at a time across every snapall: a second one is told who has the right, and waits
         let _hold = match self.system.hold_changes(&what) {
             Ok(hold) => hold,
@@ -60,6 +61,7 @@ impl<'a> Executor<'a> {
                 return Msg::Finished(Box::new(Finished {
                     outcome: Err(busy.to_string()),
                     what,
+                    present,
                     took: std::time::Duration::ZERO,
                     at: self.system.local_time(),
                     msg: Msg::Refused(busy.to_string()),
@@ -71,6 +73,7 @@ impl<'a> Executor<'a> {
         Msg::Finished(Box::new(Finished {
             outcome: how_it_went(&msg),
             what,
+            present,
             took: started.elapsed(),
             at: self.system.local_time(),
             msg,

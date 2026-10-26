@@ -36,7 +36,7 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
     if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R')) {
-        state.notice = Some(Notice::Info(
+        state.notice = Some(Notice::Error(
             "busy: wait for the current operation to finish".into(),
         ));
         return Vec::new();

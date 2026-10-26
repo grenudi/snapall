@@ -27,6 +27,7 @@ pub enum Command {
     Points,
     History,
     Health,
+    Quotas,
     Setup,
     Doctor,
     Completions,
@@ -47,6 +48,7 @@ impl Command {
         Command::Points,
         Command::History,
         Command::Health,
+        Command::Quotas,
         Command::Setup,
         Command::Doctor,
         Command::Completions,
@@ -68,6 +70,7 @@ impl Command {
             Command::History => "history",
             Command::Setup => "setup",
             Command::Health => "health",
+            Command::Quotas => "quotas",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -98,6 +101,9 @@ impl Command {
             Command::Points => "List the restore points: the snapshots one action took together",
             Command::Setup => "Protect what has no snapshots yet, explaining each step",
             Command::Health => "Show whether protection is working, and how much room it takes",
+            Command::Quotas => {
+                "Show how the disk counts the room snapshots take, and switch it on or off"
+            }
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -156,6 +162,7 @@ const OBSERVED: &[Command] = &[
     Command::Tui,
     Command::Setup,
     Command::Health,
+    Command::Quotas,
 ];
 
 contract! {
@@ -299,6 +306,7 @@ contract! {
             Command::History,
             Command::Setup,
             Command::Health,
+            Command::Quotas,
             Command::Doctor,
         ],
         env:         Some(Env::new("SNAPALL_JSON")),
@@ -409,6 +417,20 @@ contract! {
         ..Input::EMPTY
     };
 
+    // ---- quotas ----------------------------------------------------------------------
+
+    /// Whether the disk should count the room snapshots take.
+    QUOTAS_STATE: String, Command = Input {
+        key:         "state",
+        ty:          Type::String,
+        subcommands: &[Command::Quotas],
+        arg:         Some(Arg { value_name: "STATE", ..Arg::positional(0) }),
+        group:       "quotas",
+        example:     "sudo snapall quotas on",
+        summary:     "`on` or `off`. Without it, only shows how the disk counts room now and what switching it would mean.",
+        ..Input::EMPTY
+    };
+
     // ---- doctor ----------------------------------------------------------------------
 
     /// Install what is missing.
@@ -429,7 +451,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup],
+        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",

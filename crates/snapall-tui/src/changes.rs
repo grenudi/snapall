@@ -91,6 +91,71 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
     })
 }
 
+/// What a change is called while it is being done: the same changes as [`describe_change`], in the
+/// present tense, for the line that says what the window is doing and for how long.
+pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
+    use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
+    let plural = |n: usize| if n == 1 { "" } else { "s" };
+    Some(match effect {
+        Effect::Create { targets, .. } => format!(
+            "Taking a snapshot of {}",
+            targets
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Effect::Delete { config, ids } => {
+            format!(
+                "Deleting {} snapshot{} of {config}",
+                ids.len(),
+                plural(ids.len())
+            )
+        }
+        Effect::Restore {
+            config,
+            id,
+            path: Some(path),
+            ..
+        } => {
+            format!("Restoring {path} from snapshot #{id} of {config}")
+        }
+        Effect::Restore {
+            config,
+            id,
+            path: None,
+            ..
+        } => {
+            format!("Putting {config} back to snapshot #{id}")
+        }
+        Effect::RestorePoint { point } => {
+            format!("Putting every area back to restore point {}", point.point)
+        }
+        Effect::Protect { mount_point } => {
+            let title = snapall_core::coverage::describe(mount_point).title;
+            format!("Protecting {title} ({mount_point})")
+        }
+        Effect::SwitchOnCleanup => "Switching on automatic cleanup".to_owned(),
+        Effect::ControlJob { unit, action } => {
+            let doing = match action {
+                EnableNow => "Switching on",
+                DisableNow => "Switching off",
+                Start => "Starting",
+                Stop => "Stopping",
+                Restart => "Restarting",
+            };
+            format!("{doing} {}", crate::model::job_title(unit))
+        }
+        Effect::SetQuotas { turn_on, .. } => {
+            format!(
+                "Switching room counting {}",
+                if *turn_on { "on" } else { "off" }
+            )
+        }
+        _ => return None,
+    })
+}
+
 /// How a change went, from the message that says so: what came of it, or why it failed.
 pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
     let failures = |pairs: Vec<(String, &Result<String, String>)>| -> Vec<String> {

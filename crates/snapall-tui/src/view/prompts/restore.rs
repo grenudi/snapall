@@ -52,7 +52,7 @@ pub(crate) fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) 
         "The running system is left alone.",
         Style::new().fg(Color::Yellow),
     ));
-    spec.height += 6;
+    spec.height = (rows_needed(&spec.lines, spec.width) + 4).clamp(10, 21);
     let last = spec.buttons.len().saturating_sub(1);
     spec.buttons
         .insert(last, (Button::RestoreAll, format!("A: Restore all {k}")));
@@ -112,14 +112,18 @@ pub(crate) fn restore_stage_spec(
             height: 8,
             buttons: vec![close_button()],
         },
-        RestoreStage::Ready(preview) => ModalSpec {
-            title,
-            lines: restore_summary(config, id, path, &preview.changes),
-            color: Color::Yellow,
-            width: 78,
-            height: 16,
-            buttons: vec![confirm_button("Restore"), cancel_button()],
-        },
+        RestoreStage::Ready(preview) => {
+            let lines = restore_summary(config, id, path, &preview.changes);
+            let height = (rows_needed(&lines, 78) + 4).clamp(10, 21);
+            ModalSpec {
+                title,
+                lines,
+                color: Color::Yellow,
+                width: 78,
+                height,
+                buttons: vec![confirm_button("Restore"), cancel_button()],
+            }
+        }
     }
 }
 
@@ -160,5 +164,7 @@ pub(crate) fn restore_summary(
         "The current state is snapshotted first, so this can be undone.",
         Style::new().fg(Color::Yellow),
     ));
+    lines.push(Line::from(""));
+    lines.push(Line::styled(explain::RESTORE_CAUTION, Style::new().fg(DIM)));
     lines
 }

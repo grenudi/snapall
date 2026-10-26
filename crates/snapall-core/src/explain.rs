@@ -252,6 +252,10 @@ pub fn protected_text(mount_point: &str) -> String {
     )
 }
 
+/// What a restore puts back besides the files a person is thinking of, and what to do about it. Shown
+/// wherever a restore is about to happen.
+pub const RESTORE_CAUTION: &str = "Everything in the area goes back, including what programs keep there: their settings, saved sessions, databases and logs. Close the programs that use those files first, and if one file or folder is all you need, restore just that.";
+
 /// Where a restore of the whole computer happens, in two sentences, for the help text.
 pub const RESTORING: &str = "To go back, pick a snapshot and choose what to restore: one file, or a whole area such as Home. snapall always takes a snapshot of how things are first, so going back can itself be undone.";
 

@@ -165,6 +165,8 @@ pub enum Msg {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finished {
     pub what: String,
+    /// The same, in the present tense, as it was announced while it was being done.
+    pub present: String,
     pub outcome: Result<String, String>,
     pub took: Duration,
     pub at: Option<String>,

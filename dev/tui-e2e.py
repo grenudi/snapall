@@ -191,6 +191,7 @@ def tabs_scenario():
     tui.wait_gone("working", timeout=6)
     screen = tui.text()
     check("1 Snapshots" in screen and "2 Health" in screen and "3 Activity" in screen, "the tab bar names every view")
+    tui.wait_for("cleanup")  # the status bar fills in once the first screen has its data
     check(" snapshot" in tui.text().splitlines()[-3], "the status bar is under the view and counts the snapshots")
     tui.click_text("2 Health", offset=2)
     tui.wait_for("Health: ")
@@ -211,6 +212,47 @@ def tabs_scenario():
     tui.send("enter")
     tui.wait_for("Took a snapshot of snapall_it_a, snapall_it_b", timeout=10)
     check("done" in tui.text(), "a real snapshot is recorded as done")
+    tui.send("q")
+    tui.finish()
+
+
+def jobs_and_quotas_scenario():
+    """The Health tab's two prompts in a real terminal: a background job's controls (its real name and
+    every command made from it) and the question about counting room (its price, and a way out)."""
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.send("2")
+    tui.wait_for("What this means")
+    tui.send("G")
+    tui.wait_for("Cleaning up old snapshots (snapper-cleanup.timer)")
+    # choose the cleanup job by what the row says, not by where it is: other jobs may be installed too
+    for _ in range(12):
+        chosen = [line for line in tui.text().splitlines() if " > " in line]
+        if chosen and "Cleaning up old snapshots" in chosen[0]:
+            break
+        tui.send("up")
+        time.sleep(0.15)
+    check("Background jobs" in tui.text(), "the jobs have a section of their own")
+    check("the commands that check on it and control it" in tui.text(), "the row says what Enter does")
+    tui.send("enter")
+    tui.wait_for("sudo systemctl enable --now snapper-cleanup.timer")
+    text = tui.text()
+    check("sudo systemctl restart snapper-cleanup.timer" in text and "journalctl -u snapper-cleanup.service -n 50" in text,
+          "the controls show every command, made from the unit name")
+    check("q quit" in text.splitlines()[-1], "the prompt leaves the key line alone")
+    tui.send("esc")
+    tui.wait_gone("sudo systemctl enable --now")
+    tui.send("up")  # the row above: how the disk counts room
+    tui.wait_for("Counting the room snapshots take")
+    tui.send("enter")
+    tui.wait_for("snapall will switch counting on")
+    text = tui.text()
+    check("slow some operations down" in text and "leaving it off is the better choice" in text,
+          "counting room is explained with its price and when to leave it off")
+    tui.send("esc")
+    tui.wait_gone("snapall will switch counting")  # the prompt's own sentence; the row's explanation stays
+    check("Counting the room snapshots take: off" in tui.text(), "cancelling changed nothing")
     tui.send("q")
     tui.finish()
 
@@ -592,6 +634,7 @@ def main():
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
     tabs_scenario()
+    jobs_and_quotas_scenario()
     points_screen_scenario()
     restore_point_scenario()
     protect_scenario()

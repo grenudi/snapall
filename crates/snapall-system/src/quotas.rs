@@ -69,9 +69,9 @@ pub fn set(path: &str, on: bool) -> Result<(), String> {
         }
     };
     if on {
-        run(&["quota", "enable", path])?;
-        // build the tally in the background; it is correct once it has finished
-        run(&["quota", "rescan", path])
+        // enabling starts building the tally in the background by itself (a rescan of our own would be
+        // refused as "already in progress"); the figures are right once it has finished
+        run(&["quota", "enable", path])
     } else {
         run(&["quota", "disable", path])
     }

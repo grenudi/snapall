@@ -34,8 +34,30 @@ pub(crate) use prompts::*;
 pub use state::*;
 
 pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
-    let effects = handle(state, msg);
-    state.pending += effects.len();
+    // How protection stands is looked at only once what the person came to see has arrived: the worker
+    // does one thing at a time, and a status refresh must never delay the first screen.
+    let first_screen_arrived = matches!(
+        &msg,
+        Msg::SnapshotsLoaded { .. } | Msg::FileVersionsLoaded { .. } | Msg::ConfigsLoaded(Err(_))
+    ) || matches!(&msg, Msg::ConfigsLoaded(Ok(configs)) if configs.is_empty());
+    let mut effects = handle(state, msg);
+    if first_screen_arrived && !state.health_asked {
+        state.health_asked = true;
+        effects.push(Effect::LoadHealth);
+    }
+    // looking at how protection stands is a refresh on the side: it is neither work that blocks the keys
+    // that start work, nor something the screen announces
+    state.pending += effects
+        .iter()
+        .filter(|effect| !matches!(effect, Effect::LoadHealth))
+        .count();
+    state
+        .doing
+        .extend(effects.iter().filter_map(crate::changes::describe_now));
+    if state.pending == 0 {
+        state.doing.clear();
+        state.busy_ticks = 0;
+    }
     effects
 }
 
@@ -52,14 +74,11 @@ pub(crate) fn job_title(unit: &str) -> String {
 fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
     match msg {
         Msg::Start => match &state.file {
-            Some(view) => vec![
-                Effect::LoadFileVersions {
-                    config: view.target.config.clone(),
-                    path: view.target.path.clone(),
-                },
-                Effect::LoadHealth,
-            ],
-            None => vec![Effect::LoadConfigs, Effect::LoadHealth],
+            Some(view) => vec![Effect::LoadFileVersions {
+                config: view.target.config.clone(),
+                path: view.target.path.clone(),
+            }],
+            None => vec![Effect::LoadConfigs],
         },
         Msg::JobControlled {
             unit,
@@ -94,7 +113,6 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             Vec::new()
         }
         Msg::HealthLoaded(result) => {
-            settle(state);
             match result {
                 Ok(data) => {
                     state.health.data = Some(*data);
@@ -123,11 +141,16 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
         Msg::Finished(done) => {
             let Finished {
                 what,
+                present,
                 outcome,
                 took,
                 at,
                 msg,
             } = *done;
+            // it is no longer being done
+            if let Some(at) = state.doing.iter().position(|doing| *doing == present) {
+                state.doing.remove(at);
+            }
             state.activity.record(Activity {
                 at,
                 what,
@@ -141,6 +164,11 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
         }
         Msg::Tick => {
             state.spinner = state.spinner.wrapping_add(1);
+            state.busy_ticks = if state.pending > 0 {
+                state.busy_ticks.saturating_add(1)
+            } else {
+                0
+            };
             Vec::new()
         }
         Msg::Key(key) => on_key(state, key),

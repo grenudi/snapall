@@ -167,6 +167,12 @@ pub struct State {
     pub pending: usize,
     /// Advances on every `Tick`, to animate the working indicator.
     pub spinner: usize,
+    /// The report of how protection stands has been asked for once the first screen had its data.
+    pub health_asked: bool,
+    /// What the changes in flight are, in the present tense: what the screen says is being done.
+    pub doing: Vec<String>,
+    /// How many ticks (a tenth of a second each) work has been in flight without a pause.
+    pub busy_ticks: u32,
     /// What the shell told the UI about the machine, once, at the start.
     pub context: UiContext,
     /// Set when the UI was opened on one file: the screen is then that file's history.
@@ -203,6 +209,9 @@ impl Default for State {
             quit: false,
             pending: 0,
             spinner: 0,
+            health_asked: false,
+            doing: Vec::new(),
+            busy_ticks: 0,
             context: UiContext::default(),
             file: None,
             hover: None,
