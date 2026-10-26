@@ -102,7 +102,7 @@ pub fn on_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
     match key {
         Key::Up | Key::Char('k') => tab.cursor = tab.cursor.saturating_sub(1),
         Key::Down | Key::Char('j') => tab.cursor = (tab.cursor + 1).min(last),
-        Key::Home | Key::Char('g') => tab.cursor = 0,
+        Key::Home => tab.cursor = 0,
         Key::End | Key::Char('G') => tab.cursor = last,
         Key::Char('x') => ask_to_stop_the_chosen(state),
         _ => return None,

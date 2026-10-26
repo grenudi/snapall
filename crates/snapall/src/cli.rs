@@ -31,6 +31,7 @@ pub enum Request {
         description: Description,
         dry_run: bool,
         job: Option<String>,
+        group: Option<String>,
     },
     List,
     Snapshots {
@@ -60,6 +61,12 @@ pub enum Request {
     Health,
     /// What snapall has done, newest first.
     Activity,
+    /// Sets of areas that have a name.
+    Groups {
+        action: Option<String>,
+        name: Option<String>,
+        areas: Option<String>,
+    },
     /// Ask a running change to stop after the area it is on.
     Cancel {
         job: String,
@@ -382,6 +389,7 @@ fn build_request(
             },
             dry_run,
             job: Contract::JOB.get_from(resolution),
+            group: Contract::GROUP.get_from(resolution),
         },
         Command::List => Request::List,
         Command::Snapshots => Request::Snapshots {
@@ -441,6 +449,11 @@ fn build_request(
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
+        Command::Groups => Request::Groups {
+            action: Contract::GROUPS_ACTION.get_from(resolution),
+            name: Contract::GROUPS_NAME.get_from(resolution),
+            areas: Contract::GROUPS_AREAS.get_from(resolution),
+        },
         Command::Cancel => Request::Cancel {
             job: Contract::CANCEL_JOB.get_from(resolution).ok_or_else(|| {
                 usage_error("CHANGE is required: the name of the change to stop".to_owned())
@@ -484,7 +497,7 @@ fn parse_config(what: &str, name: &str) -> Result<ConfigName, UsageError> {
 }
 
 /// `--only a,b`: a comma-separated list of config names, each validated.
-fn parse_only(raw: &str) -> Result<Vec<ConfigName>, UsageError> {
+pub(crate) fn parse_only(raw: &str) -> Result<Vec<ConfigName>, UsageError> {
     raw.split(',')
         .map(|name| parse_config("--only", name.trim()))
         .collect()
@@ -532,6 +545,7 @@ mod tests {
             description: Description::parse(description).unwrap(),
             dry_run,
             job: None,
+            group: None,
         }
     }
 

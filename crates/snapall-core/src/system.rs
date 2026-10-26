@@ -87,6 +87,17 @@ pub trait SystemProbe {
     /// Take the right to make a change; `Busy` says who has it. Reading never needs it.
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy>;
 
+    /// The groups of areas the person made. None made, or no file, is an empty set; a file that cannot be
+    /// read is an error that says where.
+    fn groups(&self) -> Result<crate::groups::Groups, String> {
+        Ok(crate::groups::Groups::default())
+    }
+
+    /// Keep the groups. It needs administrator rights, and says so in plain words when it lacks them.
+    fn save_groups(&self, _groups: &crate::groups::Groups) -> Result<(), String> {
+        Err("this computer cannot keep groups".to_owned())
+    }
+
     /// Whether a change can be handed to a process that goes on without this one.
     fn can_run_in_background(&self) -> bool {
         false

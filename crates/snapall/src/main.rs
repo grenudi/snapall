@@ -102,6 +102,11 @@ fn run(parsed: Parsed) -> Outcome {
         Request::Health => commands::health(&ctx),
         Request::Activity => commands::activity(&ctx),
         Request::Cancel { job } => commands::cancel(&ctx, &job),
+        Request::Groups {
+            action,
+            name,
+            areas,
+        } => commands::groups(&ctx, action.as_deref(), name.as_deref(), areas.as_deref()),
         Request::Quotas { state, yes } => commands::quotas(&ctx, state.as_deref(), yes),
         Request::Snapshots { config } => commands::snapshots(&ctx, config),
         Request::History { path } => commands::history(&ctx, &path),
@@ -115,7 +120,15 @@ fn run(parsed: Parsed) -> Outcome {
             description,
             dry_run,
             job,
-        } => commands::create(&ctx, only.as_deref(), &description, dry_run, job.as_deref()),
+            group,
+        } => commands::create(
+            &ctx,
+            only.as_deref(),
+            group.as_deref(),
+            &description,
+            dry_run,
+            job.as_deref(),
+        ),
         Request::Delete { config, id } => commands::delete(&ctx, &config, id),
         Request::Restore {
             config,

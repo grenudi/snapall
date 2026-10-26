@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 17. Background jobs from one catalogue, room counting, and one change at a time
 
-Status: accepted. Parts 1, 2, 3 (reading), 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
+Status: accepted. Parts 1, 2, 3 (reading), 4, 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
 
 ## Context
 
@@ -52,13 +52,11 @@ Not built: editing the limits from the window. Design: a prompt per area, throug
 already sets snapper options, showing what the change would mean before it is made ("it would remove 12
 snapshots at the next cleanup").
 
-### 4. Groups of areas
+### 4. Groups of areas: built
 
-A good idea: a saved name for a set of areas ("theming" is Home plus another partition), with `all` as the
-default meaning every protected area (which is what taking a snapshot already does). Used by `create
---group`, by the window's snapshot prompt, and recorded on the restore point so points can be listed by
-group. It needs a small file of its own (`/etc/snapall/groups.json`), so it follows the foundations here
-rather than preceding them. Not built.
+A saved name for a set of areas, with `all` as the default meaning every protected area. Kept in a plain file, `/etc/snapall/groups`, one group a line (`theming: home, data`): readable, editable by hand, and not a format to migrate. A group names *areas*, never paths, so snapper stays the one place that says what is protected, and a group that names an area that no longer is **is refused with the area's name**, not shortened (a snapshot that quietly leaves out something the person thought was included is the worst way to fail). A file that cannot be read is an error naming the line, and the window will not overwrite it.
+
+Used by `snapall create --group NAME`, by `snapall groups [add|remove]`, and in the window by `g` (make, change, remove) and by Tab in the snapshot prompt (all, then each group). A group is a way of choosing areas, nothing more: the snapshot it takes is the ordinary one, one restore point, and restoring it is the ordinary restore. `all` is reserved; names are plain lower-case words. Not done: tagging a restore point with the group it came from, which would need a second place to say what a restore point is.
 
 ### 5. Protecting any volume, and stopping
 

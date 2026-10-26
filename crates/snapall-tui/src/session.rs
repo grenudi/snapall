@@ -121,6 +121,11 @@ impl<'a> Executor<'a> {
     fn perform(&self, effect: Effect) -> Msg {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
+            Effect::LoadGroups => Msg::GroupsLoaded(self.system.groups()),
+            Effect::SaveGroups { groups } => {
+                let result = self.system.save_groups(&groups);
+                Msg::GroupsSaved { groups, result }
+            }
             Effect::StopChange { id } => {
                 let result = self.system.request_stop(&id);
                 Msg::StopAsked { id, result }

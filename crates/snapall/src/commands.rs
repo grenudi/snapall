@@ -173,10 +173,22 @@ pub fn changes(ctx: &Context, config: &ConfigName, id: SnapshotId, path: Option<
 pub fn create(
     ctx: &Context,
     only: Option<&[ConfigName]>,
+    group: Option<&str>,
     description: &Description,
     dry_run: bool,
     job: Option<&str>,
 ) -> Outcome {
+    // a group is a name for a set of areas: it is what `--only` would have been
+    let from_group = match group {
+        Some(wanted) => {
+            if only.is_some() {
+                return Err("use either --only or --group, not both".into());
+            }
+            Some(areas_of_group(ctx, wanted)?)
+        }
+        None => None,
+    };
+    let only = from_group.as_deref().or(only);
     let plan = plan_snapshots(ctx.backend, only)?;
     if dry_run {
         return ctx.show.result(
@@ -363,6 +375,94 @@ pub fn activity(ctx: &Context) -> Outcome {
     let entries = snapall_system::LinuxSystem::new().history(100);
     ctx.show
         .result(render::activity(&entries), render::activity_json(&entries))
+}
+
+/// The areas of a group, out of the ones protected now; a group that names one that is not is refused.
+fn areas_of_group(ctx: &Context, wanted: &str) -> Result<Vec<ConfigName>, Box<dyn Error>> {
+    use snapall_core::{SystemProbe, Wanted};
+    let wanted = Wanted::parse(wanted)?;
+    let groups = snapall_system::LinuxSystem::new().groups()?;
+    let protected = ctx.backend.list_configs()?;
+    Ok(groups.resolve(&wanted, &protected)?)
+}
+
+/// Sets of areas that have a name. Without an action they are listed; `add` makes or replaces one and
+/// `remove` takes one away. `all` is always there, is every protected area, and cannot be changed.
+pub fn groups(
+    ctx: &Context,
+    action: Option<&str>,
+    name: Option<&str>,
+    areas: Option<&str>,
+) -> Outcome {
+    use snapall_core::{GroupName, SystemProbe};
+    let system = snapall_system::LinuxSystem::new();
+    let mut made = system.groups()?;
+    let protected = ctx.backend.list_configs()?;
+    match action {
+        None | Some("list") => ctx.show.result(
+            render::groups(&made, &protected),
+            render::groups_json(&made, &protected),
+        ),
+        Some("add") => {
+            let name =
+                GroupName::parse(name.ok_or("which group? `snapall groups add NAME AREA,AREA`")?)?;
+            let wanted = areas.ok_or("which areas? `snapall groups add NAME AREA,AREA`")?;
+            let list = crate::cli::parse_only(wanted)?;
+            if let Some(unprotected) = list.iter().find(|area| !protected.contains(area)) {
+                let there: Vec<String> = protected.iter().map(ToString::to_string).collect();
+                return Err(format!(
+                    "`{unprotected}` is not a protected area (there are: {})",
+                    there.join(", ")
+                )
+                .into());
+            }
+            let change = Change::begin(
+                &format!("Making the group {name}"),
+                &format!("Made the group {name}"),
+                None,
+            )?;
+            let saved = made
+                .set(name.clone(), list)
+                .map_err(|e| e.to_string())
+                .and_then(|()| system.save_groups(&made));
+            change.end(saved.clone().map(|()| String::new()));
+            saved?;
+            ctx.show.result(
+                format!(
+                    "The group {name} is now: {}
+",
+                    made.get(&name).map_or(String::new(), |a| a
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                ),
+                serde_json::json!({ "group": name.to_string(), "changed": true }),
+            )
+        }
+        Some("remove") => {
+            let name = GroupName::parse(name.ok_or("which group? `snapall groups remove NAME`")?)?;
+            if !made.remove(&name) {
+                return Err(format!("there is no group called `{name}`").into());
+            }
+            let change = Change::begin(
+                &format!("Removing the group {name}"),
+                &format!("Removed the group {name}"),
+                None,
+            )?;
+            let saved = system.save_groups(&made);
+            change.end(saved.clone().map(|()| String::new()));
+            saved?;
+            ctx.show.result(
+                format!(
+                    "The group {name} is gone. The areas and their snapshots are untouched.
+"
+                ),
+                serde_json::json!({ "group": name.to_string(), "changed": true }),
+            )
+        }
+        Some(other) => Err(format!("`{other}` is not `add` or `remove`").into()),
+    }
 }
 
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes

@@ -7,6 +7,7 @@
 mod delete;
 mod describe;
 mod frame;
+mod groups;
 mod help;
 mod job;
 mod points;
@@ -18,6 +19,7 @@ mod stop;
 pub(crate) use delete::*;
 pub(crate) use describe::*;
 pub(crate) use frame::*;
+pub(crate) use groups::*;
 pub(crate) use help::*;
 pub(crate) use job::*;
 pub(crate) use points::*;
