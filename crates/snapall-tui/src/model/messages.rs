@@ -40,6 +40,10 @@ pub enum Effect {
     },
     /// Look at how protection stands: the report the status bar and the Health tab are made from.
     LoadHealth,
+    /// Ask a change that is running to stop after the area it is on.
+    StopChange {
+        id: String,
+    },
     /// Read what snapall has done, from the journal: whatever snapall did it, in whichever session.
     LoadHistory,
     /// Do something to a background job (a unit name from the catalogue).
@@ -125,6 +129,18 @@ pub enum Msg {
     },
     /// A change was not made because another snapall is making one; the reason says who.
     Refused(String),
+    /// A change was handed to a process that goes on without the window; it is followed through the
+    /// journal from here.
+    StartedInBackground {
+        id: String,
+        /// What it is, in the present tense.
+        present: String,
+    },
+    /// A change was asked to stop, or why it could not be.
+    StopAsked {
+        id: String,
+        result: Result<(), String>,
+    },
     /// What snapall has done, newest first, as the journal remembers it.
     HistoryLoaded(Vec<snapall_core::JournalEntry>),
     /// How protection stands, or why that could not be found out.

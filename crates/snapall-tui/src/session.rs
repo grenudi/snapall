@@ -20,7 +20,9 @@ use snapall_core::{
     SystemProbe,
 };
 
-use crate::changes::{describe_change, describe_now, how_it_went, new_id, outcome_of};
+use crate::changes::{
+    background_arguments, describe_change, describe_now, how_it_went, new_id, outcome_of,
+};
 use crate::model::{update, Effect, Finished, Key, Msg, PointOffer, State, UiContext};
 use crate::tabs::health::HealthData;
 
@@ -50,6 +52,13 @@ impl<'a> Executor<'a> {
     /// Perform one effect. Always answers with exactly one message: for a change, that message wrapped
     /// with what it was, how it went, when and for how long, which is what the Activity tab shows.
     pub fn execute(&self, effect: Effect) -> Msg {
+        // A change of several areas goes to a process that carries on without the window, which is what
+        // lets it be closed, and watched and stopped from anywhere. If that cannot be done, it is done here.
+        if self.system.can_run_in_background() {
+            if let Some(started) = self.hand_to_the_background(&effect) {
+                return started;
+            }
+        }
         let Some(what) = describe_change(&effect) else {
             return self.perform(effect);
         };
@@ -83,7 +92,7 @@ impl<'a> Executor<'a> {
         self.system.record(&snapall_core::JournalEvent::Finished {
             id: id.clone(),
             at: self.system.local_time().unwrap_or_default(),
-            outcome: outcome.clone(),
+            outcome: outcome.clone().into(),
             took_ms: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
         });
         Msg::Finished(Box::new(Finished {
@@ -97,9 +106,25 @@ impl<'a> Executor<'a> {
         }))
     }
 
+    /// Start the change as a command of its own and say so; `None` if it is not one for the background, or
+    /// could not be started (it is then done here, as before).
+    fn hand_to_the_background(&self, effect: &Effect) -> Option<Msg> {
+        let arguments = background_arguments(effect)?;
+        let id = new_id();
+        self.system.start_in_background(&id, &arguments).ok()?;
+        Some(Msg::StartedInBackground {
+            id,
+            present: describe_now(effect).unwrap_or_default(),
+        })
+    }
+
     fn perform(&self, effect: Effect) -> Msg {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
+            Effect::StopChange { id } => {
+                let result = self.system.request_stop(&id);
+                Msg::StopAsked { id, result }
+            }
             Effect::LoadHistory => Msg::HistoryLoaded(self.system.history(200)),
             Effect::LoadHealth => Msg::HealthLoaded(
                 gather(backend, self.system)

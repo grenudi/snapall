@@ -40,6 +40,10 @@ pub struct Activity {
     pub detail: String,
     pub took: Option<Duration>,
     pub source: Option<Source>,
+    /// The process doing it, while it runs.
+    pub pid: Option<u32>,
+    /// How far it has come, while it runs.
+    pub progress: Option<snapall_core::JournalProgress>,
 }
 
 impl Activity {
@@ -55,6 +59,8 @@ impl Activity {
             detail: entry.detail.clone(),
             took: entry.took_ms.map(Duration::from_millis),
             source: entry.source,
+            pid: entry.pid,
+            progress: entry.progress.clone(),
         }
     }
 }
@@ -98,9 +104,29 @@ pub fn on_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
         Key::Down | Key::Char('j') => tab.cursor = (tab.cursor + 1).min(last),
         Key::Home | Key::Char('g') => tab.cursor = 0,
         Key::End | Key::Char('G') => tab.cursor = last,
+        Key::Char('x') => ask_to_stop_the_chosen(state),
         _ => return None,
     }
     Some(Vec::new())
+}
+
+/// `x` on a change that is running opens the question; on anything else it says what it is for.
+fn ask_to_stop_the_chosen(state: &mut State) {
+    let chosen = state.activity.entries.get(state.activity.cursor).cloned();
+    match chosen {
+        Some(entry) if entry.status == JournalStatus::Running && entry.id.is_some() => {
+            let id = entry.id.unwrap_or_default();
+            state.modal = Some(crate::model::Modal::StopChange {
+                id,
+                what: entry.what,
+            });
+        }
+        _ => {
+            state.notice = Some(crate::model::Notice::Info(
+                "x asks a change that is running to stop; this one is not running".into(),
+            ));
+        }
+    }
 }
 
 /// `2026-10-25 18:15:02` as `18:15:02`, or as `10-25 18:15` when the list spans more than one day.
@@ -208,7 +234,7 @@ fn entry_line(entry: &Activity, chosen: bool, several_days: bool) -> Line<'stati
     });
     let color = match entry.status {
         JournalStatus::Done => Color::Green,
-        JournalStatus::Running => Color::Yellow,
+        JournalStatus::Running | JournalStatus::Cancelled => Color::Yellow,
         JournalStatus::Failed | JournalStatus::Interrupted => Color::Red,
     };
     let origin = match entry.source {
@@ -218,9 +244,20 @@ fn entry_line(entry: &Activity, chosen: bool, several_days: bool) -> Line<'stati
     let mut spans = vec![
         Span::styled(if chosen { " > " } else { "   " }, body),
         Span::styled(when(entry.at.as_deref(), several_days), body.fg(DIM)),
-        Span::styled(format!("  {:<7}", entry.status.word()), body.fg(color)),
+        Span::styled(format!("  {:<9}", entry.status.word()), body.fg(color)),
         Span::styled(format!(" {}{origin}", entry.what), body),
     ];
+    if let (JournalStatus::Running, Some(progress)) = (entry.status, &entry.progress) {
+        spans.push(Span::styled(
+            format!(
+                "  ({} of {}: {})",
+                progress.done + 1,
+                progress.of,
+                progress.area
+            ),
+            body.fg(Color::Yellow),
+        ));
+    }
     if let Some(duration) = entry.took {
         spans.push(Span::styled(
             format!("  ({})", took(duration)),
@@ -236,8 +273,30 @@ fn detail_text(entry: &Activity) -> String {
         JournalStatus::Done if entry.detail.is_empty() => "It went through.".to_owned(),
         JournalStatus::Done | JournalStatus::Interrupted => entry.detail.clone(),
         JournalStatus::Failed => format!("It failed: {}", entry.detail),
-        JournalStatus::Running => "It is being done right now.".to_owned(),
+        JournalStatus::Cancelled => format!("It was stopped on request. {}", entry.detail),
+        JournalStatus::Running => running_text(entry),
     }
+}
+
+/// What a change that is running says about itself, and what can be done about it.
+fn running_text(entry: &Activity) -> String {
+    let mut text = String::from("It is being done right now");
+    if let Some(pid) = entry.pid {
+        text.push_str(&format!(" by process {pid}"));
+    }
+    text.push('.');
+    if let Some(progress) = &entry.progress {
+        text.push_str(&format!(
+            " It is on step {} of {}: {}.",
+            progress.done + 1,
+            progress.of,
+            progress.area
+        ));
+    }
+    text.push_str(
+        " Closing this window does not stop it. x asks it to stop after the area it is on.",
+    );
+    text
 }
 
 fn render_detail(state: &State, frame: &mut Frame, area: Rect) {

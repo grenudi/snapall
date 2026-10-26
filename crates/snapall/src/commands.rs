@@ -12,9 +12,9 @@ use std::process::ExitCode;
 use snapall_core::boot;
 use snapall_core::{
     all_snapshots, assess, config_covering, delete_snapshot, file_history, fresh_point, gather,
-    plan_snapshots, preview_point, preview_restore, restore_point, restore_points,
-    restore_snapshot, run_plan, snapshots_of, ConfigName, Description, Level, MemberView, Point,
-    Preview, RestoreError, RestorePoint, SnapshotBackend, SnapshotId,
+    plan_snapshots, preview_point, preview_restore, restore_point_along, restore_points,
+    restore_snapshot, run_plan_along, snapshots_of, ConfigName, Description, Level, MemberView,
+    Point, Preview, RestoreError, RestorePoint, SnapshotBackend, SnapshotId,
 };
 
 use crate::output::{Outcome, Show};
@@ -42,19 +42,27 @@ struct Change {
 impl Change {
     /// `now` is what is being done, for whoever is refused meanwhile; `done` is the same in the past
     /// tense, for the record.
-    fn begin(now: &str, done: &str) -> Result<Change, Box<dyn Error>> {
+    fn begin(now: &str, done: &str, name: Option<&str>) -> Result<Change, Box<dyn Error>> {
         use snapall_core::SystemProbe;
         let system = snapall_system::LinuxSystem::new();
         let hold = system.hold_changes(now).map_err(|busy| busy.to_string())?;
         let milliseconds = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_millis());
-        let id = format!("{}-{milliseconds}-c", std::process::id());
+        let id = name.map_or_else(
+            || format!("{}-{milliseconds}-c", std::process::id()),
+            str::to_owned,
+        );
+        // a change that the window handed to the background says so; any other is a command
+        let source = match std::env::var("SNAPALL_SOURCE").as_deref() {
+            Ok("window") => snapall_core::Source::Window,
+            _ => snapall_core::Source::Command,
+        };
         system.record(&snapall_core::JournalEvent::Started {
             id: id.clone(),
             at: system.local_time().unwrap_or_default(),
             what: done.to_owned(),
-            source: snapall_core::Source::Command,
+            source,
             pid: std::process::id(),
         });
         Ok(Change {
@@ -68,12 +76,23 @@ impl Change {
 
     /// How it went: what came of it, or why it failed.
     fn end(mut self, outcome: Result<String, String>) {
-        self.write_end(outcome);
+        self.write_end(outcome.into());
     }
 
-    fn write_end(&mut self, outcome: Result<String, String>) {
+    /// It was stopped on request, between steps; how far it had got.
+    fn end_stopped(mut self, how_far: String) {
+        self.write_end(snapall_core::JournalOutcome::Cancelled(how_far));
+    }
+
+    /// The steps it takes are reported as they begin, and a request to stop is looked for before each.
+    fn course(&self) -> Following<'_> {
+        Following { change: self }
+    }
+
+    fn write_end(&mut self, outcome: snapall_core::JournalOutcome) {
         use snapall_core::SystemProbe;
         self.ended = true;
+        self.system.clear_stop(&self.id);
         self.system.record(&snapall_core::JournalEvent::Finished {
             id: self.id.clone(),
             at: self.system.local_time().unwrap_or_default(),
@@ -88,10 +107,30 @@ impl Drop for Change {
     /// a change that looks as if it were still running.
     fn drop(&mut self) {
         if !self.ended {
-            self.write_end(Err(
+            self.write_end(snapall_core::JournalOutcome::Failed(
                 "it ended early, with an error that the command printed".to_owned(),
             ));
         }
+    }
+}
+
+/// What a change does between its steps: say how far it has come, and look for a request to stop.
+struct Following<'a> {
+    change: &'a Change,
+}
+
+impl snapall_core::Course for Following<'_> {
+    fn proceed(&self, done: usize, of: usize, area: &str) -> bool {
+        use snapall_core::SystemProbe;
+        let system = &self.change.system;
+        system.record(&snapall_core::JournalEvent::Progress {
+            id: self.change.id.clone(),
+            at: system.local_time().unwrap_or_default(),
+            done: u32::try_from(done).unwrap_or(u32::MAX),
+            of: u32::try_from(of).unwrap_or(u32::MAX),
+            area: area.to_owned(),
+        });
+        !system.stop_requested(&self.change.id)
     }
 }
 
@@ -136,6 +175,7 @@ pub fn create(
     only: Option<&[ConfigName]>,
     description: &Description,
     dry_run: bool,
+    job: Option<&str>,
 ) -> Outcome {
     let plan = plan_snapshots(ctx.backend, only)?;
     if dry_run {
@@ -153,10 +193,30 @@ pub fn create(
     let change = Change::begin(
         &format!("Taking a snapshot of {areas}"),
         &format!("Took a snapshot of {areas}"),
+        job,
     )?;
     // every snapshot of this one action is the same restore point
     let point = fresh_point(ctx.backend, unix_now());
-    let report = run_plan(ctx.backend, &plan, description, Some(&point));
+    let (report, stopped) = run_plan_along(
+        ctx.backend,
+        &plan,
+        description,
+        Some(&point),
+        &change.course(),
+    );
+    if stopped {
+        let (taken, total) = (report.outcomes.len(), plan.targets().len());
+        eprintln!(
+            "snapall: stopped on request after {taken} of {total} areas; the rest were not started"
+        );
+        let how_far = format!(
+            "stopped on request after {taken} of {total} areas: the others were not started"
+        );
+        change.end_stopped(how_far);
+        ctx.show
+            .result(render::report(&report), render::report_json(&report))?;
+        return Ok(ExitCode::FAILURE);
+    }
     change.end(if report.is_success() {
         let taken = report.outcomes.len();
         Ok(format!(
@@ -189,6 +249,7 @@ pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId) -> Outcome {
     let change = Change::begin(
         &format!("Deleting 1 snapshot of {config}"),
         &format!("Deleted 1 snapshot of {config}"),
+        None,
     )?;
     let result = delete_snapshot(ctx.backend, config, id);
     change.end(
@@ -235,7 +296,7 @@ pub fn restore(
             format!("Put {config} back to snapshot #{id}"),
         ),
     };
-    let change = Change::begin(&now, &past)?;
+    let change = Change::begin(&now, &past, None)?;
     let result = restore_snapshot(ctx.backend, config, id, path);
     change.end(
         result
@@ -264,6 +325,36 @@ pub fn health(ctx: &Context) -> Outcome {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// Ask a running change to stop after the area it is on. Only a request: the change looks for it between
+/// its areas, never inside one, so nothing is left half-done.
+pub fn cancel(ctx: &Context, job: &str) -> Outcome {
+    use snapall_core::{JournalStatus, SystemProbe};
+    let system = snapall_system::LinuxSystem::new();
+    let history = system.history(500);
+    let Some(entry) = history.iter().find(|entry| entry.id == job) else {
+        return Err(format!(
+            "there is no change called `{job}`: `snapall activity --json` lists them"
+        )
+        .into());
+    };
+    if entry.status != JournalStatus::Running {
+        return Err(format!(
+            "`{}` has already ended ({})",
+            entry.what,
+            entry.status.word().to_lowercase()
+        )
+        .into());
+    }
+    system.request_stop(job)?;
+    ctx.show.result(
+        format!(
+            "Asked {} to stop. It finishes the area it is on, then stops; nothing is left half-done.\n",
+            entry.what
+        ),
+        serde_json::json!({ "asked": job, "what": entry.what }),
+    )
 }
 
 /// What snapall has done, newest first: from the window and from commands, in this and earlier sessions.
@@ -342,6 +433,7 @@ pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
     let change = Change::begin(
         &format!("Switching room counting {side}"),
         &format!("Switched room counting {side}"),
+        None,
     )?;
     let result: Result<(), String> = facts
         .areas
@@ -373,7 +465,13 @@ pub fn points(ctx: &Context) -> Outcome {
 /// Put every area back to one restore point with a single action: shows what would change in each,
 /// asks first (unless told not to), takes a safety snapshot per area (all one restore point, so
 /// that undoing this is one action too) and reports each area. The running system is left alone.
-pub fn restore_all(ctx: &Context, wanted: &Point, dry_run: bool, yes: bool) -> Outcome {
+pub fn restore_all(
+    ctx: &Context,
+    wanted: &Point,
+    dry_run: bool,
+    yes: bool,
+    job: Option<&str>,
+) -> Outcome {
     let found = restore_points(&all_snapshots(ctx.backend)?);
     let point = the_point_named(&found, wanted)?;
     let previews = preview_point(ctx.backend, point);
@@ -395,10 +493,42 @@ pub fn restore_all(ctx: &Context, wanted: &Point, dry_run: bool, yes: bool) -> O
     let change = Change::begin(
         &format!("Putting every area back to restore point {}", point.point),
         &format!("Put every area back to restore point {}", point.point),
+        job,
     )?;
-    let done = restore_point(ctx.backend, point, fresh_point(ctx.backend, unix_now()));
+    let done = restore_point_along(
+        ctx.backend,
+        point,
+        fresh_point(ctx.backend, unix_now()),
+        &change.course(),
+    );
+    if done.stopped {
+        let (put_back, total) = (done.members.len(), point.members.len());
+        eprintln!("snapall: stopped on request after {put_back} of {total} areas; the rest were left as they are");
+        change.end_stopped(format!(
+            "stopped on request after {put_back} of {total} areas: the others were left as they are. To undo what was done: restore point {}",
+            done.safety.as_str()
+        ));
+        ctx.show.result(
+            render::point_restored(point, &done),
+            render::point_restored_json(point, &done),
+        )?;
+        return Ok(ExitCode::FAILURE);
+    }
     change.end(if done.succeeded() {
-        Ok(String::new())
+        let put_back = done
+            .members
+            .iter()
+            .filter(|m| matches!(m.result, snapall_core::MemberResult::Restored(_)))
+            .count();
+        Ok(if done.changed_anything() {
+            format!(
+                "{put_back} area{} put back. To undo it: restore point {}",
+                if put_back == 1 { "" } else { "s" },
+                done.safety.as_str()
+            )
+        } else {
+            String::new()
+        })
     } else {
         Err("some areas could not be put back: the output says which".to_owned())
     });
@@ -553,6 +683,7 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
         Some(Change::begin(
             "Protecting a part of the disk",
             "Protected a part of the disk",
+            None,
         )?)
     };
     let facts = setup::gather();

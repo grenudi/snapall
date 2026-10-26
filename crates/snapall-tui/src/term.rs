@@ -186,7 +186,7 @@ fn event_loop(
                 _ => {}
             }
             changed = true;
-        } else if state.pending > 0 {
+        } else if state.is_following_something() {
             step(&mut state, Msg::Tick, effects);
             changed = true;
         }

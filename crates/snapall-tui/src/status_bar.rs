@@ -47,17 +47,40 @@ pub fn chip_rects(area: Rect, chips: &[Chip]) -> Vec<(Rect, Topic)> {
     out
 }
 
+/// What the bar shows, left to right: what is running now, then the report's own items.
+pub fn chips(state: &State) -> Vec<Chip> {
+    let running = state
+        .activity
+        .entries
+        .iter()
+        .filter(|entry| entry.status == snapall_core::JournalStatus::Running)
+        .count();
+    let mut chips = Vec::new();
+    if running > 0 {
+        chips.push(Chip {
+            label: format!("{running} running"),
+            level: snapall_core::Level::Attention,
+            topic: Topic::Jobs,
+        });
+    }
+    if let Some(data) = &state.health.data {
+        chips.extend(data.report.chips.iter().cloned());
+    }
+    chips
+}
+
 pub fn render(state: &State, frame: &mut Frame, area: Rect) {
-    let Some(data) = &state.health.data else {
+    let chips = chips(state);
+    if chips.is_empty() {
         frame.render_widget(
             Paragraph::new(" checking how protection stands...").style(Style::new().fg(DIM)),
             area,
         );
         return;
-    };
-    let shown = chip_rects(area, &data.report.chips).len();
+    }
+    let shown = chip_rects(area, &chips).len();
     let mut spans = vec![Span::raw(" ")];
-    for (index, chip) in data.report.chips.iter().take(shown).enumerate() {
+    for (index, chip) in chips.iter().take(shown).enumerate() {
         if index > 0 {
             spans.push(Span::styled(SEPARATOR, Style::new().fg(DIM)));
         }

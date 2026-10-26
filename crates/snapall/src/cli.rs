@@ -30,6 +30,7 @@ pub enum Request {
         only: Option<Vec<ConfigName>>,
         description: Description,
         dry_run: bool,
+        job: Option<String>,
     },
     List,
     Snapshots {
@@ -59,6 +60,10 @@ pub enum Request {
     Health,
     /// What snapall has done, newest first.
     Activity,
+    /// Ask a running change to stop after the area it is on.
+    Cancel {
+        job: String,
+    },
     /// How the disk counts the room snapshots take; with `on` or `off`, switch it.
     Quotas {
         state: Option<String>,
@@ -69,6 +74,7 @@ pub enum Request {
         point: Point,
         yes: bool,
         dry_run: bool,
+        job: Option<String>,
     },
     /// How one file stood in each snapshot.
     History {
@@ -375,6 +381,7 @@ fn build_request(
                 None => Description::default(),
             },
             dry_run,
+            job: Contract::JOB.get_from(resolution),
         },
         Command::List => Request::List,
         Command::Snapshots => Request::Snapshots {
@@ -434,6 +441,11 @@ fn build_request(
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
+        Command::Cancel => Request::Cancel {
+            job: Contract::CANCEL_JOB.get_from(resolution).ok_or_else(|| {
+                usage_error("CHANGE is required: the name of the change to stop".to_owned())
+            })?,
+        },
         Command::Quotas => Request::Quotas {
             state: Contract::QUOTAS_STATE.get_from(resolution),
             yes: flag(&Contract::YES, resolution),
@@ -447,6 +459,7 @@ fn build_request(
             },
             yes: flag(&Contract::YES, resolution),
             dry_run: flag(&Contract::DRY_RUN, resolution),
+            job: Contract::JOB.get_from(resolution),
         },
         Command::Setup => Request::Setup {
             area: Contract::SETUP_AREA
@@ -518,6 +531,7 @@ mod tests {
             only: only.map(names),
             description: Description::parse(description).unwrap(),
             dry_run,
+            job: None,
         }
     }
 

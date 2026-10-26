@@ -34,7 +34,7 @@ snapall (binary: argenv CLI, wiring, rendering)
    ├── snapall-tui ───────▶ snapall-core     (+ ratatui, signal-hook)
    ├── snapall-observe ───▶ snapall-core     (+ serde_json)
    ├── snapall-snapper ───▶ snapall-core     (+ serde_json)
-   ├── snapall-system ────▶ snapall-core     (+ serde_json: df, systemctl, unit files, quotas, the lock, the journal)
+   ├── snapall-system ────▶ snapall-core     (+ serde_json: df, systemctl, unit files, quotas, the lock, the journal, the runner)
    └────────────────────────▶ snapall-core     (no I/O, no parser, no terminal, no clock)
 ```
 

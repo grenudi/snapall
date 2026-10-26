@@ -207,15 +207,21 @@ pub fn activity(entries: &[snapall_core::JournalEntry]) -> String {
             Some(Source::Command) => "command",
             None => "-",
         };
+        let step = match (&entry.status, &entry.progress) {
+            (JournalStatus::Running, Some(p)) => {
+                format!(" (step {} of {}: {})", p.done + 1, p.of, p.area)
+            }
+            _ => String::new(),
+        };
         out.push_str(&format!(
-            "{when:<19}  {:<8} {origin:<8} {}{}\n",
+            "{when:<19}  {:<9} {origin:<8} {}{step}{}\n",
             entry.status.word(),
             entry.what,
             took_words(entry.took_ms)
         ));
         if matches!(
             entry.status,
-            JournalStatus::Failed | JournalStatus::Interrupted
+            JournalStatus::Failed | JournalStatus::Interrupted | JournalStatus::Cancelled
         ) {
             out.push_str(&format!("                     {}\n", entry.detail));
         }
@@ -236,6 +242,7 @@ pub fn activity_json(entries: &[snapall_core::JournalEntry]) -> Value {
             "took_ms": entry.took_ms,
             "detail": entry.detail,
             "pid": entry.pid,
+            "progress": entry.progress.as_ref().map(|p| json!({"done": p.done, "of": p.of, "area": p.area})),
         }))
         .collect::<Vec<_>>())
 }
@@ -269,6 +276,7 @@ fn topic_word(topic: snapall_core::Topic) -> &'static str {
         Topic::Cleanup => "cleanup",
         Topic::BootMenu => "boot-menu",
         Topic::Snapshots => "snapshots",
+        Topic::Jobs => "jobs",
     }
 }
 

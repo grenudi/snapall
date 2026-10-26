@@ -11,7 +11,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use snapall_core::journal::{fold, Entry, Event, Source};
+use snapall_core::journal::{fold, Entry, Event, Outcome, Source};
 
 pub const PATH: &str = "/var/lib/snapall/journal.jsonl";
 
@@ -42,16 +42,31 @@ pub fn to_line(event: &Event) -> String {
             "event": "started", "id": id, "at": at, "what": shortened(what),
             "source": source.word(), "pid": pid,
         }),
+        Event::Progress {
+            id,
+            at,
+            done,
+            of,
+            area,
+        } => serde_json::json!({
+            "event": "progress", "id": id, "at": at, "done": done, "of": of, "area": shortened(area),
+        }),
         Event::Finished {
             id,
             at,
             outcome,
             took_ms,
-        } => serde_json::json!({
-            "event": "finished", "id": id, "at": at, "took_ms": took_ms,
-            "ok": outcome.is_ok(),
-            "detail": shortened(match outcome { Ok(text) | Err(text) => text }),
-        }),
+        } => {
+            let (result, detail) = match outcome {
+                Outcome::Done(text) => ("done", text),
+                Outcome::Failed(text) => ("failed", text),
+                Outcome::Cancelled(text) => ("cancelled", text),
+            };
+            serde_json::json!({
+                "event": "finished", "id": id, "at": at, "took_ms": took_ms,
+                "result": result, "detail": shortened(detail),
+            })
+        }
     };
     value.to_string()
 }
@@ -69,16 +84,29 @@ pub fn parse_line(line: &str) -> Option<Event> {
             source: Source::from_word(&text("source")?)?,
             pid: u32::try_from(value.get("pid")?.as_u64()?).ok()?,
         }),
+        "progress" => Some(Event::Progress {
+            id,
+            at,
+            done: u32::try_from(value.get("done")?.as_u64()?).ok()?,
+            of: u32::try_from(value.get("of")?.as_u64()?).ok()?,
+            area: text("area")?,
+        }),
         "finished" => {
             let detail = text("detail").unwrap_or_default();
+            // lines written before a change could be cancelled said only whether it was all right
+            let result = match (
+                text("result").as_deref(),
+                value.get("ok").and_then(serde_json::Value::as_bool),
+            ) {
+                (Some("done"), _) | (None, Some(true)) => Outcome::Done(detail),
+                (Some("failed"), _) | (None, Some(false)) => Outcome::Failed(detail),
+                (Some("cancelled"), _) => Outcome::Cancelled(detail),
+                _ => return None,
+            };
             Some(Event::Finished {
                 id,
                 at,
-                outcome: if value.get("ok")?.as_bool()? {
-                    Ok(detail)
-                } else {
-                    Err(detail)
-                },
+                outcome: result,
                 took_ms: value.get("took_ms")?.as_u64()?,
             })
         }
@@ -149,7 +177,7 @@ mod tests {
         Event::Finished {
             id: id.into(),
             at: "2026-10-25 18:15:03".into(),
-            outcome: outcome.map(str::to_owned).map_err(str::to_owned),
+            outcome: outcome.map(str::to_owned).map_err(str::to_owned).into(),
             took_ms: 3000,
         }
     }
@@ -277,7 +305,46 @@ mod tests {
         let line = to_line(&finished("a", Err(&"x".repeat(5000))));
         assert!(line.len() < 1200, "{}", line.len());
         assert!(
-            matches!(parse_line(&line), Some(Event::Finished { outcome: Err(text), .. }) if text.ends_with("..."))
+            matches!(parse_line(&line), Some(Event::Finished { outcome: Outcome::Failed(text), .. }) if text.ends_with("..."))
         );
+    }
+
+    #[test]
+    fn progress_and_a_cancelled_ending_survive_the_trip_and_old_lines_are_still_read() {
+        let progress = Event::Progress {
+            id: "a".into(),
+            at: "t".into(),
+            done: 1,
+            of: 3,
+            area: "home".into(),
+        };
+        assert_eq!(parse_line(&to_line(&progress)), Some(progress));
+        let cancelled = Event::Finished {
+            id: "a".into(),
+            at: "t".into(),
+            outcome: Outcome::Cancelled("1 of 3 areas".into()),
+            took_ms: 5,
+        };
+        assert_eq!(parse_line(&to_line(&cancelled)), Some(cancelled));
+        // what the previous version wrote: a plain yes or no
+        let old_ok = r#"{"event":"finished","id":"a","at":"t","took_ms":9,"ok":true,"detail":"2 snapshots taken"}"#;
+        assert_eq!(
+            parse_line(old_ok),
+            Some(Event::Finished {
+                id: "a".into(),
+                at: "t".into(),
+                outcome: Outcome::Done("2 snapshots taken".into()),
+                took_ms: 9
+            })
+        );
+        let old_no =
+            r#"{"event":"finished","id":"a","at":"t","took_ms":9,"ok":false,"detail":"boom"}"#;
+        assert!(matches!(
+            parse_line(old_no),
+            Some(Event::Finished {
+                outcome: Outcome::Failed(_),
+                ..
+            })
+        ));
     }
 }

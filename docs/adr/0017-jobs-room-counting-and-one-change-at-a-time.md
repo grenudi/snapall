@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 17. Background jobs from one catalogue, room counting, and one change at a time
 
-Status: accepted. Parts 1, 2, 3 (reading), 6, 7, 8 and 9 are built; the rest is designed here and staged.
+Status: accepted. Parts 1, 2, 3 (reading), 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
 
 ## Context
 
@@ -77,20 +77,13 @@ A resident privileged daemon (a socket, a protocol, a queue) would satisfy the r
 always-running attack surface, a second code path next to the one used today, and a thing to keep alive
 across upgrades, for a tool whose work is a few seconds of snapper calls now and then.
 
-Better fit: **jobs as transient systemd units plus a journal.** A change is handed to `systemd-run`; it
-runs detached from the window (closing the window, or an ssh drop, does not stop it), systemd already
-provides status, logs and `stop`, and each job writes its progress to a small file under
-`/var/lib/snapall/jobs/`. Nothing runs when nothing is being done. Activity then *is* the journal, so it
-survives sessions; the window polls it, so reopening shows finished, failed and ongoing jobs; a Jobs
-view and a status-bar chip ("2 running") read the same files. Computers without systemd keep today's
-in-process path, with the change lock.
+**Built (10–12): the runner is the command line itself, run detached.** Building it showed a simpler shape than transient units with a job file of their own: `snapall create` and `snapall restore-all` already take the change lock, write the journal and, given `--yes`, ask nothing. So the window hands a slow, multi-area change to *the same command a person would type*, started with `--job NAME` so that the window can find its journal entry. One code path; nothing new to serialize; anything the window can start, a terminal can start, watch (`snapall activity`) and stop (`snapall cancel NAME`). Where systemd is running it is started through `systemd-run` (so the system keeps its log under `snapall-job-NAME` and the change survives the end of a login session); elsewhere as a process group of its own. One-area changes take a moment and stay in the window. Nothing runs when nothing is being done, and there is no resident daemon.
 
-Aborting is cooperative, because a half-finished restore is worse than a finished one: a job stops
-between areas, never inside one snapper call; restoring one area is not interrupted midway. The Jobs
-view says which of these a running job is.
+The window follows what it started through the journal, once a second while anything runs (and keeps its clock ticking for that: a window that ticked only while busy never noticed a change it had handed away), says when it ends, and then looks at its lists again. A change that never appears in the journal is let go of after thirty looks, with a word about it. The status bar shows "N running", a click on which goes to the running change in Activity, which is also the jobs view: one list of changes, whatever their state, rather than a second list to disagree with the first.
 
-If a resident daemon is still wanted after this is built, the journal and the job format are the same.
-Not built; this is the next step.
+**Stopping is cooperative and never inside a step.** A multi-step change follows a *course*: before each area it is asked "may I begin step N of M?", which is also how progress is reported. Stopping is a request (a small file under `/run/snapall/stop`, named for the change) that is looked for between areas; nothing is signalled, so a snapper call is never interrupted. The steps already done stay done, the rest never start, and the change ends *cancelled* with how far it got (for a restore point, also the restore point that undoes what was done). A change killed outright (the computer switched off) is still shown as stopped, by the journal. The window asks before stopping, and says what stopping means.
+
+If a resident daemon is still wanted, the journal, the job names and the course are what it would be built on.
 
 ### 7. Restores and the state of programs
 

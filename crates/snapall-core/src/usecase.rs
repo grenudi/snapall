@@ -6,6 +6,7 @@
 
 use thiserror::Error;
 
+use crate::course::{Course, Unattended};
 use crate::domain::{
     Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, SnapshotId,
     SnapshotInfo,
@@ -61,10 +62,26 @@ pub fn run_plan(
     description: &Description,
     point: Option<&Point>,
 ) -> Report {
-    let outcomes = plan
-        .targets()
-        .iter()
-        .map(|config| Outcome {
+    run_plan_along(backend, plan, description, point, &Unattended).0
+}
+
+/// [`run_plan`], one step per config, following a [`Course`]: told before each, and stoppable between
+/// them. The second answer is whether it was stopped before the end; the report then has the outcomes of
+/// the steps that were taken.
+pub fn run_plan_along(
+    backend: &dyn SnapshotBackend,
+    plan: &Plan,
+    description: &Description,
+    point: Option<&Point>,
+    course: &dyn Course,
+) -> (Report, bool) {
+    let total = plan.targets().len();
+    let mut outcomes = Vec::with_capacity(total);
+    for (done, config) in plan.targets().iter().enumerate() {
+        if !course.proceed(done, total, config.as_str()) {
+            return (Report { outcomes }, true);
+        }
+        outcomes.push(Outcome {
             config: config.clone(),
             // every snapshot of one action carries the same restore point, so they can be found
             // together again and put back with one action
@@ -72,9 +89,9 @@ pub fn run_plan(
                 Some(point) => backend.create_snapshot_in(config, description, point),
                 None => backend.create_snapshot(config, description),
             },
-        })
-        .collect();
-    Report { outcomes }
+        });
+    }
+    (Report { outcomes }, false)
 }
 
 pub fn snapshot_all(
