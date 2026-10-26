@@ -22,6 +22,11 @@ pub(crate) fn describe_spec(
                 names.join(", ")
             )
         }
+        Target::Group(name) => {
+            let areas = state.groups.get(name).unwrap_or(&[]);
+            let list: Vec<String> = areas.iter().map(ToString::to_string).collect();
+            format!(" New snapshot of the group {name} ({}) ", list.join(", "))
+        }
     };
     let mut lines = vec![
         Line::from("A short note to help you recognise this snapshot later (Enter alone uses \"snapall\"):"),
@@ -37,12 +42,20 @@ pub(crate) fn describe_spec(
     if let Some(error) = error {
         lines.push(Line::styled(error.to_owned(), Style::new().fg(Color::Red)));
     }
+    // several areas can be narrowed to a group, if there are any: the way to do it is on the screen
+    if !matches!(target, Target::One(_)) && !state.groups.is_empty() {
+        lines.push(Line::styled(
+            "Tab: all the areas, or one of your groups",
+            Style::new().fg(DIM),
+        ));
+    }
+    let height = (rows_needed(&lines, 64) + 4).clamp(9, 21);
     ModalSpec {
         title,
         lines,
         color: ACCENT,
         width: 64,
-        height: 9,
+        height,
         buttons: vec![confirm_button("Create"), cancel_button()],
     }
 }

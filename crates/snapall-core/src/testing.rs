@@ -602,6 +602,7 @@ pub struct FakeSystem {
     busy: Option<crate::system::Busy>,
     journal: std::sync::Mutex<Vec<crate::journal::Event>>,
     background: bool,
+    groups: std::sync::Mutex<crate::groups::Groups>,
     started: std::sync::Mutex<Vec<(String, Vec<String>)>>,
     stops: std::sync::Mutex<Vec<String>>,
 }
@@ -676,6 +677,14 @@ impl FakeSystem {
             doing: doing.to_owned(),
             since: Some("12:03:00".to_owned()),
         });
+        self
+    }
+
+    /// Groups the person already made.
+    pub fn with_groups(self, groups: crate::groups::Groups) -> Self {
+        if let Ok(mut held) = self.groups.lock() {
+            *held = groups;
+        }
         self
     }
 
@@ -809,6 +818,21 @@ impl crate::system::SystemProbe for FakeSystem {
             Some(busy) => Err(busy.clone()),
             None => Ok(Box::new(())),
         }
+    }
+
+    fn groups(&self) -> Result<crate::groups::Groups, String> {
+        self.groups
+            .lock()
+            .map(|g| g.clone())
+            .map_err(|e| e.to_string())
+    }
+
+    fn save_groups(&self, groups: &crate::groups::Groups) -> Result<(), String> {
+        if self.refuse_jobs {
+            return Err("this needs administrator rights: start snapall with sudo".to_owned());
+        }
+        *self.groups.lock().map_err(|e| e.to_string())? = groups.clone();
+        Ok(())
     }
 
     fn can_run_in_background(&self) -> bool {

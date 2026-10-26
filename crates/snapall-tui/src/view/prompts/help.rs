@@ -49,6 +49,7 @@ pub(crate) fn concepts_page() -> Vec<Line<'static>> {
 
 pub(crate) fn keys_page() -> Vec<Line<'static>> {
     let rows = [
+        ("1  2  3", "Snapshots, Health, Activity"),
         ("up/down  k/j", "Move in the list that is selected"),
         ("left/right  Tab", "Switch between areas and snapshots"),
         ("space", "Mark a snapshot (Delete can take several)"),
@@ -61,7 +62,12 @@ pub(crate) fn keys_page() -> Vec<Line<'static>> {
         ),
         ("A", "In Restore: put its whole restore point back"),
         ("p", "Protect: see what has no snapshots yet, and set it up"),
+        (
+            "g",
+            "Groups: name a set of areas (theming) to snapshot together",
+        ),
         ("R", "Restore points: put every area back to one moment"),
+        ("x", "In Activity: ask a running change to stop"),
         ("r", "Look again at which snapshots exist"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
         (

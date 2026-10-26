@@ -82,7 +82,7 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         Key::Up | Key::Char('k') => step(state, -1),
         Key::Down | Key::Char('j') => step(state, 1),
-        Key::Home | Key::Char('g') => jump(state, false),
+        Key::Home => jump(state, false),
         Key::End | Key::Char('G') => jump(state, true),
         Key::Char(' ') => {
             toggle_mark(state);
@@ -94,6 +94,10 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         Key::Char('u') => open_restore(state),
         Key::Char('p') => {
             state.modal = Some(Modal::Protect { index: 0 });
+            Vec::new()
+        }
+        Key::Char('g') => {
+            state.modal = Some(Modal::Groups(GroupsScreen::List { cursor: 0 }));
             Vec::new()
         }
         Key::Char('R') => {
@@ -157,6 +161,7 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         Modal::Job { unit } => controlling_job(state, key, unit),
         Modal::Quotas { turn_on } => confirming_quotas(state, key, turn_on),
         Modal::StopChange { id, what } => confirming_stop(state, key, id, what),
+        Modal::Groups(screen) => managing_groups(state, key, screen),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
         Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
         Modal::Restore {

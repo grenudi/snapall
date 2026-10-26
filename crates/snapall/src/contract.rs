@@ -28,6 +28,7 @@ pub enum Command {
     History,
     Health,
     Activity,
+    Groups,
     Cancel,
     Quotas,
     Setup,
@@ -51,6 +52,7 @@ impl Command {
         Command::History,
         Command::Health,
         Command::Activity,
+        Command::Groups,
         Command::Cancel,
         Command::Quotas,
         Command::Setup,
@@ -77,6 +79,7 @@ impl Command {
             Command::Quotas => "quotas",
             Command::Activity => "activity",
             Command::Cancel => "cancel",
+            Command::Groups => "groups",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -114,6 +117,7 @@ impl Command {
                 "Show what snapall has done, including earlier sessions, newest first"
             }
             Command::Cancel => "Ask a running change to stop after the area it is on",
+            Command::Groups => "Name sets of areas, such as theming, to take snapshots of together",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
             Command::Man => "Print the manual page",
@@ -317,6 +321,7 @@ contract! {
             Command::Setup,
             Command::Health,
             Command::Activity,
+            Command::Groups,
             Command::Cancel,
             Command::Quotas,
             Command::Doctor,
@@ -426,6 +431,56 @@ contract! {
         group:       "setup",
         example:     "snapall setup /srv",
         summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+        ..Input::EMPTY
+    };
+
+    // ---- groups -------------------------------------------------------------------------
+
+    /// What to do with groups.
+    GROUPS_ACTION: String, Command = Input {
+        key:         "action",
+        ty:          Type::String,
+        subcommands: &[Command::Groups],
+        arg:         Some(Arg { value_name: "ACTION", ..Arg::positional(0) }),
+        group:       "groups",
+        example:     "snapall groups add theming home,data",
+        summary:     "`add` or `remove`. Without it, the groups are listed.",
+        ..Input::EMPTY
+    };
+
+    /// Which group.
+    GROUPS_NAME: String, Command = Input {
+        key:         "group_name",
+        ty:          Type::String,
+        subcommands: &[Command::Groups],
+        arg:         Some(Arg { value_name: "NAME", ..Arg::positional(1) }),
+        group:       "groups",
+        example:     "snapall groups remove theming",
+        summary:     "The group's name: lower-case letters, digits, - and _, starting with a letter. `all` is always there and cannot be changed.",
+        ..Input::EMPTY
+    };
+
+    /// The areas of the group.
+    GROUPS_AREAS: String, Command = Input {
+        key:         "group_areas",
+        ty:          Type::String,
+        subcommands: &[Command::Groups],
+        arg:         Some(Arg { value_name: "AREAS", ..Arg::positional(2) }),
+        group:       "groups",
+        example:     "snapall groups add theming home,data",
+        summary:     "With `add`: the areas, separated by commas, as `snapall list` names them.",
+        ..Input::EMPTY
+    };
+
+    /// Which group to take a snapshot of.
+    GROUP: String, Command = Input {
+        key:         "group",
+        ty:          Type::String,
+        subcommands: &[Command::Create],
+        arg:         Some(Arg::long("group")),
+        group:       "create",
+        example:     "snapall create --group theming \"before the new theme\"",
+        summary:     "Take a snapshot of the areas of this group (see `snapall groups`) instead of all of them. Not together with --only.",
         ..Input::EMPTY
     };
 

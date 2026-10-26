@@ -40,6 +40,12 @@ pub enum Effect {
     },
     /// Look at how protection stands: the report the status bar and the Health tab are made from.
     LoadHealth,
+    /// Read the groups of areas the person made.
+    LoadGroups,
+    /// Keep these groups (it replaces the file).
+    SaveGroups {
+        groups: snapall_core::Groups,
+    },
     /// Ask a change that is running to stop after the area it is on.
     StopChange {
         id: String,
@@ -129,6 +135,13 @@ pub enum Msg {
     },
     /// A change was not made because another snapall is making one; the reason says who.
     Refused(String),
+    /// The groups, or why they could not be read.
+    GroupsLoaded(Result<snapall_core::Groups, String>),
+    /// The groups were kept, or why they could not be.
+    GroupsSaved {
+        groups: snapall_core::Groups,
+        result: Result<(), String>,
+    },
     /// A change was handed to a process that goes on without the window; it is followed through the
     /// journal from here.
     StartedInBackground {
@@ -199,6 +212,9 @@ impl Effect {
     /// Looking at how protection stands, and reading what was done: refreshes on the side. They are
     /// neither work that blocks the keys that start work, nor something the screen announces.
     pub fn is_background(&self) -> bool {
-        matches!(self, Effect::LoadHealth | Effect::LoadHistory)
+        matches!(
+            self,
+            Effect::LoadHealth | Effect::LoadHistory | Effect::LoadGroups
+        )
     }
 }

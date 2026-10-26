@@ -111,6 +111,27 @@ pub enum RestoreStage {
 pub enum Target {
     One(ConfigName),
     All,
+    /// The areas of a group the person made.
+    Group(snapall_core::GroupName),
+}
+
+/// Where the groups prompt is: the list of them, naming a new one, or choosing the areas of one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupsScreen {
+    /// `all` first, then the groups the person made; one is chosen.
+    List { cursor: usize },
+    /// Typing the name of a new group.
+    Name {
+        input: String,
+        error: Option<String>,
+    },
+    /// Choosing which areas are in the group.
+    Pick {
+        name: snapall_core::GroupName,
+        picks: Vec<(ConfigName, bool)>,
+        cursor: usize,
+        error: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,6 +163,8 @@ pub enum Modal {
     Job { unit: String },
     /// Asking before switching the counting of room on or off for the disk.
     Quotas { turn_on: bool },
+    /// The groups of areas: see them, make one, change one, take one away.
+    Groups(GroupsScreen),
     /// Asking before a running change is asked to stop.
     StopChange { id: String, what: String },
 }
@@ -179,6 +202,9 @@ pub struct State {
     pub spinner: usize,
     /// The report of how protection stands has been asked for once the first screen had its data.
     pub health_asked: bool,
+    /// The groups of areas the person made, and why they could not be read, if they could not.
+    pub groups: snapall_core::Groups,
+    pub groups_error: Option<String>,
     /// Changes this window handed to the background and has not seen end: it follows them, and looks
     /// at the lists again when they have.
     pub watching: Vec<Watched>,
@@ -225,6 +251,8 @@ impl Default for State {
             pending: 0,
             spinner: 0,
             health_asked: false,
+            groups: snapall_core::Groups::default(),
+            groups_error: None,
             watching: Vec::new(),
             poll_ticks: 0,
             doing: Vec::new(),

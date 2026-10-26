@@ -24,6 +24,10 @@ pub(crate) fn describing(
     match key {
         Key::Esc | Key::CtrlC => Reaction::closes(),
         Key::Enter => create_with(state, target, input),
+        Key::Tab => {
+            let next = next_target(state, &target);
+            Reaction::stays(describe(next, input, None))
+        }
         Key::Backspace => {
             input.pop();
             Reaction::stays(describe(target, input, None))
@@ -36,6 +40,21 @@ pub(crate) fn describing(
         }
         _ => Reaction::stays(describe(target, input, None)),
     }
+}
+
+/// Tab in the prompt for several areas: every protected area, then each group in turn, then every area
+/// again. A snapshot of one chosen area has nothing to cycle through.
+fn next_target(state: &State, current: &Target) -> Target {
+    if matches!(current, Target::One(_)) {
+        return current.clone();
+    }
+    let mut options = vec![Target::All];
+    options.extend(state.groups.names().cloned().map(Target::Group));
+    let at = options
+        .iter()
+        .position(|option| option == current)
+        .unwrap_or(0);
+    options[(at + 1) % options.len()].clone()
 }
 
 /// Enter in the description prompt: an empty description means the default one, and one that is not
@@ -51,6 +70,20 @@ pub(crate) fn create_with(state: &mut State, target: Target, input: String) -> R
             let targets = match &target {
                 Target::One(config) => vec![config.clone()],
                 Target::All => state.config_names(),
+                Target::Group(name) => {
+                    let wanted = snapall_core::Wanted::Named(name.clone());
+                    match state.groups.resolve(&wanted, &state.config_names()) {
+                        Ok(areas) => areas,
+                        // a group naming an area that is no longer protected is refused, with its name
+                        Err(problem) => {
+                            return Reaction::stays(describe(
+                                target,
+                                input,
+                                Some(problem.to_string()),
+                            ));
+                        }
+                    }
+                }
             };
             state.notice = Some(Notice::Info(format!(
                 "creating {} snapshot(s)",

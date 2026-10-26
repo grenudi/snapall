@@ -45,6 +45,7 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
         state.health_asked = true;
         effects.push(Effect::LoadHealth);
         effects.push(Effect::LoadHistory);
+        effects.push(Effect::LoadGroups);
     }
     // looking at how protection stands is a refresh on the side: it is neither work that blocks the keys
     // that start work, nor something the screen announces
@@ -178,6 +179,28 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
                 (true, Ok(())) => Notice::Info("Counting is on: the disk is building its tally in the background, and figures appear as it finishes".into()),
                 (false, Ok(())) => Notice::Info("Counting is off".into()),
                 (_, Err(why)) => Notice::Error(format!("Could not change how room is counted: {why}")),
+            });
+            Vec::new()
+        }
+        Msg::GroupsLoaded(result) => {
+            match result {
+                Ok(groups) => {
+                    state.groups = groups;
+                    state.groups_error = None;
+                }
+                Err(why) => state.groups_error = Some(why),
+            }
+            Vec::new()
+        }
+        Msg::GroupsSaved { groups, result } => {
+            settle(state);
+            state.notice = Some(match result {
+                Ok(()) => {
+                    state.groups = groups;
+                    state.groups_error = None;
+                    Notice::Info("The groups are saved.".into())
+                }
+                Err(why) => Notice::Error(format!("The groups could not be saved: {why}")),
             });
             Vec::new()
         }

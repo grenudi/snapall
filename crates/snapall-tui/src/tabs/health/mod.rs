@@ -75,7 +75,7 @@ pub fn on_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
     match key {
         Key::Up | Key::Char('k') => state.health.cursor = state.health.cursor.saturating_sub(1),
         Key::Down | Key::Char('j') => state.health.cursor = (state.health.cursor + 1).min(last),
-        Key::Home | Key::Char('g') => state.health.cursor = 0,
+        Key::Home => state.health.cursor = 0,
         Key::End | Key::Char('G') => state.health.cursor = last,
         Key::Enter => return Some(act_on_chosen(state)),
         _ => return None,

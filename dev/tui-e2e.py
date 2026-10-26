@@ -96,6 +96,15 @@ class Tui:
                 self.raw += data
                 self.stream.feed(data)
 
+    def wait_until(self, condition, what, timeout=10.0):
+        """Read the terminal until `condition()` holds. (`text()` alone only shows what was already read.)"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.pump(0.1)
+            if condition():
+                return
+        raise AssertionError(f"timed out waiting for {what}; screen:\n{self.text()}")
+
     def wait_for(self, needle, timeout=6.0):
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -303,6 +312,58 @@ def runner_scenario():
     tui.finish()
     after_stop = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
     check(after_stop == (after[0] + 1, after[1]), "one area had its snapshot, the other was never begun")
+
+
+def groups_scenario():
+    """Groups of areas from the keyboard: make one, see it kept in a plain file, snapshot just it with Tab in
+    the snapshot prompt, and take it away."""
+    path = "/etc/snapall/groups"
+    if os.path.exists(path):
+        os.remove(path)
+    before = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
+    tui = Tui()
+    tui.wait_for("Snapshots of snapall_it_a (")
+    tui.wait_gone("working", timeout=6)
+    tui.send("g")
+    tui.wait_for("Groups of areas")
+    check("all every protected area (snapall_it_a, snapall_it_b)" in words(tui), "the groups start with all, which is every protected area")
+    check("q quit" in tui.text().splitlines()[-1], "the prompt leaves the key line alone")
+    tui.send("n")
+    tui.wait_for("What should the group be called?")
+    tui.type("theming")
+    tui.send("enter")
+    tui.wait_for("The areas of theming")
+    tui.send(" ")  # snapall_it_a
+    tui.send("enter")
+    # the save is a change like any other: it is done on the worker, and the list shows the group once kept
+    tui.wait_until(lambda: "theming snapall_it_a" in words(tui), "the new group in the list")
+    check("theming snapall_it_a" in words(tui), "the new group is in the list with its area")
+    check(os.path.exists(path) and "theming: snapall_it_a" in open(path).read(), "it is kept in a plain file a person can read")
+    tui.send("esc")
+    tui.wait_gone("Groups of areas")
+
+    tui.send("a")
+    tui.wait_for("New snapshot of ALL protected areas")
+    check("Tab: all the areas, or one of your groups" in words(tui), "the prompt says how to choose a group")
+    tui.send("tab")
+    tui.wait_for("New snapshot of the group theming (snapall_it_a)")
+    check(True, "Tab chooses the group and says which areas it covers")
+    tui.send("enter")
+    tui.pump(0.5)
+    tui.wait_gone("working", timeout=10)
+    after = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
+    check(after == (before[0] + 1, before[1]), f"only the group's area got a snapshot (before {before}, after {after})")
+
+    tui.send("g")
+    tui.wait_for("Groups of areas")
+    tui.send("down")
+    tui.send("d")
+    tui.wait_until(lambda: "theming snapall_it_a" not in words(tui), "the group to be taken away")
+    check("theming snapall_it_a" not in words(tui), "the group is taken away")
+    check("theming" not in open(path).read(), "and gone from the file")
+    tui.send("esc")
+    tui.send("q")
+    tui.finish()
 
 
 def jobs_and_quotas_scenario():
@@ -775,6 +836,7 @@ def main():
     check(refused.returncode == 1 and "No snapshot contains /etc/hostname" in refused.stderr and "snapper" not in refused.stderr, "a file no snapshot can contain is refused in plain words")
 
     tabs_scenario()
+    groups_scenario()
     journal_scenario()
     runner_scenario()
     jobs_and_quotas_scenario()

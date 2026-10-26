@@ -9,6 +9,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod groups;
 mod journal;
 mod lock;
 mod quotas;
@@ -27,6 +28,7 @@ use snapall_core::{
 pub struct LinuxSystem {
     lock_path: Option<PathBuf>,
     journal_path: Option<PathBuf>,
+    groups_path: Option<PathBuf>,
     stop_directory: Option<PathBuf>,
     program: Option<PathBuf>,
 }
@@ -77,6 +79,20 @@ impl LinuxSystem {
                 std::env::current_exe().map_err(|e| format!("cannot find itself to start: {e}"))
             }
         }
+    }
+
+    /// Keep the groups file somewhere else (for tests).
+    pub fn with_groups_path(path: PathBuf) -> Self {
+        Self {
+            groups_path: Some(path),
+            ..Self::default()
+        }
+    }
+
+    fn groups_path(&self) -> PathBuf {
+        self.groups_path
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(groups::PATH))
     }
 
     fn journal_path(&self) -> PathBuf {
@@ -145,6 +161,14 @@ impl SystemProbe for LinuxSystem {
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy> {
         let since = self.local_time().unwrap_or_default();
         lock::hold(&self.lock_path(), doing, &since)
+    }
+
+    fn groups(&self) -> Result<snapall_core::Groups, String> {
+        groups::read(&self.groups_path())
+    }
+
+    fn save_groups(&self, groups: &snapall_core::Groups) -> Result<(), String> {
+        groups::write(&self.groups_path(), groups)
     }
 
     fn can_run_in_background(&self) -> bool {
