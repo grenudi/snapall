@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.19.0]
+
+
+### Features
+- Stop protecting an area, after being told exactly what that deletes ([#55](https://github.com/grenudi/snapall/pull/55)) ([e92d61e])
+
+
+
 ## [0.18.0]
 
 
