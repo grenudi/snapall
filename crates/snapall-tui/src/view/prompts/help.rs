@@ -68,6 +68,10 @@ pub(crate) fn keys_page() -> Vec<Line<'static>> {
         ),
         ("R", "Restore points: put every area back to one moment"),
         ("x", "In Activity: ask a running change to stop"),
+        (
+            "U",
+            "In Health: stop protecting an area (deletes its snapshots)",
+        ),
         ("r", "Look again at which snapshots exist"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
         (

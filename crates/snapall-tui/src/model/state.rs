@@ -133,6 +133,17 @@ pub struct LimitsEditor {
     pub error: Option<String>,
 }
 
+/// The prompt before an area stops being protected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StopProtecting {
+    pub config: ConfigName,
+    /// What it would do, or why it would not; `None` while it is being worked out.
+    pub plan: Option<Result<snapall_core::unprotect::Plan, String>>,
+    /// What has been typed so far, to be the area's name.
+    pub typed: String,
+    pub error: Option<String>,
+}
+
 /// Where the groups prompt is: the list of them, naming a new one, or choosing the areas of one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GroupsScreen {
@@ -185,6 +196,8 @@ pub enum Modal {
     Groups(GroupsScreen),
     /// How many snapshots an area keeps, and when its oldest are removed.
     Limits(LimitsEditor),
+    /// Stopping the protection of an area, which deletes its snapshots for good.
+    StopProtecting(StopProtecting),
     /// Asking before a running change is asked to stop.
     StopChange { id: String, what: String },
 }

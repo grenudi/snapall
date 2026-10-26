@@ -30,6 +30,7 @@ pub enum Command {
     Activity,
     Groups,
     Limits,
+    Unprotect,
     Cancel,
     Quotas,
     Setup,
@@ -55,6 +56,7 @@ impl Command {
         Command::Activity,
         Command::Groups,
         Command::Limits,
+        Command::Unprotect,
         Command::Cancel,
         Command::Quotas,
         Command::Setup,
@@ -83,6 +85,7 @@ impl Command {
             Command::Cancel => "cancel",
             Command::Groups => "groups",
             Command::Limits => "limits",
+            Command::Unprotect => "unprotect",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -121,6 +124,7 @@ impl Command {
             }
             Command::Cancel => "Ask a running change to stop after the area it is on",
             Command::Limits => "Show or change how many snapshots an area keeps",
+            Command::Unprotect => "Stop protecting an area: deletes all its snapshots for good",
             Command::Groups => "Name sets of areas, such as theming, to take snapshots of together",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
@@ -182,6 +186,7 @@ const OBSERVED: &[Command] = &[
     Command::Health,
     Command::Quotas,
     Command::Limits,
+    Command::Unprotect,
 ];
 
 contract! {
@@ -299,7 +304,7 @@ contract! {
         key:         "dry_run",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::Restore, Command::RestoreAll, Command::Setup],
+        subcommands: &[Command::Create, Command::Restore, Command::RestoreAll, Command::Setup, Command::Unprotect],
         arg:         Some(Arg::long("dry-run")),
         group:       "create",
         summary:     "Show what would happen without changing anything.",
@@ -328,6 +333,7 @@ contract! {
             Command::Activity,
             Command::Groups,
             Command::Limits,
+            Command::Unprotect,
             Command::Cancel,
             Command::Quotas,
             Command::Doctor,
@@ -437,6 +443,20 @@ contract! {
         group:       "setup",
         example:     "snapall setup /srv",
         summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+        ..Input::EMPTY
+    };
+
+    // ---- unprotect ----------------------------------------------------------------------
+
+    /// Which area to stop protecting.
+    UNPROTECT_AREA: String, Command = Input {
+        key:         "unprotect_area",
+        ty:          Type::String,
+        subcommands: &[Command::Unprotect],
+        arg:         Some(Arg { value_name: "AREA", ..Arg::positional(0) }),
+        group:       "unprotect",
+        example:     "snapall unprotect games --dry-run",
+        summary:     "The area, as `snapall list` names it (required). The system area is never stopped.",
         ..Input::EMPTY
     };
 
@@ -600,7 +620,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits],
+        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits, Command::Unprotect],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",

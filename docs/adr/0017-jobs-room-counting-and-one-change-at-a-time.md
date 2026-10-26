@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # 17. Background jobs from one catalogue, room counting, and one change at a time
 
-Status: accepted. Parts 1, 2, 3, 4, 6, 7, 8, 9 and 10–12 are built; the rest is designed here and staged.
+Status: accepted. Every part is built; the rest is designed here and staged.
 
 ## Context
 
@@ -56,12 +56,11 @@ A saved name for a set of areas, with `all` as the default meaning every protect
 
 Used by `snapall create --group NAME`, by `snapall groups [add|remove]`, and in the window by `g` (make, change, remove) and by Tab in the snapshot prompt (all, then each group). A group is a way of choosing areas, nothing more: the snapshot it takes is the ordinary one, one restore point, and restoring it is the ordinary restore. `all` is reserved; names are plain lower-case words. Not done: tagging a restore point with the group it came from, which would need a second place to say what a restore point is.
 
-### 5. Protecting any volume, and stopping
+### 5. Protecting any volume, and stopping: built
 
-Protecting any Btrfs part of the disk already works (`snapall setup AREA`, and the offer in the window).
-Stopping protection deletes that area's snapshots (verified on real snapper), so it needs a loud warning
-and a count of what will be lost; and it is **refused for the system area**, whose history is what the boot
-menu is built from. Not built.
+Protecting any Btrfs part of the disk already worked (`snapall setup AREA`, and the offer in the window). Stopping is the one operation here that cannot be undone, and it was checked on real snapper first: removing a config deletes the `.snapshots` folder and **every snapshot of the area**, and leaves the area's own files alone. So the warning can be exact, and is: a **plan**, shown before anything is done and made from the same words for the window and the command line (how many snapshots go, how much room that frees when it is measured, how many restore points stop including the area, which groups name it, and that it cannot be undone).
+
+Two things make it hard to do by mistake. The area's **name must be typed** (in the window, and on a terminal; `--yes` is for scripts): a `y` or Enter, enough elsewhere, is not. And the **system area is refused**, at planning and again at doing, so no caller can reach the deletion without passing the check: its snapshots are what the boot menu offers and how you get back from a bad update (ADR 12 already never restores over the running system for the same reason). The plan is computed again at the moment of doing, not trusted from when the prompt opened. `U` is a key of its own, never the Enter that a row means for something milder.
 
 ### 6. Activity beyond this window: built. And 10–12, jobs that outlive the window: staged
 

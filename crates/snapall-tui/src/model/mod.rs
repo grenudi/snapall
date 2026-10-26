@@ -182,6 +182,36 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             });
             Vec::new()
         }
+        Msg::UnprotectPlanLoaded { config, plan } => {
+            if let Some(Modal::StopProtecting(prompt)) = &mut state.modal {
+                if prompt.config == config {
+                    prompt.plan = Some(plan);
+                }
+            }
+            Vec::new()
+        }
+        Msg::ProtectionStopped { config, result } => {
+            settle(state);
+            match result {
+                Ok(deleted) => {
+                    let told = Notice::Info(format!(
+                        "{config} is no longer protected: {deleted} snapshot{} deleted, its files are untouched",
+                        if deleted == 1 { "" } else { "s" }
+                    ));
+                    // looking at the lists again would clear it: it is shown again when they have arrived
+                    state.after_reload = Some(told.clone());
+                    state.notice = Some(told);
+                    // the areas listed have changed
+                    vec![Effect::LoadConfigs]
+                }
+                Err(why) => {
+                    state.notice = Some(Notice::Error(format!(
+                        "Could not stop protecting {config}: {why}"
+                    )));
+                    Vec::new()
+                }
+            }
+        }
         Msg::LimitsData { config, snapshots } => {
             if let Some(Modal::Limits(editor)) = &mut state.modal {
                 if editor.config == config {

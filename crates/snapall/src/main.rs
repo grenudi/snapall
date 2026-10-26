@@ -102,6 +102,7 @@ fn run(parsed: Parsed) -> Outcome {
         Request::Health => commands::health(&ctx),
         Request::Activity => commands::activity(&ctx),
         Request::Cancel { job } => commands::cancel(&ctx, &job),
+        Request::Unprotect { area, dry_run, yes } => commands::unprotect(&ctx, &area, dry_run, yes),
         Request::Limits {
             area,
             keep,

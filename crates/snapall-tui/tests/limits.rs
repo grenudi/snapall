@@ -275,5 +275,6 @@ fn the_health_row_says_what_enter_does() {
         .position(|r| matches!(r.action, RowAction::EditLimits(_)))
         .unwrap();
     session.state.health.cursor = at;
-    assert!(flat(&session).contains("Enter: change how many it keeps, and when the oldest go"));
+    assert!(flat(&session)
+        .contains("Enter: change what it keeps U: stop protecting it (deletes its snapshots)"));
 }

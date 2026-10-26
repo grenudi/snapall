@@ -15,6 +15,7 @@ mod protect;
 mod quotas;
 mod restore;
 mod stop;
+mod unprotect;
 
 pub(crate) use delete::*;
 pub(crate) use describe::*;
@@ -27,3 +28,4 @@ pub(crate) use protect::*;
 pub(crate) use quotas::*;
 pub(crate) use restore::*;
 pub(crate) use stop::*;
+pub(crate) use unprotect::*;

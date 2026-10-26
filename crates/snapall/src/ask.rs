@@ -39,3 +39,13 @@ pub fn confirm(question: &str, default: bool) -> Result<bool, Box<dyn Error>> {
         _ => default,
     })
 }
+
+/// Ask for `expected` to be typed out, letter for letter: for what cannot be undone, where a `y` is too
+/// easy to give. Anything else, including Enter alone, is a no.
+pub fn typed(instruction: &str, expected: &str) -> Result<bool, Box<dyn Error>> {
+    eprint!("{instruction} Type {expected} to go ahead: ");
+    io::stderr().flush()?;
+    let mut answer = String::new();
+    io::stdin().lock().read_line(&mut answer)?;
+    Ok(answer.trim() == expected)
+}

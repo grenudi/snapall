@@ -158,6 +158,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall health` | Whether protection is working: a verdict first, then what to do about anything that needs it (cleanup off, a disk nearly full, new snapshots not reaching the boot menu), then the numbers: snapshots per area, the room they hold (when measurable), how full the disk is, and which background jobs run. `--json` for scripts; exits 1 only for what needs doing now. |
 | `snapall quotas [on\|off]` | How the disk counts the room snapshots take, what that gives and costs, and the switch for it. Switching changes how the whole disk works, so it explains and asks first (`--yes` to skip). |
 | `snapall activity` | What snapall has done, newest first: from the window and from commands, in this and earlier sessions, and how each went. `--json` for scripts. It is kept in a small journal under `/var/lib/snapall`. |
+| `snapall unprotect AREA [--dry-run] [--yes]` | Stop protecting an area. **Deletes all its snapshots for good** (its own files are not touched). It always says first what that means: how many snapshots, which restore points and groups it affects. On a terminal you must type the area's name; in a script, `--yes`. The system area is never stopped. |
 | `snapall limits AREA [--keep N] [--min-age MINUTES] [--cleanup on\|off]` | How many snapshots an area keeps and when its oldest go. Without options it shows them and what the next cleanup would remove; with options it changes them, and says first what that would remove (`--yes` to go ahead without being asked). |
 | `snapall groups [add NAME AREAS\|remove NAME]` | Name a set of your areas, such as `theming`, so that one snapshot can take just those: `snapall create --group theming`. Without an action it lists them. `all` is always there and means every protected area. |
 | `snapall cancel CHANGE` | Ask a running change (`snapall activity --json` gives its name) to stop. It finishes the area it is on and then stops, never in the middle of one, so nothing is left half-done. |
@@ -270,6 +271,12 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 `snapall health` answers the questions you have once protection is set up: *is it working, how much room do the snapshots take, will old ones be cleaned up or will they fill the disk?* It starts with a verdict (*All good*, or *2 things need attention*), then says what to do about each thing, most urgent first, and then shows the numbers behind it.
 
 Some figures cannot be known, and it says so instead of guessing. The room each snapshot holds is only counted by the disk's filesystem when a feature called *quotas* is on; without it you see snapshot counts and how full the disk is overall, and the report says why. "Cleanup on" means snapper's cleanup job is switched on **and running**, not merely enabled. ([ADR 16](docs/adr/0016-health-and-activity.md) records what can be measured and how the screen is laid out.)
+
+### Stopping protection
+
+`snapall unprotect AREA`, or **`U` on an area's row** in the Health tab, stops protecting an area. This is the one thing snapall does that cannot be taken back: **every snapshot of the area is deleted for good.** The area's own files are not touched, and protecting it again later (`p`) starts fresh, with no snapshots. So it says first, in plain words, how many snapshots go, how much room that frees (when it is measured), how many restore points stop including the area and which groups name it, and it will not go ahead until you have typed the area's name; a `y` or Enter is not enough.
+
+**The system area is refused**, however you ask. Its snapshots are what the boot menu offers to start the computer from, and how you get back from a bad update.
 
 ### How many snapshots an area keeps
 

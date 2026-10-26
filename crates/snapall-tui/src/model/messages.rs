@@ -42,6 +42,14 @@ pub enum Effect {
     LoadHealth,
     /// Read the groups of areas the person made.
     LoadGroups,
+    /// Work out what stopping the protection of an area would do.
+    LoadUnprotectPlan {
+        config: ConfigName,
+    },
+    /// Stop protecting an area: delete its snapshots for good.
+    StopProtecting {
+        config: ConfigName,
+    },
     /// Read an area's snapshots, for the preview of what new limits would remove.
     LoadLimitsData {
         config: ConfigName,
@@ -154,6 +162,16 @@ pub enum Msg {
         config: ConfigName,
         result: Result<(), String>,
     },
+    /// What stopping the protection of an area would do, or why it would not.
+    UnprotectPlanLoaded {
+        config: ConfigName,
+        plan: Result<snapall_core::unprotect::Plan, String>,
+    },
+    /// An area stopped being protected (how many snapshots went), or why it did not.
+    ProtectionStopped {
+        config: ConfigName,
+        result: Result<usize, String>,
+    },
     /// The groups, or why they could not be read.
     GroupsLoaded(Result<snapall_core::Groups, String>),
     /// The groups were kept, or why they could not be.
@@ -237,6 +255,7 @@ impl Effect {
                 | Effect::LoadHistory
                 | Effect::LoadGroups
                 | Effect::LoadLimitsData { .. }
+                | Effect::LoadUnprotectPlan { .. }
         )
     }
 }
