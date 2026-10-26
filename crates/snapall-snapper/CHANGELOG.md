@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.18.0]
+
+
+### Features
+- Change how many snapshots an area keeps, after seeing what it would remove ([#53](https://github.com/grenudi/snapall/pull/53)) ([270af20])
+
+
+
 ## [0.17.0]
 
 

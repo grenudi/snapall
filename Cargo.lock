@@ -468,7 +468,7 @@ checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "snapall"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "argenv-resolve",
  "serde",
@@ -482,14 +482,14 @@ dependencies = [
 
 [[package]]
 name = "snapall-core"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "snapall-observe"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "serde_json",
  "snapall-core",
@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "snapall-snapper"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "snapall-system"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "serde_json",
  "snapall-core",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "snapall-tui"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "ratatui",
  "signal-hook",
