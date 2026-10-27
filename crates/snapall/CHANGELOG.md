@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.3]
+
+
+### Documentation
+- Every layer is the top of the layers beneath it, and the size limits are alarms ([#70](https://github.com/grenudi/snapall/pull/70)) ([af61ac6])
+
+
+### Refactoring
+- One module per command and one language per module, and the canon as the idea ([#71](https://github.com/grenudi/snapall/pull/71)) ([fb784cf])
+
+
+
 ## [0.23.2]
 
 

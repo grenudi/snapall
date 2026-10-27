@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.3]
+
+
+### Refactoring
+- One module per command and one language per module, and the canon as the idea ([#71](https://github.com/grenudi/snapall/pull/71)) ([fb784cf])
+
+
+
 ## [0.23.2]
 
 
