@@ -277,6 +277,7 @@ fn stopping_asks_first_says_what_it_means_and_only_asks() {
 
     session.press(Key::Char('x'));
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(system.stops_asked(), std::slice::from_ref(&id));
     assert!(
         format!("{:?}", session.state.notice).contains("it finishes the area it is on, then stops")
@@ -323,12 +324,13 @@ fn a_machine_that_cannot_run_in_the_background_does_the_change_itself_as_before(
     let mut session = Session::with_system(&backend, &system, UiContext::default());
     session.press(Key::Char('a'));
     session.press(Key::Enter);
+    session.confirm();
     assert!(system.handed_to_the_background().is_empty());
     assert_eq!(snapshots_of_home(&backend), before + 1, "taken here");
     assert_eq!(
         system.events().len(),
-        2,
-        "and written to the journal by the window"
+        3,
+        "and written to the journal by the window: its start, the way back from it, its end"
     );
 }
 

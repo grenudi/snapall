@@ -145,6 +145,7 @@ fn enter_protects_it_for_real_schedules_off_the_list_updates_and_the_hint_goes()
     let mut session = Session::with_context(&backend, context(true, two_offers()));
     session.press(Key::Char('p'));
     session.press(Key::Enter);
+    session.confirm();
     assert!(session.state.modal.is_none());
     let home = snapall_core::ConfigName::parse("home").unwrap();
     assert!(
@@ -181,6 +182,7 @@ fn a_failure_says_so_in_plain_words_leaves_nothing_changed_and_keeps_the_offer()
     let mut session = Session::with_context(&backend, context(true, two_offers()));
     session.press(Key::Char('p'));
     session.press(Key::Enter);
+    session.confirm();
     let note = format!("{:?}", session.state.notice);
     assert!(
         note.contains("Could not protect Home") && note.contains("Nothing was changed"),

@@ -134,6 +134,7 @@ fn a_new_group_is_named_its_areas_chosen_and_it_is_saved() {
     session.press(Key::Down); // home
     session.press(Key::Char(' '));
     session.press(Key::Enter);
+    session.confirm();
     let saved = system.groups().unwrap();
     assert_eq!(
         saved.get(&GroupName::parse("games").unwrap()).unwrap(),
@@ -204,6 +205,7 @@ fn changing_a_groups_areas_starts_from_what_it_has_and_taking_one_away_leaves_th
     );
     session.press(Key::Char(' ')); // data out
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(
         system
             .groups()
@@ -214,6 +216,7 @@ fn changing_a_groups_areas_starts_from_what_it_has_and_taking_one_away_leaves_th
     );
 
     session.press(Key::Char('d'));
+    session.confirm();
     assert!(system.groups().unwrap().is_empty(), "the group is gone");
     assert_eq!(
         count(&backend, "home"),

@@ -245,3 +245,159 @@ fn no_file_of_the_window_grows_back_into_a_wall() {
         }
     }
 }
+
+// ---- what the texts say about the command line is what the contract says -----------------------------
+
+/// What the committed contract (which another test proves is the one the code produces) says exists.
+struct Surface {
+    commands: BTreeSet<String>,
+    /// Long flags, with whether each takes a value.
+    flags: std::collections::BTreeMap<String, bool>,
+    negatable: BTreeSet<String>,
+}
+
+fn the_contract() -> Surface {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../snapall.argenv.json");
+    let document: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut surface = Surface {
+        commands: BTreeSet::new(),
+        flags: Default::default(),
+        negatable: BTreeSet::new(),
+    };
+    for input in document["inputs"].as_array().unwrap() {
+        for command in input["subcommands"].as_array().into_iter().flatten() {
+            surface
+                .commands
+                .insert(command.as_str().unwrap().to_owned());
+        }
+        if let Some(long) = input["arg"]["long"].as_str() {
+            surface.flags.insert(
+                format!("--{long}"),
+                input["arg"]["arity"].as_u64() == Some(1),
+            );
+            if input["arg"]["negatable"].as_bool() == Some(true) {
+                surface.negatable.insert(format!("--{long}"));
+            }
+        }
+    }
+    // not an input of any command: the document itself
+    surface.commands.insert("contract".to_owned());
+    surface
+}
+
+/// The text of the README and the docs, which a person reads as much as the messages.
+fn documents() -> Vec<(String, String)> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut found = vec![(
+        "README.md".to_owned(),
+        std::fs::read_to_string(root.join("README.md")).unwrap(),
+    )];
+    let mut stack = vec![root.join("docs")];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "md") {
+                found.push((
+                    path.display().to_string(),
+                    std::fs::read_to_string(&path).unwrap(),
+                ));
+            }
+        }
+    }
+    found
+}
+
+/// What is between a pair of backticks.
+fn code_spans(text: &str) -> impl Iterator<Item = &str> {
+    text.split('`').skip(1).step_by(2)
+}
+
+/// Written on purpose as a mistake, to show what snapall says to one.
+const MISTAKES_ON_PURPOSE: [&str; 1] = ["snapall lst"];
+
+/// A command or a flag that a text tells a person to type must exist. Found by hand, again and again, before
+/// this was a test: a message that sends someone to `snapall frobnicate` is a bug nobody sees until they try it.
+#[test]
+fn every_command_and_flag_a_text_tells_a_person_to_type_exists_in_the_contract() {
+    let surface = the_contract();
+    let mut texts: Vec<(String, String)> = text_a_person_can_read();
+    texts.extend(documents());
+    let mut checked = 0;
+    for (file, text) in &texts {
+        for span in code_spans(text) {
+            if !span.starts_with("snapall ") || MISTAKES_ON_PURPOSE.contains(&span.trim()) {
+                continue;
+            }
+            // a table cell escapes a bar (`--yes\|--destroy`): either way it separates alternatives
+            let spaced = span.replace("\\|", " ").replace('|', " ");
+            let mut words = spaced.split_whitespace().skip(1);
+            let mut named_a_command = false;
+            while let Some(word) = words.next() {
+                // `snapall "before theming"` is the shorthand for `create`: a quoted word is a description
+                if word.starts_with('"') || word.starts_with('\'') {
+                    continue;
+                }
+                let word = word.trim_matches(|c: char| ",.;:)\"[]|".contains(c));
+                if let Some(flag) = word.strip_prefix("--") {
+                    let name = format!("--{}", flag.split('=').next().unwrap_or(flag));
+                    let known = surface.flags.get(&name).copied().or_else(|| {
+                        // `--no-hints` is the other way of saying a flag that can be switched both ways
+                        name.strip_prefix("--no-").and_then(|bare| {
+                            let positive = format!("--{bare}");
+                            surface.negatable.contains(&positive).then_some(false)
+                        })
+                    });
+                    assert!(
+                        known.is_some() || name == "--help" || name == "--version",
+                        "`{name}` in `{span}` ({file}) is not a flag of snapall"
+                    );
+                    if known == Some(true) && !flag.contains('=') {
+                        words.next(); // its value
+                    }
+                } else if word.starts_with('-')
+                    || word.starts_with('<')
+                    || word.chars().all(|c| !c.is_lowercase())
+                {
+                    // a short flag, a <PLACEHOLDER>, or an UPPER-CASE one
+                } else if !named_a_command {
+                    named_a_command = true;
+                    assert!(
+                        surface.commands.contains(word),
+                        "`snapall {word}` in `{span}` ({file}) is not a command of snapall"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        checked > 100,
+        "only {checked} mentions were checked: the scan has stopped finding them"
+    );
+}
+
+/// And the other way: what snapall can do is written down for a person. A command that exists but is in no
+/// text is one nobody finds.
+#[test]
+fn every_command_in_the_contract_is_in_the_readme() {
+    let readme =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../README.md"))
+            .unwrap();
+    let mentioned: BTreeSet<&str> = code_spans(&readme)
+        .filter_map(|span| span.strip_prefix("snapall "))
+        .flat_map(|rest| {
+            rest.split_whitespace()
+                .filter(|w| !w.starts_with('-'))
+                .take(1)
+        })
+        .collect();
+    for command in the_contract().commands {
+        assert!(
+            mentioned.contains(command.as_str()),
+            "`snapall {command}` exists but the README never shows it: nobody can find what is not written down"
+        );
+    }
+}

@@ -7,6 +7,7 @@
 
 use crate::model::StopProtecting;
 use crate::view::*;
+use snapall_core::Weight;
 
 pub(crate) fn unprotect_spec(prompt: &StopProtecting) -> ModalSpec {
     let mut lines = Vec::new();
@@ -30,7 +31,10 @@ pub(crate) fn unprotect_spec(prompt: &StopProtecting) -> ModalSpec {
                 lines.push(Line::from(""));
             }
             lines.push(Line::from(vec![
-                Span::raw(format!("To go ahead, type its name ({}): ", prompt.config)),
+                Span::raw(format!(
+                    "{}: ",
+                    Weight::Destroys.instruction(Some(prompt.config.as_str()))
+                )),
                 Span::styled(prompt.typed.clone(), Style::new().bold()),
                 Span::styled(
                     "_",

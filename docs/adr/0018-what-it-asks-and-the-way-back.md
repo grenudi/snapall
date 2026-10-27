@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # ADR 18: What snapall asks before it acts, and the way back from what it did
 
-Status: accepted. The command line and the record are built; the window is being brought to the same rule.
+Status: accepted. Built in the command line, the record and the window; not built: an undo key in the window.
 
 ## Context
 
@@ -51,5 +51,26 @@ are checked and journaled like any other, and answers them at the weight it aske
 * Scripts that deleted without a flag now need `--destroy`; changes that asked nothing (`limits`, `groups`,
   `cancel`) now need `--yes`. This is deliberate, and recorded in the README.
 * Changes made before this version have no recorded way back, and `undo` says so.
-* Not yet: the window's typed confirmations and an undo key in the Activity tab; changes made in the window
-  record their way back only when they are handed to the background (they run the command line).
+* Not yet: an undo key in the window's Activity tab. The window shows the way back and the command; doing it
+  is `snapall undo` for now.
+
+## How it is kept true
+
+A rule that has to be remembered is broken the first time someone forgets it, so each part is tied to its source:
+
+* **One question in the window** (`model/prompts/confirm.rs`). Every change starts through it, asked at the weight
+  `Act::weight()` gives it; a prompt cannot start a change without it. Its answers are the core's
+  `Weight::accepts`, the same function the command line uses.
+* **One place for every way back** (`snapall_core::rollback`). The command line and the window record the same
+  words and the same commands for the same change; `Rollback::words` is how both show it.
+* **One declaration per command** (`contract.rs`, the `commands!` macro). The enum, the list of all commands, their
+  words and every list of who takes `--json`, logs, takes `--dry-run`, `--yes` or `--destroy` are derived from it.
+  A test ties the flags to the policy table: a command that can lose something takes `--destroy`, and one that
+  only loses something takes no `--yes`, which could not answer for it.
+* **Exhaustive, not catch-all, where a change is described** (`changes.rs`): `describe_change`, `describe_now` and
+  `how_it_went` are `#[deny(clippy::wildcard_enum_match_arm)]`, so a new kind of change does not compile until it
+  has its words and its result; a test goes through every change the window makes and requires a way back for
+  one that worked and none for one that failed.
+* **Texts are checked against the contract**: every backticked `snapall …` and `--flag` in the code, README and docs
+  must exist, and every command must be in the README. The window's help is tied to its buttons (every key on the
+  bar is explained there) and must fit the space a prompt has.

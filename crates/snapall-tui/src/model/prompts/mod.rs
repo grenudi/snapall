@@ -4,6 +4,7 @@
 
 //! One module per prompt: what opens it, what its keys do, and what comes of the answer.
 
+mod confirm;
 mod delete;
 mod describe;
 mod groups;
@@ -17,6 +18,7 @@ mod restore;
 mod stop;
 mod unprotect;
 
+pub(crate) use confirm::*;
 pub(crate) use delete::*;
 pub(crate) use describe::*;
 pub(crate) use groups::*;

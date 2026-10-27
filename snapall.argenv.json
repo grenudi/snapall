@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-27T08:02:13Z",
+  "generated": "2026-10-27T09:43:04Z",
   "inputs": [
     {
       "allowed": [],
@@ -110,14 +110,14 @@
         "restore-all",
         "points",
         "history",
-        "doctor",
-        "tui",
-        "setup",
         "health",
-        "quotas",
         "limits",
         "unprotect",
-        "undo"
+        "undo",
+        "quotas",
+        "setup",
+        "doctor",
+        "tui"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -149,14 +149,14 @@
         "restore-all",
         "points",
         "history",
-        "doctor",
-        "tui",
-        "setup",
         "health",
-        "quotas",
         "limits",
         "unprotect",
-        "undo"
+        "undo",
+        "quotas",
+        "setup",
+        "doctor",
+        "tui"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -243,8 +243,8 @@
         "create",
         "restore",
         "restore-all",
-        "setup",
-        "unprotect"
+        "unprotect",
+        "setup"
       ],
       "summary": "Show what would happen without changing anything.",
       "type": "bool"
@@ -275,7 +275,6 @@
         "restore-all",
         "points",
         "history",
-        "setup",
         "health",
         "activity",
         "groups",
@@ -284,6 +283,7 @@
         "undo",
         "cancel",
         "quotas",
+        "setup",
         "doctor"
       ],
       "summary": "Print JSON instead of text.",
@@ -742,15 +742,15 @@
       "required": false,
       "stability": "unknown",
       "subcommands": [
-        "doctor",
         "restore",
         "restore-all",
-        "setup",
-        "quotas",
-        "limits",
         "groups",
+        "limits",
+        "undo",
         "cancel",
-        "undo"
+        "quotas",
+        "setup",
+        "doctor"
       ],
       "summary": "Answer yes where snapall asks before a change that can be put back (for scripts and CI). It does not answer for deleting snapshots: that needs --destroy. With doctor, only with --install.",
       "type": "bool"
@@ -801,5 +801,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.20.0"
+  "source": "snapall@0.21.0"
 }

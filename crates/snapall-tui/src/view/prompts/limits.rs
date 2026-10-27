@@ -66,15 +66,9 @@ pub(crate) fn limits_spec(editor: &LimitsEditor, state: &State) -> ModalSpec {
     if let Some(problem) = &editor.error {
         lines.push(Line::styled(problem.clone(), Style::new().fg(Color::Red)));
     }
-    if editor.armed {
-        lines.push(Line::styled(
-            "Press Enter again to apply this. Those snapshots will be removed at the next cleanup.",
-            Style::new().fg(Color::Red).bold(),
-        ));
-    }
     lines.push(Line::from(""));
     lines.push(Line::styled(
-        "Up/Down: choose   Left/Right or - +: change   PgUp/PgDn: by ten   Enter: apply   Esc: cancel",
+        "Up/Down: choose   Left/Right or - +: change   PgUp/PgDn: by ten   Enter: review   Esc: cancel",
         Style::new().fg(DIM),
     ));
     let width = 80;

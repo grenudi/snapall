@@ -28,6 +28,9 @@ pub(crate) fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
 }
 
 /// What an effect that changes something is called in the Activity tab; `None` for one that only looks.
+// Exhaustive on purpose: a new kind of change must be given its words and its result here, and the compiler
+// refuses until it is. A catch-all would let it through as "not a change" or as a success, unseen.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
     let plural = |n: usize| if n == 1 { "" } else { "s" };
     Some(match effect {
@@ -92,7 +95,21 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
                 if *turn_on { "on" } else { "off" }
             )
         }
-        _ => return None,
+        // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
+        // the change it is about carries the record, and ends as stopped
+        Effect::StopChange { .. }
+        | Effect::LoadConfigs
+        | Effect::LoadSnapshots(_)
+        | Effect::LoadChanges { .. }
+        | Effect::LoadPointOffer { .. }
+        | Effect::LoadHealth
+        | Effect::LoadGroups
+        | Effect::LoadUnprotectPlan { .. }
+        | Effect::LoadLimitsData { .. }
+        | Effect::LoadHistory
+        | Effect::LoadPoints
+        | Effect::LoadPointPreview { .. }
+        | Effect::LoadFileVersions { .. } => return None,
     })
 }
 
@@ -142,6 +159,9 @@ pub(crate) fn new_id() -> String {
 
 /// What a change is called while it is being done: the same changes as [`describe_change`], in the
 /// present tense, for the line that says what the window is doing and for how long.
+// Exhaustive on purpose: a new kind of change must be given its words and its result here, and the compiler
+// refuses until it is. A catch-all would let it through as "not a change" or as a success, unseen.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
     use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
     let plural = |n: usize| if n == 1 { "" } else { "s" };
@@ -206,11 +226,28 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
                 if *turn_on { "on" } else { "off" }
             )
         }
-        _ => return None,
+        // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
+        // the change it is about carries the record, and ends as stopped
+        Effect::StopChange { .. }
+        | Effect::LoadConfigs
+        | Effect::LoadSnapshots(_)
+        | Effect::LoadChanges { .. }
+        | Effect::LoadPointOffer { .. }
+        | Effect::LoadHealth
+        | Effect::LoadGroups
+        | Effect::LoadUnprotectPlan { .. }
+        | Effect::LoadLimitsData { .. }
+        | Effect::LoadHistory
+        | Effect::LoadPoints
+        | Effect::LoadPointPreview { .. }
+        | Effect::LoadFileVersions { .. } => return None,
     })
 }
 
 /// How a change went, from the message that says so: what came of it, or why it failed.
+// Exhaustive on purpose: a new kind of change must be given its words and its result here, and the compiler
+// refuses until it is. A catch-all would let it through as "not a change" or as a success, unseen.
+#[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
     let failures = |pairs: Vec<(String, &Result<String, String>)>| -> Vec<String> {
         pairs
@@ -281,6 +318,7 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
             result: Err(why), ..
         }
         | Msg::CleanupSwitched(Err(why)) => Err(why.clone()),
+        Msg::CleanupSwitched(Ok(())) => Ok(String::new()),
         Msg::JobControlled { result, .. } => result.clone().map(|()| String::new()),
         Msg::GroupsSaved { result, .. } => result.clone().map(|()| String::new()),
         Msg::LimitsSet { result, .. } => result.clone().map(|()| String::new()),
@@ -298,7 +336,84 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
             .as_ref()
             .map(|_| "It has snapshots from now on.".to_owned())
             .map_err(Clone::clone),
-        _ => Ok(String::new()),
+        // everything else carries no result of a change: it is read, shown or looked at. Listed one by
+        // one, so that a new message that DOES carry a result cannot be taken for a success by default.
+        Msg::Start
+        | Msg::Tick
+        | Msg::Key(..)
+        | Msg::Hover(..)
+        | Msg::Click(..)
+        | Msg::Scroll { .. }
+        | Msg::ChangesLoaded { .. }
+        | Msg::FileVersionsLoaded { .. }
+        | Msg::ConfigsLoaded(..)
+        | Msg::PointOfferLoaded { .. }
+        | Msg::Refused(..)
+        | Msg::LimitsData { .. }
+        | Msg::UnprotectPlanLoaded { .. }
+        | Msg::GroupsLoaded(..)
+        | Msg::StartedInBackground { .. }
+        | Msg::StopAsked { .. }
+        | Msg::HistoryLoaded(..)
+        | Msg::HealthLoaded(..)
+        | Msg::Finished(..)
+        | Msg::PointsLoaded(..)
+        | Msg::PointPreviewLoaded(..)
+        | Msg::SnapshotsLoaded { .. } => Ok(String::new()),
+    }
+}
+
+/// How to get back from what the window just did, worked out from what it asked for and what came of it:
+/// only for a change that was made, and in the same words the command line uses.
+pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollback> {
+    use snapall_core::rollback as back;
+    use snapall_core::Rollback;
+    match (effect, msg) {
+        (Effect::Create { .. }, Msg::Created(made)) => {
+            let ids: Vec<_> = made
+                .iter()
+                .filter_map(|(config, result)| result.as_ref().ok().map(|id| (config.clone(), *id)))
+                .collect();
+            back::after_taking_ids(&ids)
+        }
+        (Effect::Delete { .. }, Msg::Deleted { results, .. })
+            if results.iter().any(|(_, result)| result.is_ok()) =>
+        {
+            Some(back::after_deleting())
+        }
+        (Effect::Restore { config, path, .. }, Msg::Restored { result: Ok(done), .. }) => {
+            Some(back::after_restoring(config, path.as_deref(), done.safety_snapshot))
+        }
+        (Effect::Protect { .. }, Msg::Protected { result: Ok(name), .. }) => {
+            Some(back::after_protecting(&[name.to_string()]))
+        }
+        (Effect::SetQuotas { turn_on, .. }, Msg::QuotasSet { result: Ok(()), .. }) => {
+            Some(back::after_room_counting(*turn_on))
+        }
+        (Effect::SetLimits { config, before, .. }, Msg::LimitsSet { result: Ok(()), .. }) => {
+            Some(back::after_limits(config.as_str(), before))
+        }
+        (Effect::SaveGroups { groups, before }, Msg::GroupsSaved { result: Ok(()), .. }) => {
+            // a save changes one group: the first whose areas differ is the one to put back
+            let mut names: Vec<&snapall_core::GroupName> = groups.names().chain(before.names()).collect();
+            names.dedup();
+            names
+                .into_iter()
+                .find(|name| groups.get(name) != before.get(name))
+                .map(|name| back::after_groups(name, before.get(name)))
+        }
+        (Effect::StopProtecting { .. }, Msg::ProtectionStopped { result: Ok(_), .. }) => {
+            Some(back::after_unprotecting())
+        }
+        (Effect::SwitchOnCleanup, Msg::CleanupSwitched(Ok(()))) => Some(Rollback::Advice(
+            "Automatic cleanup was off. To switch it off again, open its row under Background jobs in the Health tab and choose the opposite."
+                .to_owned(),
+        )),
+        (Effect::ControlJob { .. }, Msg::JobControlled { result: Ok(()), .. }) => Some(Rollback::Advice(
+            "To put the job back as it was, open it again in the Health tab and choose the opposite action."
+                .to_owned(),
+        )),
+        _ => None,
     }
 }
 
@@ -357,6 +472,172 @@ mod tests {
                 (describe_now(&reading), describe_change(&reading)),
                 (None, None),
                 "{reading:?}"
+            );
+        }
+    }
+
+    /// Every change the window can make, with the message that says it went through, and the same with the
+    /// message that says it did not. A way back is for a change that was made: never for one that failed.
+    #[test]
+    fn every_change_the_window_makes_records_its_way_back_and_one_that_failed_records_none() {
+        use snapall_core::{GroupName, Groups, JobAction, Limits, Rollback, SnapshotId};
+        let home = ConfigName::parse("home").unwrap();
+        let id = SnapshotId::new(7).unwrap();
+        fn failed<T>() -> Result<T, String> {
+            Err("it did not work".to_owned())
+        }
+        let mut before = Groups::default();
+        before
+            .set(GroupName::parse("g").unwrap(), vec![home.clone()])
+            .unwrap();
+        let after = Groups::default();
+        let limits = Limits {
+            keep: 50,
+            min_age_seconds: 1800,
+            cleanup: true,
+        };
+
+        // (what was asked, what came of it when it went through, what came of it when it did not)
+        let changes: Vec<(&str, Effect, Msg, Msg)> = vec![
+            (
+                "taking snapshots",
+                Effect::Create {
+                    targets: vec![home.clone()],
+                    description: Description::parse("x").unwrap(),
+                },
+                Msg::Created(vec![(home.clone(), Ok(id))]),
+                Msg::Created(vec![(home.clone(), failed())]),
+            ),
+            (
+                "deleting",
+                Effect::Delete {
+                    config: home.clone(),
+                    ids: vec![id],
+                },
+                Msg::Deleted {
+                    config: home.clone(),
+                    results: vec![(id, Ok(()))],
+                },
+                Msg::Deleted {
+                    config: home.clone(),
+                    results: vec![(id, failed())],
+                },
+            ),
+            (
+                "protecting",
+                Effect::Protect {
+                    mount_point: "/srv".into(),
+                },
+                Msg::Protected {
+                    mount_point: "/srv".into(),
+                    result: Ok(home.clone()),
+                },
+                Msg::Protected {
+                    mount_point: "/srv".into(),
+                    result: failed(),
+                },
+            ),
+            (
+                "room counting",
+                Effect::SetQuotas {
+                    turn_on: true,
+                    paths: vec![],
+                },
+                Msg::QuotasSet {
+                    turn_on: true,
+                    result: Ok(()),
+                },
+                Msg::QuotasSet {
+                    turn_on: true,
+                    result: failed(),
+                },
+            ),
+            (
+                "limits",
+                Effect::SetLimits {
+                    config: home.clone(),
+                    options: vec![],
+                    before: limits,
+                },
+                Msg::LimitsSet {
+                    config: home.clone(),
+                    result: Ok(()),
+                },
+                Msg::LimitsSet {
+                    config: home.clone(),
+                    result: failed(),
+                },
+            ),
+            (
+                "groups",
+                Effect::SaveGroups {
+                    groups: after.clone(),
+                    before: before.clone(),
+                },
+                Msg::GroupsSaved {
+                    groups: after.clone(),
+                    result: Ok(()),
+                },
+                Msg::GroupsSaved {
+                    groups: after,
+                    result: failed(),
+                },
+            ),
+            (
+                "stopping protection",
+                Effect::StopProtecting {
+                    config: home.clone(),
+                },
+                Msg::ProtectionStopped {
+                    config: home.clone(),
+                    result: Ok(3),
+                },
+                Msg::ProtectionStopped {
+                    config: home.clone(),
+                    result: failed(),
+                },
+            ),
+            (
+                "switching cleanup on",
+                Effect::SwitchOnCleanup,
+                Msg::CleanupSwitched(Ok(())),
+                Msg::CleanupSwitched(failed()),
+            ),
+            (
+                "controlling a job",
+                Effect::ControlJob {
+                    unit: "u.timer".into(),
+                    action: JobAction::Start,
+                },
+                Msg::JobControlled {
+                    unit: "u.timer".into(),
+                    action: JobAction::Start,
+                    result: Ok(()),
+                },
+                Msg::JobControlled {
+                    unit: "u.timer".into(),
+                    action: JobAction::Start,
+                    result: failed(),
+                },
+            ),
+        ];
+        for (what, effect, went_through, did_not) in changes {
+            assert!(
+                describe_change(&effect).is_some(),
+                "{what}: it is a change, so it has words"
+            );
+            assert!(
+                matches!(way_back(&effect, &went_through), Some(Rollback::Undo(_) | Rollback::Advice(_))),
+                "{what}: a change that was made must say how to get back from it, or that it cannot"
+            );
+            assert!(
+                way_back(&effect, &did_not).is_none(),
+                "{what}: nothing changed, so there is nothing to get back from"
+            );
+            assert!(how_it_went(&went_through).is_ok(), "{what}");
+            assert!(
+                how_it_went(&did_not).is_err(),
+                "{what}: a failure is recorded as one"
             );
         }
     }

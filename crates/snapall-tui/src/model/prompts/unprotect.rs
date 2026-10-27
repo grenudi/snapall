@@ -6,6 +6,7 @@
 //! before it does it. The one prompt where Enter alone, or a `y`, is never enough.
 
 use crate::model::*;
+use snapall_core::Weight;
 
 /// Open the prompt for an area, and ask for the plan of what stopping would do.
 pub(crate) fn open_unprotect(state: &mut State, config: ConfigName) -> Vec<Effect> {
@@ -45,8 +46,8 @@ pub(crate) fn confirming_unprotect(
         }
         Key::Enter if prompt.plan.is_none() => stays(prompt), // still looking
         Key::Enter => {
-            if prompt.typed != prompt.config.as_str() {
-                prompt.error = Some(format!("Type its name exactly: {}", prompt.config));
+            if !Weight::Destroys.accepts(&prompt.typed, Some(prompt.config.as_str())) {
+                prompt.error = Some(Weight::Destroys.instruction(Some(prompt.config.as_str())));
                 return stays(prompt);
             }
             if !state.context.administrator {

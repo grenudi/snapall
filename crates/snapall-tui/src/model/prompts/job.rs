@@ -6,6 +6,7 @@
 
 use crate::model::*;
 use snapall_core::services::{self, Job, JobAction};
+use snapall_core::Act;
 
 /// The key for each action, and for running a timer's work right now.
 pub(crate) const KEYS: [(char, JobAction); 5] = [
@@ -47,13 +48,18 @@ pub(crate) fn controlling_job(state: &mut State, key: Key, unit: String) -> Reac
         ));
         return Reaction::stays(Modal::Job { unit });
     }
-    state.notice = Some(Notice::Info(format!(
-        "{}: {}",
-        job.title,
-        action.label().to_lowercase()
-    )));
-    Reaction::closes_and_starts(vec![Effect::ControlJob {
-        unit: target,
-        action,
-    }])
+    let lines = vec![
+        format!("{}: {}.", job.title, action.label().to_lowercase()),
+        "To put it back, open the job again in the Health tab and choose the opposite.".to_owned(),
+    ];
+    ask_first(
+        Act::ControlJob,
+        None,
+        "Control a background job",
+        lines,
+        vec![Effect::ControlJob {
+            unit: target,
+            action,
+        }],
+    )
 }

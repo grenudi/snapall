@@ -114,6 +114,7 @@ fn a_puts_every_area_that_differs_back_leaves_the_system_alone_and_names_the_way
     let mut session = Session::new(&backend);
     open_restore(&mut session, 1);
     session.press(Key::Char('A'));
+    session.confirm();
 
     assert!(session.state.modal.is_none(), "the prompt closed");
     assert_eq!(
@@ -143,6 +144,7 @@ fn the_way_back_is_the_same_action_on_the_safety_point_it_names() {
     let mut session = Session::new(&backend);
     open_restore(&mut session, 1);
     session.press(Key::Char('A'));
+    session.confirm();
     assert_eq!(
         backend.read_file("home", "/mnt/home/b.txt").as_deref(),
         Some("home, then")
@@ -158,6 +160,7 @@ fn the_way_back_is_the_same_action_on_the_safety_point_it_names() {
         "the safety point is named for what it undoes:\n{text}"
     );
     again.press(Key::Char('A'));
+    again.confirm();
     assert_eq!(
         backend.read_file("docs", "/mnt/docs/a.txt").as_deref(),
         Some("docs, ruined"),
@@ -188,6 +191,7 @@ fn a_snapshot_taken_alone_is_offered_no_restore_point_and_a_does_nothing() {
         "{text}"
     );
     session.press(Key::Char('A'));
+    session.confirm();
     assert!(
         matches!(session.state.modal, Some(Modal::Restore { .. })),
         "A is not a key of this prompt"
@@ -249,6 +253,7 @@ fn the_button_explains_itself_and_works_by_mouse() {
         screen(&session)
     );
     session.dispatch(Msg::Click(click.unwrap()));
+    session.confirm();
     assert_eq!(
         backend.read_file("docs", "/mnt/docs/a.txt").as_deref(),
         Some("docs, then")

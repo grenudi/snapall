@@ -279,15 +279,12 @@ pub fn activity(entries: &[snapall_core::JournalEntry]) -> String {
         ) {
             out.push_str(&format!("                     {}\n", entry.detail));
         }
-        match &entry.rollback {
-            Some(snapall_core::Rollback::Undo(undo)) => out.push_str(&format!(
-                "                     way back: {}\n                     (snapall undo {})\n",
-                undo.what, entry.id
-            )),
-            Some(snapall_core::Rollback::Advice(text)) => {
-                out.push_str(&format!("                     cannot be undone: {text}\n"));
-            }
-            None => {}
+        for line in entry
+            .rollback
+            .iter()
+            .flat_map(|way_back| way_back.words(&entry.id))
+        {
+            out.push_str(&format!("                     {line}\n"));
         }
     }
     out

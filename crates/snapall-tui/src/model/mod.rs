@@ -249,6 +249,7 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
                 outcome,
                 took,
                 at,
+                way_back,
                 msg,
             } = *done;
             // it is no longer being done
@@ -269,6 +270,7 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
                 source: Some(snapall_core::Source::Window),
                 pid: None,
                 progress: None,
+                way_back,
             });
             // what changed may change how protection stands: look again
             let mut effects = handle(state, msg);

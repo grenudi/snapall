@@ -21,7 +21,7 @@ use snapall_core::{
 };
 
 use crate::changes::{
-    background_arguments, describe_change, describe_now, how_it_went, new_id, outcome_of,
+    background_arguments, describe_change, describe_now, how_it_went, new_id, outcome_of, way_back,
 };
 use crate::model::{update, Effect, Finished, Key, Msg, PointOffer, State, UiContext};
 use crate::tabs::health::HealthData;
@@ -74,6 +74,7 @@ impl<'a> Executor<'a> {
                     present,
                     took: std::time::Duration::ZERO,
                     at: self.system.local_time(),
+                    way_back: None,
                     msg: Msg::Refused(busy.to_string()),
                 }));
             }
@@ -87,8 +88,22 @@ impl<'a> Executor<'a> {
             pid: std::process::id(),
         });
         let started = std::time::Instant::now();
+        let asked_for = effect.clone();
         let msg = self.perform(effect);
         let outcome = how_it_went(&msg);
+        // how to get back from it, recorded now, while what it was before is known
+        let how_back = if outcome.is_ok() {
+            way_back(&asked_for, &msg)
+        } else {
+            None
+        };
+        if let Some(rollback) = &how_back {
+            self.system.record(&snapall_core::JournalEvent::Rollback {
+                id: id.clone(),
+                at: self.system.local_time().unwrap_or_default(),
+                rollback: rollback.clone(),
+            });
+        }
         self.system.record(&snapall_core::JournalEvent::Finished {
             id: id.clone(),
             at: self.system.local_time().unwrap_or_default(),
@@ -102,6 +117,7 @@ impl<'a> Executor<'a> {
             present,
             took: started.elapsed(),
             at: self.system.local_time(),
+            way_back: how_back,
             msg,
         }))
     }
@@ -154,14 +170,16 @@ impl<'a> Executor<'a> {
                     result: Err(error.to_string()),
                 },
             },
-            Effect::SetLimits { config, options } => {
+            Effect::SetLimits {
+                config, options, ..
+            } => {
                 let result = options
                     .iter()
                     .try_for_each(|option| backend.set_config_option(&config, *option))
                     .map_err(|error| error.to_string());
                 Msg::LimitsSet { config, result }
             }
-            Effect::SaveGroups { groups } => {
+            Effect::SaveGroups { groups, .. } => {
                 let result = self.system.save_groups(&groups);
                 Msg::GroupsSaved { groups, result }
             }
@@ -349,6 +367,23 @@ impl<'a> Session<'a> {
 
     pub fn press(&mut self, key: Key) {
         self.dispatch(Msg::Key(key));
+    }
+
+    /// Answer the question that is open, the way a person would: `y` for a change, `destroy` (and the name,
+    /// where there is one) for what is lost for good. Nothing happens if no question is open.
+    pub fn confirm(&mut self) {
+        let Some(crate::model::Modal::Confirm(question)) = &self.state.modal else {
+            return;
+        };
+        let answer = match (question.act.weight(), &question.target) {
+            (snapall_core::Weight::Destroys, Some(name)) => format!("destroy {name}"),
+            (snapall_core::Weight::Destroys, None) => "destroy".to_owned(),
+            _ => "y".to_owned(),
+        };
+        for letter in answer.chars() {
+            self.press(Key::Char(letter));
+        }
+        self.press(Key::Enter);
     }
 
     /// Process a message and every follow-up it causes, to completion.

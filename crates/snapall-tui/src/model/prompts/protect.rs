@@ -5,6 +5,7 @@
 //! Protecting a part of the disk that has no snapshots yet: one offer at a time.
 
 use crate::model::*;
+use snapall_core::Act;
 
 /// The offer to protect a part of the disk: Tab and the arrows go to the next one, Enter protects the
 /// one shown, Esc leaves. Without administrator rights, or with nothing to offer, it only informs.
@@ -17,14 +18,20 @@ pub(crate) fn protecting(state: &mut State, key: Key, index: usize) -> Reaction 
         Key::Enter if !can_protect => Reaction::closes(),
         Key::Enter | Key::Char('y' | 'Y') if can_protect => {
             let offer = &state.offers[index];
-            state.notice = Some(Notice::Info(format!(
-                "protecting {} ({})",
-                offer.title, offer.mount_point
-            )));
+            let lines = vec![
+                format!("Set up snapshots for {} ({}).", offer.title, offer.mount_point),
+                "Nothing is copied or moved. Stopping protection later deletes the snapshots taken since.".to_owned(),
+            ];
             let effect = Effect::Protect {
                 mount_point: offer.mount_point.clone(),
             };
-            Reaction::closes_and_starts(vec![effect])
+            ask_first(
+                Act::Protect,
+                None,
+                "Protect this part of the disk",
+                lines,
+                vec![effect],
+            )
         }
         Key::Tab | Key::Right | Key::Down | Key::Char('j' | 'l') if count > 1 => {
             Reaction::stays(Modal::Protect {

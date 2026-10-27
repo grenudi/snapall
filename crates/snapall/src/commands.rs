@@ -226,7 +226,7 @@ pub fn create(
         Some(&point),
         &change.course(),
     );
-    if let Some(way_back) = creation_way_back(&report) {
+    if let Some(way_back) = snapall_core::rollback::after_taking(&report) {
         change.rollback(way_back);
     }
     if stopped {
@@ -359,21 +359,11 @@ pub fn restore(
     let change = Change::begin(&now, &past, None)?;
     let result = restore_snapshot(ctx.backend, config, id, path);
     if let Ok(done) = &result {
-        let mut command = vec![
-            "restore".to_owned(),
-            config.to_string(),
-            done.safety_snapshot.to_string(),
-        ];
-        command.extend(path.map(str::to_owned));
-        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
-            what: format!(
-                "Put {config}{} back to how it was just before: snapshot #{} (taken by this restore)",
-                path.map_or(String::new(), |path| format!(" ({path})")),
-                done.safety_snapshot
-            ),
-            commands: vec![command],
-            weight: snapall_core::Weight::Changes,
-        }));
+        change.rollback(snapall_core::rollback::after_restoring(
+            config,
+            path,
+            done.safety_snapshot,
+        ));
     }
     change.end(
         result
@@ -610,22 +600,10 @@ After: {}.
             .map_err(|e| e.to_string())
     });
     if result.is_ok() {
-        // exactly what it was, so that going back is not a guess
-        let back = vec![
-            "limits".to_owned(),
-            area.to_owned(),
-            "--keep".to_owned(),
-            before.keep.to_string(),
-            "--min-age".to_owned(),
-            (before.min_age_seconds / 60).to_string(),
-            "--cleanup".to_owned(),
-            if before.cleanup { "on" } else { "off" }.to_owned(),
-        ];
-        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
-            what: format!("Set {config} back to: {}", describe(&before)),
-            commands: vec![back],
-            weight: snapall_core::Weight::Changes,
-        }));
+        change.rollback(snapall_core::rollback::after_limits(
+            &config.to_string(),
+            &before,
+        ));
     }
     change.end(result.clone().map(|()| String::new()));
     result?;
@@ -697,7 +675,10 @@ pub fn groups(
                 .map_err(|e| e.to_string())
                 .and_then(|()| system.save_groups(&made));
             if saved.is_ok() {
-                change.rollback(groups_way_back(&name, before.as_deref()));
+                change.rollback(snapall_core::rollback::after_groups(
+                    &name,
+                    before.as_deref(),
+                ));
             }
             change.end(saved.clone().map(|()| String::new()));
             saved?;
@@ -733,7 +714,10 @@ pub fn groups(
             )?;
             let saved = system.save_groups(&made);
             if saved.is_ok() {
-                change.rollback(groups_way_back(&name, before.as_deref()));
+                change.rollback(snapall_core::rollback::after_groups(
+                    &name,
+                    before.as_deref(),
+                ));
             }
             change.end(saved.clone().map(|()| String::new()));
             saved?;
@@ -864,76 +848,6 @@ pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool, no_dbus: b
     )
 }
 
-/// How to undo taking snapshots: delete the ones that were taken. That is a deletion like any other, so it
-/// weighs what a deletion weighs; the way back says so plainly.
-fn creation_way_back(report: &snapall_core::Report) -> Option<snapall_core::Rollback> {
-    let made: Vec<(&ConfigName, SnapshotId)> = report
-        .outcomes
-        .iter()
-        .filter_map(|outcome| {
-            outcome
-                .result
-                .as_ref()
-                .ok()
-                .map(|id| (&outcome.config, *id))
-        })
-        .collect();
-    if made.is_empty() {
-        return None;
-    }
-    let list: Vec<String> = made
-        .iter()
-        .map(|(config, id)| format!("#{id} of {config}"))
-        .collect();
-    Some(snapall_core::Rollback::Undo(snapall_core::Undo {
-        what: format!(
-            "Delete the {} snapshot{} this took ({}). They are lost for good, but nothing else changes",
-            made.len(),
-            if made.len() == 1 { "" } else { "s" },
-            list.join(", ")
-        ),
-        commands: made
-            .iter()
-            .map(|(config, id)| vec!["delete".to_owned(), config.to_string(), id.to_string()])
-            .collect(),
-        weight: snapall_core::Weight::Destroys,
-    }))
-}
-
-/// How to get a group back to what it was: made again with its old areas, or, if it was new, taken away.
-fn groups_way_back(
-    name: &snapall_core::GroupName,
-    before: Option<&[ConfigName]>,
-) -> snapall_core::Rollback {
-    let (what, command) = match before {
-        Some(areas) => {
-            let list = areas
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(",");
-            (
-                format!("Put the group {name} back to: {}", list.replace(',', ", ")),
-                vec![
-                    "groups".to_owned(),
-                    "add".to_owned(),
-                    name.to_string(),
-                    list,
-                ],
-            )
-        }
-        None => (
-            format!("Take the group {name} away again: it did not exist before"),
-            vec!["groups".to_owned(), "remove".to_owned(), name.to_string()],
-        ),
-    };
-    snapall_core::Rollback::Undo(snapall_core::Undo {
-        what,
-        commands: vec![command],
-        weight: snapall_core::Weight::Changes,
-    })
-}
-
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes
 /// how the whole disk works, so it explains what it gives and costs and asks first.
 pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
@@ -1004,12 +918,7 @@ pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
         .iter()
         .try_for_each(|area| system.set_quotas(&area.subvolume, turn_on));
     if result.is_ok() {
-        let opposite = if turn_on { "off" } else { "on" };
-        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
-            what: format!("Switch counting the room snapshots take back {opposite}, as it was"),
-            commands: vec![vec!["quotas".to_owned(), opposite.to_owned()]],
-            weight: snapall_core::Weight::Changes,
-        }));
+        change.rollback(snapall_core::rollback::after_room_counting(turn_on));
     }
     change.end(result.clone().map(|()| String::new()));
     result?;
@@ -1074,14 +983,9 @@ pub fn restore_all(
         &change.course(),
     );
     if !done.members.is_empty() {
-        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
-            what: format!(
-                "Put every area back to how it was just before: restore point {} (taken by this restore)",
-                done.safety
-            ),
-            commands: vec![vec!["restore-all".to_owned(), done.safety.to_string()]],
-            weight: snapall_core::Weight::Changes,
-        }));
+        change.rollback(snapall_core::rollback::after_restoring_all(
+            done.safety.as_str(),
+        ));
     }
     if done.stopped {
         let (put_back, total) = (done.members.len(), point.members.len());
@@ -1281,14 +1185,7 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
                 .iter()
                 .map(|(_, name)| name.to_string())
                 .collect();
-            change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
-                what: format!(
-                    "Stop protecting {} again, back to not protected. Any snapshots taken since would be deleted",
-                    names.join(", ")
-                ),
-                commands: names.iter().map(|name| vec!["unprotect".to_owned(), name.clone()]).collect(),
-                weight: snapall_core::Weight::Destroys,
-            }));
+            change.rollback(snapall_core::rollback::after_protecting(&names));
         }
         change.end(if report.succeeded() {
             Ok(String::new())

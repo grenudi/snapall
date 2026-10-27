@@ -88,6 +88,7 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
         Modal::Groups(screen) => groups_spec(screen, state),
         Modal::Limits(editor) => limits_spec(editor, state),
         Modal::StopProtecting(prompt) => unprotect_spec(prompt),
+        Modal::Confirm(question) => confirm_spec(question),
     }
 }
 

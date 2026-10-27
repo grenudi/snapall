@@ -5,6 +5,7 @@
 //! Asking before the disk starts, or stops, counting the room snapshots take.
 
 use crate::model::*;
+use snapall_core::Act;
 
 /// Enter or y does it, Esc leaves. Switching it needs administrator rights, and says so rather than failing.
 pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> Reaction {
@@ -30,11 +31,20 @@ pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> R
                         .collect()
                 })
                 .unwrap_or_default();
-            state.notice = Some(Notice::Info(format!(
-                "switching room counting {}",
-                if turn_on { "on" } else { "off" }
-            )));
-            Reaction::closes_and_starts(vec![Effect::SetQuotas { turn_on, paths }])
+            let lines = vec![
+                format!(
+                    "Switch counting the room snapshots take {} for the whole disk.",
+                    if turn_on { "on" } else { "off" }
+                ),
+                "It can be switched back the same way.".to_owned(),
+            ];
+            ask_first(
+                Act::RoomCounting,
+                None,
+                "Room counting",
+                lines,
+                vec![Effect::SetQuotas { turn_on, paths }],
+            )
         }
         _ => Reaction::stays(Modal::Quotas { turn_on }),
     }

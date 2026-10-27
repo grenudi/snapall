@@ -8,7 +8,7 @@
 
 use crate::model::*;
 use snapall_core::limits::{LONGEST_PROTECTION_SECONDS, MOST_KEPT};
-use snapall_core::{preview_limits, Limits};
+use snapall_core::{preview_limits, Act, Limits};
 
 /// What a setting moves by: one, or ten with Page Up and Page Down. How young is in minutes.
 const MINUTE: u64 = 60;
@@ -40,7 +40,6 @@ pub(crate) fn open_limits(state: &mut State, config: ConfigName) -> Vec<Effect> 
         limits: before,
         field: 0,
         snapshots: None,
-        armed: false,
         error: None,
     }));
     vec![Effect::LoadLimitsData { config }]
@@ -65,8 +64,6 @@ fn adjust(editor: &mut LimitsEditor, steps: i64) {
         }
         _ => editor.limits.cleanup = !editor.limits.cleanup,
     }
-    // whatever was agreed to was agreed to for the numbers as they were
-    editor.armed = false;
     editor.error = None;
 }
 
@@ -126,16 +123,31 @@ fn apply(state: &mut State, mut editor: LimitsEditor) -> Reaction {
     let would_remove = editor.snapshots.as_ref().map_or(0, |snapshots| {
         preview_limits(snapshots, &editor.limits, now_seconds(state)).would_remove
     });
-    if would_remove > 0 && !editor.armed {
-        editor.armed = true;
-        return stays(editor);
+    let removes = would_remove > 0;
+    let mut lines = vec![format!(
+        "Change what {} keeps: {}.",
+        editor.config,
+        editor.limits.describe()
+    )];
+    if let Some(snapshots) = &editor.snapshots {
+        let preview = preview_limits(snapshots, &editor.limits, now_seconds(state));
+        lines.push(snapall_core::limits_words(&preview, &editor.limits));
     }
-    state.notice = Some(Notice::Info(format!(
-        "changing what {} keeps",
-        editor.config
-    )));
-    Reaction::closes_and_starts(vec![Effect::SetLimits {
-        config: editor.config,
+    let then = vec![Effect::SetLimits {
+        config: editor.config.clone(),
         options,
-    }])
+        before: editor.before,
+    }];
+    let Modal::Confirm(mut question) = confirm_modal(
+        Act::ChangeLimits { removes },
+        None,
+        "Change what an area keeps",
+        lines,
+        then,
+    ) else {
+        unreachable!("confirm_modal makes a confirmation")
+    };
+    // cancelled, it is back in the editor with the numbers as they were typed
+    question.on_cancel = Some(Box::new(Modal::Limits(editor)));
+    Reaction::stays(Modal::Confirm(question))
 }

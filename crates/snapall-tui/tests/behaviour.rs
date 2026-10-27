@@ -167,6 +167,7 @@ fn marking_moves_on_and_delete_removes_exactly_the_marked_snapshots() {
         matches!(session.state.modal, Some(Modal::ConfirmDelete { ref ids, .. }) if ids.len() == 2)
     );
     session.press(Key::Char('y'));
+    session.confirm();
 
     assert_eq!(descriptions_of(&session), ["three", "one"]);
     assert!(session.state.marked.is_empty());
@@ -183,6 +184,7 @@ fn delete_without_marks_targets_the_row_under_the_cursor_and_can_be_cancelled() 
     assert_eq!(backend.snapshots().len(), 2, "cancel deletes nothing");
 
     press(&mut session, &[Key::Char('d'), Key::Enter]);
+    session.confirm();
     assert_eq!(
         descriptions_of(&session),
         ["one"],

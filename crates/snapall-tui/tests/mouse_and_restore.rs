@@ -406,6 +406,7 @@ fn confirming_restores_takes_the_safety_snapshot_and_shows_the_new_snapshot_in_t
     let mut session = at_first_snapshot_of_home(&backend, UiContext::default());
     session.press(Key::Char('u'));
     session.press(Key::Enter);
+    session.confirm();
     assert!(session.state.modal.is_none());
     assert_eq!(
         backend.read_file("home", "/mnt/home/a.txt").as_deref(),
@@ -441,6 +442,7 @@ fn a_restore_prompt_can_be_confirmed_by_clicking_its_button() {
         line.find("[ Enter: Restore ]").unwrap() as u16 + 4,
         y as u16,
     );
+    session.confirm();
     assert_eq!(
         backend.read_file("home", "/mnt/home/a.txt").as_deref(),
         Some("one")

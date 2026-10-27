@@ -6,6 +6,7 @@
 //! a small function of a key: the list, naming a new group, and choosing its areas.
 
 use crate::model::*;
+use snapall_core::Act;
 use snapall_core::{GroupName, Groups};
 
 fn list(cursor: usize) -> Modal {
@@ -78,11 +79,19 @@ fn on_list(state: &mut State, key: Key, cursor: usize) -> Reaction {
             }
             Some(_) if needs_rights(state) => Reaction::stays(list(cursor)),
             Some(name) => {
-                let mut groups = state.groups.clone();
+                let before = state.groups.clone();
+                let mut groups = before.clone();
                 groups.remove(&name);
-                Reaction::stays_and_starts(
+                let lines = vec![
+                    format!("Take the group {name} away?"),
+                    "The areas and their snapshots are untouched.".to_owned(),
+                ];
+                ask_first_then_return(
+                    Act::ChangeGroups,
+                    "Take a group away",
+                    lines,
+                    vec![Effect::SaveGroups { groups, before }],
                     list(cursor.saturating_sub(1)),
-                    vec![Effect::SaveGroups { groups }],
                 )
             }
         },
@@ -174,7 +183,9 @@ fn on_pick(
             if needs_rights(state) {
                 return Reaction::stays(screen(name, picks, cursor, None));
             }
-            let mut groups = state.groups.clone();
+            let areas_text: Vec<String> = chosen.iter().map(ToString::to_string).collect();
+            let before = state.groups.clone();
+            let mut groups = before.clone();
             if let Err(problem) = groups.set(name.clone(), chosen) {
                 return Reaction::stays(screen(name, picks, cursor, Some(problem.to_string())));
             }
@@ -182,7 +193,17 @@ fn on_pick(
                 .iter()
                 .position(|row| row.as_ref() == Some(&name))
                 .unwrap_or(0);
-            Reaction::stays_and_starts(list(at), vec![Effect::SaveGroups { groups }])
+            let lines = vec![
+                format!("Make the group {name} of {}.", areas_text.join(", ")),
+                "A group only chooses areas to snapshot together; the areas and their snapshots are untouched.".to_owned(),
+            ];
+            ask_first_then_return(
+                Act::ChangeGroups,
+                "Save a group",
+                lines,
+                vec![Effect::SaveGroups { groups, before }],
+                list(at),
+            )
         }
         _ => Reaction::stays(screen(name, picks, cursor, error)),
     }

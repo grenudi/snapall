@@ -26,6 +26,7 @@ pub mod observe;
 pub mod plan;
 pub mod points;
 pub mod port;
+pub mod rollback;
 pub mod services;
 pub mod system;
 pub mod unprotect;
