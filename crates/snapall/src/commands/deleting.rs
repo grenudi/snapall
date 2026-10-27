@@ -15,9 +15,7 @@ pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -
     if let Some(snapshot) = find_snapshot(ctx.backend, area, id)? {
         let it = snapshot_in_words(area, &snapshot);
         output::note(&what_deleting_loses(&it, area));
-        if let Some(stop) = ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))? {
-            return Ok(stop);
-        }
+        ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))?;
     }
     let change = Change::begin(&deleting_one(area), &deleted_one(area), None)?;
     let deleted = delete_snapshot(ctx.backend, area, id);

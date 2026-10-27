@@ -412,20 +412,30 @@ const LONGEST_HANDLER: usize = 60;
 /// and each leaves this list the moment it is short enough: the list can only get shorter. They are to be
 /// split by what they do (see ADR 19), not allowed to stay.
 const TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
-    ("groups", 107),
-    ("limits", 104),
+    ("groups", 103),
+    ("limits", 102),
     ("create", 89),
-    ("quotas", 85),
+    ("quotas", 83),
     ("restore_all", 82),
-    ("undo", 63),
+    ("undo", 61),
 ];
 
 /// Every top-level function of every file in `commands/`, with its text (not counting tests).
 fn handlers() -> Vec<(String, String)> {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands");
     let mut found = Vec::new();
-    for entry in std::fs::read_dir(dir).unwrap().flatten() {
-        let source = std::fs::read_to_string(entry.path()).unwrap();
+    let mut folders = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands")];
+    let mut files = Vec::new();
+    while let Some(folder) = folders.pop() {
+        for entry in std::fs::read_dir(folder).unwrap().flatten() {
+            if entry.path().is_dir() {
+                folders.push(entry.path());
+            } else {
+                files.push(entry.path());
+            }
+        }
+    }
+    for file in files {
+        let source = std::fs::read_to_string(file).unwrap();
         let lines: Vec<&str> = source
             .split("#[cfg(test)]")
             .next()
@@ -629,6 +639,9 @@ fn all_sources() -> Vec<(String, String)> {
                 }
             } else if name.ends_with(".rs") && path.components().any(|c| c.as_os_str() == "src") {
                 let text = std::fs::read_to_string(&path).unwrap();
+                if text.contains("#![cfg(test)]") {
+                    continue; // only compiled for tests: not production code
+                }
                 let relative = path
                     .strip_prefix(&root)
                     .unwrap()
@@ -767,14 +780,13 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 20] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 17] = [
     ("crates/snapall-core/src/doctor.rs", 397),
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-core/src/health.rs", 522),
     ("crates/snapall-core/src/points.rs", 333),
     ("crates/snapall-core/src/testing.rs", 590),
     ("crates/snapall-core/src/usecase.rs", 513),
-    ("crates/snapall-snapper/src/lib.rs", 584),
     ("crates/snapall-tui/src/changes.rs", 419),
     ("crates/snapall-tui/src/model/keys.rs", 353),
     ("crates/snapall-tui/src/model/mod.rs", 385),
@@ -783,25 +795,28 @@ const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 20] = [
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/cli.rs", 568),
-    ("crates/snapall/src/commands/going_back.rs", 390),
-    ("crates/snapall/src/commands/keeping.rs", 336),
     ("crates/snapall/src/contract.rs", 763),
     ("crates/snapall/src/render.rs", 844),
     ("crates/snapall/src/setup.rs", 432),
 ];
-const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 6] = [
+const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 5] = [
     ("crates/snapall-core/src/domain.rs", 378),
-    ("crates/snapall-snapper/src/lib.rs", 584),
     ("crates/snapall-system/src/lib.rs", 244),
     ("crates/snapall-tui/src/model/mod.rs", 385),
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/main.rs", 196),
 ];
-const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 6] = [
-    ("crates/snapall/src/commands/going_back.rs", 14),
-    ("crates/snapall/src/commands/keeping.rs", 2),
+const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 9] = [
+    ("crates/snapall/src/commands/going_back/restoring.rs", 4),
+    (
+        "crates/snapall/src/commands/going_back/restoring_a_point.rs",
+        5,
+    ),
+    ("crates/snapall/src/commands/going_back/undoing.rs", 4),
+    ("crates/snapall/src/commands/keeping/limits.rs", 1),
+    ("crates/snapall/src/commands/keeping/room_counting.rs", 1),
     ("crates/snapall/src/commands/protecting.rs", 1),
-    ("crates/snapall/src/commands/taking.rs", 1),
+    ("crates/snapall/src/commands/taking.rs", 2),
     ("crates/snapall/src/doctor.rs", 5),
     ("crates/snapall/src/main.rs", 4),
 ];
@@ -915,13 +930,13 @@ fn a_story_spells_out_little_plumbing_and_the_debt_only_shrinks() {
 
 const TURNS_TOO_MANY_FOR_NOW: [(&str, usize); 8] = [
     ("create", 8),
-    ("groups", 7),
-    ("limits", 10),
+    ("groups", 5),
+    ("limits", 9),
     ("point_confirmation", 5),
-    ("quotas", 13),
+    ("quotas", 12),
     ("restore_all", 9),
     ("setup", 7),
-    ("undo", 8),
+    ("undo", 7),
 ];
 const PLUMBING_TOO_MUCH_FOR_NOW: [(&str, usize); 3] = [
     ("check_the_way_back_still_exists", 3),

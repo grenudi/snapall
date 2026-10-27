@@ -41,20 +41,25 @@ worse, nothing new, entries leave when paid.
   `protecting`, `keeping`, `looking`, `running`, `window`, and `change` for what they share), with a front file
   that is only the map. Items were moved whole; behaviour is unchanged.
 
-* Story budgets (R11, R14): how often a handler branches (4) and how many closures it spells out (2), as
+* Story budgets: how often a handler branches (4) and how many closures it spells out (2), as
   ratchets. They name the same handlers already known to be too long and two that were not (`setup`,
   `point_confirmation`), which is some evidence that they measure something real.
 * The first story written to the grammar: `delete`, 55 lines to 19, with its words beneath it, a lookup verb in
   the core (`find_snapshot`) and `Change::end_with`. It is worked through in the canon text, with what its
   remaining syntax says the layer still lacks.
 
+* `going_back` and `keeping` are one module per command (restoring, restoring a point, undoing; limits, groups,
+  room counting), each front 17 lines. A command's helpers moved with their only user.
+* `Stopped`, found by reading what the stories still spelled out: a story ended early by an answer that is not a go
+  is now a noun, produced and read where it belongs (the asker), so a story says `ask::before(..)?;` where it said
+  three lines, and `main` ends it with its own exit code. Four handlers branch less.
+
 ## Order of the rest
 
-1. `going_back` (390) and `keeping` (336) into one module per command; handlers return what to say, and `output`
-   presents it, which empties the printing ratchet.
+1. Handlers return what to say, and `output` presents it, which empties the printing ratchet.
 2. The window: `model/mod.rs` becomes a map of the update loop's parts; `changes.rs` and `session.rs` give way
    to the layer that owns a change (ADR 19).
-3. The adapters' front files: `snapall-snapper/src/lib.rs` as a map of what it translates.
+3. (done for the snapper adapter: running, reading, files and backend, behind a 12-line front; its 32 tests moved to one test-only module) The window's `model/mod.rs` and `tabs/health/mod.rs` remain.
 4. The vocabulary: `config` -> `area` through the core, a rename that is mechanical and wide.
 5. `contract.rs`, `render.rs`, `cli.rs` split by what each declares, renders or parses.
 

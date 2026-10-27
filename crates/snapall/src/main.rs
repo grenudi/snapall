@@ -56,10 +56,10 @@ fn main() -> ExitCode {
     }
     match run(parsed) {
         Ok(code) => code,
-        Err(err) => {
+        Err(err) => ask::how_it_ended(err.as_ref()).unwrap_or_else(|| {
             eprintln!("snapall: {err}");
             ExitCode::FAILURE
-        }
+        }),
     }
 }
 

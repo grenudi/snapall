@@ -5,9 +5,12 @@
 //! Taking snapshots: of one area, of every protected area, or of a group.
 
 use super::*;
+use crate::boot_probe;
 use crate::output::Outcome;
 use crate::render;
+use snapall_core::boot;
 use snapall_core::{fresh_point, plan_snapshots, run_plan_along, ConfigName, Description};
+use std::io::IsTerminal;
 use std::process::ExitCode;
 
 pub fn create(
@@ -98,4 +101,16 @@ pub fn create(
     }
     suggest_the_boot_menu(ctx);
     Ok(ExitCode::SUCCESS)
+}
+
+/// After a snapshot: a nudge to a person, on stderr (stdout stays parseable), and only when a
+/// boot-menu tool would help.
+pub(super) fn suggest_the_boot_menu(ctx: &Context) {
+    let to_a_person = std::io::stderr().is_terminal() && !ctx.show.is_json();
+    if !ctx.hints || !to_a_person {
+        return;
+    }
+    if let Some(tip) = boot::hint(&boot::assess(&boot_probe::system())) {
+        eprintln!("{tip}");
+    }
 }
