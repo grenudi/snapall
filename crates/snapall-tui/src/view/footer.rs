@@ -198,7 +198,8 @@ pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
         } else {
             look::mood(state, Click::Button(button))
         };
-        let danger = button == Button::Delete;
+        // what loses something for good looks like it: the weight of what the button is for decides
+        let danger = button.purpose().weight() == snapall_core::Weight::Destroys;
         let line = Line::from(vec![
             Span::styled(format!(" {key}"), look::chip(mood, danger)),
             Span::styled(format!(" {label} "), look::label(mood, danger)),

@@ -82,7 +82,6 @@ pub(crate) fn browsing_points(state: &mut State, key: Key, index: usize) -> Reac
                     ask_first(
                         Act::RestorePoint,
                         None,
-                        "Put every area back",
                         lines,
                         vec![Effect::RestorePoint { point }],
                     )

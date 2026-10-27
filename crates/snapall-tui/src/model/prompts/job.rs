@@ -55,7 +55,6 @@ pub(crate) fn controlling_job(state: &mut State, key: Key, unit: String) -> Reac
     ask_first(
         Act::ControlJob,
         None,
-        "Control a background job",
         lines,
         vec![Effect::ControlJob {
             unit: target,

@@ -58,6 +58,27 @@ pub enum Button {
 }
 
 impl Button {
+    /// What pressing it is for, in the app's own words: so how it looks and what it asks follow from what
+    /// that weighs, not from a list of buttons somebody must remember to extend. Exhaustive: a new button
+    /// does not compile until it says what it is for.
+    pub fn purpose(self) -> snapall_core::Act {
+        use snapall_core::Act;
+        match self {
+            Button::Create | Button::CreateAll => Act::TakeSnapshot,
+            Button::Delete => Act::DeleteSnapshots,
+            Button::Restore => Act::Restore,
+            Button::RestoreAll | Button::Points => Act::RestorePoint,
+            Button::Protect => Act::Protect,
+            Button::Groups => Act::ChangeGroups,
+            Button::Reload
+            | Button::Help
+            | Button::Quit
+            | Button::Confirm
+            | Button::Cancel
+            | Button::Next => Act::Read,
+        }
+    }
+
     /// The key this button stands for, so a click goes through exactly the code the key does.
     pub fn key(self) -> Key {
         match self {

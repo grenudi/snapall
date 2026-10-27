@@ -138,13 +138,9 @@ fn apply(state: &mut State, mut editor: LimitsEditor) -> Reaction {
         options,
         before: editor.before,
     }];
-    let Modal::Confirm(mut question) = confirm_modal(
-        Act::ChangeLimits { removes },
-        None,
-        "Change what an area keeps",
-        lines,
-        then,
-    ) else {
+    let Modal::Confirm(mut question) =
+        confirm_modal(Act::ChangeLimits { removes }, None, lines, then)
+    else {
         unreachable!("confirm_modal makes a confirmation")
     };
     // cancelled, it is back in the editor with the numbers as they were typed

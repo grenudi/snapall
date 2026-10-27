@@ -33,7 +33,6 @@ pub(crate) fn confirming_restore(
                 return ask_first(
                     Act::RestorePoint,
                     None,
-                    "Put every area back",
                     lines,
                     vec![Effect::RestorePoint { point }],
                 );
@@ -53,7 +52,6 @@ pub(crate) fn confirming_restore(
             ask_first(
                 Act::Restore,
                 None,
-                "Put files back",
                 lines,
                 vec![Effect::Restore { config, id, path }],
             )

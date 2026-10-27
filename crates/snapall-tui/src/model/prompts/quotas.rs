@@ -41,7 +41,6 @@ pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> R
             ask_first(
                 Act::RoomCounting,
                 None,
-                "Room counting",
                 lines,
                 vec![Effect::SetQuotas { turn_on, paths }],
             )

@@ -9,6 +9,7 @@
 //! validation of invocations all derive from these declarations.
 
 use argenv_resolve::*;
+use snapall_core::{Act, Weight};
 
 /// What the contract needs to know about a command beyond its name: its words, and which of the shared flags
 /// it takes. Declared with the command, once, in the `commands!` macro below; every list of commands below (those that take
@@ -26,9 +27,12 @@ pub struct Spec {
     pub logged: bool,
     /// Takes `--dry-run`: it can say what it would do without doing it.
     pub dry_run: bool,
-    /// Takes `--yes`: it asks before a change that can be put back, and a script can answer.
+    /// What it does, in the app's own words ([`Act`]). Whether it asks, and what a script must say to answer,
+    /// is not declared here a second time: it is the weight of these.
+    pub acts: [Option<Act>; 2],
+    /// Takes `--yes`: some act of it is a change that can be put back. Derived from [`Spec::acts`].
     pub yes: bool,
-    /// Takes `--destroy`: it asks before a loss for good, and a script can answer. `--yes` cannot.
+    /// Takes `--destroy`: some act of it loses something for good. Derived from [`Spec::acts`]; `--yes` cannot answer.
     pub destroy: bool,
 }
 
@@ -40,6 +44,7 @@ impl Spec {
             json: false,
             logged: false,
             dry_run: false,
+            acts: [None, None],
             yes: false,
             destroy: false,
         }
@@ -56,12 +61,18 @@ impl Spec {
         self.dry_run = true;
         self
     }
-    const fn yes(mut self) -> Spec {
-        self.yes = true;
-        self
-    }
-    const fn destroy(mut self) -> Spec {
-        self.destroy = true;
+    /// One thing it does. Its weight decides which of `--yes` and `--destroy` it takes.
+    const fn does(mut self, act: Act) -> Spec {
+        match act.weight() {
+            Weight::Light => {}
+            Weight::Changes => self.yes = true,
+            Weight::Destroys => self.destroy = true,
+        }
+        if self.acts[0].is_none() {
+            self.acts[0] = Some(act);
+        } else {
+            self.acts[1] = Some(act);
+        }
         self
     }
 }
@@ -92,81 +103,82 @@ macro_rules! commands {
 
 commands! {
     Create => Spec::new("create", "Take one snapshot of every protected area (the default command)")
-            .json()
-            .logged()
-            .dry_run(),
+        .json()
+        .logged()
+        .dry_run()
+        .does(Act::TakeSnapshot),
     List => Spec::new("list", "List the protected areas snapall can see")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     Snapshots => Spec::new("snapshots", "List the snapshots of one protected area, or of all of them")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     Delete => Spec::new("delete", "Delete one snapshot of a protected area")
-            .json()
-            .logged()
-            .destroy(),
+        .json()
+        .logged()
+        .does(Act::DeleteSnapshots),
     Changes => Spec::new("changes", "Show what restoring a snapshot would change")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     Restore => Spec::new("restore", "Put a protected area, or one path of it, back to how a snapshot had it")
-            .json()
-            .logged()
-            .dry_run()
-            .yes(),
+        .json()
+        .logged()
+        .dry_run()
+        .does(Act::Restore),
     RestoreAll => Spec::new("restore-all", "Put every protected area back to one restore point, in one action")
-            .json()
-            .logged()
-            .dry_run()
-            .yes(),
+        .json()
+        .logged()
+        .dry_run()
+        .does(Act::RestorePoint),
     Points => Spec::new("points", "List the restore points: the snapshots one action took together")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     History => Spec::new("history", "Show how one file stood in each snapshot")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     Health => Spec::new("health", "Show whether protection is working, and how much room it takes")
-            .json()
-            .logged(),
+        .json()
+        .logged(),
     Activity => Spec::new("activity", "Show what snapall has done, including earlier sessions, newest first")
-            .json(),
+        .json(),
     Groups => Spec::new("groups", "Name sets of areas, such as theming, to take snapshots of together")
-            .json()
-            .yes(),
+        .json()
+        .does(Act::ChangeGroups),
     Limits => Spec::new("limits", "Show or change how many snapshots an area keeps")
-            .json()
-            .logged()
-            .yes()
-            .destroy(),
+        .json()
+        .logged()
+        .does(Act::ChangeLimits { removes: false })
+        .does(Act::ChangeLimits { removes: true }),
     Unprotect => Spec::new("unprotect", "Stop protecting an area: deletes all its snapshots for good")
-            .json()
-            .logged()
-            .dry_run()
-            .destroy(),
+        .json()
+        .logged()
+        .dry_run()
+        .does(Act::StopProtecting),
     Undo => Spec::new("undo", "Roll a change back, to the state it recorded, after showing what that is")
-            .json()
-            .logged()
-            .yes()
-            .destroy(),
+        .json()
+        .logged()
+        .does(Act::Undo { doing: Weight::Changes })
+        .does(Act::Undo { doing: Weight::Destroys }),
     Cancel => Spec::new("cancel", "Ask a running change to stop after the area it is on")
-            .json()
-            .yes(),
+        .json()
+        .does(Act::StopChange),
     Quotas => Spec::new("quotas", "Show how the disk counts the room snapshots take, and switch it on or off")
-            .json()
-            .logged()
-            .yes(),
+        .json()
+        .logged()
+        .does(Act::RoomCounting),
     Setup => Spec::new("setup", "Protect what has no snapshots yet, explaining each step")
-            .json()
-            .logged()
-            .dry_run()
-            .yes(),
+        .json()
+        .logged()
+        .dry_run()
+        .does(Act::Protect),
     Doctor => Spec::new("doctor", "Check that snapper works, and install it if it is missing")
-            .json()
-            .logged()
-            .yes(),
+        .json()
+        .logged()
+        .does(Act::InstallSnapper),
     Completions => Spec::new("completions", "Print shell completions (bash, zsh, fish, nushell)"),
     Man => Spec::new("man", "Print the manual page"),
     Tui => Spec::new("tui", "Open the interactive terminal UI")
-            .logged(),
+        .logged(),
     Contract => Spec::new("contract", "Print this program's invocation contract as argenv JSON"),
 }
 
@@ -754,89 +766,53 @@ mod tests {
     use super::*;
     use snapall_core::{Act, Weight};
 
-    /// The command that carries out each act. Exhaustive, so a new act does not compile until it is placed.
-    fn carried_out_by(act: Act) -> Option<&'static str> {
-        match act {
-            Act::Read | Act::TakeSnapshot => None,
-            Act::DeleteSnapshots => Some("delete"),
-            Act::Restore => Some("restore"),
-            Act::RestorePoint => Some("restore-all"),
-            Act::Protect => Some("setup"),
-            Act::StopProtecting => Some("unprotect"),
-            Act::ChangeLimits { .. } => Some("limits"),
-            Act::RoomCounting => Some("quotas"),
-            Act::ChangeGroups => Some("groups"),
-            // stopping a running change is `cancel`; the window's job controls have no command at all
-            Act::StopChange => Some("cancel"),
-            Act::ControlJob => None,
-            Act::InstallSnapper => Some("doctor"),
-            Act::Undo { .. } => Some("undo"),
+    /// The commands that carry out an act, from what each command declares it does.
+    fn commands_doing(act: Act) -> Vec<&'static str> {
+        Command::ALL
+            .iter()
+            .map(|command| command.spec())
+            .filter(|spec| spec.acts.contains(&Some(act)))
+            .map(|spec| spec.token)
+            .collect()
+    }
+
+    /// What the window does and the command line does not, by design: the whole of reading (every command
+    /// that lists, shows or explains something), and the jobs, which are the system's, not snapall's to script.
+    const WINDOW_ONLY: [Act; 2] = [Act::Read, Act::ControlJob];
+
+    #[test]
+    fn every_act_is_carried_out_by_a_command_except_what_is_the_windows_alone_and_says_so() {
+        for act in Act::EVERY {
+            let commands = commands_doing(act);
+            if WINDOW_ONLY.contains(&act) {
+                assert!(
+                    commands.is_empty(),
+                    "{act:?} is declared the window's alone, but `{commands:?}` does it"
+                );
+            } else {
+                assert!(!commands.is_empty(), "no command carries out {act:?}: the app does something it cannot be told to do");
+            }
         }
     }
 
-    const EVERY_ACT: [Act; 16] = [
-        Act::Read,
-        Act::TakeSnapshot,
-        Act::DeleteSnapshots,
-        Act::Restore,
-        Act::RestorePoint,
-        Act::Protect,
-        Act::StopProtecting,
-        Act::ChangeLimits { removes: true },
-        Act::ChangeLimits { removes: false },
-        Act::RoomCounting,
-        Act::ChangeGroups,
-        Act::ControlJob,
-        Act::StopChange,
-        Act::InstallSnapper,
-        // it weighs what the change it rolls back weighs: so it takes both flags
-        Act::Undo {
-            doing: Weight::Changes,
-        },
-        Act::Undo {
-            doing: Weight::Destroys,
-        },
-    ];
-
     #[test]
-    fn a_command_takes_the_flag_that_answers_what_it_does_and_no_flag_that_does_not() {
-        for act in EVERY_ACT {
-            let Some(token) = carried_out_by(act) else {
-                continue;
-            };
-            let spec = Command::from_token(token)
-                .expect("a command that exists")
-                .spec();
-            match act.weight() {
-                Weight::Destroys => assert!(
-                    spec.destroy,
-                    "`{token}` does {act:?}, which loses something for good: it needs --destroy"
-                ),
-                Weight::Changes => {
-                    assert!(spec.yes, "`{token}` does {act:?}, a change: it needs --yes")
-                }
-                Weight::Light => {}
-            }
-        }
-        // and the other way: --destroy is only on a command that can destroy, and a command that can only
-        // destroy has no --yes, which could not answer for it
+    fn what_a_command_asks_and_what_a_script_must_say_follow_from_what_it_does() {
         for command in Command::ALL {
             let spec = command.spec();
-            let weights: Vec<Weight> = EVERY_ACT
-                .iter()
-                .filter(|act| carried_out_by(**act) == Some(spec.token))
-                .map(|act| act.weight())
-                .collect();
-            assert!(
-                !spec.destroy || weights.contains(&Weight::Destroys),
-                "`{}` takes --destroy but destroys nothing",
+            let weights: Vec<Weight> = spec.acts.iter().flatten().map(|act| act.weight()).collect();
+            assert_eq!(
+                spec.destroy,
+                weights.contains(&Weight::Destroys),
+                "`{}` and --destroy",
                 spec.token
             );
-            assert!(
-                !spec.yes || weights.contains(&Weight::Changes),
-                "`{}` takes --yes but changes nothing it asks about",
+            assert_eq!(
+                spec.yes,
+                weights.contains(&Weight::Changes),
+                "`{}` and --yes",
                 spec.token
             );
+            // --yes cannot answer for a loss: a command that only loses something takes none
             let only_destroys =
                 !weights.is_empty() && weights.iter().all(|w| *w == Weight::Destroys);
             assert!(

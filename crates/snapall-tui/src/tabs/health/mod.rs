@@ -126,7 +126,6 @@ fn act_on_chosen(state: &mut State) -> Vec<Effect> {
             state.modal = Some(crate::model::confirm_modal(
                 snapall_core::Act::ControlJob,
                 None,
-                "Switch cleanup on",
                 lines,
                 vec![Effect::SwitchOnCleanup],
             ));

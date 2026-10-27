@@ -115,7 +115,32 @@ pub enum Act {
 }
 
 impl Act {
-    pub fn weight(self) -> Weight {
+    /// Every act, once (the ones with a detail, in each form). A new act does not compile in [`Act::weight`]
+    /// or [`Act::title`] until it has its place, and a test requires it to be here.
+    pub const EVERY: [Act; 16] = [
+        Act::Read,
+        Act::TakeSnapshot,
+        Act::DeleteSnapshots,
+        Act::Restore,
+        Act::RestorePoint,
+        Act::Protect,
+        Act::StopProtecting,
+        Act::ChangeLimits { removes: true },
+        Act::ChangeLimits { removes: false },
+        Act::RoomCounting,
+        Act::ChangeGroups,
+        Act::ControlJob,
+        Act::StopChange,
+        Act::InstallSnapper,
+        Act::Undo {
+            doing: Weight::Changes,
+        },
+        Act::Undo {
+            doing: Weight::Destroys,
+        },
+    ];
+
+    pub const fn weight(self) -> Weight {
         match self {
             Act::Read | Act::TakeSnapshot => Weight::Light,
             Act::DeleteSnapshots | Act::StopProtecting | Act::ChangeLimits { removes: true } => {
@@ -133,6 +158,26 @@ impl Act {
             Act::Undo { doing } => doing,
         }
     }
+
+    /// What it is called to a person: the title of the question before it, the one place its name is written.
+    pub const fn title(self) -> &'static str {
+        match self {
+            Act::Read => "Look",
+            Act::TakeSnapshot => "Take a snapshot",
+            Act::DeleteSnapshots => "Delete for good",
+            Act::Restore => "Put files back",
+            Act::RestorePoint => "Put every area back",
+            Act::Protect => "Protect this part of the disk",
+            Act::StopProtecting => "Stop protecting an area",
+            Act::ChangeLimits { .. } => "Change what an area keeps",
+            Act::RoomCounting => "Count the room snapshots take",
+            Act::ChangeGroups => "Change a group",
+            Act::ControlJob => "Control a background job",
+            Act::StopChange => "Ask it to stop",
+            Act::InstallSnapper => "Install the snapshot tool",
+            Act::Undo { .. } => "Roll a change back",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -145,6 +190,54 @@ mod tests {
             assert_eq!(Weight::from_word(weight.word()), Some(weight));
         }
         assert_eq!(Weight::from_word("enormous"), None);
+    }
+
+    /// A representative of each kind of act, by an exhaustive `match`: a new act does not compile here until it
+    /// is placed, and [`Act::EVERY`] is then required to contain it.
+    fn representative(act: Act) -> Act {
+        match act {
+            Act::Read
+            | Act::TakeSnapshot
+            | Act::DeleteSnapshots
+            | Act::Restore
+            | Act::RestorePoint
+            | Act::Protect
+            | Act::StopProtecting
+            | Act::ChangeLimits { .. }
+            | Act::RoomCounting
+            | Act::ChangeGroups
+            | Act::ControlJob
+            | Act::StopChange
+            | Act::InstallSnapper
+            | Act::Undo { .. } => act,
+        }
+    }
+
+    #[test]
+    fn every_act_is_listed_once_and_has_a_title_a_sentence_of_its_own() {
+        for act in Act::EVERY {
+            assert!(Act::EVERY.contains(&representative(act)));
+            assert!(
+                !act.title().is_empty()
+                    && act.title().chars().next().is_some_and(char::is_uppercase),
+                "{act:?}"
+            );
+        }
+        for (at, act) in Act::EVERY.iter().enumerate() {
+            assert!(!Act::EVERY[..at].contains(act), "{act:?} is listed twice");
+        }
+        // a variant with a detail is listed in each form that weighs differently
+        assert!(
+            Act::EVERY.contains(&Act::ChangeLimits { removes: true })
+                && Act::EVERY.contains(&Act::ChangeLimits { removes: false })
+        );
+        assert!(
+            Act::EVERY.contains(&Act::Undo {
+                doing: Weight::Changes
+            }) && Act::EVERY.contains(&Act::Undo {
+                doing: Weight::Destroys
+            })
+        );
     }
 
     #[test]

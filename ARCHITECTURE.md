@@ -23,6 +23,17 @@ snapall follows the [software-engineering-canon](https://github.com/creation-gui
 | [Typestate](https://github.com/creation-guidelines/software-engineering-canon/blob/main/docs/principles.md#typestate) | `doctor --install` can only run steps that are `Approved`, and the only way to get an `Approved` is to show them and be told yes (or `--yes`). Running unapproved package-manager commands as root is not a state the program can be in. | `snapall/src/doctor.rs` |
 | [Domain-driven design](https://github.com/creation-guidelines/software-engineering-canon/blob/main/docs/architectures.md#domain-driven-design) | One vocabulary, written down: [docs/glossary.md](docs/glossary.md). Four contexts with their own models: snapshots (`snapall-core`), environment diagnosis (`doctor`), invocation (the argenv contract) and presentation (the TUI). | `docs/glossary.md` |
 
+## Reading order
+
+To learn what snapall is for, read from the top and stop when you have enough: each layer is written in the
+words of the one above it (ADR 19).
+
+1. `snapall-core/src/consequence.rs`: **what the app does**, as acts, each with its weight and its title.
+2. `snapall/src/contract.rs`: **what a person can ask for**; every command says which acts it does, and what it
+   asks and what a script must say follow from that.
+3. `snapall-core/src/usecase.rs`, `rollback.rs`, `limits.rs`, `unprotect.rs`...: **how each is done**.
+4. The adapters (`snapall-snapper`, `snapall-system`): **what it is done to**.
+
 ## The invocation contract
 
 The CLI surface (flags, positionals, environment variables, which command each applies to) is declared once with [argenv](https://github.com/argenv-opencommons/argenv) in `crates/snapall/src/contract.rs`. From that single declaration come: argument and environment resolution with provenance, `--help`, the validation of invocations, and the published `snapall contract` document (committed as `snapall.argenv.json`, checked by a test and by `argenv lint` in CI). The canon's DRY applied to an interface: one authoritative home for each piece of knowledge.

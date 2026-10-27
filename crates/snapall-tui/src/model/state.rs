@@ -148,7 +148,6 @@ pub struct Confirm {
     pub act: snapall_core::Act,
     /// What the answer must name, where the change is done to one thing (`destroy home`).
     pub target: Option<String>,
-    pub title: String,
     /// What it will do, in plain words; the first line is the one that matters most.
     pub lines: Vec<String>,
     pub typed: String,

@@ -24,7 +24,6 @@ pub(crate) fn confirming_delete(
             ask_first(
                 Act::DeleteSnapshots,
                 None,
-                "Delete for good",
                 lines,
                 vec![Effect::Delete { config, ids }],
             )
