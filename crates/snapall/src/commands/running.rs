@@ -30,9 +30,7 @@ pub fn cancel(ctx: &Context, job: &str, yes: bool) -> Outcome {
         .into());
     }
     let question = format!("Ask {} to stop after the area it is on?", entry.what);
-    if let Some(stop) = ask::gate(Act::StopChange.weight(), yes, &question, None)? {
-        return Ok(stop);
-    }
+    ask::gate(Act::StopChange.weight(), yes, &question, None)?;
     system.request_stop(job)?;
     ctx.show.result(
         format!(

@@ -41,14 +41,12 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
         "Stop protecting {area} and delete its {} snapshots for good?",
         plan.snapshots
     );
-    if let Some(stop) = ask::gate(
+    ask::gate(
         Act::StopProtecting.weight(),
         destroy,
         &question,
         Some(config.as_str()),
-    )? {
-        return Ok(stop);
-    }
+    )?;
     let title = snapall_core::coverage::describe(&plan.subvolume).title;
     let change = Change::begin(
         &format!("Stopping protection of {title}"),

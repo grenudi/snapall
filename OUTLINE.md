@@ -44,7 +44,11 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-snapper
 
-- `lib.rs`: Adapter: the `SnapshotBackend` port, implemented by running the `snapper` CLI.
+- `backend.rs`: Our snapshot verbs, said to snapper one command at a time.
+- `files.rs`: Looking at a file as snapper's snapshots keep it, and comparing it with now.
+- `lib.rs`: The snapshot backend for snapper: our verbs said to it, and what it says read back in our words.
+- `reading.rs`: Reading what snapper prints back into our own words.
+- `running.rs`: Running the snapper program and what it leaves behind.
 
 ## snapall-system
 
@@ -117,13 +121,19 @@ What each part of snapall says it is for, read from the first line of each modul
 ## snapall
 
 - `advice.rs`: What to tell someone whose file no snapshot can contain: why, and what to do about it, in snapall's own words and with snapall's own command.
-- `ask.rs`: Asking the person at the terminal a yes/no question, in one place.
+- `ask.rs`: Asking before a change, and the end of a command that was not told to go ahead.
 - `boot_probe.rs`: The imperative half of the boot-menu check: look at files and services, hand the facts to `snapall_core::boot::assess`.
 - `cli.rs`: Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
   - `commands/change.rs`: A change being made: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
   - `commands/deleting.rs`: Deleting a snapshot.
-  - `commands/going_back.rs`: Going back: putting an area or a restore point back, and rolling a change back with `undo`.
-  - `commands/keeping.rs`: What is kept: how many snapshots an area holds, whether the room they take is counted, and the groups of areas.
+    - `commands/going_back/mod.rs`: Going back: to a snapshot, to a restore point, or to before a change.
+    - `commands/going_back/restoring.rs`: Putting one area, or one file of it, back to how a snapshot had it.
+    - `commands/going_back/restoring_a_point.rs`: Putting every area back to how a restore point had them.
+    - `commands/going_back/undoing.rs`: Rolling a change back to the state it recorded.
+    - `commands/keeping/groups.rs`: Groups of areas: naming a set of them to snapshot together.
+    - `commands/keeping/limits.rs`: How many snapshots an area keeps, and when its oldest go.
+    - `commands/keeping/mod.rs`: What is kept: how many snapshots, whether their room is counted, and which areas go together.
+    - `commands/keeping/room_counting.rs`: Counting the room that snapshots take.
   - `commands/looking.rs`: Looking, which changes nothing: the areas, their snapshots, the history of a file, the health, the record, the restore points.
   - `commands/mod.rs`: Everything the command line does, by what it is for.
   - `commands/protecting.rs`: Protecting parts of the disk, and stopping protecting them.

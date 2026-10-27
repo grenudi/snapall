@@ -31,7 +31,6 @@ pub use window::tui;
 
 // what the commands share, in one place: the change being made, and the few helpers more than one needs
 use change::Change;
-use going_back::suggest_the_boot_menu;
 use keeping::areas_of_group;
 use looking::show_changes;
 use window::{absolute, unix_now};
