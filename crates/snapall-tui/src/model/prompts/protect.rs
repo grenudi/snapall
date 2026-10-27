@@ -25,13 +25,7 @@ pub(crate) fn protecting(state: &mut State, key: Key, index: usize) -> Reaction 
             let effect = Effect::Protect {
                 mount_point: offer.mount_point.clone(),
             };
-            ask_first(
-                Act::Protect,
-                None,
-                "Protect this part of the disk",
-                lines,
-                vec![effect],
-            )
+            ask_first(Act::Protect, None, lines, vec![effect])
         }
         Key::Tab | Key::Right | Key::Down | Key::Char('j' | 'l') if count > 1 => {
             Reaction::stays(Modal::Protect {

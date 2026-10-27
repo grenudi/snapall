@@ -47,7 +47,7 @@ pub(crate) fn confirm_spec(question: &Confirm) -> ModalSpec {
     let width = 76;
     let height = (rows_needed(&lines, width) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     ModalSpec {
-        title: format!(" {} ", question.title),
+        title: format!(" {} ", question.act.title()),
         lines,
         color: colour,
         width,

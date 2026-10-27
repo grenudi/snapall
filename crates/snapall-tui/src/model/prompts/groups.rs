@@ -88,7 +88,6 @@ fn on_list(state: &mut State, key: Key, cursor: usize) -> Reaction {
                 ];
                 ask_first_then_return(
                     Act::ChangeGroups,
-                    "Take a group away",
                     lines,
                     vec![Effect::SaveGroups { groups, before }],
                     list(cursor.saturating_sub(1)),
@@ -199,7 +198,6 @@ fn on_pick(
             ];
             ask_first_then_return(
                 Act::ChangeGroups,
-                "Save a group",
                 lines,
                 vec![Effect::SaveGroups { groups, before }],
                 list(at),

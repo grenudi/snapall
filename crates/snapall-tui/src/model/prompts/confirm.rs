@@ -14,14 +14,12 @@ use snapall_core::Act;
 pub(crate) fn confirm_modal(
     act: Act,
     target: Option<&str>,
-    title: &str,
     lines: Vec<String>,
     then: Vec<Effect>,
 ) -> Modal {
     Modal::Confirm(Confirm {
         act,
         target: target.map(str::to_owned),
-        title: title.to_owned(),
         lines,
         typed: String::new(),
         error: None,
@@ -36,25 +34,23 @@ pub(crate) fn confirm_modal(
 pub(crate) fn ask_first(
     act: Act,
     target: Option<&str>,
-    title: &str,
     lines: Vec<String>,
     then: Vec<Effect>,
 ) -> Reaction {
     if !act.weight().asks() {
         return Reaction::closes_and_starts(then);
     }
-    Reaction::stays(confirm_modal(act, target, title, lines, then))
+    Reaction::stays(confirm_modal(act, target, lines, then))
 }
 
 /// [`ask_first`], for a prompt that wants to be where it was after the question, answered or not.
 pub(crate) fn ask_first_then_return(
     act: Act,
-    title: &str,
     lines: Vec<String>,
     then: Vec<Effect>,
     back: Modal,
 ) -> Reaction {
-    let Modal::Confirm(mut question) = confirm_modal(act, None, title, lines, then) else {
+    let Modal::Confirm(mut question) = confirm_modal(act, None, lines, then) else {
         unreachable!("confirm_modal makes a confirmation")
     };
     question.on_cancel = Some(Box::new(back.clone()));

@@ -401,3 +401,86 @@ fn every_command_in_the_contract_is_in_the_readme() {
         );
     }
 }
+
+// ---- a handler reads like a sentence --------------------------------------------------------------------
+
+/// The longest a command's handler may be. Past it, it is doing the work of several sentences (asking, doing,
+/// recording, saying) and no longer reads as what the command is for.
+const LONGEST_HANDLER: usize = 60;
+
+/// The handlers that are longer today, with how long. A ratchet: a handler may not grow, no new one may join,
+/// and each leaves this list the moment it is short enough: the list can only get shorter. They are to be
+/// split by what they do (see ADR 19), not allowed to stay.
+const TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
+    ("groups", 107),
+    ("limits", 104),
+    ("create", 89),
+    ("quotas", 85),
+    ("restore_all", 82),
+    ("undo", 63),
+];
+
+/// Every top-level function of `commands.rs` and its length in lines (not counting its tests).
+fn handler_lengths() -> Vec<(String, usize)> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands.rs");
+    let source = std::fs::read_to_string(path).unwrap();
+    let lines: Vec<&str> = source
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap()
+        .lines()
+        .collect();
+    let mut found = Vec::new();
+    let mut at = 0;
+    while at < lines.len() {
+        let name = ["pub fn ", "pub(crate) fn ", "fn "]
+            .iter()
+            .find_map(|prefix| lines[at].strip_prefix(prefix))
+            .and_then(|rest| rest.split(['(', '<']).next());
+        if let Some(name) = name {
+            let end = (at..lines.len())
+                .find(|line| lines[*line] == "}")
+                .unwrap_or(at);
+            found.push((name.to_owned(), end - at + 1));
+            at = end;
+        }
+        at += 1;
+    }
+    found
+}
+
+#[test]
+fn a_command_handler_is_short_enough_to_read_as_a_sentence_and_the_debt_only_shrinks() {
+    let lengths = handler_lengths();
+    assert!(
+        lengths.len() > 20,
+        "the scan found {} handlers: it has stopped finding them",
+        lengths.len()
+    );
+    for (name, length) in &lengths {
+        let allowed = TOO_LONG_FOR_NOW
+            .iter()
+            .find(|(listed, _)| listed == name)
+            .map_or(LONGEST_HANDLER, |(_, most)| *most);
+        assert!(
+            *length <= allowed,
+            "`{name}` is {length} lines (the most allowed is {allowed}): split it by what it does, so that it reads as a sentence"
+        );
+    }
+    for (listed, most) in TOO_LONG_FOR_NOW {
+        let now = lengths
+            .iter()
+            .find(|(name, _)| name == listed)
+            .map(|(_, length)| *length);
+        match now {
+            None => panic!("`{listed}` is on the too-long list but no longer exists: take it off"),
+            Some(length) if length <= LONGEST_HANDLER => {
+                panic!("`{listed}` is {length} lines, short enough now: take it off the list, so it cannot grow back")
+            }
+            Some(length) if length < most => {
+                panic!("`{listed}` shrank to {length} lines: lower its entry from {most} so that it cannot grow back")
+            }
+            Some(_) => {}
+        }
+    }
+}

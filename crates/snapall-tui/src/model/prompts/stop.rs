@@ -20,7 +20,6 @@ pub(crate) fn confirming_stop(_state: &mut State, key: Key, id: String, what: St
             ask_first(
                 Act::StopChange,
                 None,
-                "Ask it to stop",
                 lines,
                 vec![Effect::StopChange { id }],
             )
