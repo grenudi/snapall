@@ -248,7 +248,7 @@ fn escape_changes_nothing_and_the_button_works_by_mouse_with_its_explanation_on_
     };
     let click = view::hit_test(&session.state, SCREEN, col_row.0 + 2, col_row.1);
     assert_eq!(click, Some(Click::Button(Button::Protect)));
-    session.dispatch(Msg::Hover(Some(Button::Protect)));
+    session.dispatch(Msg::Hover(Some(Click::Button(Button::Protect))));
     assert!(screen(&session)
         .contains("See which parts of your disk have no snapshots yet, and protect them"));
     session.dispatch(Msg::Click(click.unwrap()));

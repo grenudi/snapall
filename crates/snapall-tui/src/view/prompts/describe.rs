@@ -49,7 +49,7 @@ pub(crate) fn describe_spec(
             Style::new().fg(DIM),
         ));
     }
-    let height = (rows_needed(&lines, 64) + 4).clamp(9, 21);
+    let height = (rows_needed(&lines, 64) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title,
         lines,

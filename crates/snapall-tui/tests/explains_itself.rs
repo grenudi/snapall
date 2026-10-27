@@ -12,7 +12,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
 use snapall_core::{ConfigName, Description, SnapshotBackend};
-use snapall_tui::model::{Button, Key, Modal, Msg};
+use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, FileTarget, Session, UiContext};
 
 const JARGON: [&str; 6] = [
@@ -71,7 +71,7 @@ fn assert_plain(what: &str, text: &str) {
 fn the_mouse_over_a_button_says_what_it_does_and_leaving_it_stops() {
     let backend = backend();
     let mut session = Session::new(&backend);
-    session.dispatch(Msg::Hover(Some(Button::Delete)));
+    session.dispatch(Msg::Hover(Some(Click::Button(Button::Delete))));
     let text = screen(&session);
     assert!(
         text.contains("Delete the marked snapshots for good. Your files are not touched"),
@@ -252,10 +252,10 @@ fn no_prompt_covers_the_two_footer_lines_at_24_rows() {
         }
         assert!(session.state.modal.is_some(), "{name}: a prompt is open");
         // the explanation row has a button's explanation on it
-        session.dispatch(Msg::Hover(Some(Button::Cancel)));
+        session.dispatch(Msg::Hover(Some(Click::Button(Button::Cancel))));
         let text = screen(&session);
         let rows: Vec<&str> = text.lines().collect();
-        let (explanation, keys_row) = (rows[22], rows[23]);
+        let (explanation, keys_row) = (rows[21], rows[23]);
         assert!(
             keys_row.contains("q quit"),
             "{name}: the key line is covered:\n{text}"

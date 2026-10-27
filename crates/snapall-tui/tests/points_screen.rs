@@ -79,25 +79,22 @@ fn two_points() -> InMemoryBackend {
 }
 
 #[test]
-fn nine_footer_buttons_fit_eighty_columns_so_none_is_lost_off_the_end() {
+fn every_footer_button_fits_eighty_columns_on_two_rows_so_none_is_lost_off_the_end() {
     let backend = two_points();
     let session = Session::new(&backend);
     let text = screen(&session);
-    let footer = text.lines().nth(23).unwrap();
-    for button in [
-        "c create",
-        "a all",
-        "d delete",
-        "u restore",
-        "R points",
-        "r reload",
-        "p protect",
-        "? help",
-        "q quit",
-    ] {
+    let (first, second) = (text.lines().nth(22).unwrap(), text.lines().nth(23).unwrap());
+    // the first row is for doing things, the second for finding your way and leaving
+    for button in ["c create", "a all", "d delete", "u restore", "g groups"] {
         assert!(
-            footer.contains(button),
-            "`{button}` missing from the key line:\n{footer}"
+            first.contains(button),
+            "`{button}` missing from the first row:\n{first}"
+        );
+    }
+    for button in ["R points", "r reload", "p protect", "? help", "q quit"] {
+        assert!(
+            second.contains(button),
+            "`{button}` missing from the second row:\n{second}"
         );
     }
 }
@@ -244,7 +241,7 @@ fn the_button_opens_it_by_mouse_explains_itself_and_the_prompt_leaves_the_footer
     let col = text.lines().nth(23).unwrap().find("R points").unwrap();
     let click = view::hit_test(&session.state, SCREEN, u16::try_from(col).unwrap(), 23);
     assert_eq!(click, Some(Click::Button(Button::Points)));
-    session.dispatch(Msg::Hover(Some(Button::Points)));
+    session.dispatch(Msg::Hover(Some(Click::Button(Button::Points))));
     let help = view::button_help(Button::Points, &session.state);
     assert!(
         help.chars().count() <= 70 && screen(&session).contains(help),
@@ -253,12 +250,12 @@ fn the_button_opens_it_by_mouse_explains_itself_and_the_prompt_leaves_the_footer
     session.dispatch(Msg::Click(click.unwrap()));
     assert!(matches!(session.state.modal, Some(Modal::Points { .. })));
     // inside the prompt, the footer still shows what the buttons do
-    session.dispatch(Msg::Hover(Some(Button::Confirm)));
+    session.dispatch(Msg::Hover(Some(Click::Button(Button::Confirm))));
     let rows: Vec<String> = screen(&session).lines().map(str::to_owned).collect();
     assert!(
-        rows[22].contains("Put every area of the chosen restore point back"),
+        rows[21].contains("Put every area of the chosen restore point back"),
         "{}",
-        rows[22]
+        rows[21]
     );
     assert!(rows[23].contains("q quit"), "{}", rows[23]);
 }

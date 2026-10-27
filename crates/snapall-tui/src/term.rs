@@ -21,7 +21,7 @@ use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::flag;
 use snapall_core::SnapshotBackend;
 
-use crate::model::{update, Click, Effect, Key, Msg, Notice, State, UiContext};
+use crate::model::{update, Effect, Key, Msg, Notice, State, UiContext};
 use crate::session::Executor;
 use crate::view;
 
@@ -161,11 +161,7 @@ fn event_loop(
                         }
                         // Moving over a button explains it; only a change is worth a redraw.
                         MouseEventKind::Moved => {
-                            let over = match view::hit_test(&state, screen, mouse.column, mouse.row)
-                            {
-                                Some(Click::Button(button)) => Some(button),
-                                _ => None,
-                            };
+                            let over = view::hit_test(&state, screen, mouse.column, mouse.row);
                             (over != state.hover).then_some(Msg::Hover(over))
                         }
                         MouseEventKind::ScrollUp => {

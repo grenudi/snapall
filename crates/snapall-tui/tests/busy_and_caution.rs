@@ -78,12 +78,12 @@ fn while_work_is_in_flight_the_window_says_what_it_is_doing_and_for_how_long() {
         screen[0]
     );
     assert!(
-        screen[22].contains("Taking a snapshot of home, root... 3 s"),
+        screen[21].contains("Taking a snapshot of home, root... 3 s"),
         "the line under the status bar says what: {}",
-        screen[22]
+        screen[21]
     );
     assert!(
-        !screen[22].contains("this can take a while"),
+        !screen[21].contains("this can take a while"),
         "not before there is reason to"
     );
 }
@@ -95,7 +95,7 @@ fn after_a_few_seconds_it_says_it_can_take_a_while_and_that_waiting_is_safe() {
     for _ in 0..60 {
         update(&mut state, Msg::Tick);
     }
-    let line = rows(&state)[22].clone();
+    let line = rows(&state)[21].clone();
     assert!(
         line.contains(
             "This can take a while; waiting is safe. Taking a snapshot of home, root (6 s)"
@@ -109,7 +109,7 @@ fn closing_while_work_is_in_flight_says_it_waits_for_it() {
     let backend = backend();
     let mut state = waiting_for_snapshots(&backend);
     state.quit = true;
-    let line = rows(&state)[22].clone();
+    let line = rows(&state)[21].clone();
     assert!(
         line.contains("Closing as soon as this has finished: Taking a snapshot"),
         "{line}"
@@ -132,7 +132,7 @@ fn when_the_work_is_done_the_line_goes_and_the_clock_starts_over() {
         state.doing,
         state.busy_ticks
     );
-    assert!(!rows(&state)[22].contains("Taking a snapshot of"));
+    assert!(!rows(&state)[21].contains("Taking a snapshot of"));
 }
 
 #[test]

@@ -44,11 +44,7 @@ pub(crate) fn tab_spans(state: &State) -> Vec<Span<'static>> {
         width: u16::MAX,
         height: 1,
     }) {
-        let style = if tab == state.tab {
-            Style::new().fg(Color::Black).bg(Color::White).bold()
-        } else {
-            Style::new().fg(DIM)
-        };
+        let style = look::tab(look::mood(state, Click::Tab(tab)), tab == state.tab);
         spans.push(Span::styled(tab_label(tab), style));
         spans.push(Span::raw(" "));
     }

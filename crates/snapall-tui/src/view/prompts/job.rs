@@ -88,7 +88,7 @@ pub(crate) fn job_spec(unit: &str, state: &State) -> ModalSpec {
     }
     let width = 80;
     // the box, its border and the line for the buttons, plus every line as it wraps
-    let height = (rows_needed(&lines, width) + 4).clamp(10, 21);
+    let height = (rows_needed(&lines, width) + 4).clamp(10, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: format!(" {} ", job.title),
         lines,

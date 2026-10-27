@@ -313,7 +313,7 @@ fn these_prompts_leave_the_status_bar_and_the_two_lines_beneath_it_and_use_no_un
         session.dispatch(Msg::Tick);
         let text = screen(&session);
         assert!(
-            text.lines().nth(21).unwrap().contains("snapshots"),
+            text.lines().nth(20).unwrap().contains("snapshots"),
             "status bar covered:\n{text}"
         );
         assert!(

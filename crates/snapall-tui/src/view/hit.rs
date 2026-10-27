@@ -68,7 +68,8 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
         .into_iter()
         .find(|(rect, _, _, _)| contains(*rect, col, row))
     {
-        return Some(Click::Button(button));
+        // a button that does nothing here is not one to click
+        return (!is_disabled(state, button)).then_some(Click::Button(button));
     }
     if state.file.is_none() && state.tab != Tab::Snapshots {
         let index = match state.tab {
@@ -79,7 +80,11 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
         return index.map(|index| Click::TabRow { index });
     }
     let block = Block::default().borders(Borders::ALL);
-    let configs = block.inner(areas.configs);
+    let (configs, groups) = configs_split(state, block.inner(areas.configs));
+    // the groups under the areas open the groups, like the button
+    if groups.is_some_and(|groups| contains(groups, col, row)) {
+        return Some(Click::Button(Button::Groups));
+    }
     if state.file.is_none() && contains(configs, col, row) && !state.entries().is_empty() {
         let index =
             window_start(state.config_cursor, configs.height as usize) + (row - configs.y) as usize;

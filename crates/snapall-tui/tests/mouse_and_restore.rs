@@ -132,37 +132,38 @@ fn every_footer_button_is_drawn_where_it_is_clickable_and_does_what_its_key_does
     let backend = backend(3);
     let session = Session::new(&backend);
     let drawn = rows(&session.state, 100, 24);
-    let keys_row = 23; // the last line of a 24-line screen
+    // the buttons are on the last two lines of a 24-line screen: doing things first, then finding your way
     let expected = [
-        ("c create", Button::Create),
-        ("a all", Button::CreateAll),
-        ("d delete", Button::Delete),
-        ("u restore", Button::Restore),
-        ("r reload", Button::Reload),
-        ("? help", Button::Help),
-        ("q quit", Button::Quit),
+        ("c create", Button::Create, 22),
+        ("a all", Button::CreateAll, 22),
+        ("d delete", Button::Delete, 22),
+        ("u restore", Button::Restore, 22),
+        ("g groups", Button::Groups, 22),
+        ("R points", Button::Points, 23),
+        ("r reload", Button::Reload, 23),
+        ("p protect", Button::Protect, 23),
+        ("? help", Button::Help, 23),
+        ("q quit", Button::Quit, 23),
     ];
-    for (label, button) in expected {
-        let col = drawn[keys_row]
+    for (label, button, row) in expected {
+        let col = drawn[row]
             .find(label)
-            .unwrap_or_else(|| panic!("`{label}` is not drawn: {}", drawn[keys_row]))
+            .unwrap_or_else(|| panic!("`{label}` is not drawn: {}", drawn[row]))
             as u16;
-        for offset in [0, label.len() as u16 - 1] {
+        let (first, last) = (col, col + label.len() as u16 - 1);
+        // the button is the label and a space of padding each side: all of it answers a click
+        for at in [first - 1, first, last, last + 1] {
             assert_eq!(
-                view::hit_test(&session.state, SIZE, col + offset, keys_row as u16),
+                view::hit_test(&session.state, SIZE, at, row as u16),
                 Some(Click::Button(button)),
-                "{label} at +{offset}"
+                "{label} at column {at}"
             );
         }
+        // and the gap between one button and the next does not
         assert_eq!(
-            view::hit_test(
-                &session.state,
-                SIZE,
-                col + label.len() as u16,
-                keys_row as u16
-            ),
+            view::hit_test(&session.state, SIZE, last + 2, row as u16),
             None,
-            "just past {label}"
+            "the gap after {label}"
         );
     }
 }

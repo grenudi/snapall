@@ -43,7 +43,7 @@ pub(crate) fn unprotect_spec(prompt: &StopProtecting) -> ModalSpec {
         }
     }
     let width = 78;
-    let height = (rows_needed(&lines, width) + 4).clamp(9, 21);
+    let height = (rows_needed(&lines, width) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     let buttons = match &prompt.plan {
         Some(Ok(_)) => vec![confirm_button("Stop protecting"), cancel_button()],
         _ => vec![close_button()],

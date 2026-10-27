@@ -171,7 +171,7 @@ fn the_status_bar_is_under_every_view_and_says_the_same_thing_in_each() {
     let mut session = Session::with_system(&backend, &system, UiContext::default());
     for key in ['1', '2', '3'] {
         session.press(Key::Char(key));
-        let bar = row(&screen(&session), 21);
+        let bar = row(&screen(&session), 20);
         for item in [
             "2 snapshots",
             "disk 91% full",
@@ -191,8 +191,8 @@ fn a_click_on_a_status_item_goes_to_the_row_that_explains_it() {
     let backend = machine();
     let system = troubled();
     let mut session = Session::with_system(&backend, &system, UiContext::default());
-    let col = row(&screen(&session), 21).find("cleanup off").unwrap();
-    let click = view::hit_test(&session.state, SCREEN, u16::try_from(col + 3).unwrap(), 21);
+    let col = row(&screen(&session), 20).find("cleanup off").unwrap();
+    let click = view::hit_test(&session.state, SCREEN, u16::try_from(col + 3).unwrap(), 20);
     assert_eq!(click, Some(Click::Chip(Topic::Cleanup)));
     session.dispatch(Msg::Click(click.unwrap()));
     assert_eq!(session.state.tab, Tab::Health);
@@ -209,13 +209,13 @@ fn enter_on_the_cleanup_row_switches_it_on_and_the_whole_window_follows() {
     let backend = machine();
     let system = troubled();
     let mut session = Session::with_system(&backend, &system, as_administrator());
-    let col = row(&screen(&session), 21).find("cleanup off").unwrap();
+    let col = row(&screen(&session), 20).find("cleanup off").unwrap();
     session.dispatch(Msg::Click(Click::Chip(Topic::Cleanup)));
     let _ = col;
     session.press(Key::Enter);
 
     assert_eq!(system.jobs_switched_on(), ["snapper-cleanup.timer"]);
-    let bar = row(&screen(&session), 21);
+    let bar = row(&screen(&session), 20);
     assert!(
         bar.contains("cleanup on") && !bar.contains("cleanup off"),
         "the bar turned: {bar}"
@@ -249,7 +249,7 @@ fn without_administrator_rights_it_says_so_in_plain_words_and_changes_nothing() 
     assert!(format!("{:?}", session.state.notice)
         .contains("Could not switch automatic cleanup on: Access denied"));
     assert!(
-        row(&screen(&session), 21).contains("cleanup off"),
+        row(&screen(&session), 20).contains("cleanup off"),
         "nothing changed"
     );
 }
@@ -330,7 +330,7 @@ fn no_prompt_covers_the_status_bar_or_the_two_lines_beneath_it() {
         assert!(session.state.modal.is_some(), "{name}");
         let text = screen(&session);
         assert!(
-            row(&text, 21).contains("snapshots"),
+            row(&text, 20).contains("snapshots"),
             "{name}: the status bar is covered:\n{text}"
         );
         assert!(

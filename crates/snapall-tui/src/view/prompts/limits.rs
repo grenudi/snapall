@@ -78,7 +78,7 @@ pub(crate) fn limits_spec(editor: &LimitsEditor, state: &State) -> ModalSpec {
         Style::new().fg(DIM),
     ));
     let width = 80;
-    let height = (rows_needed(&lines, width) + 4).clamp(12, 21);
+    let height = (rows_needed(&lines, width) + 4).clamp(12, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: format!(" What {area} keeps "),
         lines,

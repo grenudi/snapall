@@ -57,6 +57,10 @@ pub(crate) fn cancel_button() -> (Button, String) {
     (Button::Cancel, "Esc: Cancel".to_owned())
 }
 
+/// The most rows a prompt may take: the status bar, the line of explanation and the two rows of buttons stay
+/// visible under it.
+pub(crate) const MAX_PROMPT_HEIGHT: u16 = 20;
+
 pub(crate) fn close_button() -> (Button, String) {
     (Button::Cancel, "Esc: Close".to_owned())
 }
@@ -94,10 +98,10 @@ pub(crate) fn modal_geometry(
     size: Rect,
 ) -> (ModalSpec, Rect, Vec<(Rect, Button, String)>) {
     let spec = modal_spec(modal, state);
-    // A prompt never covers the two footer lines: the one below it explains the button the mouse is
-    // over, and a prompt is exactly where that explanation matters.
+    // A prompt never covers the footer: the line there explains the button the mouse is over, and a prompt
+    // is exactly where that explanation matters.
     let above_footer = Rect {
-        height: size.height.saturating_sub(3),
+        height: size.height.saturating_sub(4),
         ..size
     };
     let area = centered(above_footer, spec.width, spec.height);
@@ -149,10 +153,8 @@ pub(crate) fn render_modal(modal: &Modal, state: &State, frame: &mut Frame) {
         text_area,
     );
     for (rect, button, label) in buttons {
-        let style = match button {
-            Button::Cancel => Style::new().fg(DIM),
-            _ => Style::new().fg(Color::Black).bg(spec.color).bold(),
-        };
+        let mood = look::mood(state, Click::Button(button));
+        let style = look::prompt_button(mood, button != Button::Cancel, spec.color);
         frame.render_widget(
             Paragraph::new(Span::styled(format!("[ {label} ]"), style)),
             rect,

@@ -108,7 +108,7 @@ pub enum Msg {
     Tick,
     Key(Key),
     /// The mouse moved over a button (or off every button).
-    Hover(Option<Button>),
+    Hover(Option<Click>),
     /// A left click, resolved by the view.
     Click(Click),
     /// The wheel over a pane: positive moves down.

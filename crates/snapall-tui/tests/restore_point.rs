@@ -11,7 +11,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
 use snapall_core::{plan_snapshots, run_plan, ConfigName, Description, Point, SnapshotBackend};
-use snapall_tui::model::{Button, Key, Modal, Msg};
+use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session};
 
 const SCREEN: Rect = Rect {
@@ -237,7 +237,7 @@ fn the_button_explains_itself_and_works_by_mouse() {
         click,
         Some(snapall_tui::model::Click::Button(Button::RestoreAll))
     );
-    session.dispatch(Msg::Hover(Some(Button::RestoreAll)));
+    session.dispatch(Msg::Hover(Some(Click::Button(Button::RestoreAll))));
     let text = view::button_help(Button::RestoreAll, &session.state);
     assert!(
         text.chars().count() <= 70,

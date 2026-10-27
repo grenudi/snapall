@@ -18,6 +18,7 @@ use snapall_core::{
 };
 
 mod file;
+mod following;
 mod input;
 mod keys;
 mod lists;
@@ -26,6 +27,7 @@ mod prompts;
 mod state;
 
 pub(crate) use file::*;
+pub(crate) use following::*;
 pub use input::*;
 pub(crate) use keys::*;
 pub(crate) use lists::*;
@@ -63,78 +65,8 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
     effects
 }
 
-/// While anything runs, or this window started something that has not yet been seen to end, the journal
-/// is read once a second, so that progress moves and the end is noticed even if another program caused it.
-fn follow_what_runs(state: &mut State) -> Vec<Effect> {
-    let running = state
-        .activity
-        .entries
-        .iter()
-        .any(|entry| entry.status == snapall_core::JournalStatus::Running);
-    if !running && state.watching.is_empty() {
-        state.poll_ticks = 0;
-        return Vec::new();
-    }
-    state.poll_ticks += 1;
-    if state.poll_ticks < 10 {
-        return Vec::new();
-    }
-    state.poll_ticks = 0;
-    vec![Effect::LoadHistory]
-}
-
-/// The journal was read: a change this window handed to the background may have ended, and then the lists
-/// are looked at again, because it changed what they show. One that never appears in the journal is let go
-/// of after a while, with a word about it.
-fn what_this_window_started_has_ended(
-    state: &mut State,
-    entries: &[snapall_core::JournalEntry],
-) -> Vec<Effect> {
-    use snapall_core::JournalStatus;
-    const LET_GO_AFTER: u32 = 30;
-    let mut effects = Vec::new();
-    let mut notice = None;
-    state.watching.retain_mut(|watched| {
-        match entries.iter().find(|entry| entry.id == watched.id) {
-            None => {
-                watched.unseen += 1;
-                if watched.unseen > LET_GO_AFTER {
-                    notice = Some(Notice::Error(
-                        "A change started in the background never reported: look in Activity, and at the snapshots, to see whether it happened"
-                            .into(),
-                    ));
-                    return false;
-                }
-                true
-            }
-            Some(entry) if entry.status == JournalStatus::Running => true,
-            Some(entry) => {
-                notice = Some(match entry.status {
-                    JournalStatus::Done if entry.detail.is_empty() => {
-                        Notice::Info(format!("{}: done", entry.what))
-                    }
-                    JournalStatus::Done => {
-                        Notice::Info(format!("{}: done. {}", entry.what, entry.detail))
-                    }
-                    JournalStatus::Cancelled => {
-                        Notice::Info(format!("{}: stopped on request. {}", entry.what, entry.detail))
-                    }
-                    _ => Notice::Error(format!("{}: {}", entry.what, entry.detail)),
-                });
-                effects = vec![Effect::LoadConfigs, Effect::LoadHealth];
-                false
-            }
-        }
-    });
-    if let Some(notice) = notice {
-        // looking at the lists again would clear it: it is shown again when they have arrived
-        if !effects.is_empty() {
-            state.after_reload = Some(notice.clone());
-        }
-        state.notice = Some(notice);
-    }
-    effects
-}
+/// How long a click leaves its button looking pressed: a few tenths of a second.
+const PRESSED_TICKS: u8 = 3;
 
 /// What a unit is called to a person: its job's title, or the unit's own name if it is not one.
 pub(crate) fn job_title(unit: &str) -> String {
@@ -346,6 +278,11 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
         }
         Msg::Tick => {
             state.spinner = state.spinner.wrapping_add(1);
+            state.pressed = state.pressed.and_then(|(click, left)| {
+                left.checked_sub(1)
+                    .filter(|left| *left > 0)
+                    .map(|left| (click, left))
+            });
             state.busy_ticks = if state.pending > 0 {
                 state.busy_ticks.saturating_add(1)
             } else {
@@ -390,11 +327,15 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             settle(state);
             on_protected(state, &mount_point, result)
         }
-        Msg::Hover(button) => {
-            state.hover = button;
+        Msg::Hover(over) => {
+            state.hover = over;
             Vec::new()
         }
-        Msg::Click(click) => on_click(state, click),
+        Msg::Click(click) => {
+            // shown pressed for a moment, whatever the click then does
+            state.pressed = Some((click, PRESSED_TICKS));
+            on_click(state, click)
+        }
         Msg::Scroll { pane, delta } => on_scroll(state, pane, delta),
         Msg::ChangesLoaded { config, id, result } => {
             settle(state);
