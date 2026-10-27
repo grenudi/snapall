@@ -26,7 +26,8 @@ snapall follows the [software-engineering-canon](https://github.com/creation-gui
 ## Reading order
 
 To learn what snapall is for, read from the top and stop when you have enough: each layer is written in the
-words of the one above it (ADR 19).
+words of the one above it (ADR 19, ADR 20, `docs/canon/small-languages.md`). `OUTLINE.md` is the whole program as a
+table of contents, generated from what each module says it is for.
 
 1. `snapall-core/src/consequence.rs`: **what the app does**, as acts, each with its weight and its title.
 2. `snapall/src/contract.rs`: **what a person can ask for**; every command says which acts it does, and what it
