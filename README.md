@@ -2,6 +2,11 @@
 
 **Try risky things on Linux, and go back if they go wrong.**
 
+[Screencast_20261027_011609.webm](https://github.com/user-attachments/assets/9d31b0c9-3feb-43d4-adf1-b0ad90e9cd44)
+
+[Screencast_20261027_011752.webm](https://github.com/user-attachments/assets/20351ff8-3f34-4eec-a2a8-1c076837e5fd)
+
+
 Before an Arch update, a new desktop theme or a config you are not sure about, add a restore point in one command, try the thing, and put your files back if you do not like it. snapall takes the snapshot of everything you have set up (system and home), lists them in a friendly terminal UI you can drive with the mouse, restores files from them, and deletes the ones you no longer need, so they do not pile up. It is a plug-and-play front end for [snapper](http://snapper.io/) on Btrfs: no configuration of its own, nothing to learn first.
 
 - **One command, everything.** `sudo snapall "before theming"` snapshots every protected area at once (the System, your Home files, and anything else you protect).
