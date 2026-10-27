@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.21.0]
+
+
+### Features
+- What it asks scales with what is at stake, and every change records its way back ([#59](https://github.com/grenudi/snapall/pull/59)) ([cfa7e7a])
+
+
+
 ## [0.20.0]
 
 
