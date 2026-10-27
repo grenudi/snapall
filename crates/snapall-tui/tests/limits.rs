@@ -121,7 +121,7 @@ fn the_editor_shows_what_the_area_keeps_now_and_what_that_would_do() {
     }
     let screen = rows(&session);
     assert!(
-        screen[21].contains("snapshots") && screen[23].contains("q quit"),
+        screen[20].contains("snapshots") && screen[23].contains("q quit"),
         "the bars are not covered"
     );
 }

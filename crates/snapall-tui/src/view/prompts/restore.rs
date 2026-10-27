@@ -52,7 +52,7 @@ pub(crate) fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) 
         "The running system is left alone.",
         Style::new().fg(Color::Yellow),
     ));
-    spec.height = (rows_needed(&spec.lines, spec.width) + 4).clamp(10, 21);
+    spec.height = (rows_needed(&spec.lines, spec.width) + 4).clamp(10, MAX_PROMPT_HEIGHT);
     let last = spec.buttons.len().saturating_sub(1);
     spec.buttons
         .insert(last, (Button::RestoreAll, format!("A: Restore all {k}")));
@@ -114,7 +114,7 @@ pub(crate) fn restore_stage_spec(
         },
         RestoreStage::Ready(preview) => {
             let lines = restore_summary(config, id, path, &preview.changes);
-            let height = (rows_needed(&lines, 78) + 4).clamp(10, 21);
+            let height = (rows_needed(&lines, 78) + 4).clamp(10, MAX_PROMPT_HEIGHT);
             ModalSpec {
                 title,
                 lines,

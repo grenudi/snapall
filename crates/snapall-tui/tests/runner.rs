@@ -165,7 +165,7 @@ fn what_runs_is_followed_through_the_journal_with_its_progress_and_shown_on_the_
     worker_steps(&system, &id, 1, "root");
     a_second(&mut session);
 
-    let bar = rows(&session)[21].clone();
+    let bar = rows(&session)[20].clone();
     assert!(bar.contains("1 running"), "the status bar says so: {bar}");
     session.press(Key::Char('3'));
     let text = flat(&session);
@@ -204,7 +204,7 @@ fn when_it_ends_the_window_says_so_and_looks_at_the_lists_again() {
     );
     assert!(format!("{:?}", session.state.notice).contains("Took a snapshot of home, root: done"));
     assert!(
-        !rows(&session)[21].contains("running"),
+        !rows(&session)[20].contains("running"),
         "the item leaves the status bar"
     );
 }
@@ -233,9 +233,9 @@ fn a_click_on_the_running_item_goes_to_the_running_change() {
     let (mut session, id) = handed_over(&backend, &system);
     worker_starts(&system, &id);
     a_second(&mut session);
-    let col = rows(&session)[21].find("1 running").unwrap();
+    let col = rows(&session)[20].find("1 running").unwrap();
     let click =
-        view::hit_test(&session.state, SCREEN, u16::try_from(col + 2).unwrap(), 21).unwrap();
+        view::hit_test(&session.state, SCREEN, u16::try_from(col + 2).unwrap(), 20).unwrap();
     session.dispatch(Msg::Click(click));
     assert_eq!(session.state.tab, Tab::Activity);
     assert_eq!(
@@ -269,7 +269,7 @@ fn stopping_asks_first_says_what_it_means_and_only_asks() {
     }
     let screen = rows(&session);
     assert!(
-        screen[21].contains("running") && screen[23].contains("q quit"),
+        screen[20].contains("running") && screen[23].contains("q quit"),
         "the bars are not covered"
     );
     session.press(Key::Esc);

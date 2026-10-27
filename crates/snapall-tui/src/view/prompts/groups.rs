@@ -32,7 +32,7 @@ pub(crate) fn groups_spec(screen: &GroupsScreen, state: &State) -> ModalSpec {
     };
     lines.push(Line::styled(help, Style::new().fg(DIM)));
     let width = 78;
-    let height = (rows_needed(&lines, width) + 4).clamp(9, 21);
+    let height = (rows_needed(&lines, width) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: title.into(),
         lines,
@@ -154,7 +154,7 @@ fn pick_spec(
         "Space: include or leave out   Enter: save   Esc: back",
         Style::new().fg(DIM),
     ));
-    let height = (rows_needed(&lines, 78) + 4).clamp(9, 21);
+    let height = (rows_needed(&lines, 78) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: format!(" The areas of {name} "),
         lines,

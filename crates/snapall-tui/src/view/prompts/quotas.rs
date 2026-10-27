@@ -40,7 +40,7 @@ pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {
         Line::from(""),
         Line::styled(will, Style::new().fg(Color::Yellow)),
     ];
-    let height = (rows_needed(&lines, 80) + 4).clamp(10, 21);
+    let height = (rows_needed(&lines, 80) + 4).clamp(10, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: if turn_on {
             " Count the room snapshots take? ".into()

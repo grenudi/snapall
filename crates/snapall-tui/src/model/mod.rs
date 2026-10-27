@@ -136,6 +136,9 @@ fn what_this_window_started_has_ended(
     effects
 }
 
+/// How long a click leaves its button looking pressed: a few tenths of a second.
+const PRESSED_TICKS: u8 = 3;
+
 /// What a unit is called to a person: its job's title, or the unit's own name if it is not one.
 pub(crate) fn job_title(unit: &str) -> String {
     snapall_core::services::ALL
@@ -346,6 +349,11 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
         }
         Msg::Tick => {
             state.spinner = state.spinner.wrapping_add(1);
+            state.pressed = state.pressed.and_then(|(click, left)| {
+                left.checked_sub(1)
+                    .filter(|left| *left > 0)
+                    .map(|left| (click, left))
+            });
             state.busy_ticks = if state.pending > 0 {
                 state.busy_ticks.saturating_add(1)
             } else {
@@ -390,11 +398,15 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             settle(state);
             on_protected(state, &mount_point, result)
         }
-        Msg::Hover(button) => {
-            state.hover = button;
+        Msg::Hover(over) => {
+            state.hover = over;
             Vec::new()
         }
-        Msg::Click(click) => on_click(state, click),
+        Msg::Click(click) => {
+            // shown pressed for a moment, whatever the click then does
+            state.pressed = Some((click, PRESSED_TICKS));
+            on_click(state, click)
+        }
         Msg::Scroll { pane, delta } => on_scroll(state, pane, delta),
         Msg::ChangesLoaded { config, id, result } => {
             settle(state);

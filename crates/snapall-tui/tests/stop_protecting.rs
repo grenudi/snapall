@@ -136,7 +136,7 @@ fn the_question_says_what_goes_what_stays_and_that_it_cannot_be_undone() {
     }
     let screen = rows(&session);
     assert!(
-        screen[21].contains("snapshots") && screen[23].contains("q quit"),
+        screen[20].contains("snapshots") && screen[23].contains("q quit"),
         "the bars are not covered"
     );
 }

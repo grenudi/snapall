@@ -53,6 +53,8 @@ pub enum Button {
     RestoreAll,
     /// See the restore points and put every area back to one of them.
     Points,
+    /// See the groups of areas, make one, change one.
+    Groups,
 }
 
 impl Button {
@@ -72,6 +74,7 @@ impl Button {
             Button::Next => Key::Tab,
             Button::RestoreAll => Key::Char('A'),
             Button::Points => Key::Char('R'),
+            Button::Groups => Key::Char('g'),
         }
     }
 }

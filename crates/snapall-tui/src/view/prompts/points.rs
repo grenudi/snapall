@@ -110,7 +110,9 @@ pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
         )));
     }
     buttons.push(close_button());
-    let height = u16::try_from(lines.len() + 3).unwrap_or(20).clamp(10, 21);
+    let height = u16::try_from(lines.len() + 3)
+        .unwrap_or(20)
+        .clamp(10, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: format!(" Restore points  ({} of {}) ", index + 1, points.len()),
         lines,

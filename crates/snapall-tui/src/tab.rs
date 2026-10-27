@@ -43,7 +43,7 @@ impl Tab {
         match self {
             Tab::Snapshots => "Your protected areas and their snapshots: take, delete and restore",
             Tab::Health => "Is protection working, how much room it takes, and what to do about it",
-            Tab::Activity => "What snapall did in this window, and how it went",
+            Tab::Activity => "What snapall has done, from here and from commands, and how it went",
         }
     }
 }

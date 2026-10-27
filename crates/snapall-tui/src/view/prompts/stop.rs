@@ -14,7 +14,7 @@ pub(crate) fn stop_spec(what: &str) -> ModalSpec {
         Line::from(""),
         Line::styled("Closing this window does not stop it; only this does. It stops within moments once the area it is on is finished.", Style::new().fg(DIM)),
     ];
-    let height = (rows_needed(&lines, 76) + 4).clamp(9, 21);
+    let height = (rows_needed(&lines, 76) + 4).clamp(9, MAX_PROMPT_HEIGHT);
     ModalSpec {
         title: " Stop it after this area? ".into(),
         lines,

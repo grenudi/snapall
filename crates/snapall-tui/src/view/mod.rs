@@ -26,6 +26,7 @@ mod footer;
 mod header;
 mod hit;
 mod lists;
+mod look;
 mod prompts;
 
 pub(crate) use file::*;
@@ -56,13 +57,13 @@ pub fn areas(size: Rect) -> Areas {
         Constraint::Length(1),
         Constraint::Min(3),
         Constraint::Length(1),
-        Constraint::Length(2),
+        Constraint::Length(3),
     ])
     .areas(size);
     let [configs, snapshots] =
         Layout::horizontal([Constraint::Length(28), Constraint::Min(20)]).areas(body);
     let [notice, keys] =
-        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(footer);
+        Layout::vertical([Constraint::Length(1), Constraint::Length(2)]).areas(footer);
     Areas {
         header,
         body,

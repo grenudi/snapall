@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-26T22:53:05Z",
+  "generated": "2026-10-27T02:45:37Z",
   "inputs": [
     {
       "allowed": [],
@@ -754,5 +754,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.18.0"
+  "source": "snapall@0.19.0"
 }

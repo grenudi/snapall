@@ -252,7 +252,10 @@ pub struct State {
     /// Set when the UI was opened on one file: the screen is then that file's history.
     pub file: Option<FileView>,
     /// The button the mouse is over: what it does is written on the footer line while it is.
-    pub hover: Option<Button>,
+    /// What the mouse is over, if it is something that can be clicked: it is lit, and a button says what it does.
+    pub hover: Option<Click>,
+    /// What was clicked a moment ago, and for how many more ticks it is shown pressed.
+    pub pressed: Option<(Click, u8)>,
     /// The parts of the disk still offered for protecting; one leaves the list when it is protected.
     pub offers: Vec<Offer>,
     /// A message to show once the list has been reloaded: the reload clears older notices, and a
@@ -293,6 +296,7 @@ impl Default for State {
             context: UiContext::default(),
             file: None,
             hover: None,
+            pressed: None,
             offers: Vec::new(),
             after_reload: None,
             point_offer: None,
@@ -310,6 +314,7 @@ impl State {
     /// handed to the background, or anything the journal says is running. The clock ticks while it is so.
     pub fn is_following_something(&self) -> bool {
         self.pending > 0
+            || self.pressed.is_some()
             || !self.watching.is_empty()
             || self
                 .activity

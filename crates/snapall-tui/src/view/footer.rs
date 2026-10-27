@@ -6,52 +6,72 @@
 
 use crate::view::*;
 
-/// The footer's buttons, in order: the button, the key it stands for, and its label.
-pub(crate) const ACTIONS: [(Button, &str, &str); 9] = [
-    (Button::Create, "c", "create"),
-    (Button::CreateAll, "a", "all"),
-    (Button::Delete, "d", "delete"),
-    (Button::Restore, "u", "restore"),
-    (Button::Points, "R", "points"),
-    (Button::Reload, "r", "reload"),
-    (Button::Protect, "p", "protect"),
-    (Button::Help, "?", "help"),
-    (Button::Quit, "q", "quit"),
+/// The footer's buttons: the button, the key it stands for, its label, and which of the two rows it is on.
+/// The first row is for doing things, the second for finding your way and leaving.
+pub(crate) const ACTIONS: [(Button, &str, &str, u16); 10] = [
+    (Button::Create, "c", "create", 0),
+    (Button::CreateAll, "a", "all", 0),
+    (Button::Delete, "d", "delete", 0),
+    (Button::Restore, "u", "restore", 0),
+    (Button::Groups, "g", "groups", 0),
+    (Button::Points, "R", "points", 1),
+    (Button::Reload, "r", "reload", 1),
+    (Button::Protect, "p", "protect", 1),
+    (Button::Help, "?", "help", 1),
+    (Button::Quit, "q", "quit", 1),
 ];
 
-/// Each footer button and the cells it covers on the key line.
-pub(crate) const FILE_ACTIONS: [(Button, &str, &str); 4] = [
-    (Button::Restore, "u", "restore this version"),
-    (Button::Reload, "r", "reload"),
-    (Button::Help, "?", "help"),
-    (Button::Quit, "q", "quit"),
+/// The footer of the screen that is open on one file.
+pub(crate) const FILE_ACTIONS: [(Button, &str, &str, u16); 4] = [
+    (Button::Restore, "u", "restore this version", 0),
+    (Button::Reload, "r", "reload", 0),
+    (Button::Help, "?", "help", 0),
+    (Button::Quit, "q", "quit", 0),
 ];
 
+/// Whether a button does anything where the person is: taking, deleting and restoring act on the snapshot
+/// lists, so they have nothing to act on in the other tabs. They are drawn dim and do not answer the mouse,
+/// rather than looking alive and doing nothing.
+pub(crate) fn is_disabled(state: &State, button: Button) -> bool {
+    matches!(button, Button::Create | Button::Delete | Button::Restore)
+        && state.file.is_none()
+        && state.tab != Tab::Snapshots
+}
+
+/// The cells a button takes: a space, the key, a space, the label and a space. The key is the chip, so the
+/// text still reads `c create`.
+fn width_of(key: &str, label: &str) -> u16 {
+    u16::try_from(key.chars().count() + label.chars().count() + 3).unwrap_or(u16::MAX)
+}
+
+/// Each footer button and the cells it covers.
 pub(crate) fn footer_buttons(
     keys: Rect,
     file_mode: bool,
 ) -> Vec<(Rect, Button, &'static str, &'static str)> {
-    let mut x = keys.x.saturating_add(1);
+    let actions: &[(Button, &str, &str, u16)] = if file_mode { &FILE_ACTIONS } else { &ACTIONS };
+    let mut next_x = [keys.x.saturating_add(1); 2];
     let mut out = Vec::new();
-    let actions: &[(Button, &str, &str)] = if file_mode { &FILE_ACTIONS } else { &ACTIONS };
-    for &(button, key, label) in actions {
-        let width = (key.chars().count() + 1 + label.chars().count()) as u16;
-        if x.saturating_add(width) > keys.x.saturating_add(keys.width) {
-            break; // what does not fit is not drawn, and so cannot be clicked
+    for &(button, key, label, row) in actions {
+        let width = width_of(key, label);
+        let slot = usize::from(row.min(1));
+        if row >= keys.height
+            || next_x[slot].saturating_add(width) > keys.x.saturating_add(keys.width)
+        {
+            continue; // what does not fit is not drawn, and so cannot be clicked
         }
         out.push((
             Rect {
-                x,
-                y: keys.y,
+                x: next_x[slot],
+                y: keys.y.saturating_add(row),
                 width,
-                height: 1.min(keys.height),
+                height: 1,
             },
             button,
             key,
             label,
         ));
-        // one space between buttons: nine of them must fit 80 columns, and the key letter is bold
-        x = x.saturating_add(width).saturating_add(1);
+        next_x[slot] = next_x[slot].saturating_add(width).saturating_add(1);
     }
     out
 }
@@ -100,6 +120,7 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
         }
         (None, Button::Help) => "Explain what snapshots are and what each key does",
         (None, Button::Quit) => "Close snapall. Nothing is changed",
+        (_, Button::Groups) => "Name sets of your areas, such as theming, and snapshot just those",
         (None, Button::Confirm | Button::Cancel | Button::Next | Button::RestoreAll) => "",
     }
 }
@@ -124,7 +145,11 @@ pub(crate) fn busy_line(state: &State) -> Option<String> {
 pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
     let explanation = state
         .hover
-        .map(|button| button_help(button, state))
+        .and_then(|over| match over {
+            Click::Button(button) => Some(button_help(button, state)),
+            Click::Tab(tab) => Some(tab.purpose()),
+            _ => None,
+        })
         .filter(|text| !text.is_empty());
     // What deserves attention comes before a tip: a part of the disk without snapshots, then the boot menu.
     let attention = state
@@ -152,10 +177,16 @@ pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
         (None, None, None) => Span::raw(""),
     };
     frame.render_widget(Paragraph::new(Line::from(notice)), areas.notice);
-    for (rect, _button, key, label) in footer_buttons(areas.keys, state.file.is_some()) {
+    for (rect, button, key, label) in footer_buttons(areas.keys, state.file.is_some()) {
+        let mood = if is_disabled(state, button) {
+            look::Mood::Disabled
+        } else {
+            look::mood(state, Click::Button(button))
+        };
+        let danger = button == Button::Delete;
         let line = Line::from(vec![
-            Span::styled(key, Style::new().fg(ACCENT).bold()),
-            Span::styled(format!(" {label}"), Style::new().fg(DIM)),
+            Span::styled(format!(" {key}"), look::chip(mood, danger)),
+            Span::styled(format!(" {label} "), look::label(mood, danger)),
         ]);
         frame.render_widget(Paragraph::new(line), rect);
     }

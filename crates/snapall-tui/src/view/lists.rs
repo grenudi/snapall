@@ -19,6 +19,76 @@ pub(crate) fn pane_block(title: String, focused: bool) -> Block<'static> {
         .title(Span::styled(title, Style::new().fg(color).bold()))
 }
 
+/// The groups under the areas: a heading, up to three groups, and how many more there are; or, when there
+/// are none, a line that says how to make one, so that the feature can be found by looking.
+/// `text` cut to `width` columns, with an ellipsis where it was cut: a clipped word is read as a different one.
+fn fit(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_owned();
+    }
+    let kept: String = text.chars().take(width.saturating_sub(1)).collect();
+    format!("{kept}…")
+}
+
+fn group_lines(state: &State, width: usize) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::from(vec![
+        Span::styled("Groups", Style::new().fg(ACCENT).bold()),
+        Span::styled("  g: manage", Style::new().fg(DIM)),
+    ])];
+    let names: Vec<&snapall_core::GroupName> = state.groups.names().collect();
+    if names.is_empty() {
+        lines.push(Line::styled("none yet: press g", Style::new().fg(DIM)));
+        return lines;
+    }
+    for name in names.iter().take(3) {
+        let areas: Vec<String> = state
+            .groups
+            .get(name)
+            .unwrap_or(&[])
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let name = name.to_string();
+        let room = width.saturating_sub(name.chars().count() + 2);
+        lines.push(Line::from(vec![
+            Span::styled(name, Style::new().bold()),
+            Span::styled(
+                format!("  {}", fit(&areas.join(", "), room)),
+                Style::new().fg(DIM),
+            ),
+        ]));
+    }
+    if names.len() > 3 {
+        lines.push(Line::styled(
+            format!("+{} more", names.len() - 3),
+            Style::new().fg(DIM),
+        ));
+    }
+    lines
+}
+
+/// The left pane's inside, split: the areas, and beneath them (if there is room for every area and a gap
+/// as well) the groups. Drawing and clicking both use this, so a click lands on what was drawn.
+pub(crate) fn configs_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) {
+    let wanted =
+        u16::try_from(group_lines(state, usize::from(inner.width)).len()).unwrap_or(u16::MAX);
+    let areas = u16::try_from(state.entries().len().max(1)).unwrap_or(u16::MAX);
+    if state.file.is_some() || inner.height < areas.saturating_add(wanted).saturating_add(1) {
+        return (inner, None);
+    }
+    // right under the areas they are made of, after a blank line
+    let list = Rect {
+        height: areas,
+        ..inner
+    };
+    let groups = Rect {
+        y: inner.y + areas + 1,
+        height: wanted,
+        ..inner
+    };
+    (list, Some(groups))
+}
+
 pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
     let focused = state.focus == Pane::Configs && state.modal.is_none();
     let block = pane_block(" Protected areas ".into(), focused);
@@ -44,6 +114,9 @@ pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
             );
         }
         Load::Loaded(entries) => {
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+            let (list_area, groups_area) = configs_split(state, inner);
             let items: Vec<ListItem> = entries
                 .iter()
                 .map(|entry| {
@@ -64,11 +137,22 @@ pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
                 Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
             };
             let list = List::new(items)
-                .block(block)
                 .highlight_style(highlight)
                 .highlight_symbol("> ");
             let mut list_state = ListState::default().with_selected(Some(state.config_cursor));
-            frame.render_stateful_widget(list, area, &mut list_state);
+            frame.render_stateful_widget(list, list_area, &mut list_state);
+            if let Some(groups) = groups_area {
+                let hovered = state.hover == Some(Click::Button(Button::Groups));
+                let style = if hovered {
+                    Style::new().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::new()
+                };
+                frame.render_widget(
+                    Paragraph::new(group_lines(state, usize::from(groups.width))).style(style),
+                    groups,
+                );
+            }
         }
     }
 }
