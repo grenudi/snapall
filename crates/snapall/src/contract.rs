@@ -11,7 +11,7 @@
 use argenv_resolve::*;
 
 /// What the contract needs to know about a command beyond its name: its words, and which of the shared flags
-/// it takes. Declared with the command, once, in [`commands!`]; every list of commands below (those that take
+/// it takes. Declared with the command, once, in the `commands!` macro below; every list of commands below (those that take
 /// `--json`, that log, that take `--dry-run`, `--yes` or `--destroy`) is *derived* from it, so a command cannot
 /// be taken by a flag in one place and forgotten in another.
 #[derive(Clone, Copy)]
