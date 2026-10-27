@@ -118,6 +118,9 @@ jobs:
       - name: TUI end to end, in a pseudo-terminal
         run: sudo "$RUNNER_TEMP/venv/bin/python" dev/tui-e2e.py target/debug/snapall
 
+      - name: What the command line asks, and the way back, in a pseudo-terminal
+        run: sudo "$RUNNER_TEMP/venv/bin/python" dev/cli-consequences.py target/debug/snapall
+
       - name: Port contract against real snapper
         run: sudo SNAPALL_IT=1 "$(cat "$RUNNER_TEMP/it-bin")" --nocapture
 
@@ -132,7 +135,7 @@ jobs:
 
           id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci end to end") | .id')"
           test -n "$id"
-          $S delete snapall_it_a "$id"
+          $S delete snapall_it_a "$id" --destroy      # a deletion is answered by --destroy, not --yes
           if sudo snapper --no-dbus -c snapall_it_a list | grep -q "ci end to end"; then
             echo "the deleted snapshot is still there"; exit 1
           fi
@@ -150,9 +153,10 @@ jobs:
 
           $S --log-file "$log" "ci audit"
           id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci audit") | .id')"
-          $S --log-file "$log" delete snapall_it_a "$id"
+          $S --log-file "$log" delete snapall_it_a "$id" --destroy
           failed=0
-          $S --log-file "$log" delete snapall_it_a "$id" 2>/dev/null || failed=$?
+          # already gone: it is not asked about, the attempt fails, and the failed attempt is in the audit trail
+          $S --log-file "$log" delete snapall_it_a "$id" --destroy 2>/dev/null || failed=$?
           test "$failed" -eq 1
 
           # private: it records privileged actions

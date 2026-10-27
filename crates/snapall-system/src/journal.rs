@@ -11,7 +11,8 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use snapall_core::journal::{fold, Entry, Event, Outcome, Source};
+use snapall_core::journal::{fold, Entry, Event, Outcome, Rollback, Source, Undo};
+use snapall_core::Weight;
 
 pub const PATH: &str = "/var/lib/snapall/journal.jsonl";
 
@@ -51,6 +52,16 @@ pub fn to_line(event: &Event) -> String {
         } => serde_json::json!({
             "event": "progress", "id": id, "at": at, "done": done, "of": of, "area": shortened(area),
         }),
+        Event::Rollback { id, at, rollback } => match rollback {
+            Rollback::Undo(undo) => serde_json::json!({
+                "event": "rollback", "id": id, "at": at, "kind": "undo",
+                "what": shortened(&undo.what), "commands": undo.commands,
+                "weight": undo.weight.word(),
+            }),
+            Rollback::Advice(text) => serde_json::json!({
+                "event": "rollback", "id": id, "at": at, "kind": "advice", "text": shortened(text),
+            }),
+        },
         Event::Finished {
             id,
             at,
@@ -84,6 +95,29 @@ pub fn parse_line(line: &str) -> Option<Event> {
             source: Source::from_word(&text("source")?)?,
             pid: u32::try_from(value.get("pid")?.as_u64()?).ok()?,
         }),
+        "rollback" => {
+            let rollback = match text("kind")?.as_str() {
+                "advice" => Rollback::Advice(text("text")?),
+                "undo" => Rollback::Undo(Undo {
+                    what: text("what")?,
+                    commands: value
+                        .get("commands")?
+                        .as_array()?
+                        .iter()
+                        .map(|command| {
+                            command
+                                .as_array()?
+                                .iter()
+                                .map(|word| word.as_str().map(str::to_owned))
+                                .collect()
+                        })
+                        .collect::<Option<Vec<Vec<String>>>>()?,
+                    weight: Weight::from_word(&text("weight")?)?,
+                }),
+                _ => return None,
+            };
+            Some(Event::Rollback { id, at, rollback })
+        }
         "progress" => Some(Event::Progress {
             id,
             at,
@@ -346,5 +380,50 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn a_way_back_survives_the_trip_with_commands_that_have_spaces_quotes_and_unicode() {
+        let undo = Event::Rollback {
+            id: "a".into(),
+            at: "t".into(),
+            rollback: Rollback::Undo(Undo {
+                what: "Put Home back to how it was: snapshot #12 (\"before the new theme\")".into(),
+                commands: vec![
+                    vec![
+                        "restore".into(),
+                        "home".into(),
+                        "12".into(),
+                        "--path".into(),
+                        "/home/a b/ünï \"x\".txt".into(),
+                    ],
+                    vec!["delete".into(), "data".into(), "7".into()],
+                ],
+                weight: Weight::Destroys,
+            }),
+        };
+        let line = to_line(&undo);
+        assert!(!line.contains('\n'));
+        assert_eq!(parse_line(&line), Some(undo));
+        let advice = Event::Rollback {
+            id: "a".into(),
+            at: "t".into(),
+            rollback: Rollback::Advice(
+                "Deleted snapshots are gone: take one first next time.".into(),
+            ),
+        };
+        assert_eq!(parse_line(&to_line(&advice)), Some(advice));
+    }
+
+    #[test]
+    fn a_damaged_way_back_is_skipped_not_guessed() {
+        for bad in [
+            r#"{"event":"rollback","id":"a","at":"t","kind":"undo","what":"x","commands":"restore home","weight":"changes"}"#,
+            r#"{"event":"rollback","id":"a","at":"t","kind":"undo","what":"x","commands":[["a"]],"weight":"enormous"}"#,
+            r#"{"event":"rollback","id":"a","at":"t","kind":"undo","what":"x","commands":[[1]],"weight":"changes"}"#,
+            r#"{"event":"rollback","id":"a","at":"t","kind":"teleport"}"#,
+        ] {
+            assert_eq!(parse_line(bad), None, "{bad}");
+        }
     }
 }

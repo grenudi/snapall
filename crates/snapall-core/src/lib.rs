@@ -12,6 +12,7 @@
 
 pub mod boot;
 pub mod calendar;
+pub mod consequence;
 pub mod course;
 pub mod coverage;
 pub mod doctor;
@@ -33,6 +34,7 @@ pub mod usecase;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use consequence::{Act, Weight};
 pub use course::{Course, Unattended};
 pub use domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
@@ -44,7 +46,7 @@ pub use health::{
 };
 pub use journal::{
     Entry as JournalEntry, Event as JournalEvent, Outcome as JournalOutcome,
-    Progress as JournalProgress, Source, Status as JournalStatus,
+    Progress as JournalProgress, Rollback, Source, Status as JournalStatus, Undo,
 };
 pub use limits::{
     preview as preview_limits, preview_words as limits_words, Limits, Preview as LimitsPreview,

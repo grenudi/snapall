@@ -31,6 +31,7 @@ pub enum Command {
     Groups,
     Limits,
     Unprotect,
+    Undo,
     Cancel,
     Quotas,
     Setup,
@@ -57,6 +58,7 @@ impl Command {
         Command::Groups,
         Command::Limits,
         Command::Unprotect,
+        Command::Undo,
         Command::Cancel,
         Command::Quotas,
         Command::Setup,
@@ -86,6 +88,7 @@ impl Command {
             Command::Groups => "groups",
             Command::Limits => "limits",
             Command::Unprotect => "unprotect",
+            Command::Undo => "undo",
             Command::Doctor => "doctor",
             Command::Completions => "completions",
             Command::Man => "man",
@@ -125,6 +128,9 @@ impl Command {
             Command::Cancel => "Ask a running change to stop after the area it is on",
             Command::Limits => "Show or change how many snapshots an area keeps",
             Command::Unprotect => "Stop protecting an area: deletes all its snapshots for good",
+            Command::Undo => {
+                "Roll a change back, to the state it recorded, after showing what that is"
+            }
             Command::Groups => "Name sets of areas, such as theming, to take snapshots of together",
             Command::Doctor => "Check that snapper works, and install it if it is missing",
             Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
@@ -187,6 +193,7 @@ const OBSERVED: &[Command] = &[
     Command::Quotas,
     Command::Limits,
     Command::Unprotect,
+    Command::Undo,
 ];
 
 contract! {
@@ -300,6 +307,17 @@ contract! {
     };
 
     /// Show the plan without acting.
+    DESTROY: bool, Command = Input {
+        key:         "destroy",
+        ty:          Type::Bool,
+        default:     Some(false),
+        subcommands: &[Command::Delete, Command::Limits, Command::Unprotect, Command::Undo],
+        arg:         Some(Arg::long("destroy")),
+        group:       "destroy",
+        summary:     "Go ahead without asking, where it deletes snapshots for good. `--yes` is for changes that can be put back and is not enough for this.",
+        ..Input::EMPTY
+    };
+
     DRY_RUN: bool, Command = Input {
         key:         "dry_run",
         ty:          Type::Bool,
@@ -334,6 +352,7 @@ contract! {
             Command::Groups,
             Command::Limits,
             Command::Unprotect,
+            Command::Undo,
             Command::Cancel,
             Command::Quotas,
             Command::Doctor,
@@ -443,6 +462,20 @@ contract! {
         group:       "setup",
         example:     "snapall setup /srv",
         summary:     "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+        ..Input::EMPTY
+    };
+
+    // ---- undo ---------------------------------------------------------------------------
+
+    /// Which change to roll back.
+    UNDO_CHANGE: String, Command = Input {
+        key:         "undo_change",
+        ty:          Type::String,
+        subcommands: &[Command::Undo],
+        arg:         Some(Arg { value_name: "CHANGE", ..Arg::positional(0) }),
+        group:       "undo",
+        example:     "snapall undo 4242-1793029083222-c",
+        summary:     "The name of the change, as `snapall activity` shows it (required). Where nothing can be rolled back it says why instead.",
         ..Input::EMPTY
     };
 
@@ -620,10 +653,10 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits, Command::Unprotect],
+        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits, Command::Groups, Command::Cancel, Command::Undo],
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
-        summary:     "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
+        summary:     "Answer yes where snapall asks before a change that can be put back (for scripts and CI). It does not answer for deleting snapshots: that needs --destroy. With doctor, only with --install.",
         ..Input::EMPTY
     };
 

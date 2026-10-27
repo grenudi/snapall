@@ -252,6 +252,12 @@ pub fn protected_text(mount_point: &str) -> String {
     )
 }
 
+/// What to say about a deleted snapshot, which cannot be brought back: what protects against needing to.
+pub const DELETE_ADVICE: &str = "A deleted snapshot cannot be brought back. What protects against needing to is a snapshot taken before a risky step: snapall create, or snapall create --group NAME to take one of a whole group.";
+
+/// The same for an area that stopped being protected.
+pub const UNPROTECT_ADVICE: &str = "Stopping protection cannot be undone: its snapshots are gone. snapall setup protects the area again, starting fresh with no snapshots. What protects against needing to is a snapshot taken before a risky step: snapall create, or snapall create --group NAME to take one of a whole group.";
+
 /// What a restore puts back besides the files a person is thinking of, and what to do about it. Shown
 /// wherever a restore is about to happen.
 pub const RESTORE_CAUTION: &str = "Everything in the area goes back, including what programs keep there: their settings, saved sessions, databases and logs. Close the programs that use those files first, and if one file or folder is all you need, restore just that.";

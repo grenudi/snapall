@@ -396,7 +396,8 @@ impl Talk for Terminal {
                     .into(),
             );
         }
-        crate::ask::confirm(question, true)
+        // typed, like every change: Enter alone is not a yes
+        crate::ask::yes_no(question)
     }
 
     fn switch_on_cleanup(&mut self) -> Result<(), Box<dyn Error>> {

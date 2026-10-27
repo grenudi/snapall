@@ -13,8 +13,8 @@ use snapall_core::boot;
 use snapall_core::{
     all_snapshots, assess, config_covering, delete_snapshot, file_history, fresh_point, gather,
     plan_snapshots, preview_point, preview_restore, restore_point_along, restore_points,
-    restore_snapshot, run_plan_along, snapshots_of, ConfigName, Description, Level, MemberView,
-    Point, Preview, RestoreError, RestorePoint, SnapshotBackend, SnapshotId,
+    restore_snapshot, run_plan_along, snapshots_of, Act, ConfigName, Description, Level,
+    MemberView, Point, Preview, RestoreError, RestorePoint, SnapshotBackend, SnapshotId,
 };
 
 use crate::output::{Outcome, Show};
@@ -72,6 +72,16 @@ impl Change {
             started: std::time::Instant::now(),
             ended: false,
         })
+    }
+
+    /// How to get back from this change, worked out now, while the earlier state is known.
+    fn rollback(&self, rollback: snapall_core::Rollback) {
+        use snapall_core::SystemProbe;
+        self.system.record(&snapall_core::JournalEvent::Rollback {
+            id: self.id.clone(),
+            at: self.system.local_time().unwrap_or_default(),
+            rollback,
+        });
     }
 
     /// How it went: what came of it, or why it failed.
@@ -216,6 +226,9 @@ pub fn create(
         Some(&point),
         &change.course(),
     );
+    if let Some(way_back) = creation_way_back(&report) {
+        change.rollback(way_back);
+    }
     if stopped {
         let (taken, total) = (report.outcomes.len(), plan.targets().len());
         eprintln!(
@@ -257,13 +270,48 @@ pub fn create(
     Ok(ExitCode::SUCCESS)
 }
 
-pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId) -> Outcome {
+pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
+    // What is about to be lost is said first. A snapshot that is not there is not asked about: the attempt
+    // fails and says so, and the failed attempt is in the audit trail, as it always was.
+    if let Some(snapshot) = ctx
+        .backend
+        .list_snapshots(config)?
+        .into_iter()
+        .find(|snapshot| snapshot.id == id)
+    {
+        let what = format!(
+            "snapshot #{id} of {config}{}{}",
+            snapshot
+                .date
+                .as_deref()
+                .map_or(String::new(), |date| format!(" from {date}")),
+            if snapshot.description.is_empty() {
+                String::new()
+            } else {
+                format!(" (\"{}\")", snapshot.description)
+            }
+        );
+        eprintln!("{what} will be deleted for good. Only this saved moment goes: the files in {config} are not touched.\n");
+        if let Some(stop) = ask::gate(
+            Act::DeleteSnapshots.weight(),
+            destroy,
+            &format!("Delete {what}?"),
+            None,
+        )? {
+            return Ok(stop);
+        }
+    }
     let change = Change::begin(
         &format!("Deleting 1 snapshot of {config}"),
         &format!("Deleted 1 snapshot of {config}"),
         None,
     )?;
     let result = delete_snapshot(ctx.backend, config, id);
+    if result.is_ok() {
+        change.rollback(snapall_core::Rollback::Advice(
+            snapall_core::explain::DELETE_ADVICE.to_owned(),
+        ));
+    }
     change.end(
         result
             .as_ref()
@@ -310,6 +358,23 @@ pub fn restore(
     };
     let change = Change::begin(&now, &past, None)?;
     let result = restore_snapshot(ctx.backend, config, id, path);
+    if let Ok(done) = &result {
+        let mut command = vec![
+            "restore".to_owned(),
+            config.to_string(),
+            done.safety_snapshot.to_string(),
+        ];
+        command.extend(path.map(str::to_owned));
+        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
+            what: format!(
+                "Put {config}{} back to how it was just before: snapshot #{} (taken by this restore)",
+                path.map_or(String::new(), |path| format!(" ({path})")),
+                done.safety_snapshot
+            ),
+            commands: vec![command],
+            weight: snapall_core::Weight::Changes,
+        }));
+    }
     change.end(
         result
             .as_ref()
@@ -341,7 +406,7 @@ pub fn health(ctx: &Context) -> Outcome {
 
 /// Ask a running change to stop after the area it is on. Only a request: the change looks for it between
 /// its areas, never inside one, so nothing is left half-done.
-pub fn cancel(ctx: &Context, job: &str) -> Outcome {
+pub fn cancel(ctx: &Context, job: &str, yes: bool) -> Outcome {
     use snapall_core::{JournalStatus, SystemProbe};
     let system = snapall_system::LinuxSystem::new();
     let history = system.history(500);
@@ -358,6 +423,10 @@ pub fn cancel(ctx: &Context, job: &str) -> Outcome {
             entry.status.word().to_lowercase()
         )
         .into());
+    }
+    let question = format!("Ask {} to stop after the area it is on?", entry.what);
+    if let Some(stop) = ask::gate(Act::StopChange.weight(), yes, &question, None)? {
+        return Ok(stop);
     }
     system.request_stop(job)?;
     ctx.show.result(
@@ -380,7 +449,7 @@ pub fn activity(ctx: &Context) -> Outcome {
 /// Stop protecting an area: every snapshot of it is deleted for good, its own files are not touched. It
 /// always says what that means first; on a terminal it needs the area's name typed out, in a script `--yes`;
 /// `--dry-run` only says. The system area is refused.
-pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, yes: bool) -> Outcome {
+pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Outcome {
     use snapall_core::unprotect::{plan, stop_protecting};
     use snapall_core::SystemProbe;
     let config = ConfigName::parse(area)?;
@@ -403,15 +472,18 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, yes: bool) -> Outcome
             serde_json::json!({ "area": area, "snapshots": plan.snapshots, "changed": false }),
         );
     }
-    if !yes {
-        if !ask::can_ask() {
-            eprintln!("snapall: this deletes snapshots for good and there is no terminal to ask on: read the above, then pass --yes");
-            return Ok(ExitCode::from(2));
-        }
-        if !ask::typed("This cannot be undone.", config.as_str())? {
-            eprintln!("snapall: nothing changed");
-            return Ok(ExitCode::FAILURE);
-        }
+    // the word and the area's name: the word says it is understood, the name that it is this one
+    let question = format!(
+        "Stop protecting {area} and delete its {} snapshots for good?",
+        plan.snapshots
+    );
+    if let Some(stop) = ask::gate(
+        Act::StopProtecting.weight(),
+        destroy,
+        &question,
+        Some(config.as_str()),
+    )? {
+        return Ok(stop);
     }
     let title = snapall_core::coverage::describe(&plan.subvolume).title;
     let change = Change::begin(
@@ -420,6 +492,11 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, yes: bool) -> Outcome
         None,
     )?;
     let result = stop_protecting(ctx.backend, &plan).map_err(|e| e.to_string());
+    if result.is_ok() {
+        change.rollback(snapall_core::Rollback::Advice(
+            snapall_core::explain::UNPROTECT_ADVICE.to_owned(),
+        ));
+    }
     change.end(result.clone().map(|n| format!("{n} snapshots deleted")));
     let deleted = result?;
     ctx.show.result(
@@ -442,7 +519,13 @@ pub struct LimitsWanted<'a> {
 /// How many snapshots an area keeps, and when its oldest go. Without options it shows them and what the
 /// next cleanup would remove; with options it changes them, after saying what that would remove (a removed
 /// snapshot cannot be brought back, so a change that removes any asks first, or needs `--yes`).
-pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, yes: bool) -> Outcome {
+pub fn limits(
+    ctx: &Context,
+    area: &str,
+    wanted: LimitsWanted<'_>,
+    yes: bool,
+    destroy: bool,
+) -> Outcome {
     use snapall_core::{limits_words, preview_limits, Limits, SystemProbe};
     let config = ConfigName::parse(area)?;
     if !ctx.backend.list_configs()?.contains(&config) {
@@ -505,15 +588,16 @@ After: {}.
         describe(&after),
         limits_words(&preview, &after)
     );
-    if preview.would_remove > 0 && !yes {
-        if !ask::can_ask() {
-            eprintln!("snapall: this would remove snapshots and there is no terminal to ask on: pass --yes to go ahead");
-            return Ok(ExitCode::from(2));
-        }
-        if !ask::yes_no("Apply this?")? {
-            eprintln!("snapall: nothing changed");
-            return Ok(ExitCode::FAILURE);
-        }
+    // a change that would remove snapshots is destroying; any other is a change like the rest
+    let removes = preview.would_remove > 0;
+    let act = Act::ChangeLimits { removes };
+    if let Some(stop) = ask::gate(
+        act.weight(),
+        if removes { destroy } else { yes },
+        "Apply this?",
+        None,
+    )? {
+        return Ok(stop);
     }
     let change = Change::begin(
         &format!("Changing how many snapshots {config} keeps"),
@@ -525,6 +609,24 @@ After: {}.
             .set_config_option(&config, *option)
             .map_err(|e| e.to_string())
     });
+    if result.is_ok() {
+        // exactly what it was, so that going back is not a guess
+        let back = vec![
+            "limits".to_owned(),
+            area.to_owned(),
+            "--keep".to_owned(),
+            before.keep.to_string(),
+            "--min-age".to_owned(),
+            (before.min_age_seconds / 60).to_string(),
+            "--cleanup".to_owned(),
+            if before.cleanup { "on" } else { "off" }.to_owned(),
+        ];
+        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
+            what: format!("Set {config} back to: {}", describe(&before)),
+            commands: vec![back],
+            weight: snapall_core::Weight::Changes,
+        }));
+    }
     change.end(result.clone().map(|()| String::new()));
     result?;
     ctx.show.result(
@@ -550,6 +652,7 @@ pub fn groups(
     action: Option<&str>,
     name: Option<&str>,
     areas: Option<&str>,
+    yes: bool,
 ) -> Outcome {
     use snapall_core::{GroupName, SystemProbe};
     let system = snapall_system::LinuxSystem::new();
@@ -573,6 +676,17 @@ pub fn groups(
                 )
                 .into());
             }
+            let before = made.get(&name).map(<[ConfigName]>::to_vec);
+            let question = format!(
+                "Make the group {name} of {}?",
+                list.iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            if let Some(stop) = ask::gate(Act::ChangeGroups.weight(), yes, &question, None)? {
+                return Ok(stop);
+            }
             let change = Change::begin(
                 &format!("Making the group {name}"),
                 &format!("Made the group {name}"),
@@ -582,6 +696,9 @@ pub fn groups(
                 .set(name.clone(), list)
                 .map_err(|e| e.to_string())
                 .and_then(|()| system.save_groups(&made));
+            if saved.is_ok() {
+                change.rollback(groups_way_back(&name, before.as_deref()));
+            }
             change.end(saved.clone().map(|()| String::new()));
             saved?;
             ctx.show.result(
@@ -599,15 +716,25 @@ pub fn groups(
         }
         Some("remove") => {
             let name = GroupName::parse(name.ok_or("which group? `snapall groups remove NAME`")?)?;
-            if !made.remove(&name) {
+            let before = made.get(&name).map(<[ConfigName]>::to_vec);
+            if before.is_none() {
                 return Err(format!("there is no group called `{name}`").into());
             }
+            let question =
+                format!("Take the group {name} away? The areas and their snapshots are untouched.");
+            if let Some(stop) = ask::gate(Act::ChangeGroups.weight(), yes, &question, None)? {
+                return Ok(stop);
+            }
+            made.remove(&name);
             let change = Change::begin(
                 &format!("Removing the group {name}"),
                 &format!("Removed the group {name}"),
                 None,
             )?;
             let saved = system.save_groups(&made);
+            if saved.is_ok() {
+                change.rollback(groups_way_back(&name, before.as_deref()));
+            }
             change.end(saved.clone().map(|()| String::new()));
             saved?;
             ctx.show.result(
@@ -620,6 +747,191 @@ pub fn groups(
         }
         Some(other) => Err(format!("`{other}` is not `add` or `remove`").into()),
     }
+}
+
+/// Whether what a rollback would go back to is still there. It is checked when the rollback is asked for, not
+/// when it was recorded: snapper's cleanup may have removed the snapshot since, and then the honest answer is
+/// that it cannot be done.
+fn check_the_way_back_still_exists(
+    ctx: &Context,
+    commands: &[Vec<String>],
+) -> Result<(), Box<dyn Error>> {
+    for command in commands {
+        match command
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
+            ["restore", config, id, ..] => {
+                let config = ConfigName::parse(config)?;
+                let number: u64 = id
+                    .parse()
+                    .map_err(|_| format!("`{id}` is not a snapshot number"))?;
+                let there = ctx
+                    .backend
+                    .list_snapshots(&config)?
+                    .iter()
+                    .any(|snapshot| snapshot.id.get() == number);
+                if !there {
+                    return Err(format!(
+                        "snapshot #{number} of {config}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
+                    )
+                    .into());
+                }
+            }
+            ["restore-all", point, ..] => {
+                let there = restore_points(&all_snapshots(ctx.backend)?)
+                    .iter()
+                    .any(|candidate| candidate.point.to_string() == *point);
+                if !there {
+                    return Err(format!(
+                        "restore point {point}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
+                    )
+                    .into());
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Roll a change back to the state it recorded, if it recorded one. It says what that state is and what it
+/// will run, asks as heavily as what it does weighs (undoing the taking of a snapshot is deleting it), and
+/// runs the recorded commands through this same program, so they are checked and journaled like any other.
+pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool, no_dbus: bool) -> Outcome {
+    use snapall_core::{Rollback, SystemProbe, Weight};
+    let system = snapall_system::LinuxSystem::new();
+    let history = system.history(500);
+    let Some(entry) = history.iter().find(|entry| entry.id == change_id) else {
+        return Err(format!(
+            "there is no change called `{change_id}`: `snapall activity` lists them"
+        )
+        .into());
+    };
+    let undo = match &entry.rollback {
+        Some(Rollback::Undo(undo)) => undo,
+        Some(Rollback::Advice(text)) => {
+            eprintln!("{} cannot be undone.\n{text}", entry.what);
+            return Ok(ExitCode::FAILURE);
+        }
+        None => {
+            return Err(format!(
+                "no way back was recorded for `{}`: changes made before snapall recorded one have none",
+                entry.what
+            )
+            .into());
+        }
+    };
+    check_the_way_back_still_exists(ctx, &undo.commands)?;
+    eprintln!("To roll back: {}\n  {}\n", entry.what, undo.what);
+    for command in &undo.commands {
+        eprintln!("  snapall {}", command.join(" "));
+    }
+    eprintln!();
+    let said_so = if undo.weight == Weight::Destroys {
+        destroy
+    } else {
+        yes
+    };
+    let act = Act::Undo { doing: undo.weight };
+    if let Some(stop) = ask::gate(act.weight(), said_so, "Roll this back?", None)? {
+        return Ok(stop);
+    }
+    let program = std::env::current_exe()?;
+    for command in &undo.commands {
+        let mut step = std::process::Command::new(&program);
+        if no_dbus {
+            step.arg("--no-dbus");
+        }
+        step.args(command);
+        // it has been answered here, at the weight of what it does
+        if let Some(flag) = undo.weight.script_flag() {
+            step.arg(flag);
+        }
+        if !step.status()?.success() {
+            return Err(format!(
+                "`snapall {}` did not succeed, so the rollback stopped there and nothing after it was done",
+                command.join(" ")
+            )
+            .into());
+        }
+    }
+    ctx.show.result(
+        format!("Rolled back: {}\n", undo.what),
+        serde_json::json!({ "change": change_id, "rolled_back": true }),
+    )
+}
+
+/// How to undo taking snapshots: delete the ones that were taken. That is a deletion like any other, so it
+/// weighs what a deletion weighs; the way back says so plainly.
+fn creation_way_back(report: &snapall_core::Report) -> Option<snapall_core::Rollback> {
+    let made: Vec<(&ConfigName, SnapshotId)> = report
+        .outcomes
+        .iter()
+        .filter_map(|outcome| {
+            outcome
+                .result
+                .as_ref()
+                .ok()
+                .map(|id| (&outcome.config, *id))
+        })
+        .collect();
+    if made.is_empty() {
+        return None;
+    }
+    let list: Vec<String> = made
+        .iter()
+        .map(|(config, id)| format!("#{id} of {config}"))
+        .collect();
+    Some(snapall_core::Rollback::Undo(snapall_core::Undo {
+        what: format!(
+            "Delete the {} snapshot{} this took ({}). They are lost for good, but nothing else changes",
+            made.len(),
+            if made.len() == 1 { "" } else { "s" },
+            list.join(", ")
+        ),
+        commands: made
+            .iter()
+            .map(|(config, id)| vec!["delete".to_owned(), config.to_string(), id.to_string()])
+            .collect(),
+        weight: snapall_core::Weight::Destroys,
+    }))
+}
+
+/// How to get a group back to what it was: made again with its old areas, or, if it was new, taken away.
+fn groups_way_back(
+    name: &snapall_core::GroupName,
+    before: Option<&[ConfigName]>,
+) -> snapall_core::Rollback {
+    let (what, command) = match before {
+        Some(areas) => {
+            let list = areas
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            (
+                format!("Put the group {name} back to: {}", list.replace(',', ", ")),
+                vec![
+                    "groups".to_owned(),
+                    "add".to_owned(),
+                    name.to_string(),
+                    list,
+                ],
+            )
+        }
+        None => (
+            format!("Take the group {name} away again: it did not exist before"),
+            vec!["groups".to_owned(), "remove".to_owned(), name.to_string()],
+        ),
+    };
+    snapall_core::Rollback::Undo(snapall_core::Undo {
+        what,
+        commands: vec![command],
+        weight: snapall_core::Weight::Changes,
+    })
 }
 
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes
@@ -669,22 +981,17 @@ pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
         .iter()
         .map(snapall_core::AreaFacts::title)
         .collect();
-    if !yes {
-        if !ask::can_ask() {
-            eprintln!("snapall: this changes how the whole disk works and there is no terminal to ask on; read `snapall quotas`, then pass --yes");
-            return Ok(ExitCode::from(2));
-        }
+    if !yes && ask::can_ask() {
         eprintln!("{}\n", room_counting_text(mode));
-        let question = format!(
-            "Switch counting {} for the disk{} holding {}?",
-            if turn_on { "on" } else { "off" },
-            if areas.len() == 1 { "" } else { "s" },
-            areas.join(", ")
-        );
-        if !ask::yes_no(&question)? {
-            eprintln!("snapall: nothing changed");
-            return Ok(ExitCode::FAILURE);
-        }
+    }
+    let question = format!(
+        "Switch counting {} for the disk{} holding {}?",
+        if turn_on { "on" } else { "off" },
+        if areas.len() == 1 { "" } else { "s" },
+        areas.join(", ")
+    );
+    if let Some(stop) = ask::gate(Act::RoomCounting.weight(), yes, &question, None)? {
+        return Ok(stop);
     }
     let side = if turn_on { "on" } else { "off" };
     let change = Change::begin(
@@ -696,6 +1003,14 @@ pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
         .areas
         .iter()
         .try_for_each(|area| system.set_quotas(&area.subvolume, turn_on));
+    if result.is_ok() {
+        let opposite = if turn_on { "off" } else { "on" };
+        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
+            what: format!("Switch counting the room snapshots take back {opposite}, as it was"),
+            commands: vec![vec!["quotas".to_owned(), opposite.to_owned()]],
+            weight: snapall_core::Weight::Changes,
+        }));
+    }
     change.end(result.clone().map(|()| String::new()));
     result?;
     ctx.show.result(
@@ -758,6 +1073,16 @@ pub fn restore_all(
         fresh_point(ctx.backend, unix_now()),
         &change.course(),
     );
+    if !done.members.is_empty() {
+        change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
+            what: format!(
+                "Put every area back to how it was just before: restore point {} (taken by this restore)",
+                done.safety
+            ),
+            commands: vec![vec!["restore-all".to_owned(), done.safety.to_string()]],
+            weight: snapall_core::Weight::Changes,
+        }));
+    }
     if done.stopped {
         let (put_back, total) = (done.members.len(), point.members.len());
         eprintln!("snapall: stopped on request after {put_back} of {total} areas; the rest were left as they are");
@@ -950,6 +1275,21 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
         setup::run(ctx.backend, &facts, &mut setup::Terminal, &options)?
     };
     if let Some(change) = change {
+        if !report.protected_now.is_empty() {
+            let names: Vec<String> = report
+                .protected_now
+                .iter()
+                .map(|(_, name)| name.to_string())
+                .collect();
+            change.rollback(snapall_core::Rollback::Undo(snapall_core::Undo {
+                what: format!(
+                    "Stop protecting {} again, back to not protected. Any snapshots taken since would be deleted",
+                    names.join(", ")
+                ),
+                commands: names.iter().map(|name| vec!["unprotect".to_owned(), name.clone()]).collect(),
+                weight: snapall_core::Weight::Destroys,
+            }));
+        }
         change.end(if report.succeeded() {
             Ok(String::new())
         } else {

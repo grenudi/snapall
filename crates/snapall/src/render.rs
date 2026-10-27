@@ -279,6 +279,16 @@ pub fn activity(entries: &[snapall_core::JournalEntry]) -> String {
         ) {
             out.push_str(&format!("                     {}\n", entry.detail));
         }
+        match &entry.rollback {
+            Some(snapall_core::Rollback::Undo(undo)) => out.push_str(&format!(
+                "                     way back: {}\n                     (snapall undo {})\n",
+                undo.what, entry.id
+            )),
+            Some(snapall_core::Rollback::Advice(text)) => {
+                out.push_str(&format!("                     cannot be undone: {text}\n"));
+            }
+            None => {}
+        }
     }
     out
 }
@@ -297,6 +307,12 @@ pub fn activity_json(entries: &[snapall_core::JournalEntry]) -> Value {
             "detail": entry.detail,
             "pid": entry.pid,
             "progress": entry.progress.as_ref().map(|p| json!({"done": p.done, "of": p.of, "area": p.area})),
+            "rollback": entry.rollback.as_ref().map(|way_back| match way_back {
+                snapall_core::Rollback::Undo(undo) => json!({
+                    "kind": "undo", "what": undo.what, "weight": undo.weight.word(), "commands": undo.commands,
+                }),
+                snapall_core::Rollback::Advice(text) => json!({"kind": "advice", "text": text}),
+            }),
         }))
         .collect::<Vec<_>>())
 }

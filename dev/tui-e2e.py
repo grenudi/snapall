@@ -257,10 +257,17 @@ def runner_scenario():
     # An earlier step killed a command in the middle of a slow snapshot; the slow stand-in for snapper it
     # was running goes on for a few seconds after that and then takes the snapshot. Wait for it, so that
     # it is not counted as this journey's.
-    for _ in range(30):
-        if subprocess.run(["pgrep", "-f", "slow-snapper-"], capture_output=True).returncode != 0:
+    # The stand-in ends by `exec`-ing the real snapper, after which its command line no longer says
+    # "slow-snapper-": so wait until no snapper at all is running either, or the snapshot it is still making
+    # would be counted as this journey's.
+    quiet = 0
+    for _ in range(60):
+        busy = (subprocess.run(["pgrep", "-f", "slow-snapper-"], capture_output=True).returncode == 0
+                or subprocess.run(["pgrep", "-x", "snapper"], capture_output=True).returncode == 0)
+        quiet = 0 if busy else quiet + 1
+        if quiet >= 3:  # quiet for a moment, not just between two steps
             break
-        time.sleep(0.5)
+        time.sleep(0.4)
     before = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
     tui = Tui(extra_path=shim)
     tui.wait_for("Snapshots of snapall_it_a (")

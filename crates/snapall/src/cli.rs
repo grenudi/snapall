@@ -40,6 +40,7 @@ pub enum Request {
     Delete {
         config: ConfigName,
         id: SnapshotId,
+        destroy: bool,
     },
     /// What restoring snapshot `id` would change.
     Changes {
@@ -66,6 +67,7 @@ pub enum Request {
         action: Option<String>,
         name: Option<String>,
         areas: Option<String>,
+        yes: bool,
     },
     /// How many snapshots an area keeps: show it, or change it.
     Limits {
@@ -74,16 +76,24 @@ pub enum Request {
         min_age: Option<String>,
         cleanup: Option<String>,
         yes: bool,
+        destroy: bool,
     },
     /// Stop protecting an area (deletes its snapshots).
     Unprotect {
         area: String,
         dry_run: bool,
+        destroy: bool,
+    },
+    /// Roll a change back, if a way back was recorded.
+    Undo {
+        change: String,
         yes: bool,
+        destroy: bool,
     },
     /// Ask a running change to stop after the area it is on.
     Cancel {
         job: String,
+        yes: bool,
     },
     /// How the disk counts the room snapshots take; with `on` or `off`, switch it.
     Quotas {
@@ -414,7 +424,11 @@ fn build_request(
         },
         Command::Delete => {
             let (config, id) = target(resolution)?;
-            Request::Delete { config, id }
+            Request::Delete {
+                config,
+                id,
+                destroy: flag(&Contract::DESTROY, resolution),
+            }
         }
         Command::Changes => {
             let (config, id) = target(resolution)?;
@@ -463,6 +477,13 @@ fn build_request(
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
+        Command::Undo => Request::Undo {
+            change: Contract::UNDO_CHANGE.get_from(resolution).ok_or_else(|| {
+                usage_error("CHANGE is required: the name of the change to roll back".to_owned())
+            })?,
+            yes: flag(&Contract::YES, resolution),
+            destroy: flag(&Contract::DESTROY, resolution),
+        },
         Command::Unprotect => Request::Unprotect {
             area: Contract::UNPROTECT_AREA
                 .get_from(resolution)
@@ -470,7 +491,7 @@ fn build_request(
                     usage_error("AREA is required: which area to stop protecting".to_owned())
                 })?,
             dry_run: flag(&Contract::DRY_RUN, resolution),
-            yes: flag(&Contract::YES, resolution),
+            destroy: flag(&Contract::DESTROY, resolution),
         },
         Command::Limits => Request::Limits {
             area: Contract::LIMITS_AREA
@@ -480,16 +501,19 @@ fn build_request(
             min_age: Contract::LIMITS_MIN_AGE.get_from(resolution),
             cleanup: Contract::LIMITS_CLEANUP.get_from(resolution),
             yes: flag(&Contract::YES, resolution),
+            destroy: flag(&Contract::DESTROY, resolution),
         },
         Command::Groups => Request::Groups {
             action: Contract::GROUPS_ACTION.get_from(resolution),
             name: Contract::GROUPS_NAME.get_from(resolution),
             areas: Contract::GROUPS_AREAS.get_from(resolution),
+            yes: flag(&Contract::YES, resolution),
         },
         Command::Cancel => Request::Cancel {
             job: Contract::CANCEL_JOB.get_from(resolution).ok_or_else(|| {
                 usage_error("CHANGE is required: the name of the change to stop".to_owned())
             })?,
+            yes: flag(&Contract::YES, resolution),
         },
         Command::Quotas => Request::Quotas {
             state: Contract::QUOTAS_STATE.get_from(resolution),
@@ -741,7 +765,21 @@ mod tests {
             Request::Delete {
                 config: ConfigName::parse("home").unwrap(),
                 id: SnapshotId::new(12).unwrap(),
+                destroy: false,
             }
+        );
+        // only --destroy answers for a deletion: --yes is for changes that can be put back
+        assert_eq!(
+            ok(&["delete", "home", "12", "--destroy"]).request,
+            Request::Delete {
+                config: ConfigName::parse("home").unwrap(),
+                id: SnapshotId::new(12).unwrap(),
+                destroy: true,
+            }
+        );
+        assert!(
+            err(&["delete", "home", "12", "--yes"]).contains("--yes"),
+            "--yes does not apply to delete"
         );
         assert!(err(&["delete"]).contains("missing required argument <AREA>"));
         assert!(err(&["delete", "home"]).contains("missing required argument <ID>"));
