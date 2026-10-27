@@ -420,31 +420,33 @@ const TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
     ("undo", 63),
 ];
 
-/// Every top-level function of `commands.rs` and its length in lines (not counting its tests).
+/// Every top-level function of every file in `commands/` and its length in lines (not counting its tests).
 fn handler_lengths() -> Vec<(String, usize)> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands.rs");
-    let source = std::fs::read_to_string(path).unwrap();
-    let lines: Vec<&str> = source
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap()
-        .lines()
-        .collect();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands");
     let mut found = Vec::new();
-    let mut at = 0;
-    while at < lines.len() {
-        let name = ["pub fn ", "pub(crate) fn ", "fn "]
-            .iter()
-            .find_map(|prefix| lines[at].strip_prefix(prefix))
-            .and_then(|rest| rest.split(['(', '<']).next());
-        if let Some(name) = name {
-            let end = (at..lines.len())
-                .find(|line| lines[*line] == "}")
-                .unwrap_or(at);
-            found.push((name.to_owned(), end - at + 1));
-            at = end;
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let source = std::fs::read_to_string(entry.path()).unwrap();
+        let lines: Vec<&str> = source
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap()
+            .lines()
+            .collect();
+        let mut at = 0;
+        while at < lines.len() {
+            let name = ["pub fn ", "pub(super) fn ", "pub(crate) fn ", "fn "]
+                .iter()
+                .find_map(|prefix| lines[at].strip_prefix(prefix))
+                .and_then(|rest| rest.split(['(', '<']).next());
+            if let Some(name) = name {
+                let end = (at..lines.len())
+                    .find(|line| lines[*line] == "}")
+                    .unwrap_or(at);
+                found.push((name.to_owned(), end - at + 1));
+                at = end;
+            }
+            at += 1;
         }
-        at += 1;
     }
     found
 }
@@ -483,4 +485,322 @@ fn a_command_handler_is_short_enough_to_read_as_a_sentence_and_the_debt_only_shr
             Some(_) => {}
         }
     }
+}
+
+// ---- the shape of the code: every module a small language, every front file a map ------------------------
+//
+// The rules (ADR 19, 20 and `docs/canon/small-languages.md`) are only kept if a machine keeps them: a person
+// forgets, and so does an agent. Each rule below is a *ratchet*: the debt that exists today is written down
+// with its size; nothing may get worse, nothing new may join, and an entry leaves the list the moment it is
+// paid. Whoever fixes one is told to take it off, so the list can only shrink.
+
+/// A ratchet. `observed` is what the code has now (name -> size); `limit` what is allowed without a
+/// reason; `debt` the names that are over it today, with their size.
+fn ratchet(
+    rule: &str,
+    observed: &std::collections::BTreeMap<String, usize>,
+    limit: usize,
+    debt: &[(&str, usize)],
+) {
+    let mut problems = Vec::new();
+    for (name, size) in observed {
+        let most = debt
+            .iter()
+            .find(|(listed, _)| listed == name)
+            .map_or(limit, |(_, most)| *most);
+        if *size > most {
+            problems.push(format!("`{name}` is {size} (the most allowed is {most})"));
+        }
+    }
+    for (listed, most) in debt {
+        match observed.get(*listed) {
+            None => problems.push(format!(
+                "`{listed}` is on the debt list but no longer exists: take it off"
+            )),
+            Some(size) if *size <= limit => {
+                problems.push(format!("`{listed}` is {size}, within the limit now: take it off the list, so it cannot grow back"));
+            }
+            Some(size) if size < most => {
+                problems.push(format!("`{listed}` shrank to {size}: lower its entry from {most}, so it cannot grow back"));
+            }
+            Some(_) => {}
+        }
+    }
+    let over: Vec<String> = observed
+        .iter()
+        .filter(|(_, size)| **size > limit)
+        .map(|(name, size)| format!("(\"{name}\", {size}),"))
+        .collect();
+    assert!(
+        problems.is_empty(),
+        "{rule}\n  {}\nover the limit of {limit} now:\n  {}",
+        problems.join("\n  "),
+        over.join("\n  ")
+    );
+}
+
+/// Every Rust source file of every crate, as (path from the repository root, code without its tests).
+fn all_sources() -> Vec<(String, String)> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut found = Vec::new();
+    let mut stack = vec![root.join("crates")];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default()
+                .to_owned();
+            if path.is_dir() {
+                if name != "tests" && name != "target" {
+                    stack.push(path);
+                }
+            } else if name.ends_with(".rs") && path.components().any(|c| c.as_os_str() == "src") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                let relative = path
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .display()
+                    .to_string()
+                    .replace("../", "");
+                found.push((
+                    relative,
+                    text.split("#[cfg(test)]").next().unwrap().to_owned(),
+                ));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+fn lines_of(code: &str) -> usize {
+    code.lines().count()
+}
+
+/// How long a file may be before it is more than one thing.
+const LONGEST_FILE: usize = 300;
+/// How long a front file (`lib.rs`, `main.rs`, `mod.rs`) may be: it is a map of its module, not its contents.
+const LONGEST_FRONT_FILE: usize = 120;
+
+#[test]
+fn a_file_is_one_thing_short_enough_to_read_whole_and_the_debt_only_shrinks() {
+    let observed = all_sources()
+        .into_iter()
+        .map(|(path, code)| (path, lines_of(&code)))
+        .collect();
+    ratchet(
+        "Files over the length of one thing:",
+        &observed,
+        LONGEST_FILE,
+        &FILES_TOO_LONG_FOR_NOW,
+    );
+}
+
+#[test]
+fn a_front_file_is_a_map_of_its_module_and_not_its_contents() {
+    let observed = all_sources()
+        .into_iter()
+        .filter(|(path, _)| {
+            ["lib.rs", "main.rs", "mod.rs"]
+                .iter()
+                .any(|front| path.ends_with(front))
+        })
+        .map(|(path, code)| (path, lines_of(&code)))
+        .collect();
+    ratchet(
+        "Front files that hold more than a map:",
+        &observed,
+        LONGEST_FRONT_FILE,
+        &FRONT_FILES_TOO_BIG_FOR_NOW,
+    );
+}
+
+/// Text for a person is *returned* by a command and shown by the one that presents it, so that everything a
+/// person can be shown is in one place. Only the asker (which has to put a question and read the answer)
+/// prints on its own.
+#[test]
+fn nothing_prints_to_a_person_except_what_presents_and_what_asks() {
+    let mut observed = std::collections::BTreeMap::new();
+    for (path, code) in all_sources() {
+        if path.ends_with("ask.rs") || path.contains("snapall-tui") {
+            continue;
+        }
+        let prints = code
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .map(|line| {
+                ["println!(", "print!("] /* eprintln!( and eprint!( contain these: each print is counted once */
+                    .iter()
+                    .map(|p| line.matches(p).count())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        if prints > 0 {
+            observed.insert(path, prints);
+        }
+    }
+    ratchet(
+        "Files that print by themselves:",
+        &observed,
+        0,
+        &PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW,
+    );
+}
+
+/// Above the adapters the words are the person's (`area`, `snapshot`, `restore point`), never the tools':
+/// snapper's `config`, `subvolume`, Btrfs and systemd belong to the code that wraps them and nowhere above it.
+#[test]
+fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
+    let foreign = ["snapper", "btrfs", "subvol", "systemctl", "config"];
+    let mut observed = std::collections::BTreeMap::new();
+    for (path, code) in all_sources() {
+        let crate_name = path.split('/').nth(1).unwrap_or_default().to_owned();
+        if !["snapall-core", "snapall-tui", "snapall"].contains(&crate_name.as_str()) {
+            continue; // the adapters are where the tools' words belong
+        }
+        for line in code
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+        {
+            for keyword in [
+                "fn ", "struct ", "enum ", "const ", "let ", "mod ", "type ", "static ",
+            ] {
+                let mut rest = line;
+                while let Some(at) = rest.find(keyword) {
+                    let after = &rest[at + keyword.len()..];
+                    let name: String = after
+                        .trim_start_matches("mut ")
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if foreign
+                        .iter()
+                        .any(|word| name.to_lowercase().contains(word))
+                    {
+                        *observed.entry(crate_name.clone()).or_insert(0) += 1;
+                    }
+                    rest = after;
+                }
+            }
+        }
+    }
+    ratchet(
+        "Crates with names in the tools' words above the adapters:",
+        &observed,
+        0,
+        &FOREIGN_WORDS_IN_NAMES_FOR_NOW,
+    );
+}
+
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 20] = [
+    ("crates/snapall-core/src/doctor.rs", 397),
+    ("crates/snapall-core/src/domain.rs", 378),
+    ("crates/snapall-core/src/health.rs", 522),
+    ("crates/snapall-core/src/points.rs", 333),
+    ("crates/snapall-core/src/testing.rs", 590),
+    ("crates/snapall-core/src/usecase.rs", 513),
+    ("crates/snapall-snapper/src/lib.rs", 584),
+    ("crates/snapall-tui/src/changes.rs", 419),
+    ("crates/snapall-tui/src/model/keys.rs", 353),
+    ("crates/snapall-tui/src/model/mod.rs", 385),
+    ("crates/snapall-tui/src/model/state.rs", 401),
+    ("crates/snapall-tui/src/session.rs", 405),
+    ("crates/snapall-tui/src/tabs/activity.rs", 339),
+    ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
+    ("crates/snapall/src/cli.rs", 568),
+    ("crates/snapall/src/commands/going_back.rs", 390),
+    ("crates/snapall/src/commands/keeping.rs", 336),
+    ("crates/snapall/src/contract.rs", 763),
+    ("crates/snapall/src/render.rs", 844),
+    ("crates/snapall/src/setup.rs", 432),
+];
+const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 6] = [
+    ("crates/snapall-core/src/domain.rs", 378),
+    ("crates/snapall-snapper/src/lib.rs", 584),
+    ("crates/snapall-system/src/lib.rs", 244),
+    ("crates/snapall-tui/src/model/mod.rs", 385),
+    ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
+    ("crates/snapall/src/main.rs", 196),
+];
+const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 7] = [
+    ("crates/snapall/src/commands/deleting.rs", 1),
+    ("crates/snapall/src/commands/going_back.rs", 14),
+    ("crates/snapall/src/commands/keeping.rs", 2),
+    ("crates/snapall/src/commands/protecting.rs", 1),
+    ("crates/snapall/src/commands/taking.rs", 1),
+    ("crates/snapall/src/doctor.rs", 5),
+    ("crates/snapall/src/main.rs", 4),
+];
+const FOREIGN_WORDS_IN_NAMES_FOR_NOW: [(&str, usize); 3] =
+    [("snapall", 19), ("snapall-core", 37), ("snapall-tui", 7)];
+
+// ---- the outline: the code, read as a table of contents ----------------------------------------------------
+
+/// What a module says it is for: the first sentence of its `//!`. A module that says nothing has no place in
+/// the outline, and so none in the code.
+fn purpose_of(path: &str, code: &str) -> String {
+    let doc: Vec<&str> = code
+        .lines()
+        .skip_while(|line| !line.starts_with("//!"))
+        .take_while(|line| line.starts_with("//!") && !line[3..].trim().is_empty())
+        .map(|line| line[3..].trim())
+        .collect();
+    assert!(
+        !doc.is_empty(),
+        "`{path}` does not say what it is for: its first doc line (`//!`) is missing"
+    );
+    let paragraph = doc.join(" ");
+    // the first sentence: up to a full stop that ends a word, not one inside `e.g.`
+    let end = paragraph
+        .match_indices(". ")
+        .map(|(at, _)| at + 1)
+        .find(|at| !paragraph[..*at].ends_with("e.g.") && !paragraph[..*at].ends_with("i.e."))
+        .unwrap_or(paragraph.len());
+    paragraph[..end].to_owned()
+}
+
+/// The outline, generated: every crate, and under it every module with what it says it is for. Written by no
+/// one, so it is always what the code says.
+fn outline() -> String {
+    let mut out = String::from(
+        "<!--\nSPDX-FileCopyrightText: 2026 grenudi\n\nSPDX-License-Identifier: GPL-3.0-or-later\n-->\n\n\
+         # Outline\n\nWhat each part of snapall says it is for, read from the first line of each module. \
+         Generated: do not edit. After changing what a module is for, run\n\
+         `UPDATE_OUTLINE=1 cargo test -p snapall --test architecture the_outline`.\n",
+    );
+    let mut current = String::new();
+    for (path, code) in all_sources() {
+        let mut parts = path.splitn(4, '/');
+        let (_, crate_name, _, inside) = (
+            parts.next(),
+            parts.next().unwrap_or_default(),
+            parts.next(),
+            parts.next().unwrap_or_default(),
+        );
+        let purpose = purpose_of(&path, &code);
+        if crate_name != current {
+            current = crate_name.to_owned();
+            out.push_str(&format!("\n## {crate_name}\n\n"));
+        }
+        let depth = inside.matches('/').count();
+        out.push_str(&format!("{}- `{inside}`: {purpose}\n", "  ".repeat(depth)));
+    }
+    out
+}
+
+#[test]
+fn the_outline_of_the_code_is_generated_from_what_each_module_says_it_is_for() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../OUTLINE.md");
+    let outline = outline();
+    if std::env::var_os("UPDATE_OUTLINE").is_some() {
+        std::fs::write(&path, &outline).unwrap();
+        return;
+    }
+    let committed = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(
+        committed == outline,
+        "OUTLINE.md is not what the code says. After changing what a module is for, run:\n  UPDATE_OUTLINE=1 cargo test -p snapall --test architecture the_outline"
+    );
 }
