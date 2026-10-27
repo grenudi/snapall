@@ -153,9 +153,10 @@ jobs:
 
           $S --log-file "$log" "ci audit"
           id="$($S snapshots snapall_it_a --json | jq -r '.configs.snapall_it_a[] | select(.description == "ci audit") | .id')"
-          $S --log-file "$log" delete snapall_it_a "$id"
+          $S --log-file "$log" delete snapall_it_a "$id" --destroy
           failed=0
-          $S --log-file "$log" delete snapall_it_a "$id" 2>/dev/null || failed=$?
+          # already gone: it is not asked about, the attempt fails, and the failed attempt is in the audit trail
+          $S --log-file "$log" delete snapall_it_a "$id" --destroy 2>/dev/null || failed=$?
           test "$failed" -eq 1
 
           # private: it records privileged actions

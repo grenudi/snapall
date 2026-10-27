@@ -271,34 +271,35 @@ pub fn create(
 }
 
 pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
-    let snapshot = ctx
+    // What is about to be lost is said first. A snapshot that is not there is not asked about: the attempt
+    // fails and says so, and the failed attempt is in the audit trail, as it always was.
+    if let Some(snapshot) = ctx
         .backend
         .list_snapshots(config)?
         .into_iter()
         .find(|snapshot| snapshot.id == id)
-        .ok_or_else(|| {
-            format!("{config} has no snapshot #{id}: `snapall snapshots {config}` lists them")
-        })?;
-    let what = format!(
-        "snapshot #{id} of {config}{}{}",
-        snapshot
-            .date
-            .as_deref()
-            .map_or(String::new(), |date| format!(" from {date}")),
-        if snapshot.description.is_empty() {
-            String::new()
-        } else {
-            format!(" (\"{}\")", snapshot.description)
+    {
+        let what = format!(
+            "snapshot #{id} of {config}{}{}",
+            snapshot
+                .date
+                .as_deref()
+                .map_or(String::new(), |date| format!(" from {date}")),
+            if snapshot.description.is_empty() {
+                String::new()
+            } else {
+                format!(" (\"{}\")", snapshot.description)
+            }
+        );
+        eprintln!("{what} will be deleted for good. Only this saved moment goes: the files in {config} are not touched.\n");
+        if let Some(stop) = ask::gate(
+            Act::DeleteSnapshots.weight(),
+            destroy,
+            &format!("Delete {what}?"),
+            None,
+        )? {
+            return Ok(stop);
         }
-    );
-    eprintln!("{what} will be deleted for good. Only this saved moment goes: the files in {config} are not touched.\n");
-    if let Some(stop) = ask::gate(
-        Act::DeleteSnapshots.weight(),
-        destroy,
-        &format!("Delete {what}?"),
-        None,
-    )? {
-        return Ok(stop);
     }
     let change = Change::begin(
         &format!("Deleting 1 snapshot of {config}"),

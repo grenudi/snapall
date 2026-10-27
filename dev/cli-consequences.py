@@ -103,6 +103,8 @@ def main():
     entry = the_change("Deleted")
     check(entry["rollback"]["kind"] == "advice" and "snapall create --group" in entry["rollback"]["text"],
           "a deletion records that it cannot be undone, and what protects next time")
+    check(sh(["delete", B, "99999", "--destroy"]).returncode == 1, "a snapshot that is not there is not asked about: it fails, and says so, and has no way back to record")
+    check(the_change("Deleted")["status"] == "failed" and the_change("Deleted")["rollback"] is None, "the failed attempt is in the record as failed")
 
     print("a restore asks y or yes, and its undo really puts the file back")
     open(NOTE, "w").write("version 1\n")
