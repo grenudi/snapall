@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-27T02:45:37Z",
+  "generated": "2026-10-27T08:02:13Z",
   "inputs": [
     {
       "allowed": [],
@@ -116,7 +116,8 @@
         "health",
         "quotas",
         "limits",
-        "unprotect"
+        "unprotect",
+        "undo"
       ],
       "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
       "type": "enum"
@@ -154,7 +155,8 @@
         "health",
         "quotas",
         "limits",
-        "unprotect"
+        "unprotect",
+        "undo"
       ],
       "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
       "type": "path"
@@ -201,6 +203,28 @@
       ],
       "summary": "Comma-separated names of the areas to snapshot (default: all of them; `snapall list` shows the names). A name that does not exist is an error.",
       "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "destroy",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "group": "destroy",
+      "key": "destroy",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "delete",
+        "limits",
+        "unprotect",
+        "undo"
+      ],
+      "summary": "Go ahead without asking, where it deletes snapshots for good. `--yes` is for changes that can be put back and is not enough for this.",
+      "type": "bool"
     },
     {
       "allowed": [],
@@ -257,6 +281,7 @@
         "groups",
         "limits",
         "unprotect",
+        "undo",
         "cancel",
         "quotas",
         "doctor"
@@ -425,6 +450,26 @@
       ],
       "summary": "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
       "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CHANGE"
+      },
+      "example": "snapall undo 4242-1793029083222-c",
+      "group": "undo",
+      "key": "undo_change",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "undo"
+      ],
+      "summary": "The name of the change, as `snapall activity` shows it (required). Where nothing can be rolled back it says why instead.",
+      "type": "string"
     },
     {
       "allowed": [],
@@ -703,9 +748,11 @@
         "setup",
         "quotas",
         "limits",
-        "unprotect"
+        "groups",
+        "cancel",
+        "undo"
       ],
-      "summary": "Do not ask for confirmation (for scripts and CI). With doctor, only with --install.",
+      "summary": "Answer yes where snapall asks before a change that can be put back (for scripts and CI). It does not answer for deleting snapshots: that needs --destroy. With doctor, only with --install.",
       "type": "bool"
     },
     {
@@ -754,5 +801,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.19.0"
+  "source": "snapall@0.20.0"
 }

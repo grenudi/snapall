@@ -55,6 +55,28 @@ impl From<Result<String, String>> for Outcome {
     }
 }
 
+/// The way back from a change, worked out when it was made, so that it knows the state that was actually
+/// there, not a guess made later.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Undo {
+    /// What it would put back, in a sentence that names the earlier state: `Put Home back to how it was at
+    /// 18:15: snapshot #12`.
+    pub what: String,
+    /// The snapall commands that do it, one after the other.
+    pub commands: Vec<Vec<String>>,
+    /// What doing it weighs: undoing the taking of a snapshot is deleting it.
+    pub weight: crate::consequence::Weight,
+}
+
+/// What can be done about a change afterwards.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Rollback {
+    /// It can be undone, and this says how.
+    Undo(Undo),
+    /// It cannot be undone, and this says what protects against it the next time.
+    Advice(String),
+}
+
 /// One line of the journal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -85,14 +107,21 @@ pub enum Event {
         outcome: Outcome,
         took_ms: u64,
     },
+    /// The way back from the change, once it is known.
+    Rollback {
+        id: String,
+        at: String,
+        rollback: Rollback,
+    },
 }
 
 impl Event {
     pub fn id(&self) -> &str {
         match self {
-            Event::Started { id, .. } | Event::Progress { id, .. } | Event::Finished { id, .. } => {
-                id
-            }
+            Event::Started { id, .. }
+            | Event::Progress { id, .. }
+            | Event::Finished { id, .. }
+            | Event::Rollback { id, .. } => id,
         }
     }
 }
@@ -134,6 +163,8 @@ pub struct Progress {
 /// A change, as the journal tells it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// The way back from it, if it was recorded.
+    pub rollback: Option<Rollback>,
     /// How far it has come, while it runs and a step reported it.
     pub progress: Option<Progress>,
     pub id: String,
@@ -169,6 +200,7 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
                 what: what.clone(),
                 source: Some(*source),
                 pid: Some(*pid),
+                rollback: None,
                 progress: None,
                 started_at: Some(at.clone()),
                 finished_at: None,
@@ -187,6 +219,11 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
             }
             // a step of a change whose start is gone says nothing worth showing
             (Event::Progress { .. }, None) => {}
+            (Event::Rollback { rollback, .. }, Some(index)) => {
+                entries[index].rollback = Some(rollback.clone());
+            }
+            // a way back for a change whose start is gone belongs to nothing we show
+            (Event::Rollback { .. }, None) => {}
             (
                 Event::Finished {
                     id,
@@ -203,6 +240,7 @@ pub fn fold(events: &[Event], is_alive: impl Fn(u32) -> bool) -> Vec<Entry> {
                         what: "An earlier change".to_owned(),
                         source: None,
                         pid: None,
+                        rollback: None,
                         progress: None,
                         started_at: None,
                         finished_at: None,
@@ -359,5 +397,44 @@ mod tests {
             assert_eq!(Source::from_word(source.word()), Some(source));
         }
         assert_eq!(Source::from_word("other"), None);
+    }
+
+    #[test]
+    fn a_way_back_recorded_for_a_change_is_part_of_its_entry_whenever_it_was_recorded() {
+        let undo = Rollback::Undo(Undo {
+            what: "Put Home back to how it was: snapshot #12".into(),
+            commands: vec![vec!["restore".into(), "home".into(), "12".into()]],
+            weight: crate::consequence::Weight::Changes,
+        });
+        let way_back = |rollback: Rollback| Event::Rollback {
+            id: "a".into(),
+            at: "t".into(),
+            rollback,
+        };
+        // before the change ended, and after it
+        for events in [
+            vec![
+                started("a", "x", 1),
+                way_back(undo.clone()),
+                finished("a", Ok("")),
+            ],
+            vec![
+                started("a", "x", 1),
+                finished("a", Ok("")),
+                way_back(undo.clone()),
+            ],
+        ] {
+            assert_eq!(fold(&events, |_| true)[0].rollback, Some(undo.clone()));
+        }
+        let advice = Rollback::Advice("Deleted snapshots are gone.".into());
+        let entries = fold(&[started("b", "y", 1), way_back(advice.clone())], |_| true);
+        assert_eq!(
+            entries[0].rollback, None,
+            "advice for another change is not this one's"
+        );
+        assert!(
+            fold(&[way_back(advice)], |_| true).is_empty(),
+            "a way back alone is not a change"
+        );
     }
 }

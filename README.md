@@ -158,7 +158,7 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall health` | Whether protection is working: a verdict first, then what to do about anything that needs it (cleanup off, a disk nearly full, new snapshots not reaching the boot menu), then the numbers: snapshots per area, the room they hold (when measurable), how full the disk is, and which background jobs run. `--json` for scripts; exits 1 only for what needs doing now. |
 | `snapall quotas [on\|off]` | How the disk counts the room snapshots take, what that gives and costs, and the switch for it. Switching changes how the whole disk works, so it explains and asks first (`--yes` to skip). |
 | `snapall activity` | What snapall has done, newest first: from the window and from commands, in this and earlier sessions, and how each went. `--json` for scripts. It is kept in a small journal under `/var/lib/snapall`. |
-| `snapall unprotect AREA [--dry-run] [--yes]` | Stop protecting an area. **Deletes all its snapshots for good** (its own files are not touched). It always says first what that means: how many snapshots, which restore points and groups it affects. On a terminal you must type the area's name; in a script, `--yes`. The system area is never stopped. |
+| `snapall unprotect AREA [--dry-run] [--destroy]` | Stop protecting an area. **Deletes all its snapshots for good** (its own files are not touched). It always says first what that means: how many snapshots, which restore points and groups it affects. On a terminal you must type `destroy` and the area's name (`destroy home`); in a script, `--destroy`. The system area is never stopped. |
 | `snapall limits AREA [--keep N] [--min-age MINUTES] [--cleanup on\|off]` | How many snapshots an area keeps and when its oldest go. Without options it shows them and what the next cleanup would remove; with options it changes them, and says first what that would remove (`--yes` to go ahead without being asked). |
 | `snapall groups [add NAME AREAS\|remove NAME]` | Name a set of your areas, such as `theming`, so that one snapshot can take just those: `snapall create --group theming`. Without an action it lists them. `all` is always there and means every protected area. |
 | `snapall cancel CHANGE` | Ask a running change (`snapall activity --json` gives its name) to stop. It finishes the area it is on and then stops, never in the middle of one, so nothing is left half-done. |
@@ -166,7 +166,8 @@ The flake wraps snapper into the program's `PATH`. A program in your *user* prof
 | `snapall restore-all POINT` | Put **every** area back to one restore point with a single action. Shows what changes in each, asks first (`--yes` skips the question, `--dry-run` only shows), takes a safety snapshot per area, and prints the one command that undoes all of it. The running system is left alone. |
 | `snapall setup [AREA]` | Find the parts of your disk that have no snapshots yet (such as your Home files), explain in plain words what protecting them means, ask, and do it. `--dry-run` only explains; `--yes` accepts what snapall recommends. Needs `sudo`. |
 | `snapall snapshots [AREA]` | The snapshots of one protected area, or of all. |
-| `snapall delete AREA ID` | Delete one snapshot. `0` is the current system and is refused. |
+| `snapall delete AREA ID [--destroy]` | Delete one snapshot **for good**. It says which one (date and description) and asks you to type `destroy`; in a script, `--destroy` (`--yes` is not enough). `0` is the current system and is refused. |
+| `snapall undo CHANGE [--yes\|--destroy]` | Roll a change back to the state it recorded (`snapall activity` shows it under each change). It says what that state is and what it will run, checks that it still exists, and asks as heavily as what it does weighs. Where nothing can be undone, it says so and what protects you instead. |
 | `snapall changes AREA ID [PATH]` | What restoring that snapshot would change: files it would revert, remove or bring back. |
 | `snapall restore AREA ID [PATH]` | Put a protected area (or one path of it) back to how the snapshot had it. Shows what changes and asks first (`--yes` skips the question, `--dry-run` only shows). The state just before is snapshotted first, so a restore can be undone. The system root is refused: see [Restoring](#restoring). |
 | `snapall doctor [--install]` | Checks that snapper works; with `--install`, installs it with this system's package manager (shows the commands, asks first, needs root). |
@@ -271,6 +272,18 @@ It also tells you whether old snapshots are cleaned up automatically on your com
 `snapall health` answers the questions you have once protection is set up: *is it working, how much room do the snapshots take, will old ones be cleaned up or will they fill the disk?* It starts with a verdict (*All good*, or *2 things need attention*), then says what to do about each thing, most urgent first, and then shows the numbers behind it.
 
 Some figures cannot be known, and it says so instead of guessing. The room each snapshot holds is only counted by the disk's filesystem when a feature called *quotas* is on; without it you see snapshot counts and how full the disk is overall, and the report says why. "Cleanup on" means snapper's cleanup job is switched on **and running**, not merely enabled. ([ADR 16](docs/adr/0016-health-and-activity.md) records what can be measured and how the screen is laid out.)
+
+### What it asks, and the way back
+
+How much snapall asks depends on what is at stake, because a question you answer without reading protects nothing:
+
+* **Reading, and taking a snapshot: never asked.** A snapshot is the safety net itself. If making it took a ceremony, people would skip it.
+* **A change that can be put back** (restoring, protecting, settings, groups, switching room counting, stopping a running change): type `y` or `yes`. Enter alone is never a yes. In a script, `--yes`.
+* **What loses something for good** (deleting snapshots, stopping protection, a limit that makes cleanup remove snapshots): type `destroy`, and, where it is done to one thing, its name (`destroy home`). In a script, `--destroy`; `--yes` is deliberately not enough.
+
+Every change records **how to get back from it**, worked out when it was made, so it names the state that was really there. `snapall activity` shows it under the change, and `snapall undo CHANGE` does it. A restore goes back to the snapshot it took of the state just before; a limit goes back to the numbers it had; a group to the areas it had; protecting an area goes back to not protected. Undoing the taking of a snapshot is deleting it, so it asks for `destroy`. And what cannot be undone says so: a deleted snapshot, or an area that stopped being protected, record that, and what protects you next time (a snapshot, or a group snapshot with `snapall create --group NAME`, before the risky step). A rollback is checked when you ask for it, not when it was recorded: if cleanup has removed the snapshot it would return to, it says so instead of pretending.
+
+(The window still confirms with Enter in places; it is being brought to the same rule.)
 
 ### Stopping protection
 
