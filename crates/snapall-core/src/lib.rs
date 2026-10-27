@@ -18,6 +18,7 @@ pub mod coverage;
 pub mod doctor;
 pub mod domain;
 pub mod explain;
+pub mod find;
 pub mod groups;
 pub mod health;
 pub mod journal;
@@ -41,6 +42,7 @@ pub use domain::{
     Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
     Point, RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
 };
+pub use find::find_snapshot;
 pub use groups::{GroupName, Groups, GroupsError, Wanted};
 pub use health::{
     assess, gather, AreaFacts, Chip, Facts, Finding, Health, Level, Remedy, Topic, Verdict,

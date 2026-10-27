@@ -2,64 +2,103 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Deleting a snapshot: it says which one, and asks for `destroy`.
+//! Deleting a snapshot.
 
 use super::*;
 use crate::output::Outcome;
-use crate::{ask, render};
-use snapall_core::{delete_snapshot, Act, ConfigName, SnapshotId};
+use crate::{ask, output};
+use snapall_core::rollback::after_deleting;
+use snapall_core::SnapshotInfo;
+use snapall_core::{delete_snapshot, find_snapshot, Act, ConfigName, SnapshotId};
 
-pub fn delete(ctx: &Context, config: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
-    // What is about to be lost is said first. A snapshot that is not there is not asked about: the attempt
-    // fails and says so, and the failed attempt is in the audit trail, as it always was.
-    if let Some(snapshot) = ctx
-        .backend
-        .list_snapshots(config)?
-        .into_iter()
-        .find(|snapshot| snapshot.id == id)
-    {
-        let what = format!(
-            "snapshot #{id} of {config}{}{}",
-            snapshot
-                .date
-                .as_deref()
-                .map_or(String::new(), |date| format!(" from {date}")),
-            if snapshot.description.is_empty() {
-                String::new()
-            } else {
-                format!(" (\"{}\")", snapshot.description)
-            }
-        );
-        eprintln!("{what} will be deleted for good. Only this saved moment goes: the files in {config} are not touched.\n");
-        if let Some(stop) = ask::gate(
-            Act::DeleteSnapshots.weight(),
-            destroy,
-            &format!("Delete {what}?"),
-            None,
-        )? {
+pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
+    if let Some(snapshot) = find_snapshot(ctx.backend, area, id)? {
+        let it = snapshot_in_words(area, &snapshot);
+        output::note(&what_deleting_loses(&it, area));
+        if let Some(stop) = ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))? {
             return Ok(stop);
         }
     }
-    let change = Change::begin(
-        &format!("Deleting 1 snapshot of {config}"),
-        &format!("Deleted 1 snapshot of {config}"),
-        None,
-    )?;
-    let result = delete_snapshot(ctx.backend, config, id);
-    if result.is_ok() {
-        change.rollback(snapall_core::Rollback::Advice(
-            snapall_core::explain::DELETE_ADVICE.to_owned(),
-        ));
+    let change = Change::begin(&deleting_one(area), &deleted_one(area), None)?;
+    let deleted = delete_snapshot(ctx.backend, area, id);
+    if deleted.is_ok() {
+        change.rollback(after_deleting());
     }
-    change.end(
-        result
-            .as_ref()
-            .map(|()| String::new())
-            .map_err(ToString::to_string),
-    );
-    result?;
+    change.end_with(&deleted);
+    deleted?;
     ctx.show.result(
-        render::deleted(config, id),
-        render::deleted_json(config, id),
+        crate::render::deleted(area, id),
+        crate::render::deleted_json(area, id),
     )
+}
+
+fn snapshot_in_words(area: &ConfigName, snapshot: &SnapshotInfo) -> String {
+    let when = snapshot
+        .date
+        .as_deref()
+        .map_or(String::new(), |date| format!(" from {date}"));
+    let note = if snapshot.description.is_empty() {
+        String::new()
+    } else {
+        format!(" (\"{}\")", snapshot.description)
+    };
+    format!("snapshot #{} of {area}{when}{note}", snapshot.id)
+}
+
+fn what_deleting_loses(it: &str, area: &ConfigName) -> String {
+    format!("{it} will be deleted for good. Only this saved moment goes: the files in {area} are not touched.\n")
+}
+
+fn delete_question(it: &str) -> String {
+    format!("Delete {it}?")
+}
+
+fn deleting_one(area: &ConfigName) -> String {
+    format!("Deleting 1 snapshot of {area}")
+}
+
+fn deleted_one(area: &ConfigName) -> String {
+    format!("Deleted 1 snapshot of {area}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snapall_core::SnapshotKind;
+
+    #[test]
+    fn a_snapshot_is_named_with_its_moment_and_its_note_when_it_has_them() {
+        let home = ConfigName::parse("home").unwrap();
+        let mut snapshot = SnapshotInfo {
+            id: SnapshotId::new(3).unwrap(),
+            kind: SnapshotKind::Single,
+            date: Some("2026-10-25 18:15:00".into()),
+            user: "root".into(),
+            cleanup: None,
+            description: "before the theme".into(),
+            point: None,
+            used_bytes: None,
+        };
+        assert_eq!(
+            snapshot_in_words(&home, &snapshot),
+            "snapshot #3 of home from 2026-10-25 18:15:00 (\"before the theme\")"
+        );
+        snapshot.description.clear();
+        assert_eq!(
+            snapshot_in_words(&home, &snapshot),
+            "snapshot #3 of home from 2026-10-25 18:15:00"
+        );
+        snapshot.date = None;
+        assert_eq!(snapshot_in_words(&home, &snapshot), "snapshot #3 of home");
+    }
+
+    #[test]
+    fn what_is_lost_is_said_in_words_that_assume_nothing() {
+        let home = ConfigName::parse("home").unwrap();
+        let said = what_deleting_loses("snapshot #3 of home", &home);
+        assert!(
+            said.contains("deleted for good") && said.contains("the files in home are not touched"),
+            "{said}"
+        );
+    }
 }

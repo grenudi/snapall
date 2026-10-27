@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Printing: the one place output leaves the program, and the one place that decides between text
-//! for a person and JSON for a program.
+//! Printing, and the choice between text for a person and JSON for a program.
 
 use std::error::Error;
 use std::io::{self, Write};
@@ -24,6 +23,12 @@ pub fn emit(text: &str) -> Result<(), Box<dyn Error>> {
         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
         other => other.map_err(Into::into),
     }
+}
+
+/// Something said to the person on the way, apart from the result: it goes to stderr, so a result piped
+/// to another program stays clean.
+pub fn note(text: &str) {
+    let _ = writeln!(io::stderr(), "{text}");
 }
 
 pub fn emit_json(value: &Value) -> Result<(), Box<dyn Error>> {

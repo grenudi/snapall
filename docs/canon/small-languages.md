@@ -82,6 +82,46 @@ the question can produce), so the wrong order does not compile. Check: the lint;
 **R10. Prose is generated.** The outline of the whole program is produced from R1's sentences; the manual's
 command list, the completions and the man page from the contract. Written by no one, so it is always true.
 
+**R11. Each layer owns a kind of logic; the top keeps only *which*, *when* and *where*.** The top layers do have
+logic, in the smallest portions: choosing between named outcomes, putting things in order, arranging what sits
+beside or above what, streaming inputs into stories and results into the presenter. They do not contain *how*.
+Logic lives at the lowest layer that can state it without knowing the layer above: domain decisions in the
+middle, translation and mechanics at the bottom. A top-layer line reads as common sense, with no knowledge of
+the language, the libraries, the system or the hardware assumed, and it is also the real, running implementation:
+the idea, in the flesh of working code. Check: ratchets on how often a story turns and how much plumbing it spells out.
+
+**R12. Prose may name; only code may claim.** A module's sentence (R1) is a noun phrase that says what the module
+is *about* ("Deleting a snapshot."). It never says *only*, *never* or *always*: those are guarantees, and a
+guarantee in prose can be false while the build is green. Put the guarantee in a test, where it can fail. (Found
+in snapall: a module whose sentence claimed to be "the one place output leaves the program" while seven others
+printed by themselves.)
+
+**R13. The *why* has three carriers, and none is a comment.** (1) *Names and types*: `Weight::Destroys` is a
+reason, `Approved` is a rule. (2) *Executable facts*: a test named as a sentence about the world, including the
+foreign world, that runs against the real thing (`removing_an_area_deletes_every_snapshot_and_leaves_its_files`
+against real snapper), so it cannot drift. (3) *The generated outline.* Comments are kept for machine-readable
+annotations only (`TODO(owner): ...`, `SAFETY: ...`, attributes). A reason that no carrier holds is a missing name
+or a missing test, not a missing comment: add that.
+
+**R14. A story has a grammar.** Each line is `noun = verb(noun, noun)` or `verb(noun)`, in this order: ask, do,
+record, say. A story contains no lifetimes, generics, format strings, closures that plumb `Option` or `Result`,
+bare `bool` or `None` arguments, or chains of adapters; each such construction is hidden behind a verb named for
+what it *means*. What is left of Rust's own syntax in a story (`?`, `if let Some(..)`) is not to be tolerated but
+read: it marks a *missing noun* (a `Stop`, an `Approved`, a `Said`) that the layer needs to name. Budgets: at
+most 4 turns, 2 closures, 60 lines (40 is the aim).
+
+**R15. Arrangement is data at the top.** What sits where (a window's tabs above its page above its status above
+its buttons; the commands and the flags each takes) is a declarative tree or table of nouns, written once, and
+interpreted by a lower layer that knows cells, rectangles and terminals. The top says *above*, *beside*, *fills*;
+the numbers live below.
+
+**R16. A reader learns by reading downwards.** Each word is defined before it is used, in the layer the reader is
+already in or the one directly below; a module's `use` lines are its dependency vocabulary and name only the layer
+below. The domain is taught by its types: each noun defined once, with its relations ("a restore point is one
+snapshot in every area, taken together"). Check: dependency direction tests; a *cold read*: someone (or an agent)
+given only the outline and front files should be able to say what the program does and what happens when a
+snapshot is deleted. Where they cannot, a name is missing.
+
 ## Procedure
 
 **Adding a feature.**
@@ -128,6 +168,42 @@ pub fn delete(world: &World, snapshot: Snapshot, answer: Answer) -> Said {
 }
 ```
 
+## A worked example: `snapall delete`
+
+Before, 55 lines. It *taught Rust* (`.into_iter().find(|snapshot| snapshot.id == id)`, `map_or(String::new(),
+|date| format!(...))`, `result.as_ref().map(|()| String::new()).map_err(ToString::to_string)`), what `None` was in
+`Change::begin(a, b, None)` and what `destroy: bool` meant could not be read from it, and the only place its *why*
+was written was a prose comment.
+
+After, 19 lines, in the language of the layer below:
+
+```rust
+pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
+    if let Some(snapshot) = find_snapshot(ctx.backend, area, id)? {
+        let it = snapshot_in_words(area, &snapshot);
+        output::note(&what_deleting_loses(&it, area));
+        if let Some(stop) = ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))? {
+            return Ok(stop);
+        }
+    }
+    let change = Change::begin(&deleting_one(area), &deleted_one(area), None)?;
+    let deleted = delete_snapshot(ctx.backend, area, id);
+    if deleted.is_ok() {
+        change.rollback(after_deleting());
+    }
+    change.end_with(&deleted);
+    deleted?;
+    ctx.show.result(render::deleted(area, id), render::deleted_json(area, id))
+}
+```
+
+The wording moved beneath the story, the lookup became a verb in the core, the plumbing became `end_with`, and the
+prose comment is gone: *a snapshot that is not there is not asked about, and the failed attempt is recorded* is
+now two tests with those names (`dev/cli-consequences.py`, the audit step of CI). What remains of Rust's syntax
+(`?`, `if let Some(stop)`, the trailing `None`, the bare `destroy: bool`) is the list of nouns the layer still
+lacks: a `Stop` that is not an error, an `Approved` in place of a flag and a question, a name for "no name".
+That is the next layer, found by reading what the story still has to spell out.
+
 ## What goes wrong
 
 * **A prose layer that does not run.** If it can be deleted and the program is unchanged, it is a comment.
@@ -152,6 +228,9 @@ pub fn delete(world: &World, snapshot: Snapshot, answer: Answer) -> Said {
 | R7 | `drivers_and_adapters_never_know_each_other` and the per-crate dependency tests |
 | R8 | `#[deny(clippy::wildcard_enum_match_arm)]` on the change-describing functions |
 | R9 | ratchet: files over 300 lines |
+| R11 | ratchets: a story turns at most 4 times and spells out at most 2 closures |
+| R12 | purposes are noun phrases; guarantees are the ratchets and tests themselves |
+| R13 | named executable facts: `dev/cli-consequences.py`, the real-snapper tests, CI's audit step |
 
 ## What is not settled
 
