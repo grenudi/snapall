@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.1]
+
+
+### Refactoring
+- Every module is a small language, with a generated outline and ratchets to keep it so ([#65](https://github.com/grenudi/snapall/pull/65)) ([f540f54])
+
+
+
 ## [0.23.0]
 
 
