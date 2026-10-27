@@ -558,7 +558,7 @@ fn a_command_handler_is_short_enough_to_read_as_a_sentence_and_the_debt_only_shr
     }
 }
 
-// ---- the shape of the code: every module a small language, every front file a map ------------------------
+// ---- the shape of the code: every module a small language, every layer the top of those beneath ---------
 //
 // The rules (ADR 19, 20 and `docs/canon/small-languages.md`) are only kept if a machine keeps them: a person
 // forgets, and so does an agent. Each rule below is a *ratchet*: the debt that exists today is written down
@@ -652,7 +652,9 @@ fn lines_of(code: &str) -> usize {
 
 /// How long a file may be before it is more than one thing.
 const LONGEST_FILE: usize = 300;
-/// How long a front file (`lib.rs`, `main.rs`, `mod.rs`) may be: it is a map of its module, not its contents.
+/// How long an entry file (`lib.rs`, `main.rs`, `mod.rs`) may be before a level is probably hiding in it: its
+/// job is to say what the module is for and offer its vocabulary. An alarm that finds candidates, not the
+/// definition of a good module.
 const LONGEST_FRONT_FILE: usize = 120;
 
 #[test]
@@ -670,7 +672,7 @@ fn a_file_is_one_thing_short_enough_to_read_whole_and_the_debt_only_shrinks() {
 }
 
 #[test]
-fn a_front_file_is_a_map_of_its_module_and_not_its_contents() {
+fn an_entry_file_longer_than_a_screen_hides_a_level_and_the_debt_only_shrinks() {
     let observed = all_sources()
         .into_iter()
         .filter(|(path, _)| {
@@ -681,7 +683,7 @@ fn a_front_file_is_a_map_of_its_module_and_not_its_contents() {
         .map(|(path, code)| (path, lines_of(&code)))
         .collect();
     ratchet(
-        "Front files that hold more than a map:",
+        "Entry files so long that a level is probably hiding in them:",
         &observed,
         LONGEST_FRONT_FILE,
         &FRONT_FILES_TOO_BIG_FOR_NOW,

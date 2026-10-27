@@ -25,11 +25,13 @@ together as one discipline instead of six habits.
 ## Vocabulary
 
 * **Layer**: a level of abstraction. Each is written in the words of the one above it and calls only the one below.
-* **Module**: one purpose, one language. A directory or a file, with a *front file*.
-* **Front file** (`lib.rs`, `main.rs`, `mod.rs`): the *map* of the module. It says what the module is for, names
-  its nouns and verbs, and nothing else. It is short enough to read in one look.
+* **Module**: one purpose, one language. A directory or a file. Every module has two faces: an upward one (what it
+  is for, and the vocabulary of nouns and verbs it offers the layer above) and a downward one (its body, written
+  only in the vocabulary of the layers beneath it).
+* **Front**: a module's upward face. In a directory module it is the entry file (`mod.rs`, `lib.rs`), in a one-file
+  module the public items at its top. It is a *role* that every module plays, not a kind of file.
 * **Surface**: where a person or another program meets the application: the command line, the window. A surface is
-  a front file whose nouns are *every input a person can give* and *every output they can be shown*.
+  a module whose front lists *every input a person can give* and *every output they can be shown*.
 * **Boundary**: where our code ends. An *adapter* wraps what lies beyond it.
 * **Ratchet**: a rule that cannot be met yet, kept honest by writing the debt down with its size: nothing may get
   worse, nothing new may join, and an entry must leave the list when paid.
@@ -40,10 +42,13 @@ together as one discipline instead of six habits.
 Why: it is the module's name in prose; the outline is built from it. Check: a missing line fails the build; the
 outline (`OUTLINE.md`) is generated from these sentences and must equal the committed one.
 
-**R2. A front file is a map, not contents.** It holds: the purpose sentence, `mod` declarations, the re-export of
-the module's vocabulary, the declarations of its nouns, and short functions that only compose verbs. No
-algorithms, no parsing, no formatting. Bound: 120 lines. If it grows past a screen you have found a missing
-level, not a reason to write more here. Check: ratchet on front-file length.
+**R2. Every module is the top of what lies beneath it.** The same shape repeats at every level. A module says what
+it is for and offers its vocabulary to the layer above, and its body is written only in the vocabulary of the
+layers beneath it, each of which is in turn the top of its own. Reading one module alone tells you its purpose and
+its words, and going down is always optional. Top is relative: the command line and the window are the top of the
+whole program, and a small adapter is the top of the tool it wraps. The layers form a graph and not a tree, since
+a lower layer is used by many above it, and the only structural rule is that dependencies point downward. Check:
+the dependency direction tests. An entry file past a screen (120 lines) is an alarm that a level is hiding in it.
 
 **R3. Names are the person's words.** Nouns and verbs are named as a person would say them
 (`take_a_snapshot`, `GoBack`, `ProtectedArea`), never by a pattern (`Manager`, `Helper`, `Util`, `Handler`) and
@@ -77,7 +82,11 @@ and forbid the catch-all (`clippy::wildcard_enum_match_arm`), so the compiler as
 (a change must be approved before it is made), carry it in the type (an `Approved` value that only the answer to
 the question can produce), so the wrong order does not compile. Check: the lint; the type.
 
-**R9. A file is one thing.** Bound: 300 lines. Past it, find the second thing and name it. Check: ratchet.
+**R9. A module speaks one language.** A module that needs two levels, such as arranging a window and also calling a
+tool, is two modules, whatever its length. A file past a screen is a smell that a level is hiding, and a long file
+that is one declarative table is fine. The limits (300 lines a file, 120 an entry file, 60 a function) are alarms
+that find candidates and are kept as ratchets for that reason. They are not what makes a module good: a short file
+that mixes two levels is wrong, and a long one in a single language is not.
 
 **R10. Prose is generated.** The outline of the whole program is produced from R1's sentences; the manual's
 command list, the completions and the man page from the contract. Written by no one, so it is always true.
@@ -119,7 +128,7 @@ the numbers live below.
 already in or the one directly below; a module's `use` lines are its dependency vocabulary and name only the layer
 below. The domain is taught by its types: each noun defined once, with its relations ("a restore point is one
 snapshot in every area, taken together"). Check: dependency direction tests; a *cold read*: someone (or an agent)
-given only the outline and front files should be able to say what the program does and what happens when a
+given only the outline and the entry points should be able to say what the program does and what happens when a
 snapshot is deleted. Where they cannot, a name is missing.
 
 ## Procedure
@@ -137,13 +146,13 @@ snapshot is deleted. Where they cannot, a name is missing.
 a tool: adapter; decide what to do: story; define a word: vocabulary; show or read: surface)? is it already
 declared somewhere (derive, do not copy)?
 
-**Paying down a ratchet.** Take the largest entry. List its nouns and verbs. Make a front file that names them.
+**Paying down a ratchet.** Take the largest entry. List its nouns and verbs. Make a front that names them.
 Move whole items, never rewrite while moving. Compile; run the tests; lower the entry. Behaviour does not change
 in a move; if it must, that is a separate change.
 
 ## Templates
 
-A front file:
+A module's front:
 
 ```rust
 //! What this module is for, in one sentence a person would say.
@@ -207,7 +216,7 @@ That is the next layer, found by reading what the story still has to spell out.
 ## What goes wrong
 
 * **A prose layer that does not run.** If it can be deleted and the program is unchanged, it is a comment.
-* **A front file that grows.** It is a map; if it has logic, a level is missing.
+* **A front that grows.** It offers a vocabulary and nothing more. If it has logic, a level is missing.
 * **Pass-through layers.** A layer that only renames the one below adds a hop and no meaning. Remove it.
 * **Names by pattern** (`Manager`, `Service`, `Util`): they say nothing about purpose.
 * **Vocabulary leaks.** A tool's word above its adapter splits the language in two.
@@ -220,14 +229,14 @@ That is the next layer, found by reading what the story still has to spell out.
 | Rule | Where it is kept |
 |------|------------------|
 | R1, R10 | `OUTLINE.md`, generated; `architecture.rs` |
-| R2 | ratchet: front files over 120 lines |
+| R2 | dependency tests; ratchet (alarm): entry files over 120 lines |
 | R3 | ratchet: tool words in identifiers; tests on messages |
 | R4 | ratchet: handlers over 60 lines; crate dependency tests |
 | R5 | `commands!` macro derives flag lists; `Act` derives titles and looks; text tests |
 | R6 | ratchet: printing outside the presenter |
 | R7 | `drivers_and_adapters_never_know_each_other` and the per-crate dependency tests |
 | R8 | `#[deny(clippy::wildcard_enum_match_arm)]` on the change-describing functions |
-| R9 | ratchet: files over 300 lines |
+| R9 | ratchet (alarm): files over 300 lines |
 | R11 | ratchets: a story turns at most 4 times and spells out at most 2 closures |
 | R12 | purposes are noun phrases; guarantees are the ratchets and tests themselves |
 | R13 | named executable facts: `dev/cli-consequences.py`, the real-snapper tests, CI's audit step |
