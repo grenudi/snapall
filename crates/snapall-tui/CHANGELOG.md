@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.20.0]
+
+
+### Features
+- **tui:** A coloured button bar, groups you can see, and buttons that say when they do nothing ([#57](https://github.com/grenudi/snapall/pull/57)) ([82faab9])
+
+
+
 ## [0.19.0]
 
 
