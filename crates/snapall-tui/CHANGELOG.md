@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.0]
+
+
+### Refactoring
+- The app's vocabulary is declared once and the contract, the questions and the buttons are derived from it ([#63](https://github.com/grenudi/snapall/pull/63)) ([a861b18])
+
+
+
 ## [0.22.0]
 
 
