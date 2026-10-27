@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.22.0]
+
+
+### Features
+- The window asks what the command line asks, and the rules are tied to their sources ([#61](https://github.com/grenudi/snapall/pull/61)) ([eda018a])
+
+
+
 ## [0.21.0]
 
 
