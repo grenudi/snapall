@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.2]
+
+
+### Refactoring
+- A story reads as a sequence of verbs, with rules for what each layer's logic is and where the why lives ([#67](https://github.com/grenudi/snapall/pull/67)) ([5a0e3b8])
+
+
+
 ## [0.23.1]
 
 
