@@ -168,6 +168,7 @@ fn restoring_a_version_asks_first_then_puts_the_file_back_and_the_list_catches_u
     );
 
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(backend.read_file("home", FILE).as_deref(), Some("v2"));
     let note = format!("{:?}", session.state.notice);
     assert!(
@@ -244,6 +245,7 @@ fn the_mouse_selects_a_version_and_its_buttons_restore_it() {
         session.state.modal
     );
     click_text(&mut session, "[ Enter: Restore ]", 4);
+    session.confirm();
     assert_eq!(backend.read_file("home", FILE).as_deref(), Some("v2"));
 }
 
@@ -338,6 +340,7 @@ fn a_file_of_the_system_root_can_be_restored_though_the_root_itself_cannot() {
     );
     assert!(text.contains("[ Enter: Restore ]"), "{text}");
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(
         backend.read_file("root", "/etc/fstab").as_deref(),
         Some("good")

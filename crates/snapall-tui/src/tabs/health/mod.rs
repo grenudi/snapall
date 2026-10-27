@@ -119,8 +119,18 @@ fn act_on_chosen(state: &mut State) -> Vec<Effect> {
             Vec::new()
         }
         RowAction::Fix(Remedy::SwitchOnCleanup) => {
-            state.notice = Some(Notice::Info("switching automatic cleanup on".into()));
-            vec![Effect::SwitchOnCleanup]
+            let lines = vec![
+                "Switch automatic cleanup on.".to_owned(),
+                "Old snapshots are then removed by themselves, within the limits set for each area. It can be switched off again from the Health tab.".to_owned(),
+            ];
+            state.modal = Some(crate::model::confirm_modal(
+                snapall_core::Act::ControlJob,
+                None,
+                "Switch cleanup on",
+                lines,
+                vec![Effect::SwitchOnCleanup],
+            ));
+            Vec::new()
         }
         RowAction::Fix(Remedy::CountRoom) | RowAction::CountRoom(true) => {
             state.modal = Some(Modal::Quotas { turn_on: true });

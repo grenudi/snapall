@@ -5,6 +5,7 @@
 //! Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
 
 use crate::model::*;
+use snapall_core::Act;
 
 /// The restore prompt. Only a prompt with real changes to restore can be confirmed, and the system
 /// root only when it is a single path of it. Anything else is information, and any key closes it.
@@ -25,21 +26,37 @@ pub(crate) fn confirming_restore(
         if let Some((c, i, offer)) = &state.point_offer {
             if *c == config && *i == id && offer.areas_to_change() > 0 {
                 let (areas, point) = (offer.areas_to_change(), offer.point.clone());
-                state.notice = Some(Notice::Info(format!(
-                    "putting {areas} area(s) back to {}",
-                    point.point
-                )));
-                return Reaction::closes_and_starts(vec![Effect::RestorePoint { point }]);
+                let lines = vec![
+                    format!("Put {areas} area(s) back to restore point {}.", point.point),
+                    "Each area's current state is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
+                ];
+                return ask_first(
+                    Act::RestorePoint,
+                    None,
+                    "Put every area back",
+                    lines,
+                    vec![Effect::RestorePoint { point }],
+                );
             }
         }
     }
     match key {
         Key::Char('y' | 'Y') | Key::Enter if actionable => {
-            state.notice = Some(Notice::Info(match &path {
-                Some(path) => format!("restoring {path} from #{id}"),
-                None => format!("restoring {config} to #{id}"),
-            }));
-            Reaction::closes_and_starts(vec![Effect::Restore { config, id, path }])
+            let what = match &path {
+                Some(path) => format!("Put {path} back to how snapshot #{id} had it."),
+                None => format!("Put {config} back to how snapshot #{id} had it."),
+            };
+            let lines = vec![
+                what,
+                "How it is now is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
+            ];
+            ask_first(
+                Act::Restore,
+                None,
+                "Put files back",
+                lines,
+                vec![Effect::Restore { config, id, path }],
+            )
         }
         Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Reaction::closes(),
         // information with nothing to confirm: any key closes it (but not while still looking)

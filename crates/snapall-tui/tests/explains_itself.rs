@@ -166,9 +166,10 @@ fn the_help_teaches_what_snapshots_are_before_it_lists_keys_and_fits_a_small_ter
     let second = screen(&session);
     for must in [
         "Keys and buttons",
-        "Take a snapshot of the selected area now",
-        "Delete marked snapshots for good",
-        "Restore: go back to the selected snapshot",
+        "Take a snapshot of this area, or of every one",
+        "Delete marked snapshots for good (you type destroy)",
+        "Restore a snapshot",
+        "Answer a question: y for a change, destroy for a loss",
         "hover a button to read what it does",
         "Close snapall (changes nothing)",
     ] {

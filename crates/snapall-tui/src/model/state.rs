@@ -128,8 +128,6 @@ pub struct LimitsEditor {
     pub field: usize,
     /// The area's snapshots, for the preview, once they have arrived.
     pub snapshots: Option<Vec<snapall_core::SnapshotInfo>>,
-    /// Enter was pressed on a change that would remove snapshots: the next one applies it.
-    pub armed: bool,
     pub error: Option<String>,
 }
 
@@ -142,6 +140,25 @@ pub struct StopProtecting {
     /// What has been typed so far, to be the area's name.
     pub typed: String,
     pub error: Option<String>,
+}
+
+/// The question before a change: what it will do, and the answer that goes with its weight.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Confirm {
+    pub act: snapall_core::Act,
+    /// What the answer must name, where the change is done to one thing (`destroy home`).
+    pub target: Option<String>,
+    pub title: String,
+    /// What it will do, in plain words; the first line is the one that matters most.
+    pub lines: Vec<String>,
+    pub typed: String,
+    pub error: Option<String>,
+    /// What starts when it is answered.
+    pub then: Vec<Effect>,
+    /// Where to go back to if it is cancelled, instead of closing.
+    pub on_cancel: Option<Box<Modal>>,
+    /// Where to be after it is answered, instead of closing.
+    pub on_done: Option<Box<Modal>>,
 }
 
 /// Where the groups prompt is: the list of them, naming a new one, or choosing the areas of one.
@@ -198,6 +215,8 @@ pub enum Modal {
     Limits(LimitsEditor),
     /// Stopping the protection of an area, which deletes its snapshots for good.
     StopProtecting(StopProtecting),
+    /// The question before a change.
+    Confirm(Confirm),
     /// Asking before a running change is asked to stop.
     StopChange { id: String, what: String },
 }

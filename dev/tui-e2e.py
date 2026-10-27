@@ -42,6 +42,7 @@ KEYS = {
     "right": b"\x1b[C",
     "left": b"\x1b[D",
     "ctrl-c": b"\x03",
+    "backspace": b"\x7f",
 }
 
 
@@ -161,6 +162,11 @@ class Tui:
     def type(self, text):
         for char in text:
             self.send(char)
+
+    def answer(self, text):
+        """Answer the question that is open, as a person does: type it, then Enter. A bare Enter never answers."""
+        self.type(text)
+        self.send("enter")
 
     def stop_with(self, sig):
         """Send a signal; return the exit status once the process has gone."""
@@ -298,8 +304,13 @@ def runner_scenario():
     after = (len(listing("snapall_it_a")), len(listing("snapall_it_b")))
     check(after == (before[0] + 1, before[1] + 1), f"both areas got their snapshot, without the window (before {before}, after {after})")
 
-    # a second one, stopped from the window
-    tui = Tui(extra_path=shim)
+    # a second one, stopped from the window. Asking to stop is a change and so is asked about, which takes a
+    # moment: this one is slow enough (six seconds an area) that it is still in its first area when answered.
+    slower = tempfile.mkdtemp(prefix="slow-snapper-")
+    with open(f"{slower}/snapper", "w") as handle:
+        handle.write("#!/bin/sh\ncase \" $* \" in *\" create \"*) sleep 6;; esac\n" + f'exec {real} "$@"\n')
+    os.chmod(f"{slower}/snapper", 0o755)
+    tui = Tui(extra_path=slower)
     tui.wait_for("Snapshots of snapall_it_a (")
     tui.wait_gone("working", timeout=6)
     tui.send("a")
@@ -313,7 +324,9 @@ def runner_scenario():
     tui.wait_for("Stop it after this area?", timeout=4)
     check("never stopped in the middle of an area" in words(tui), "stopping says what it means before it asks")
     tui.send("enter")
-    tui.wait_for("CANCELLED", timeout=12)
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
+    tui.wait_for("CANCELLED", timeout=16)
     check("stopped on request after 1 of 2 areas" in words(tui), "it stopped between areas and says how far it got")
     tui.send("q")
     tui.finish()
@@ -351,6 +364,9 @@ def groups_scenario():
     tui.wait_for("The areas of theming")
     tui.send(" ")  # snapall_it_a
     tui.send("enter")
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    check(not os.path.exists(path) or "theming" not in open(path).read(), "nothing is saved until the question is answered")
+    tui.answer("y")
     # the save is a change like any other: it is done on the worker, and the list shows the group once kept
     tui.wait_until(lambda: "theming snapall_it_a" in words(tui), "the new group in the list")
     check("theming snapall_it_a" in words(tui), "the new group is in the list with its area")
@@ -374,6 +390,8 @@ def groups_scenario():
     tui.wait_for("Groups of areas")
     tui.send("down")
     tui.send("d")
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
     tui.wait_until(lambda: "theming snapall_it_a" not in words(tui), "the group to be taken away")
     check("theming snapall_it_a" not in words(tui), "the group is taken away")
     check("theming" not in open(path).read(), "and gone from the file")
@@ -426,9 +444,13 @@ def _limits_journey(config):
     tui.wait_until(lambda: "removed, the oldest first" in words(tui), "what would go")
     check("cannot be brought back" in words(tui), "it says a removed snapshot cannot be brought back")
     tui.send("enter")
-    tui.wait_for("Press Enter again to apply this")
-    check(config("NUMBER_LIMIT") == "50", "the first Enter changes nothing")
-    tui.send("enter")
+    tui.wait_for("Type destroy, then Enter, to go ahead")
+    check(config("NUMBER_LIMIT") == "50", "the question changes nothing")
+    tui.answer("y")
+    tui.wait_for("Not that")
+    check(config("NUMBER_LIMIT") == "50", "y is not the answer to what loses snapshots")
+    tui.send("backspace")
+    tui.answer("destroy")
     tui.wait_until(lambda: "takes effect at the next cleanup" in words(tui), "the change to be applied", timeout=12)
     check(config("NUMBER_LIMIT") == "1" and config("NUMBER_MIN_AGE") == "0", "snapper now holds the new numbers")
     tui.send("q")
@@ -468,13 +490,12 @@ def stop_protecting_scenario():
         tui.wait_until(lambda: "will be deleted for good" in words(tui), "the plan")
         text = words(tui)
         check("deleted for good" in text and "files in it" in text and "cannot be undone" in text, "it says what goes, what stays and that it cannot be undone")
-        check("type its name (snapall_it_b)" in text, "it asks for the name")
+        check("Type destroy snapall_it_b, then Enter, to go ahead" in text, "it asks for the word and the name")
         check("q quit" in tui.text().splitlines()[-1], "the prompt leaves the key line alone")
         tui.send("enter")
-        tui.wait_for("Type its name exactly")
+        tui.wait_for("Not that" if False else "Type destroy snapall_it_b")
         check("snapall_it_b" in configs(), "Enter alone changed nothing")
-        tui.type("snapall_it_b")
-        tui.send("enter")
+        tui.answer("destroy snapall_it_b")
         tui.wait_until(lambda: "no longer protected" in words(tui), "it to be done", timeout=12)
         check("snapall_it_b" not in configs() and "snapall_it_a" in configs(), "the area is no longer protected and the other still is")
         check(open(marker).read() == "my file", "its own files are untouched")
@@ -608,6 +629,8 @@ def points_screen_scenario():
     tui.wait_for("Put every area of the chosen restore point back (not the system)")
     check(True, "hovering the button explains it, and the prompt leaves that line free")
     tui.send("enter")
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
     tui.wait_for("started in the background", timeout=6)
     tui.wait_for("To undo it: restore point", timeout=15)
     check(open(a).read() == "a, then" and open(b).read() == "b, then", "both areas are back on disk, a deleted file included")
@@ -644,6 +667,8 @@ def restore_point_scenario():
     tui.wait_for("Put all areas of this restore point back at once (not the system)")
     check(True, "hovering the button explains it, and the prompt does not cover that line")
     tui.send("A")
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
     tui.wait_for("started in the background", timeout=6)
     tui.wait_for("To undo it: restore point", timeout=15)
     check(True, "it confirms in plain words and names the way back")
@@ -688,6 +713,8 @@ def protect_scenario():
         tui.wait_for("Set this part of the disk up for snapshots (nothing is copied or moved)")
         check(True, "hovering Protect it explains what it will do")
         tui.send("enter")
+        tui.wait_for("Type y or yes, then Enter, to go ahead")
+        tui.answer("y")
         tui.wait_for("Notes (")
         tui.wait_for("is protected now", timeout=10)
         check(True, "it confirms in plain words and the confirmation survives the reload")
@@ -736,6 +763,8 @@ def main():
     tui.send("d")
     tui.wait_for("Delete 2 snapshot(s) of snapall_it_a")
     tui.send("y")
+    tui.wait_for("Type destroy, then Enter, to go ahead")
+    tui.answer("destroy")
     tui.wait_for("deleted")
     remaining = set(listing("snapall_it_a").values())
     check("seed one" not in remaining and "seed two" not in remaining, "snapper deleted exactly the marked snapshots")
@@ -898,7 +927,9 @@ def main():
     check("tui-restore-keep" in screen and "snapshotted first" in screen, "the prompt names what would change and says it is undoable")
     check(open(keep).read() == "version TWO", "nothing changed yet: the prompt only looked")
 
-    tui.click_text("[ Enter: Restore ]", offset=4)        # the mouse path to confirming
+    tui.click_text("[ Enter: Restore ]", offset=4)        # the mouse path to the question
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
     tui.wait_for(f"restored {cfg} to #{base}")
     check(open(keep).read() == "version one", "the edited file is back to the snapshot's version")
     check(open(gone).read() == "to be deleted", "the deleted file is back")
@@ -938,6 +969,9 @@ def main():
     check("snapshotted first" in tui.text(), "the prompt says the current state is saved first")
     check(open(doc).read() == "current version", "the prompt alone changed nothing")
     tui.send("\r")
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    check(open(doc).read() == "current version", "and the question alone changed nothing either")
+    tui.answer("y")
     tui.wait_for("restored")
     check(open(doc).read() == "second version", "the file is back to the second version")
     check(any(d.startswith("before restoring") for d in listing(cfg).values()), "snapper has the safety snapshot")
@@ -949,6 +983,8 @@ def main():
     tui.click_text("u restore this version", offset=0)
     tui.wait_for("Put")
     tui.click_text("[ Enter: Restore ]", offset=4)
+    tui.wait_for("Type y or yes, then Enter, to go ahead")
+    tui.answer("y")
     tui.wait_for("restored")
     check(open(doc).read() == "first version", "by mouse: the file is back to the first version")
     check(tui.finish() == 0, "q leaves cleanly")

@@ -53,26 +53,31 @@ pub(crate) fn keys_page() -> Vec<Line<'static>> {
         ("up/down  k/j", "Move in the list that is selected"),
         ("left/right  Tab", "Switch between areas and snapshots"),
         ("space", "Mark a snapshot (Delete can take several)"),
-        ("c", "Take a snapshot of the selected area now"),
-        ("a", "Take a snapshot of every protected area"),
-        ("d", "Delete marked snapshots for good (files untouched)"),
         (
-            "u",
-            "Restore: go back to the selected snapshot (asks first)",
+            "c  a",
+            "Take a snapshot of this area, or of every one (Tab: a group)",
         ),
-        ("A", "In Restore: put its whole restore point back"),
+        ("d", "Delete marked snapshots for good (you type destroy)"),
+        (
+            "u  A",
+            "Restore a snapshot; A: put its whole restore point back",
+        ),
         ("p", "Protect: see what has no snapshots yet, and set it up"),
         (
             "g",
             "Groups: name a set of areas (theming) to snapshot together",
         ),
         ("R", "Restore points: put every area back to one moment"),
-        ("x", "In Activity: ask a running change to stop"),
         (
-            "U",
-            "In Health: stop protecting an area (deletes its snapshots)",
+            "x  U",
+            "Activity: ask a change to stop. Health: stop protecting",
         ),
         ("r", "Look again at which snapshots exist"),
+        (
+            "y  destroy",
+            "Answer a question: y for a change, destroy for a loss",
+        ),
+        ("?", "This help"),
         ("q  Ctrl-C", "Close snapall (changes nothing)"),
         (
             "mouse",
@@ -87,4 +92,64 @@ pub(crate) fn keys_page() -> Vec<Line<'static>> {
             ])
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::view::{footer_buttons, MAX_PROMPT_HEIGHT};
+    use ratatui::layout::Rect;
+
+    fn words(lines: &[Line<'_>]) -> Vec<String> {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+
+    /// What a prompt has of an 80-by-24 screen: its text rows, after the frame and the button row.
+    const TEXT_ROWS: u16 = MAX_PROMPT_HEIGHT - 3;
+
+    #[test]
+    fn both_help_pages_fit_in_the_space_a_prompt_has_so_nothing_is_cut_off_the_end() {
+        for (name, page) in [("concepts", concepts_page()), ("keys", keys_page())] {
+            let needed = rows_needed(&page, 84 - 2);
+            assert!(
+                needed <= TEXT_ROWS,
+                "the {name} page needs {needed} rows and a prompt has {TEXT_ROWS}: its last lines would be cut off"
+            );
+        }
+    }
+
+    #[test]
+    fn every_button_on_the_bar_has_its_key_explained_in_the_help() {
+        let keys = words(&keys_page());
+        let screen = Rect {
+            x: 0,
+            y: 0,
+            width: 80,
+            height: 2,
+        };
+        for file_mode in [false, true] {
+            for (_, button, letter, label) in footer_buttons(screen, file_mode) {
+                // the key column is the first twenty cells: the letter is one of the keys listed there
+                let explained = keys.iter().any(|line| {
+                    let column: String = line.chars().take(20).collect();
+                    column
+                        .split_whitespace()
+                        .any(|key| key == letter.to_string())
+                });
+                assert!(
+                    explained,
+                    "the `{letter} {label}` button is on the bar but the help's keys page never explains `{letter}`"
+                );
+                let _ = button;
+            }
+        }
+    }
 }

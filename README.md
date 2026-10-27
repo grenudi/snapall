@@ -283,7 +283,7 @@ How much snapall asks depends on what is at stake, because a question you answer
 
 Every change records **how to get back from it**, worked out when it was made, so it names the state that was really there. `snapall activity` shows it under the change, and `snapall undo CHANGE` does it. A restore goes back to the snapshot it took of the state just before; a limit goes back to the numbers it had; a group to the areas it had; protecting an area goes back to not protected. Undoing the taking of a snapshot is deleting it, so it asks for `destroy`. And what cannot be undone says so: a deleted snapshot, or an area that stopped being protected, record that, and what protects you next time (a snapshot, or a group snapshot with `snapall create --group NAME`, before the risky step). A rollback is checked when you ask for it, not when it was recorded: if cleanup has removed the snapshot it would return to, it says so instead of pretending.
 
-(The window still confirms with Enter in places; it is being brought to the same rule.)
+**The window asks the same questions**, through one prompt that every change goes through: it says what will happen, then waits for the typed answer (`y`, or `destroy`; stopping protection takes `destroy home`). A bare Enter, or a click on its button, does nothing until the answer is typed; Esc says nothing was changed. Taking a snapshot never asks. What a change recorded is shown in the **Activity** tab under *How it went*: the state it can go back to and the command that does it (`snapall undo CHANGE`), or that it cannot be undone and what protects you next time. (An undo key in the window is not built yet.)
 
 ### Stopping protection
 

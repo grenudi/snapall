@@ -108,8 +108,9 @@ fn a_change_made_now_is_recorded_once_and_shown_once_whichever_way_it_is_read() 
     session.press(Key::Char('a'));
     session.press(Key::Enter);
 
+    // a start, the way back from it, and its end
     let events = system.events();
-    assert_eq!(events.len(), 2, "{events:?}");
+    assert_eq!(events.len(), 3, "{events:?}");
     let (
         JournalEvent::Started {
             id: a,
@@ -118,10 +119,14 @@ fn a_change_made_now_is_recorded_once_and_shown_once_whichever_way_it_is_read() 
             ..
         },
         JournalEvent::Finished { id: b, outcome, .. },
-    ) = (&events[0], &events[1])
+    ) = (&events[0], &events[2])
     else {
         panic!("a start and an end: {events:?}");
     };
+    assert!(
+        matches!(&events[1], JournalEvent::Rollback { id, rollback: snapall_core::Rollback::Undo(_), .. } if id == a),
+        "taking a snapshot records how to undo it, on the same change: {events:?}"
+    );
     assert_eq!(
         (a, *source, what.as_str()),
         (b, Source::Window, "Took a snapshot of home, root")

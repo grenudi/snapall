@@ -44,6 +44,8 @@ pub struct Activity {
     pub pid: Option<u32>,
     /// How far it has come, while it runs.
     pub progress: Option<snapall_core::JournalProgress>,
+    /// How to get back from it, or that it cannot be undone.
+    pub way_back: Option<snapall_core::Rollback>,
 }
 
 impl Activity {
@@ -61,6 +63,7 @@ impl Activity {
             source: entry.source,
             pid: entry.pid,
             progress: entry.progress.clone(),
+            way_back: entry.rollback.clone(),
         }
     }
 }
@@ -269,6 +272,14 @@ fn entry_line(entry: &Activity, chosen: bool, several_days: bool) -> Line<'stati
 
 /// What the chosen entry says about itself, in words.
 fn detail_text(entry: &Activity) -> String {
+    let went = went_text(entry);
+    match (&entry.way_back, &entry.id) {
+        (Some(way_back), Some(id)) => format!("{went}\n{}", way_back.words(id).join("\n")),
+        _ => went,
+    }
+}
+
+fn went_text(entry: &Activity) -> String {
     match entry.status {
         JournalStatus::Done if entry.detail.is_empty() => "It went through.".to_owned(),
         JournalStatus::Done | JournalStatus::Interrupted => entry.detail.clone(),

@@ -77,6 +77,21 @@ pub enum Rollback {
     Advice(String),
 }
 
+impl Rollback {
+    /// What to tell a person about it, for the change called `id`: the state it returns to and how to do it,
+    /// or that it cannot be undone and what protects them next time. Two lines at most, no indentation: the
+    /// caller lays them out. The command line and the window both say it this way.
+    pub fn words(&self, id: &str) -> Vec<String> {
+        match self {
+            Rollback::Undo(undo) => vec![
+                format!("Way back: {}.", undo.what),
+                format!("To do it: snapall undo {id}"),
+            ],
+            Rollback::Advice(text) => vec![format!("It cannot be undone. {text}")],
+        }
+    }
+}
+
 /// One line of the journal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -435,6 +450,27 @@ mod tests {
         assert!(
             fold(&[way_back(advice)], |_| true).is_empty(),
             "a way back alone is not a change"
+        );
+    }
+
+    #[test]
+    fn a_way_back_is_worded_once_for_whoever_shows_it() {
+        let undo = Rollback::Undo(Undo {
+            what: "Put Home back to how it was".into(),
+            commands: vec![],
+            weight: crate::consequence::Weight::Changes,
+        });
+        assert_eq!(
+            undo.words("42-1-c"),
+            [
+                "Way back: Put Home back to how it was.",
+                "To do it: snapall undo 42-1-c"
+            ]
+        );
+        let advice = Rollback::Advice("Deleted snapshots are gone.".into());
+        assert_eq!(
+            advice.words("42-1-c"),
+            ["It cannot be undone. Deleted snapshots are gone."]
         );
     }
 }

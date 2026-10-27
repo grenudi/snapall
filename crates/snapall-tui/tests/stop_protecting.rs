@@ -130,7 +130,7 @@ fn the_question_says_what_goes_what_stays_and_that_it_cannot_be_undone() {
         "will no longer be protected. Its 2 snapshots will be deleted for good. The files in it are not touched.",
         "2 restore points include it and will no longer put it back.",
         "This cannot be undone. Protecting it again later starts fresh, with no snapshots.",
-        "To go ahead, type its name (home):",
+        "Type destroy home, then Enter, to go ahead:",
     ] {
         assert!(text.contains(must), "`{must}` missing at 80x24:\n{text}");
     }
@@ -142,41 +142,44 @@ fn the_question_says_what_goes_what_stays_and_that_it_cannot_be_undone() {
 }
 
 #[test]
-fn nothing_happens_until_the_name_is_typed_exactly() {
+fn nothing_happens_until_the_word_and_the_name_are_typed_exactly() {
     let (backend, system) = (machine(), system());
     let mut session = asking_about(&backend, &system, "home", admin());
     session.press(Key::Enter);
-    assert!(flat(&session).contains("Type its name exactly: home"));
-    type_text(&mut session, "hom");
-    session.press(Key::Enter);
-    assert!(
-        matches!(session.state.modal, Some(Modal::StopProtecting(_))),
-        "a part of the name is not the name"
-    );
-    type_text(&mut session, "eX");
-    session.press(Key::Enter);
-    assert!(
-        matches!(session.state.modal, Some(Modal::StopProtecting(_))),
-        "nor is the name and more"
-    );
-    assert_eq!(
-        protected(&backend),
-        ["data", "home", "root"],
-        "nothing was removed"
-    );
-    // a `y`, the answer that is enough elsewhere, is not the name
-    session.press(Key::Esc);
-    let mut again = asking_about(&backend, &system, "home", admin());
-    type_text(&mut again, "y");
-    again.press(Key::Enter);
-    assert_eq!(protected(&backend), ["data", "home", "root"]);
+    assert!(flat(&session).contains("Type destroy home, then Enter, to go ahead"));
+    // none of these is the answer, however close; each is typed into the same prompt after clearing it
+    for wrong in [
+        "home",
+        "destroy",
+        "destroy hom",
+        "destroy homeX",
+        "Destroy home",
+        "destroy  home",
+        "y",
+        "yes",
+    ] {
+        for _ in 0..40 {
+            session.press(Key::Backspace);
+        }
+        type_text(&mut session, wrong);
+        session.press(Key::Enter);
+        assert!(
+            matches!(session.state.modal, Some(Modal::StopProtecting(_))),
+            "{wrong:?} is not the answer"
+        );
+        assert_eq!(
+            protected(&backend),
+            ["data", "home", "root"],
+            "{wrong:?} removed nothing"
+        );
+    }
 }
 
 #[test]
 fn typing_the_name_stops_the_protection_deletes_its_snapshots_and_leaves_the_rest() {
     let (backend, system) = (machine(), system());
     let mut session = asking_about(&backend, &system, "home", admin());
-    type_text(&mut session, "home");
+    type_text(&mut session, "destroy home");
     session.press(Key::Enter);
     assert!(session.state.modal.is_none());
     assert_eq!(protected(&backend), ["data", "root"]);
@@ -231,7 +234,7 @@ fn the_system_area_is_refused_with_the_reason_and_nothing_is_removed() {
 fn without_administrator_rights_it_says_so_and_changes_nothing() {
     let (backend, system) = (machine(), system());
     let mut session = asking_about(&backend, &system, "home", UiContext::default());
-    type_text(&mut session, "home");
+    type_text(&mut session, "destroy home");
     session.press(Key::Enter);
     assert!(format!("{:?}", session.state.notice).contains("needs administrator rights"));
     assert!(
@@ -255,7 +258,7 @@ fn a_group_that_names_the_area_is_told_about_and_then_says_it_is_no_longer_prote
     assert!(flat(&session).contains(
         "The group theming names it, and will say it is no longer protected until you change it."
     ));
-    type_text(&mut session, "home");
+    type_text(&mut session, "destroy home");
     session.press(Key::Enter);
     session.press(Key::Char('g'));
     assert!(
@@ -269,7 +272,7 @@ fn a_group_that_names_the_area_is_told_about_and_then_says_it_is_no_longer_prote
 fn escape_leaves_everything_as_it_was_and_u_elsewhere_says_what_it_is_for() {
     let (backend, system) = (machine(), system());
     let mut session = asking_about(&backend, &system, "home", admin());
-    type_text(&mut session, "home");
+    type_text(&mut session, "destroy home");
     session.press(Key::Esc);
     assert!(session.state.modal.is_none());
     assert_eq!(protected(&backend), ["data", "home", "root"]);

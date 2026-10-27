@@ -4,29 +4,31 @@
 
 //! The two lines under the status bar: the explanation of whatever the mouse is over, and the keys as buttons.
 
+use crate::model::Key;
 use crate::view::*;
 
-/// The footer's buttons: the button, the key it stands for, its label, and which of the two rows it is on.
+/// The footer's buttons: the button, its label, and which of the two rows it is on. The letter shown on a
+/// button is the key the button stands for ([`Button::key`]), never typed a second time here.
 /// The first row is for doing things, the second for finding your way and leaving.
-pub(crate) const ACTIONS: [(Button, &str, &str, u16); 10] = [
-    (Button::Create, "c", "create", 0),
-    (Button::CreateAll, "a", "all", 0),
-    (Button::Delete, "d", "delete", 0),
-    (Button::Restore, "u", "restore", 0),
-    (Button::Groups, "g", "groups", 0),
-    (Button::Points, "R", "points", 1),
-    (Button::Reload, "r", "reload", 1),
-    (Button::Protect, "p", "protect", 1),
-    (Button::Help, "?", "help", 1),
-    (Button::Quit, "q", "quit", 1),
+pub(crate) const ACTIONS: [(Button, &str, u16); 10] = [
+    (Button::Create, "create", 0),
+    (Button::CreateAll, "all", 0),
+    (Button::Delete, "delete", 0),
+    (Button::Restore, "restore", 0),
+    (Button::Groups, "groups", 0),
+    (Button::Points, "points", 1),
+    (Button::Reload, "reload", 1),
+    (Button::Protect, "protect", 1),
+    (Button::Help, "help", 1),
+    (Button::Quit, "quit", 1),
 ];
 
 /// The footer of the screen that is open on one file.
-pub(crate) const FILE_ACTIONS: [(Button, &str, &str, u16); 4] = [
-    (Button::Restore, "u", "restore this version", 0),
-    (Button::Reload, "r", "reload", 0),
-    (Button::Help, "?", "help", 0),
-    (Button::Quit, "q", "quit", 0),
+pub(crate) const FILE_ACTIONS: [(Button, &str, u16); 4] = [
+    (Button::Restore, "restore this version", 0),
+    (Button::Reload, "reload", 0),
+    (Button::Help, "help", 0),
+    (Button::Quit, "quit", 0),
 ];
 
 /// Whether a button does anything where the person is: taking, deleting and restoring act on the snapshot
@@ -40,20 +42,30 @@ pub(crate) fn is_disabled(state: &State, button: Button) -> bool {
 
 /// The cells a button takes: a space, the key, a space, the label and a space. The key is the chip, so the
 /// text still reads `c create`.
-fn width_of(key: &str, label: &str) -> u16 {
-    u16::try_from(key.chars().count() + label.chars().count() + 3).unwrap_or(u16::MAX)
+fn width_of(label: &str) -> u16 {
+    // a space, the one-letter key, a space, the label and a space
+    u16::try_from(label.chars().count() + 4).unwrap_or(u16::MAX)
+}
+
+/// The letter on a button: the key it stands for.
+fn key_letter(button: Button) -> char {
+    match button.key() {
+        Key::Char(letter) => letter,
+        // every footer button is a letter or a symbol; anything else would have no letter to show
+        _ => '?',
+    }
 }
 
 /// Each footer button and the cells it covers.
 pub(crate) fn footer_buttons(
     keys: Rect,
     file_mode: bool,
-) -> Vec<(Rect, Button, &'static str, &'static str)> {
-    let actions: &[(Button, &str, &str, u16)] = if file_mode { &FILE_ACTIONS } else { &ACTIONS };
+) -> Vec<(Rect, Button, char, &'static str)> {
+    let actions: &[(Button, &str, u16)] = if file_mode { &FILE_ACTIONS } else { &ACTIONS };
     let mut next_x = [keys.x.saturating_add(1); 2];
     let mut out = Vec::new();
-    for &(button, key, label, row) in actions {
-        let width = width_of(key, label);
+    for &(button, label, row) in actions {
+        let width = width_of(label);
         let slot = usize::from(row.min(1));
         if row >= keys.height
             || next_x[slot].saturating_add(width) > keys.x.saturating_add(keys.width)
@@ -68,7 +80,7 @@ pub(crate) fn footer_buttons(
                 height: 1,
             },
             button,
-            key,
+            key_letter(button),
             label,
         ));
         next_x[slot] = next_x[slot].saturating_add(width).saturating_add(1);
@@ -88,6 +100,9 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
             "Put the files back (how they are now is saved first, so this can be undone)"
         }
         (Some(Modal::Help { .. }), Button::Confirm) => "Show the other page",
+        (Some(Modal::Confirm(_)), Button::Confirm) => {
+            "Do it: only once what is asked above has been typed"
+        }
         (Some(Modal::Protect { .. }), Button::Confirm) => {
             "Set this part of the disk up for snapshots (nothing is copied or moved)"
         }

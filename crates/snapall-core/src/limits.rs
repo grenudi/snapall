@@ -41,6 +41,16 @@ impl Limits {
         })
     }
 
+    /// The settings in words: what they keep, and the age under which nothing goes.
+    pub fn describe(&self) -> String {
+        format!(
+            "keeps the newest {}, never removes one younger than {} minutes, cleanup {}",
+            self.keep,
+            self.min_age_seconds / 60,
+            if self.cleanup { "on" } else { "off" }
+        )
+    }
+
     /// Why these cannot be set, in a sentence, if they cannot.
     pub fn problem(&self) -> Option<String> {
         if self.keep == 0 {

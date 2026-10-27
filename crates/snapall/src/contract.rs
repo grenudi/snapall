@@ -10,91 +10,169 @@
 
 use argenv_resolve::*;
 
-/// Every subcommand. Inputs scoped to one are checked by the compiler: a typo or a removed
-/// variant fails the build instead of silently doing nothing.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Command {
-    Create,
-    List,
-    Snapshots,
-    Delete,
-    Changes,
-    Restore,
-    /// Spelled with a hyphen on the command line, so it is in the contract as well.
-    #[serde(rename = "restore-all")]
-    RestoreAll,
-    Points,
-    History,
-    Health,
-    Activity,
-    Groups,
-    Limits,
-    Unprotect,
-    Undo,
-    Cancel,
-    Quotas,
-    Setup,
-    Doctor,
-    Completions,
-    Man,
-    Tui,
-    Contract,
+/// What the contract needs to know about a command beyond its name: its words, and which of the shared flags
+/// it takes. Declared with the command, once, in the `commands!` macro below; every list of commands below (those that take
+/// `--json`, that log, that take `--dry-run`, `--yes` or `--destroy`) is *derived* from it, so a command cannot
+/// be taken by a flag in one place and forgotten in another.
+#[derive(Clone, Copy)]
+pub struct Spec {
+    /// How it is typed.
+    pub token: &'static str,
+    /// One line for the command list in `--help`.
+    pub summary: &'static str,
+    /// Takes `--json`.
+    pub json: bool,
+    /// Writes to the log (`--log`, `--log-file`).
+    pub logged: bool,
+    /// Takes `--dry-run`: it can say what it would do without doing it.
+    pub dry_run: bool,
+    /// Takes `--yes`: it asks before a change that can be put back, and a script can answer.
+    pub yes: bool,
+    /// Takes `--destroy`: it asks before a loss for good, and a script can answer. `--yes` cannot.
+    pub destroy: bool,
+}
+
+impl Spec {
+    const fn new(token: &'static str, summary: &'static str) -> Spec {
+        Spec {
+            token,
+            summary,
+            json: false,
+            logged: false,
+            dry_run: false,
+            yes: false,
+            destroy: false,
+        }
+    }
+    const fn json(mut self) -> Spec {
+        self.json = true;
+        self
+    }
+    const fn logged(mut self) -> Spec {
+        self.logged = true;
+        self
+    }
+    const fn dry_run(mut self) -> Spec {
+        self.dry_run = true;
+        self
+    }
+    const fn yes(mut self) -> Spec {
+        self.yes = true;
+        self
+    }
+    const fn destroy(mut self) -> Spec {
+        self.destroy = true;
+        self
+    }
+}
+
+/// Declare every subcommand, once. The enum, the list of all of them and the exhaustive `match` that gives
+/// each its [`Spec`] come from the same lines, so adding a command is one declaration, and one without its
+/// words does not compile.
+macro_rules! commands {
+    ($($name:ident => $spec:expr,)+) => {
+        /// Every subcommand. Inputs scoped to one are checked by the compiler: a typo or a removed
+        /// variant fails the build instead of silently doing nothing.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub enum Command {
+            $($name,)+
+        }
+
+        impl Command {
+            pub const ALL: &'static [Command] = &[$(Command::$name,)+];
+
+            pub const fn spec(self) -> Spec {
+                match self {
+                    $(Command::$name => $spec,)+
+                }
+            }
+        }
+    };
+}
+
+commands! {
+    Create => Spec::new("create", "Take one snapshot of every protected area (the default command)")
+            .json()
+            .logged()
+            .dry_run(),
+    List => Spec::new("list", "List the protected areas snapall can see")
+            .json()
+            .logged(),
+    Snapshots => Spec::new("snapshots", "List the snapshots of one protected area, or of all of them")
+            .json()
+            .logged(),
+    Delete => Spec::new("delete", "Delete one snapshot of a protected area")
+            .json()
+            .logged()
+            .destroy(),
+    Changes => Spec::new("changes", "Show what restoring a snapshot would change")
+            .json()
+            .logged(),
+    Restore => Spec::new("restore", "Put a protected area, or one path of it, back to how a snapshot had it")
+            .json()
+            .logged()
+            .dry_run()
+            .yes(),
+    RestoreAll => Spec::new("restore-all", "Put every protected area back to one restore point, in one action")
+            .json()
+            .logged()
+            .dry_run()
+            .yes(),
+    Points => Spec::new("points", "List the restore points: the snapshots one action took together")
+            .json()
+            .logged(),
+    History => Spec::new("history", "Show how one file stood in each snapshot")
+            .json()
+            .logged(),
+    Health => Spec::new("health", "Show whether protection is working, and how much room it takes")
+            .json()
+            .logged(),
+    Activity => Spec::new("activity", "Show what snapall has done, including earlier sessions, newest first")
+            .json(),
+    Groups => Spec::new("groups", "Name sets of areas, such as theming, to take snapshots of together")
+            .json()
+            .yes(),
+    Limits => Spec::new("limits", "Show or change how many snapshots an area keeps")
+            .json()
+            .logged()
+            .yes()
+            .destroy(),
+    Unprotect => Spec::new("unprotect", "Stop protecting an area: deletes all its snapshots for good")
+            .json()
+            .logged()
+            .dry_run()
+            .destroy(),
+    Undo => Spec::new("undo", "Roll a change back, to the state it recorded, after showing what that is")
+            .json()
+            .logged()
+            .yes()
+            .destroy(),
+    Cancel => Spec::new("cancel", "Ask a running change to stop after the area it is on")
+            .json()
+            .yes(),
+    Quotas => Spec::new("quotas", "Show how the disk counts the room snapshots take, and switch it on or off")
+            .json()
+            .logged()
+            .yes(),
+    Setup => Spec::new("setup", "Protect what has no snapshots yet, explaining each step")
+            .json()
+            .logged()
+            .dry_run()
+            .yes(),
+    Doctor => Spec::new("doctor", "Check that snapper works, and install it if it is missing")
+            .json()
+            .logged()
+            .yes(),
+    Completions => Spec::new("completions", "Print shell completions (bash, zsh, fish, nushell)"),
+    Man => Spec::new("man", "Print the manual page"),
+    Tui => Spec::new("tui", "Open the interactive terminal UI")
+            .logged(),
+    Contract => Spec::new("contract", "Print this program's invocation contract as argenv JSON"),
 }
 
 impl Command {
-    pub const ALL: &'static [Command] = &[
-        Command::Create,
-        Command::List,
-        Command::Snapshots,
-        Command::Delete,
-        Command::Changes,
-        Command::Restore,
-        Command::RestoreAll,
-        Command::Points,
-        Command::History,
-        Command::Health,
-        Command::Activity,
-        Command::Groups,
-        Command::Limits,
-        Command::Unprotect,
-        Command::Undo,
-        Command::Cancel,
-        Command::Quotas,
-        Command::Setup,
-        Command::Doctor,
-        Command::Completions,
-        Command::Man,
-        Command::Tui,
-        Command::Contract,
-    ];
-
     pub const fn token(self) -> &'static str {
-        match self {
-            Command::Create => "create",
-            Command::List => "list",
-            Command::Snapshots => "snapshots",
-            Command::Delete => "delete",
-            Command::Changes => "changes",
-            Command::Restore => "restore",
-            Command::RestoreAll => "restore-all",
-            Command::Points => "points",
-            Command::History => "history",
-            Command::Setup => "setup",
-            Command::Health => "health",
-            Command::Quotas => "quotas",
-            Command::Activity => "activity",
-            Command::Cancel => "cancel",
-            Command::Groups => "groups",
-            Command::Limits => "limits",
-            Command::Unprotect => "unprotect",
-            Command::Undo => "undo",
-            Command::Doctor => "doctor",
-            Command::Completions => "completions",
-            Command::Man => "man",
-            Command::Tui => "tui",
-            Command::Contract => "contract",
-        }
+        self.spec().token
     }
 
     pub fn from_token(token: &str) -> Option<Command> {
@@ -103,43 +181,67 @@ impl Command {
 
     /// One line for the command list in `--help`.
     pub const fn summary(self) -> &'static str {
-        match self {
-            Command::Create => "Take one snapshot of every protected area (the default command)",
-            Command::List => "List the protected areas snapall can see",
-            Command::Snapshots => "List the snapshots of one protected area, or of all of them",
-            Command::Delete => "Delete one snapshot of a protected area",
-            Command::Changes => "Show what restoring a snapshot would change",
-            Command::Restore => {
-                "Put a protected area, or one path of it, back to how a snapshot had it"
-            }
-            Command::History => "Show how one file stood in each snapshot",
-            Command::RestoreAll => {
-                "Put every protected area back to one restore point, in one action"
-            }
-            Command::Points => "List the restore points: the snapshots one action took together",
-            Command::Setup => "Protect what has no snapshots yet, explaining each step",
-            Command::Health => "Show whether protection is working, and how much room it takes",
-            Command::Quotas => {
-                "Show how the disk counts the room snapshots take, and switch it on or off"
-            }
-            Command::Activity => {
-                "Show what snapall has done, including earlier sessions, newest first"
-            }
-            Command::Cancel => "Ask a running change to stop after the area it is on",
-            Command::Limits => "Show or change how many snapshots an area keeps",
-            Command::Unprotect => "Stop protecting an area: deletes all its snapshots for good",
-            Command::Undo => {
-                "Roll a change back, to the state it recorded, after showing what that is"
-            }
-            Command::Groups => "Name sets of areas, such as theming, to take snapshots of together",
-            Command::Doctor => "Check that snapper works, and install it if it is missing",
-            Command::Completions => "Print shell completions (bash, zsh, fish, nushell)",
-            Command::Man => "Print the manual page",
-            Command::Tui => "Open the interactive terminal UI",
-            Command::Contract => "Print this program's invocation contract as argenv JSON",
-        }
+        self.spec().summary
     }
 }
+
+/// It is spelled as it is typed (`restore-all`), which is how the contract names it.
+impl serde::Serialize for Command {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.token())
+    }
+}
+
+/// Which shared flag a list of commands is about.
+#[derive(Clone, Copy)]
+enum Scope {
+    Json,
+    Logged,
+    DryRun,
+    Yes,
+    Destroy,
+}
+
+const fn takes(command: Command, scope: Scope) -> bool {
+    let spec = command.spec();
+    match scope {
+        Scope::Json => spec.json,
+        Scope::Logged => spec.logged,
+        Scope::DryRun => spec.dry_run,
+        Scope::Yes => spec.yes,
+        Scope::Destroy => spec.destroy,
+    }
+}
+
+const fn how_many(scope: Scope) -> usize {
+    let (mut found, mut at) = (0, 0);
+    while at < Command::ALL.len() {
+        if takes(Command::ALL[at], scope) {
+            found += 1;
+        }
+        at += 1;
+    }
+    found
+}
+
+const fn commands_that<const N: usize>(scope: Scope) -> [Command; N] {
+    let mut out = [Command::Create; N];
+    let (mut filled, mut at) = (0, 0);
+    while at < Command::ALL.len() {
+        if takes(Command::ALL[at], scope) {
+            out[filled] = Command::ALL[at];
+            filled += 1;
+        }
+        at += 1;
+    }
+    out
+}
+
+const JSON_COMMANDS: [Command; how_many(Scope::Json)] = commands_that(Scope::Json);
+const LOGGED_COMMANDS: [Command; how_many(Scope::Logged)] = commands_that(Scope::Logged);
+const DRY_RUN_COMMANDS: [Command; how_many(Scope::DryRun)] = commands_that(Scope::DryRun);
+const YES_COMMANDS: [Command; how_many(Scope::Yes)] = commands_that(Scope::Yes);
+const DESTROY_COMMANDS: [Command; how_many(Scope::Destroy)] = commands_that(Scope::Destroy);
 
 /// How events are written. `Off` is the default: a command-line tool is quiet unless asked.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
@@ -174,27 +276,6 @@ impl FromRaw for LogFormat {
         })
     }
 }
-
-/// The commands that do something observable (everything but `contract`).
-const OBSERVED: &[Command] = &[
-    Command::Create,
-    Command::List,
-    Command::Snapshots,
-    Command::Delete,
-    Command::Changes,
-    Command::Restore,
-    Command::RestoreAll,
-    Command::Points,
-    Command::History,
-    Command::Doctor,
-    Command::Tui,
-    Command::Setup,
-    Command::Health,
-    Command::Quotas,
-    Command::Limits,
-    Command::Unprotect,
-    Command::Undo,
-];
 
 contract! {
     // ---- general ---------------------------------------------------------------------
@@ -254,7 +335,7 @@ contract! {
         ty:          Type::Enum,
         default:     Some(LogFormat::Off),
         allowed:     LogFormat::TOKENS,
-        subcommands: OBSERVED,
+        subcommands: &LOGGED_COMMANDS,
         env:         Some(Env::new("SNAPALL_LOG")),
         arg:         Some(Arg { value_name: "FORMAT", ..Arg::long("log") }),
         group:       "logging",
@@ -267,7 +348,7 @@ contract! {
     LOG_FILE: std::path::PathBuf, Command = Input {
         key:         "log_file",
         ty:          Type::Path,
-        subcommands: OBSERVED,
+        subcommands: &LOGGED_COMMANDS,
         env:         Some(Env::new("SNAPALL_LOG_FILE")),
         arg:         Some(Arg { value_name: "PATH", ..Arg::long("log-file") }),
         group:       "logging",
@@ -311,7 +392,7 @@ contract! {
         key:         "destroy",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Delete, Command::Limits, Command::Unprotect, Command::Undo],
+        subcommands: &DESTROY_COMMANDS,
         arg:         Some(Arg::long("destroy")),
         group:       "destroy",
         summary:     "Go ahead without asking, where it deletes snapshots for good. `--yes` is for changes that can be put back and is not enough for this.",
@@ -322,7 +403,7 @@ contract! {
         key:         "dry_run",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Create, Command::Restore, Command::RestoreAll, Command::Setup, Command::Unprotect],
+        subcommands: &DRY_RUN_COMMANDS,
         arg:         Some(Arg::long("dry-run")),
         group:       "create",
         summary:     "Show what would happen without changing anything.",
@@ -336,27 +417,7 @@ contract! {
         key:         "json",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[
-            Command::Create,
-            Command::List,
-            Command::Snapshots,
-            Command::Delete,
-            Command::Changes,
-            Command::Restore,
-            Command::RestoreAll,
-            Command::Points,
-            Command::History,
-            Command::Setup,
-            Command::Health,
-            Command::Activity,
-            Command::Groups,
-            Command::Limits,
-            Command::Unprotect,
-            Command::Undo,
-            Command::Cancel,
-            Command::Quotas,
-            Command::Doctor,
-        ],
+        subcommands: &JSON_COMMANDS,
         env:         Some(Env::new("SNAPALL_JSON")),
         arg:         Some(Arg::long("json")),
         group:       "output",
@@ -653,7 +714,7 @@ contract! {
         key:         "yes",
         ty:          Type::Bool,
         default:     Some(false),
-        subcommands: &[Command::Doctor, Command::Restore, Command::RestoreAll, Command::Setup, Command::Quotas, Command::Limits, Command::Groups, Command::Cancel, Command::Undo],
+        subcommands: &YES_COMMANDS,
         arg:         Some(Arg::pair("yes", 'y')),
         group:       "doctor",
         summary:     "Answer yes where snapall asks before a change that can be put back (for scripts and CI). It does not answer for deleting snapshots: that needs --destroy. With doctor, only with --install.",
@@ -686,4 +747,143 @@ contract! {
         summary:     "Seconds since the Unix epoch to use as the man page date, so that builds are reproducible (the SOURCE_DATE_EPOCH convention). Default: now.",
         ..Input::EMPTY
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snapall_core::{Act, Weight};
+
+    /// The command that carries out each act. Exhaustive, so a new act does not compile until it is placed.
+    fn carried_out_by(act: Act) -> Option<&'static str> {
+        match act {
+            Act::Read | Act::TakeSnapshot => None,
+            Act::DeleteSnapshots => Some("delete"),
+            Act::Restore => Some("restore"),
+            Act::RestorePoint => Some("restore-all"),
+            Act::Protect => Some("setup"),
+            Act::StopProtecting => Some("unprotect"),
+            Act::ChangeLimits { .. } => Some("limits"),
+            Act::RoomCounting => Some("quotas"),
+            Act::ChangeGroups => Some("groups"),
+            // stopping a running change is `cancel`; the window's job controls have no command at all
+            Act::StopChange => Some("cancel"),
+            Act::ControlJob => None,
+            Act::InstallSnapper => Some("doctor"),
+            Act::Undo { .. } => Some("undo"),
+        }
+    }
+
+    const EVERY_ACT: [Act; 16] = [
+        Act::Read,
+        Act::TakeSnapshot,
+        Act::DeleteSnapshots,
+        Act::Restore,
+        Act::RestorePoint,
+        Act::Protect,
+        Act::StopProtecting,
+        Act::ChangeLimits { removes: true },
+        Act::ChangeLimits { removes: false },
+        Act::RoomCounting,
+        Act::ChangeGroups,
+        Act::ControlJob,
+        Act::StopChange,
+        Act::InstallSnapper,
+        // it weighs what the change it rolls back weighs: so it takes both flags
+        Act::Undo {
+            doing: Weight::Changes,
+        },
+        Act::Undo {
+            doing: Weight::Destroys,
+        },
+    ];
+
+    #[test]
+    fn a_command_takes_the_flag_that_answers_what_it_does_and_no_flag_that_does_not() {
+        for act in EVERY_ACT {
+            let Some(token) = carried_out_by(act) else {
+                continue;
+            };
+            let spec = Command::from_token(token)
+                .expect("a command that exists")
+                .spec();
+            match act.weight() {
+                Weight::Destroys => assert!(
+                    spec.destroy,
+                    "`{token}` does {act:?}, which loses something for good: it needs --destroy"
+                ),
+                Weight::Changes => {
+                    assert!(spec.yes, "`{token}` does {act:?}, a change: it needs --yes")
+                }
+                Weight::Light => {}
+            }
+        }
+        // and the other way: --destroy is only on a command that can destroy, and a command that can only
+        // destroy has no --yes, which could not answer for it
+        for command in Command::ALL {
+            let spec = command.spec();
+            let weights: Vec<Weight> = EVERY_ACT
+                .iter()
+                .filter(|act| carried_out_by(**act) == Some(spec.token))
+                .map(|act| act.weight())
+                .collect();
+            assert!(
+                !spec.destroy || weights.contains(&Weight::Destroys),
+                "`{}` takes --destroy but destroys nothing",
+                spec.token
+            );
+            assert!(
+                !spec.yes || weights.contains(&Weight::Changes),
+                "`{}` takes --yes but changes nothing it asks about",
+                spec.token
+            );
+            let only_destroys =
+                !weights.is_empty() && weights.iter().all(|w| *w == Weight::Destroys);
+            assert!(
+                !(only_destroys && spec.yes),
+                "`{}` only destroys, so --yes must not be accepted",
+                spec.token
+            );
+        }
+    }
+
+    #[test]
+    fn every_command_has_its_own_words_and_the_derived_lists_say_what_the_declarations_say() {
+        let mut seen = std::collections::BTreeSet::new();
+        for command in Command::ALL {
+            let spec = command.spec();
+            assert!(
+                seen.insert(spec.token),
+                "`{}` is declared twice",
+                spec.token
+            );
+            assert!(
+                !spec.summary.is_empty()
+                    && spec.summary.chars().next().is_some_and(char::is_uppercase),
+                "{}: a summary is a sentence",
+                spec.token
+            );
+            assert_eq!(Command::from_token(spec.token), Some(*command));
+            assert_eq!(JSON_COMMANDS.contains(command), spec.json, "{}", spec.token);
+            assert_eq!(
+                LOGGED_COMMANDS.contains(command),
+                spec.logged,
+                "{}",
+                spec.token
+            );
+            assert_eq!(YES_COMMANDS.contains(command), spec.yes, "{}", spec.token);
+            assert_eq!(
+                DESTROY_COMMANDS.contains(command),
+                spec.destroy,
+                "{}",
+                spec.token
+            );
+            assert_eq!(
+                DRY_RUN_COMMANDS.contains(command),
+                spec.dry_run,
+                "{}",
+                spec.token
+            );
+        }
+    }
 }

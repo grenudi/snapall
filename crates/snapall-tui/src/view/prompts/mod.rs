@@ -4,6 +4,7 @@
 
 //! The prompts: their shared frame, then one module per prompt that says what it shows.
 
+mod confirm;
 mod delete;
 mod describe;
 mod frame;
@@ -18,6 +19,7 @@ mod restore;
 mod stop;
 mod unprotect;
 
+pub(crate) use confirm::*;
 pub(crate) use delete::*;
 pub(crate) use describe::*;
 pub(crate) use frame::*;

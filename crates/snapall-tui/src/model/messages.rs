@@ -58,10 +58,14 @@ pub enum Effect {
     SetLimits {
         config: ConfigName,
         options: Vec<snapall_core::ConfigOption>,
+        /// What it kept before, so that the way back is known.
+        before: snapall_core::Limits,
     },
     /// Keep these groups (it replaces the file).
     SaveGroups {
         groups: snapall_core::Groups,
+        /// The groups as they were, so that the way back is known.
+        before: snapall_core::Groups,
     },
     /// Ask a change that is running to stop after the area it is on.
     StopChange {
@@ -242,6 +246,8 @@ pub struct Finished {
     pub outcome: Result<String, String>,
     pub took: Duration,
     pub at: Option<String>,
+    /// How to get back from it, recorded in the journal at the same moment.
+    pub way_back: Option<snapall_core::Rollback>,
     pub msg: Msg,
 }
 

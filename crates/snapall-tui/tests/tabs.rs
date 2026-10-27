@@ -213,6 +213,7 @@ fn enter_on_the_cleanup_row_switches_it_on_and_the_whole_window_follows() {
     session.dispatch(Msg::Click(Click::Chip(Topic::Cleanup)));
     let _ = col;
     session.press(Key::Enter);
+    session.confirm();
 
     assert_eq!(system.jobs_switched_on(), ["snapper-cleanup.timer"]);
     let bar = row(&screen(&session), 20);
@@ -246,6 +247,7 @@ fn without_administrator_rights_it_says_so_in_plain_words_and_changes_nothing() 
     let mut session = Session::with_system(&backend, &refusing, as_administrator());
     session.dispatch(Msg::Click(Click::Chip(Topic::Cleanup)));
     session.press(Key::Enter);
+    session.confirm();
     assert!(format!("{:?}", session.state.notice)
         .contains("Could not switch automatic cleanup on: Access denied"));
     assert!(

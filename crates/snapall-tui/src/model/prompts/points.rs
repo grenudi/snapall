@@ -5,6 +5,7 @@
 //! Restore points: the list of them, the preview of the chosen one, and putting one back.
 
 use crate::model::*;
+use snapall_core::Act;
 
 impl State {
     /// The restore point the points screen has the cursor on.
@@ -70,12 +71,21 @@ pub(crate) fn browsing_points(state: &mut State, key: Key, index: usize) -> Reac
                 (Some(point), Some(preview))
                     if preview.point.point == point.point && preview.areas_to_change() > 0 =>
                 {
-                    state.notice = Some(Notice::Info(format!(
-                        "putting {} area(s) back to {}",
-                        preview.areas_to_change(),
-                        point.point
-                    )));
-                    Reaction::closes_and_starts(vec![Effect::RestorePoint { point }])
+                    let lines = vec![
+                        format!(
+                            "Put {} area(s) back to restore point {}.",
+                            preview.areas_to_change(),
+                            point.point
+                        ),
+                        "Each area's current state is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
+                    ];
+                    ask_first(
+                        Act::RestorePoint,
+                        None,
+                        "Put every area back",
+                        lines,
+                        vec![Effect::RestorePoint { point }],
+                    )
                 }
                 _ => Reaction::stays(Modal::Points { index }),
             }

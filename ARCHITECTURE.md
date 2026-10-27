@@ -51,7 +51,8 @@ model/            what the window does (pure: no terminal, no clock, no I/O)
    messages.rs      what it asks the shell to do, and what the shell reports back
    keys.rs          what each key and click means
    lists.rs file.rs the arrival of the lists; the file-history screen
-   prompts/         one module per prompt: describe, delete, restore, points, protect, help
+   prompts/         one module per prompt: describe, delete, restore, points, protect, help, limits, groups,
+                    unprotect, and confirm: the one question every change goes through
 tabs/             the Health and Activity tabs: each owns its state, keys and drawing
 status_bar.rs     the line under every view
 view/             drawing only: the frame, the tab bar, the lists, the footer, where a click lands,

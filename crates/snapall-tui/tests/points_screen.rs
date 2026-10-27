@@ -133,6 +133,7 @@ fn enter_puts_every_area_back_leaves_the_system_and_names_the_way_back() {
     let mut session = Session::new(&backend);
     session.press(Key::Char('R'));
     session.press(Key::Enter);
+    session.confirm();
     assert!(session.state.modal.is_none());
     assert_eq!(
         backend.read_file("docs", "/mnt/docs/a.txt").as_deref(),
@@ -171,6 +172,7 @@ fn choosing_an_older_point_looks_up_and_restores_that_one_not_the_newest() {
         "the preview is for the point chosen:\n{text}"
     );
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(
         backend.read_file("docs", "/mnt/docs/a.txt").as_deref(),
         Some("docs, first")

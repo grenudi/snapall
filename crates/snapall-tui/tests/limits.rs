@@ -126,8 +126,23 @@ fn the_editor_shows_what_the_area_keeps_now_and_what_that_would_do() {
     );
 }
 
+/// Type `text` and press Enter, as a person answers a question.
+fn answer(session: &mut Session<'_>, text: &str) {
+    for letter in text.chars() {
+        session.press(Key::Char(letter));
+    }
+    session.press(Key::Enter);
+}
+
+/// Take back what was typed in the question.
+fn clear(session: &mut Session<'_>) {
+    for _ in 0..40 {
+        session.press(Key::Backspace);
+    }
+}
+
 #[test]
-fn lowering_it_shows_what_would_go_and_applying_needs_a_second_enter() {
+fn lowering_it_shows_what_would_go_and_applying_needs_the_word_destroy() {
     let (backend, system) = (machine(), system());
     let mut session = editing(&backend, &system, admin());
     for _ in 0..45 {
@@ -141,59 +156,101 @@ fn lowering_it_shows_what_would_go_and_applying_needs_a_second_enter() {
         ),
         "{text}"
     );
-    assert!(text.contains("cannot be brought back"), "{text}");
 
     session.press(Key::Enter);
     assert!(
-        matches!(session.state.modal, Some(Modal::Limits(_))),
-        "the first Enter only asks"
+        matches!(session.state.modal, Some(Modal::Confirm(_))),
+        "Enter only asks"
+    );
+    let asked = flat(&session);
+    assert!(
+        asked.contains("Type destroy, then Enter, to go ahead"),
+        "{asked}"
     );
     assert!(
-        flat(&session).contains("Press Enter again to apply this"),
-        "{}",
-        flat(&session)
+        asked.contains("cannot be brought back"),
+        "the cost is said where it is answered: {asked}"
     );
     assert_eq!(keep(&backend), Some(50), "nothing was changed yet");
 
-    session.press(Key::Enter);
+    // what is enough elsewhere is not enough here
+    for wrong in ["", "y", "yes", "Destroy", "destroy it"] {
+        clear(&mut session);
+        answer(&mut session, wrong);
+        assert!(
+            matches!(session.state.modal, Some(Modal::Confirm(_))),
+            "{wrong:?} is not the answer"
+        );
+        assert_eq!(keep(&backend), Some(50), "{wrong:?} changed nothing");
+    }
+    clear(&mut session);
+    answer(&mut session, "destroy");
     assert!(session.state.modal.is_none());
     assert_eq!(keep(&backend), Some(5), "snapper now keeps five");
     assert!(format!("{:?}", session.state.notice).contains("takes effect at the next cleanup"));
+    let events = system.events();
     assert!(
-        system
-            .events()
+        events
             .iter()
             .any(|e| format!("{e:?}").contains("Changed how many snapshots home keeps")),
         "it is in the record"
     );
+    assert!(
+        events
+            .iter()
+            .any(|e| format!("{e:?}").contains("Set home back to: keeps the newest 50")),
+        "and so is exactly what it was before, to go back to: {events:?}"
+    );
 }
 
 #[test]
-fn changing_the_numbers_after_the_question_asks_again_because_the_answer_was_for_other_numbers() {
+fn cancelling_the_question_goes_back_to_the_editor_with_the_numbers_as_they_were_typed() {
     let (backend, system) = (machine(), system());
     let mut session = editing(&backend, &system, admin());
     for _ in 0..45 {
         session.press(Key::Left);
     }
     session.press(Key::Enter); // asked
+    session.press(Key::Esc);
+    assert!(
+        matches!(session.state.modal, Some(Modal::Limits(_))),
+        "back where it was"
+    );
+    assert!(
+        flat(&session).contains("[ 5 ]"),
+        "with the numbers as typed"
+    );
     session.press(Key::Left); // 5 -> 4: more would go
     session.press(Key::Enter);
     assert!(
-        matches!(session.state.modal, Some(Modal::Limits(_))),
-        "it asks again"
+        matches!(session.state.modal, Some(Modal::Confirm(_))),
+        "it asks again, for these numbers"
     );
     assert_eq!(keep(&backend), Some(50));
 }
 
 #[test]
-fn a_change_that_removes_nothing_is_applied_at_once() {
+fn a_change_that_removes_nothing_asks_for_yes_and_not_for_destroy() {
     let (backend, system) = (machine(), system());
     let mut session = editing(&backend, &system, admin());
     for _ in 0..10 {
         session.press(Key::Left); // 50 -> 40: still far above the eight there are
     }
     session.press(Key::Enter);
-    assert!(session.state.modal.is_none(), "nothing to be careful about");
+    let asked = flat(&session);
+    assert!(
+        asked.contains("Type y or yes, then Enter, to go ahead"),
+        "a change, not a loss: {asked}"
+    );
+    assert!(!asked.contains("destroy"), "{asked}");
+    session.press(Key::Enter);
+    assert!(
+        matches!(session.state.modal, Some(Modal::Confirm(_))),
+        "Enter alone is not a yes"
+    );
+    assert_eq!(keep(&backend), Some(50));
+    answer(&mut session, "yes");
+    assert!(session.state.modal.is_none(), "answered");
     assert_eq!(keep(&backend), Some(40));
 }
 
@@ -215,6 +272,7 @@ fn the_age_under_which_nothing_goes_and_whether_cleanup_runs_are_set_the_same_wa
         "{text}"
     );
     session.press(Key::Enter);
+    session.confirm();
     let after = backend.retention(&home()).unwrap();
     assert_eq!(
         (after.min_age_seconds, after.cleanup, after.keep),

@@ -5,18 +5,29 @@
 //! Deleting snapshots: asking first, and what comes of it.
 
 use crate::model::*;
+use snapall_core::Act;
 
 /// Deleting cannot be undone, so it asks: `y` or Enter confirms, `n` or Esc cancels.
 pub(crate) fn confirming_delete(
-    state: &mut State,
+    _state: &mut State,
     key: Key,
     config: ConfigName,
     ids: Vec<SnapshotId>,
 ) -> Reaction {
     match key {
         Key::Char('y' | 'Y') | Key::Enter => {
-            state.notice = Some(Notice::Info(format!("deleting {} snapshot(s)", ids.len())));
-            Reaction::closes_and_starts(vec![Effect::Delete { config, ids }])
+            let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
+            let lines = vec![
+                format!("Delete {} snapshot(s) of {config} for good: {}.", ids.len(), list.join(", ")),
+                "Only these saved moments go: the files are not touched. A deleted snapshot cannot be brought back.".to_owned(),
+            ];
+            ask_first(
+                Act::DeleteSnapshots,
+                None,
+                "Delete for good",
+                lines,
+                vec![Effect::Delete { config, ids }],
+            )
         }
         Key::Char('n' | 'N') | Key::Esc | Key::CtrlC => Reaction::closes(),
         _ => Reaction::stays(Modal::ConfirmDelete { config, ids }),

@@ -138,7 +138,9 @@ fn the_keys_do_what_they_say_and_the_report_follows() {
     let mut session = Session::with_system(&backend, &machine, admin());
     choose(&mut session, the_cleanup_job);
     session.press(Key::Enter);
+    session.confirm();
     session.press(Key::Char('e'));
+    session.confirm();
     assert!(session.state.modal.is_none(), "it closed");
     assert_eq!(
         machine.job_actions(),
@@ -153,6 +155,7 @@ fn the_keys_do_what_they_say_and_the_report_follows() {
     choose(&mut session, the_cleanup_job);
     session.press(Key::Enter);
     session.press(Key::Char('n'));
+    session.confirm();
     assert_eq!(
         machine.job_actions().last().unwrap(),
         &("snapper-cleanup.service".to_owned(), JobAction::Start)
@@ -167,6 +170,7 @@ fn the_keys_do_what_they_say_and_the_report_follows() {
         choose(&mut session, the_cleanup_job);
         session.press(Key::Enter);
         session.press(Key::Char(key));
+        session.confirm();
         assert_eq!(
             machine.job_actions().last().unwrap(),
             &(services::CLEANUP.unit.to_owned(), action),
@@ -198,7 +202,9 @@ fn a_machine_that_refuses_says_why_in_the_activity_record() {
     let mut session = Session::with_system(&backend, &machine, admin());
     choose(&mut session, the_cleanup_job);
     session.press(Key::Enter);
+    session.confirm();
     session.press(Key::Char('e'));
+    session.confirm();
     assert!(format!("{:?}", session.state.notice)
         .contains("Could not do that to Cleaning up old snapshots: Access denied"));
     session.press(Key::Char('3'));
@@ -251,6 +257,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
     });
     session.press(Key::Enter);
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(machine.quota_mode("/"), QuotaMode::Full);
     assert!(format!("{:?}", session.state.notice).contains("building its tally in the background"));
 
@@ -261,6 +268,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
     session.press(Key::Enter);
     assert!(flat(&screen(&session)).contains("Switching it off removes the tally"));
     session.press(Key::Enter);
+    session.confirm();
     assert_eq!(machine.quota_mode("/"), QuotaMode::Off);
 }
 
