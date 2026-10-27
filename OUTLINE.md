@@ -19,6 +19,7 @@ What each part of snapall says it is for, read from the first line of each modul
 - `doctor.rs`: `snapall doctor`, as pure functions: from facts about the machine to findings and an install plan.
 - `domain.rs`: Validated domain types.
 - `explain.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
+- `find.rs`: Finding what a person points at: one snapshot of an area, by its number.
 - `groups.rs`: Groups: a name for a set of protected areas, so that "take a snapshot of my theming" is one thing to say.
 - `health.rs`: Health: is protection working, how much room does it take, will old snapshots be cleaned up.
 - `journal.rs`: What snapall did, remembered: every change writes an event when it starts and another when it ends, whichever snapall made it (the window or a command), and folding them gives the record a person reads.
@@ -120,7 +121,7 @@ What each part of snapall says it is for, read from the first line of each modul
 - `boot_probe.rs`: The imperative half of the boot-menu check: look at files and services, hand the facts to `snapall_core::boot::assess`.
 - `cli.rs`: Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
   - `commands/change.rs`: A change being made: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
-  - `commands/deleting.rs`: Deleting a snapshot: it says which one, and asks for `destroy`.
+  - `commands/deleting.rs`: Deleting a snapshot.
   - `commands/going_back.rs`: Going back: putting an area or a restore point back, and rolling a change back with `undo`.
   - `commands/keeping.rs`: What is kept: how many snapshots an area holds, whether the room they take is counted, and the groups of areas.
   - `commands/looking.rs`: Looking, which changes nothing: the areas, their snapshots, the history of a file, the health, the record, the restore points.
@@ -135,6 +136,6 @@ What each part of snapall says it is for, read from the first line of each modul
 - `help.rs`: `--help`, generated from the contract so it can never disagree with what is accepted.
 - `logging.rs`: Where the audit trail goes: nowhere, to stderr, or to a private file.
 - `main.rs`: Composition root and imperative shell: wires the argenv-driven CLI, the TUI and the snapper adapter to the core, performs the I/O, and maps outcomes to exit codes.
-- `output.rs`: Printing: the one place output leaves the program, and the one place that decides between text for a person and JSON for a program.
+- `output.rs`: Printing, and the choice between text for a person and JSON for a program.
 - `render.rs`: Presentation: pure functions from domain values to text or JSON.
 - `setup.rs`: `snapall setup`: find the parts of the disk that snapshots do not cover, explain what that means in plain words, ask, and set them up.

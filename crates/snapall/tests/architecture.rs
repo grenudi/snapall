@@ -420,8 +420,8 @@ const TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
     ("undo", 63),
 ];
 
-/// Every top-level function of every file in `commands/` and its length in lines (not counting its tests).
-fn handler_lengths() -> Vec<(String, usize)> {
+/// Every top-level function of every file in `commands/`, with its text (not counting tests).
+fn handlers() -> Vec<(String, String)> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/commands");
     let mut found = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -442,11 +442,82 @@ fn handler_lengths() -> Vec<(String, usize)> {
                 let end = (at..lines.len())
                     .find(|line| lines[*line] == "}")
                     .unwrap_or(at);
-                found.push((name.to_owned(), end - at + 1));
+                found.push((name.to_owned(), lines[at..=end].join("\n")));
                 at = end;
             }
             at += 1;
         }
+    }
+    found
+}
+
+/// Every handler and its length in lines.
+fn handler_lengths() -> Vec<(String, usize)> {
+    handlers()
+        .into_iter()
+        .map(|(name, text)| (name, text.lines().count()))
+        .collect()
+}
+
+/// The code of a handler, without its comments and the text inside its quotation marks, which are not what it
+/// does.
+fn only_the_doing(text: &str) -> String {
+    let mut out = String::new();
+    for line in text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+    {
+        let mut inside = false;
+        for letter in line.chars() {
+            if letter == '"' {
+                inside = !inside;
+            } else if !inside {
+                out.push(letter);
+            }
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// How many times a handler branches or repeats.
+fn turns_in(text: &str) -> usize {
+    let doing = only_the_doing(text);
+    ["if ", "match ", "for ", "while ", "loop "]
+        .iter()
+        .map(|word| {
+            doing
+                .match_indices(word)
+                .filter(|(at, _)| {
+                    *at == 0 || !doing[..*at].ends_with(|c: char| c.is_alphanumeric() || c == '_')
+                })
+                .count()
+        })
+        .sum()
+}
+
+/// How many closures a handler spells out: iterator and `Option` plumbing, not what the command is for.
+fn plumbing_in(text: &str) -> usize {
+    let doing = only_the_doing(text);
+    let letters: Vec<char> = doing.chars().collect();
+    let mut found = 0;
+    let mut at = 0;
+    while at + 1 < letters.len() {
+        // `|name|` or `|(a, b)|` or `|_|`, not `||` and not `a | b`
+        if letters[at] == '|'
+            && (letters[at + 1].is_alphabetic() || "_&(".contains(letters[at + 1]))
+        {
+            if let Some(close) = letters[at + 1..]
+                .iter()
+                .position(|c| *c == '|' || *c == '\n')
+            {
+                if letters[at + 1 + close] == '|' {
+                    found += 1;
+                    at += close + 1;
+                }
+            }
+        }
+        at += 1;
     }
     found
 }
@@ -724,8 +795,7 @@ const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 6] = [
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/main.rs", 196),
 ];
-const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 7] = [
-    ("crates/snapall/src/commands/deleting.rs", 1),
+const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 6] = [
     ("crates/snapall/src/commands/going_back.rs", 14),
     ("crates/snapall/src/commands/keeping.rs", 2),
     ("crates/snapall/src/commands/protecting.rs", 1),
@@ -804,3 +874,55 @@ fn the_outline_of_the_code_is_generated_from_what_each_module_says_it_is_for() {
         "OUTLINE.md is not what the code says. After changing what a module is for, run:\n  UPDATE_OUTLINE=1 cargo test -p snapall --test architecture the_outline"
     );
 }
+
+// ---- a story is a sequence of verbs: it branches little and spells out little plumbing --------------------
+
+/// A handler decides *which* and *in what order* and leaves *how* to the layer below: it may turn (branch or
+/// repeat) this often.
+const MOST_TURNS_IN_A_STORY: usize = 4;
+/// And it may spell out this many closures: more is iterator and `Option` plumbing that a named verb would hide.
+const MOST_PLUMBING_IN_A_STORY: usize = 2;
+
+#[test]
+fn a_story_branches_little_and_the_debt_only_shrinks() {
+    let observed = handlers()
+        .into_iter()
+        .map(|(name, text)| (name, turns_in(&text)))
+        .collect();
+    ratchet(
+        "Handlers that turn more often than a story should:",
+        &observed,
+        MOST_TURNS_IN_A_STORY,
+        &TURNS_TOO_MANY_FOR_NOW,
+    );
+}
+
+#[test]
+fn a_story_spells_out_little_plumbing_and_the_debt_only_shrinks() {
+    let observed = handlers()
+        .into_iter()
+        .map(|(name, text)| (name, plumbing_in(&text)))
+        .collect();
+    ratchet(
+        "Handlers that spell out plumbing a verb should hide:",
+        &observed,
+        MOST_PLUMBING_IN_A_STORY,
+        &PLUMBING_TOO_MUCH_FOR_NOW,
+    );
+}
+
+const TURNS_TOO_MANY_FOR_NOW: [(&str, usize); 8] = [
+    ("create", 8),
+    ("groups", 7),
+    ("limits", 10),
+    ("point_confirmation", 5),
+    ("quotas", 13),
+    ("restore_all", 9),
+    ("setup", 7),
+    ("undo", 8),
+];
+const PLUMBING_TOO_MUCH_FOR_NOW: [(&str, usize); 3] = [
+    ("check_the_way_back_still_exists", 3),
+    ("groups", 6),
+    ("limits", 7),
+];

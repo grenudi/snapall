@@ -67,6 +67,15 @@ impl Change {
     }
 
     /// How it went: what came of it, or why it failed.
+    pub(super) fn end_with<T, E: ToString>(self, result: &Result<T, E>) {
+        self.end(
+            result
+                .as_ref()
+                .map(|_| String::new())
+                .map_err(ToString::to_string),
+        );
+    }
+
     pub(super) fn end(mut self, outcome: Result<String, String>) {
         self.write_end(outcome.into());
     }

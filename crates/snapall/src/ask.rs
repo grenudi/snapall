@@ -55,6 +55,14 @@ pub fn decide(
     })
 }
 
+pub fn before(
+    act: snapall_core::Act,
+    said_so: bool,
+    question: &str,
+) -> Result<Option<ExitCode>, Box<dyn Error>> {
+    gate(act.weight(), said_so, question, None)
+}
+
 /// [`decide`], and if the answer is not a go, what to say and how to leave: `Some(exit)` means stop.
 pub fn gate(
     weight: Weight,

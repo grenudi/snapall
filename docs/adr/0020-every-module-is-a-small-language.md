@@ -41,6 +41,13 @@ worse, nothing new, entries leave when paid.
   `protecting`, `keeping`, `looking`, `running`, `window`, and `change` for what they share), with a front file
   that is only the map. Items were moved whole; behaviour is unchanged.
 
+* Story budgets (R11, R14): how often a handler branches (4) and how many closures it spells out (2), as
+  ratchets. They name the same handlers already known to be too long and two that were not (`setup`,
+  `point_confirmation`), which is some evidence that they measure something real.
+* The first story written to the grammar: `delete`, 55 lines to 19, with its words beneath it, a lookup verb in
+  the core (`find_snapshot`) and `Change::end_with`. It is worked through in the canon text, with what its
+  remaining syntax says the layer still lacks.
+
 ## Order of the rest
 
 1. `going_back` (390) and `keeping` (336) into one module per command; handlers return what to say, and `output`
