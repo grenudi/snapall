@@ -98,7 +98,7 @@ pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool, no_dbus: b
         yes
     };
     let act = Act::Undo { doing: undo.weight };
-    ask::gate(act.weight(), said_so, "Roll this back?", None)?;
+    let _asked = ask::gate(act, said_so, "Roll this back?", None)?;
     let program = std::env::current_exe()?;
     for command in &undo.commands {
         let mut step = std::process::Command::new(&program);

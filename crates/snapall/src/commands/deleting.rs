@@ -12,12 +12,12 @@ use snapall_core::SnapshotInfo;
 use snapall_core::{delete_snapshot, find_snapshot, Act, ConfigName, SnapshotId};
 
 pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
-    if let Some(snapshot) = find_snapshot(ctx.backend, area, id)? {
-        let it = snapshot_in_words(area, &snapshot);
-        output::note(&what_deleting_loses(&it, area));
-        ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))?;
-    }
-    let change = Change::begin(&deleting_one(area), &deleted_one(area), None)?;
+    let found = find_snapshot(ctx.backend, area, id)?;
+    let approved = match &found {
+        Some(snapshot) => ask_before_deleting(area, snapshot, destroy)?,
+        None => ask::nothing_to_lose(Act::DeleteSnapshots, &found)?,
+    };
+    let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
     let deleted = delete_snapshot(ctx.backend, area, id);
     if deleted.is_ok() {
         change.rollback(after_deleting());
@@ -28,6 +28,16 @@ pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -
         crate::render::deleted(area, id),
         crate::render::deleted_json(area, id),
     )
+}
+
+fn ask_before_deleting(
+    area: &ConfigName,
+    snapshot: &SnapshotInfo,
+    destroy: bool,
+) -> Result<ask::Approved, Box<dyn std::error::Error>> {
+    let it = snapshot_in_words(area, snapshot);
+    output::note(&what_deleting_loses(&it, area));
+    ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))
 }
 
 fn snapshot_in_words(area: &ConfigName, snapshot: &SnapshotInfo) -> String {

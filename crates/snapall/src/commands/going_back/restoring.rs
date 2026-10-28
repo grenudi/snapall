@@ -8,11 +8,11 @@ use super::*;
 use crate::output::Outcome;
 use crate::{ask, boot_probe, render};
 use snapall_core::boot;
+use snapall_core::Act;
 use snapall_core::{
     preview_restore, restore_snapshot, ConfigName, Preview, RestoreError, SnapshotId,
 };
 use std::error::Error;
-use std::process::ExitCode;
 
 /// Put a config, or one path of it, back to how a snapshot had it. It shows what will change, asks
 /// first (unless told not to), and the use case takes a snapshot of the current state before it
@@ -30,11 +30,7 @@ pub fn restore(
     if dry_run || preview.changes.is_empty() {
         return show_changes(ctx, config, id, &preview);
     }
-    match confirmation(yes, config, id, &preview)? {
-        Confirmation::Given => {}
-        Confirmation::NoTerminalToAskOn => return Ok(ExitCode::from(2)),
-        Confirmation::Declined => return Ok(ExitCode::FAILURE),
-    }
+    let approved = ask_before_restoring(yes, config, id, &preview)?;
     let (now, past) = match path {
         Some(path) => (
             format!("Restoring {path} from snapshot #{id} of {config}"),
@@ -45,7 +41,7 @@ pub fn restore(
             format!("Put {config} back to snapshot #{id}"),
         ),
     };
-    let change = Change::begin(&now, &past, None)?;
+    let change = Change::begin(approved, &now, &past, None)?;
     let result = restore_snapshot(ctx.backend, config, id, path);
     if let Ok(done) = &result {
         change.rollback(snapall_core::rollback::after_restoring(
@@ -84,41 +80,30 @@ pub(super) fn refuse_to_restore_the_whole_system_root(
     Ok(())
 }
 
-pub(super) enum Confirmation {
-    Given,
-    /// Nobody to ask: the caller must say `--yes`, so nothing is changed.
-    NoTerminalToAskOn,
-    Declined,
+fn restore_question(preview: &Preview, config: &ConfigName, id: SnapshotId) -> String {
+    let count = preview.changes.len();
+    let paths = if count == 1 { "path" } else { "paths" };
+    format!(
+        "Restore {count} {paths} of {config} to #{id}? The current state is snapshotted first, so this can be undone."
+    )
 }
 
-/// Restoring changes files, so the person is asked, unless they said `--yes`.
-pub(super) fn confirmation(
+fn ask_before_restoring(
     yes: bool,
     config: &ConfigName,
     id: SnapshotId,
     preview: &Preview,
-) -> Result<Confirmation, Box<dyn Error>> {
-    if yes {
-        return Ok(Confirmation::Given);
-    }
-    if !ask::can_ask() {
-        eprintln!(
-            "snapall: restore changes files and there is no terminal to ask on; \
-             look first with `snapall changes`, then pass --yes"
-        );
-        return Ok(Confirmation::NoTerminalToAskOn);
-    }
-    eprint!("{}", render::changes(config, id, preview));
-    eprintln!("\n{}\n", snapall_core::explain::RESTORE_CAUTION);
-    let count = preview.changes.len();
-    let paths = if count == 1 { "path" } else { "paths" };
-    let question = format!(
-        "Restore {count} {paths} of {config} to #{id}? The current state is snapshotted first, so this can be undone."
-    );
-    if ask::yes_no(&question)? {
-        Ok(Confirmation::Given)
-    } else {
-        eprintln!("snapall: not restoring");
-        Ok(Confirmation::Declined)
-    }
+) -> Result<ask::Approved, Box<dyn std::error::Error>> {
+    ask::before_showing(
+        Act::Restore,
+        yes,
+        || {
+            format!(
+                "{}\n{}\n",
+                render::changes(config, id, preview),
+                snapall_core::explain::RESTORE_CAUTION
+            )
+        },
+        &restore_question(preview, config, id),
+    )
 }

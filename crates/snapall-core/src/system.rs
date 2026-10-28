@@ -165,6 +165,39 @@ pub enum QuotaMode {
     Unknown,
 }
 
+/// What asking for room counting to be switched on or off comes to, given how the disk counts it now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Switching {
+    /// It is already that way: nothing to do.
+    AlreadyThatWay,
+    /// The simple kind cannot be changed to the full kind in place.
+    CannotBeDoneInPlace,
+    Possible,
+}
+
+impl QuotaMode {
+    /// How the disk counts, in a few words: `off`, `on`, `on, the simple kind`, or that it could not be found out.
+    pub fn word(self) -> &'static str {
+        match self {
+            QuotaMode::Off => "off",
+            QuotaMode::Full => "on",
+            QuotaMode::Simple => "on, the simple kind",
+            QuotaMode::Unknown => "could not be found out",
+        }
+    }
+
+    pub fn switching(self, on: bool) -> Switching {
+        match (self, on) {
+            (QuotaMode::Simple, true) => Switching::CannotBeDoneInPlace,
+            (QuotaMode::Full, true) | (QuotaMode::Off, false) => Switching::AlreadyThatWay,
+            (QuotaMode::Off, true)
+            | (QuotaMode::Full, false)
+            | (QuotaMode::Simple, false)
+            | (QuotaMode::Unknown, _) => Switching::Possible,
+        }
+    }
+}
+
 /// Another snapall is making a change, so this one must wait.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Busy {
@@ -236,5 +269,27 @@ impl SystemProbe for NoSystem {
 
     fn hold_changes(&self, _doing: &str) -> Result<Hold, Busy> {
         Ok(Box::new(()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn switching_room_counting_is_already_so_impossible_in_place_or_possible() {
+        use QuotaMode::{Full, Off, Simple, Unknown};
+        assert_eq!(Full.switching(true), Switching::AlreadyThatWay);
+        assert_eq!(Off.switching(false), Switching::AlreadyThatWay);
+        assert_eq!(Simple.switching(true), Switching::CannotBeDoneInPlace);
+        for (mode, on) in [
+            (Off, true),
+            (Full, false),
+            (Simple, false),
+            (Unknown, true),
+            (Unknown, false),
+        ] {
+            assert_eq!(mode.switching(on), Switching::Possible, "{mode:?} to {on}");
+        }
     }
 }

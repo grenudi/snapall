@@ -13,5 +13,3 @@ mod undoing;
 pub use restoring::restore;
 pub use restoring_a_point::restore_all;
 pub use undoing::undo;
-
-use restoring::Confirmation;

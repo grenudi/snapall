@@ -282,7 +282,20 @@ mod tests {
         .unwrap();
         fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
         // as a process of its own whatever this machine's init is: the test must not depend on it
-        start_as_process(&script, "7-1-w", &["create".to_owned()]).unwrap();
+        // a script written a moment ago can be "text file busy" while another test's fork still holds its write
+        // handle: that clears in milliseconds, so start again until it does
+        let started = (0..50).find_map(|_| {
+            match start_as_process(&script, "7-1-w", &["create".to_owned()]) {
+                Err(why) if why.contains("Text file busy") => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    None
+                }
+                other => Some(other),
+            }
+        });
+        started
+            .expect("the script stayed busy for a whole second")
+            .unwrap();
         assert!(
             !marker.exists(),
             "start returns at once, it does not wait for the change"

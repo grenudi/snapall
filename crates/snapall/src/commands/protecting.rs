@@ -41,14 +41,15 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
         "Stop protecting {area} and delete its {} snapshots for good?",
         plan.snapshots
     );
-    ask::gate(
-        Act::StopProtecting.weight(),
+    let approved = ask::gate(
+        Act::StopProtecting,
         destroy,
         &question,
         Some(config.as_str()),
     )?;
     let title = snapall_core::coverage::describe(&plan.subvolume).title;
     let change = Change::begin(
+        approved,
         &format!("Stopping protection of {title}"),
         &format!("Stopped protecting {title}"),
         None,
@@ -83,7 +84,7 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
     let change = if options.dry_run {
         None
     } else {
-        Some(Change::begin(
+        Some(Change::begin_asking_along(
             "Protecting a part of the disk",
             "Protected a part of the disk",
             None,

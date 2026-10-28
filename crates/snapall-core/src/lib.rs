@@ -63,7 +63,7 @@ pub use points::{
 pub use port::{BackendError, SnapshotBackend};
 pub use services::{Command, Job, JobAction};
 pub use system::{
-    Busy, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, SystemProbe, UnitDetails,
+    Busy, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, Switching, SystemProbe, UnitDetails,
 };
 pub use usecase::{
     all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
