@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.25.1]
+
+
+### Refactoring
+- The program's entry point reads as the program, and the outline's sentences say what things are for ([#84](https://github.com/grenudi/snapall/pull/84)) ([61578f7])
+
+
+
 ## [0.25.0]
 
 
