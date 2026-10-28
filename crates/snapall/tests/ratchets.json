@@ -5,7 +5,6 @@
   },
   "files_too_long": {
     "crates/snapall-tui/src/changes.rs": 419,
-    "crates/snapall-tui/src/model/state.rs": 400,
     "crates/snapall-tui/src/tabs/activity.rs": 339,
     "crates/snapall/src/contract/inputs.rs": 514,
     "crates/snapall/src/setup.rs": 432

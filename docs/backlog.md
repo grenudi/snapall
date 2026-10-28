@@ -20,7 +20,7 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 
 | # | Item | Status |
 |---|---|---|
-| 1 | The window is organised by mechanism (`model/`, `view/`), so its screens and questions are scattered. Group it by screen (snapshots, file history, health, activity) and by question, finishing what `tabs/health/` already does. The first step is `model/state.rs` (400 lines), which mixes the window's state with its questions | open |
+| 1 | The window is organised by mechanism (`model/`, `view/`), so its screens and questions are scattered. Group it by screen (snapshots, file history, health, activity) and by question, finishing what `tabs/health/` already does. The window's state is now four modules (`model/state/`: what looking brought back, what it is told, its questions, the window itself). Next, bring each screen's keys, state and drawing together as `tabs/health/` does, starting with the snapshots screen (`model/lists.rs`, `view/lists.rs`) | open |
 | 2 | `setup.rs` (432 lines) asks area by area as it works, which is why it is the one change that begins without a leave (`begin_asking_along`). Plan first, ask once, then begin | open |
 | 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
 | 4 | Window files over 300 lines: `changes.rs` (419) and `tabs/activity.rs` (339) | open |
