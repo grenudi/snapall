@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.4]
+
+
+### Refactoring
+- The doctor asks the machine through the adapters ([#95](https://github.com/grenudi/snapall/pull/95)) ([d85fa71])
+
+
+
 ## [0.26.3]
 
 
