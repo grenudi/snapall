@@ -55,7 +55,7 @@ fn flat(screen: &str) -> String {
 
 /// docs, home and the system; two actions a moment apart, the content changing in between.
 fn two_points() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["docs", "home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["docs", "home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     backend.write_file("docs", "/mnt/docs/a.txt", "docs, first");
     backend.write_file("home", "/mnt/home/b.txt", "home, first");
@@ -195,7 +195,7 @@ fn choosing_an_older_point_looks_up_and_restores_that_one_not_the_newest() {
 
 #[test]
 fn with_no_restore_points_it_says_what_makes_one() {
-    let backend = InMemoryBackend::with_configs(&["docs", "home"]);
+    let backend = InMemoryBackend::with_areas(&["docs", "home"]);
     let mut session = Session::new(&backend);
     session.press(Key::Char('R'));
     let text = flat(&screen(&session));

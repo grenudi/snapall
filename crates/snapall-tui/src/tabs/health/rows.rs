@@ -41,7 +41,7 @@ pub struct Row {
     /// What Enter does on this row, if anything.
     pub action: RowAction,
     /// The area this row is about, if it is one: what `U` (stop protecting) acts on.
-    pub area: Option<snapall_core::ConfigName>,
+    pub area: Option<snapall_core::AreaName>,
 }
 
 /// What Enter does on a row.
@@ -55,7 +55,7 @@ pub enum RowAction {
     /// Switch counting the room snapshots take on (`true`) or off (`false`).
     CountRoom(bool),
     /// Change how many snapshots this area keeps, and when its oldest are removed.
-    EditLimits(snapall_core::ConfigName),
+    EditLimits(snapall_core::AreaName),
 }
 
 /// Everything the tab lists, in the order it is shown.
@@ -112,7 +112,7 @@ pub(crate) fn space_row(area: &AreaFacts) -> Row {
         label: format!(
             "{} ({})  {snapshots}  {room}{disk}",
             area.title(),
-            area.subvolume
+            area.location
         ),
         detail: space_detail(area, &snapshots),
         // what it keeps can be changed, if snapper said what it keeps

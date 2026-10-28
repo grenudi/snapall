@@ -102,7 +102,7 @@ fn on_list(state: &mut State, key: Key, cursor: usize) -> Reaction {
 fn pick(state: &State, name: GroupName) -> Modal {
     let already = state.groups.get(&name).unwrap_or(&[]).to_vec();
     let picks = state
-        .config_names()
+        .area_names()
         .into_iter()
         .map(|area| {
             let ticked = already.contains(&area);
@@ -144,13 +144,13 @@ fn on_pick(
     state: &mut State,
     key: Key,
     name: GroupName,
-    mut picks: Vec<(ConfigName, bool)>,
+    mut picks: Vec<(AreaName, bool)>,
     cursor: usize,
     error: Option<String>,
 ) -> Reaction {
     let last = picks.len().saturating_sub(1);
     let screen =
-        |name: GroupName, picks: Vec<(ConfigName, bool)>, cursor: usize, error: Option<String>| {
+        |name: GroupName, picks: Vec<(AreaName, bool)>, cursor: usize, error: Option<String>| {
             Modal::Groups(GroupsScreen::Pick {
                 name,
                 picks,
@@ -173,8 +173,7 @@ fn on_pick(
             Reaction::stays(screen(name, picks, cursor, None))
         }
         Key::Enter => {
-            let chosen: Vec<ConfigName> =
-                picks.iter().filter(|p| p.1).map(|p| p.0.clone()).collect();
+            let chosen: Vec<AreaName> = picks.iter().filter(|p| p.1).map(|p| p.0.clone()).collect();
             if chosen.is_empty() {
                 let why = "Choose at least one area (Space includes or leaves out the one under the cursor)".to_owned();
                 return Reaction::stays(screen(name, picks, cursor, Some(why)));

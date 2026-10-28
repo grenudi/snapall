@@ -7,11 +7,11 @@
 //! snapper is busy. The pure model is driven directly (no executor), so "in flight" can be held
 //! open as long as a test needs.
 
-use snapall_core::ConfigName;
+use snapall_core::AreaName;
 use snapall_tui::model::{update, Effect, Key, Modal, Msg, Notice, State};
 
-fn name(s: &str) -> ConfigName {
-    ConfigName::parse(s).unwrap()
+fn name(s: &str) -> AreaName {
+    AreaName::parse(s).unwrap()
 }
 
 /// A state with one config selected and its snapshots still being fetched: one effect in flight.
@@ -19,7 +19,7 @@ fn busy() -> State {
     let mut state = State::default();
     update(&mut state, Msg::Start);
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
-    let effects = update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
+    let effects = update(&mut state, Msg::AreasLoaded(Ok(vec![name("home")])));
     assert_eq!(effects, [Effect::LoadSnapshots(name("home"))]);
     assert_eq!(state.pending, 1);
     state
@@ -33,7 +33,7 @@ fn press(state: &mut State, key: Key) -> Vec<Effect> {
 fn starting_asks_for_the_areas_first_and_how_protection_stands_only_after_the_first_screen_has_its_data(
 ) {
     let mut state = State::default();
-    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
+    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadAreas]);
     // the areas are work in flight; the health report loads on the side and does not count
     assert_eq!(state.pending, 1);
     update(&mut state, Msg::HealthLoaded(Err("not measured".into())));
@@ -50,13 +50,13 @@ fn a_result_settles_one_pending_effect_and_may_ask_for_more() {
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
     assert_eq!(state.pending, 1);
     // The config list came back (-1) and asks for the first config's snapshots (+1).
-    update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
+    update(&mut state, Msg::AreasLoaded(Ok(vec![name("home")])));
     assert_eq!(state.pending, 1);
     // The snapshots came back (-1) and ask for nothing more.
     update(
         &mut state,
         Msg::SnapshotsLoaded {
-            config: name("home"),
+            area: name("home"),
             result: Ok(Vec::new()),
         },
     );
@@ -66,7 +66,7 @@ fn a_result_settles_one_pending_effect_and_may_ask_for_more() {
 #[test]
 fn a_result_nobody_asked_for_never_takes_the_count_below_zero() {
     let mut state = State::default();
-    update(&mut state, Msg::ConfigsLoaded(Ok(Vec::new())));
+    update(&mut state, Msg::AreasLoaded(Ok(Vec::new())));
     assert_eq!(state.pending, 0);
 }
 
@@ -103,7 +103,7 @@ fn work_can_be_started_again_once_the_last_result_is_in() {
     update(
         &mut state,
         Msg::SnapshotsLoaded {
-            config: name("home"),
+            area: name("home"),
             result: Ok(Vec::new()),
         },
     );
@@ -135,11 +135,11 @@ fn a_prompt_opened_before_the_work_began_can_still_be_cancelled() {
     let mut state = State::default();
     update(&mut state, Msg::Start);
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
-    update(&mut state, Msg::ConfigsLoaded(Ok(vec![name("home")])));
+    update(&mut state, Msg::AreasLoaded(Ok(vec![name("home")])));
     update(
         &mut state,
         Msg::SnapshotsLoaded {
-            config: name("home"),
+            area: name("home"),
             result: Ok(Vec::new()),
         },
     );
@@ -156,14 +156,14 @@ fn the_health_report_is_asked_for_after_the_first_screen_and_never_blocks_the_ke
     // The worker does one thing at a time, so a status refresh queued before the first screen's data
     // would delay it: the report is asked for only once that data has arrived.
     let mut state = State::default();
-    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadConfigs]);
-    let effects = update(&mut state, Msg::ConfigsLoaded(Ok(vec![])));
+    assert_eq!(update(&mut state, Msg::Start), [Effect::LoadAreas]);
+    let effects = update(&mut state, Msg::AreasLoaded(Ok(vec![])));
     assert_eq!(
         effects,
         [Effect::LoadHealth, Effect::LoadHistory, Effect::LoadGroups]
     );
     assert!(
-        update(&mut state, Msg::ConfigsLoaded(Ok(vec![]))).is_empty(),
+        update(&mut state, Msg::AreasLoaded(Ok(vec![]))).is_empty(),
         "and only once"
     );
     // it is on its way, and it is not work: nothing that starts work is refused for it

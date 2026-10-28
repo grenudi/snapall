@@ -16,8 +16,8 @@ pub enum Load<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConfigEntry {
-    pub name: ConfigName,
+pub struct AreaEntry {
+    pub name: AreaName,
     /// Oldest first, as the port returns them. The view shows newest first.
     pub snapshots: Load<Vec<SnapshotInfo>>,
 }
@@ -26,7 +26,7 @@ pub struct ConfigEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileTarget {
     pub path: String,
-    pub config: ConfigName,
+    pub area: AreaName,
 }
 
 /// The file history screen's own state.
@@ -109,7 +109,7 @@ pub enum RestoreStage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
-    One(ConfigName),
+    One(AreaName),
     All,
     /// The areas of a group the person made.
     Group(snapall_core::GroupName),
@@ -119,7 +119,7 @@ pub enum Target {
 /// that would do to the snapshots there are.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LimitsEditor {
-    pub config: ConfigName,
+    pub area: AreaName,
     /// What snapper has now.
     pub before: snapall_core::Limits,
     /// What is being set.
@@ -134,7 +134,7 @@ pub struct LimitsEditor {
 /// The prompt before an area stops being protected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StopProtecting {
-    pub config: ConfigName,
+    pub area: AreaName,
     /// What it would do, or why it would not; `None` while it is being worked out.
     pub plan: Option<Result<snapall_core::unprotect::Plan, String>>,
     /// What has been typed so far, to be the area's name.
@@ -173,7 +173,7 @@ pub enum GroupsScreen {
     /// Choosing which areas are in the group.
     Pick {
         name: snapall_core::GroupName,
-        picks: Vec<(ConfigName, bool)>,
+        picks: Vec<(AreaName, bool)>,
         cursor: usize,
         error: Option<String>,
     },
@@ -187,12 +187,12 @@ pub enum Modal {
         error: Option<String>,
     },
     ConfirmDelete {
-        config: ConfigName,
+        area: AreaName,
         ids: Vec<SnapshotId>,
     },
     /// Put a config back to how a snapshot had it.
     Restore {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         /// One path of the config, or `None` for all of it.
         path: Option<String>,
@@ -236,8 +236,8 @@ pub struct Watched {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct State {
-    pub configs: Load<Vec<ConfigEntry>>,
-    pub config_cursor: usize,
+    pub areas: Load<Vec<AreaEntry>>,
+    pub area_cursor: usize,
     /// Index into the *displayed* (newest-first) snapshot list.
     pub snapshot_cursor: usize,
     pub marked: BTreeSet<SnapshotId>,
@@ -280,7 +280,7 @@ pub struct State {
     /// confirmation must not be one of them.
     pub after_reload: Option<Notice>,
     /// The restore point of the snapshot the restore prompt is about, once looked up.
-    pub point_offer: Option<(ConfigName, SnapshotId, PointOffer)>,
+    pub point_offer: Option<(AreaName, SnapshotId, PointOffer)>,
     /// The restore points, newest first, once looked up (`None` while looking).
     pub points: Option<Vec<snapall_core::RestorePoint>>,
     /// What putting the chosen restore point back would do.
@@ -294,11 +294,11 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            configs: Load::NotLoaded,
-            config_cursor: 0,
+            areas: Load::NotLoaded,
+            area_cursor: 0,
             snapshot_cursor: 0,
             marked: BTreeSet::new(),
-            focus: Pane::Configs,
+            focus: Pane::Areas,
             modal: None,
             notice: None,
             quit: false,
@@ -363,20 +363,20 @@ impl State {
         }
     }
 
-    pub fn entries(&self) -> &[ConfigEntry] {
-        match &self.configs {
+    pub fn entries(&self) -> &[AreaEntry] {
+        match &self.areas {
             Load::Loaded(entries) => entries,
             _ => &[],
         }
     }
 
-    pub fn selected_config(&self) -> Option<&ConfigEntry> {
-        self.entries().get(self.config_cursor)
+    pub fn selected_area(&self) -> Option<&AreaEntry> {
+        self.entries().get(self.area_cursor)
     }
 
     /// The selected config's snapshots, newest first.
     pub fn displayed_snapshots(&self) -> Vec<&SnapshotInfo> {
-        match self.selected_config().map(|c| &c.snapshots) {
+        match self.selected_area().map(|c| &c.snapshots) {
             Some(Load::Loaded(list)) => list.iter().rev().collect(),
             _ => Vec::new(),
         }
@@ -388,12 +388,12 @@ impl State {
             .copied()
     }
 
-    pub(crate) fn config_names(&self) -> Vec<ConfigName> {
+    pub(crate) fn area_names(&self) -> Vec<AreaName> {
         self.entries().iter().map(|e| e.name.clone()).collect()
     }
 
-    pub(crate) fn entry_mut(&mut self, name: &ConfigName) -> Option<&mut ConfigEntry> {
-        match &mut self.configs {
+    pub(crate) fn entry_mut(&mut self, name: &AreaName) -> Option<&mut AreaEntry> {
+        match &mut self.areas {
             Load::Loaded(entries) => entries.iter_mut().find(|e| &e.name == name),
             _ => None,
         }

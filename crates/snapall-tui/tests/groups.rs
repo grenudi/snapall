@@ -10,7 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{
-    plan_snapshots, run_plan, ConfigName, Description, GroupName, Groups, SnapshotBackend,
+    plan_snapshots, run_plan, AreaName, Description, GroupName, Groups, SnapshotBackend,
     SystemProbe,
 };
 use snapall_tui::model::{GroupsScreen, Key, Modal};
@@ -55,13 +55,13 @@ fn flat(session: &Session<'_>) -> String {
         .join(" ")
 }
 
-fn area(name: &str) -> ConfigName {
-    ConfigName::parse(name).unwrap()
+fn area(name: &str) -> AreaName {
+    AreaName::parse(name).unwrap()
 }
 
 /// Three protected areas, each with a snapshot.
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["data", "home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["data", "home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     run_plan(&backend, &plan, &Description::parse("first").unwrap(), None);
     backend

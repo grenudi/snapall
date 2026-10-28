@@ -7,18 +7,15 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, render};
-use snapall_core::{Act, ConfigName, GroupName, SystemProbe};
+use snapall_core::{Act, AreaName, GroupName, SystemProbe};
 use std::error::Error;
 
 /// The areas of a group, out of the ones protected now; a group that names one that is not is refused.
-pub(crate) fn areas_of_group(
-    ctx: &Context,
-    wanted: &str,
-) -> Result<Vec<ConfigName>, Box<dyn Error>> {
+pub(crate) fn areas_of_group(ctx: &Context, wanted: &str) -> Result<Vec<AreaName>, Box<dyn Error>> {
     use snapall_core::{SystemProbe, Wanted};
     let wanted = Wanted::parse(wanted)?;
     let groups = snapall_system::LinuxSystem::new().groups()?;
-    let protected = ctx.backend.list_configs()?;
+    let protected = ctx.backend.list_areas()?;
     Ok(groups.resolve(&wanted, &protected)?)
 }
 
@@ -42,7 +39,7 @@ pub fn groups(
 
 fn list_the_groups(ctx: &Context, system: &dyn SystemProbe) -> Outcome {
     let made = system.groups()?;
-    let protected = ctx.backend.list_configs()?;
+    let protected = ctx.backend.list_areas()?;
     ctx.show.result(
         render::groups(&made, &protected),
         render::groups_json(&made, &protected),
@@ -57,9 +54,9 @@ fn make_a_group(
     yes: bool,
 ) -> Outcome {
     let mut made = system.groups()?;
-    let protected = ctx.backend.list_configs()?;
+    let protected = ctx.backend.list_areas()?;
     let (name, list) = the_group_asked_for(name, areas, &protected)?;
-    let before = made.get(&name).map(<[ConfigName]>::to_vec);
+    let before = made.get(&name).map(<[AreaName]>::to_vec);
     let question = format!("Make the group {name} of {}?", in_words(&list));
     let approved = ask::gate(Act::ChangeGroups, yes, &question, None)?;
     let change = Change::begin(
@@ -97,7 +94,7 @@ fn take_a_group_away(
 ) -> Outcome {
     let mut made = system.groups()?;
     let name = GroupName::parse(name.ok_or("which group? `snapall groups remove NAME`")?)?;
-    let before = made.get(&name).map(<[ConfigName]>::to_vec);
+    let before = made.get(&name).map(<[AreaName]>::to_vec);
     if before.is_none() {
         return Err(format!("there is no group called `{name}`").into());
     }
@@ -130,8 +127,8 @@ fn take_a_group_away(
 fn the_group_asked_for(
     name: Option<&str>,
     areas: Option<&str>,
-    protected: &[ConfigName],
-) -> Result<(GroupName, Vec<ConfigName>), Box<dyn Error>> {
+    protected: &[AreaName],
+) -> Result<(GroupName, Vec<AreaName>), Box<dyn Error>> {
     let name = GroupName::parse(name.ok_or("which group? `snapall groups add NAME AREA,AREA`")?)?;
     let wanted = areas.ok_or("which areas? `snapall groups add NAME AREA,AREA`")?;
     let list = crate::cli::parse_only(wanted)?;
@@ -146,7 +143,7 @@ fn the_group_asked_for(
     Ok((name, list))
 }
 
-fn in_words(areas: &[ConfigName]) -> String {
+fn in_words(areas: &[AreaName]) -> String {
     let words: Vec<String> = areas.iter().map(ToString::to_string).collect();
     words.join(", ")
 }

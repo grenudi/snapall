@@ -58,7 +58,7 @@ fn plain(path: &Path, error: &std::io::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::{ConfigName, GroupName};
+    use snapall_core::{AreaName, GroupName};
 
     fn directory(name: &str) -> std::path::PathBuf {
         let dir =
@@ -73,7 +73,7 @@ mod tests {
             .set(
                 GroupName::parse("theming").unwrap(),
                 ["home", "data"]
-                    .map(|a| ConfigName::parse(a).unwrap())
+                    .map(|a| AreaName::parse(a).unwrap())
                     .to_vec(),
             )
             .unwrap();
@@ -113,7 +113,7 @@ mod tests {
         other
             .set(
                 GroupName::parse("games").unwrap(),
-                vec![ConfigName::parse("data").unwrap()],
+                vec![AreaName::parse("data").unwrap()],
             )
             .unwrap();
         write(&path, &other).unwrap();

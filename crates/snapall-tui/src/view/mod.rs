@@ -13,7 +13,7 @@ use ratatui::widgets::{
 };
 use ratatui::Frame;
 use snapall_core::explain;
-use snapall_core::{ChangeKind, ConfigName, FileState, SnapshotId, SnapshotInfo, SnapshotKind};
+use snapall_core::{AreaName, ChangeKind, FileState, SnapshotId, SnapshotInfo, SnapshotKind};
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
 
@@ -101,7 +101,7 @@ pub fn render(state: &State, frame: &mut Frame) {
     match (state.file.is_some(), state.tab) {
         (true, _) => render_file(state, frame, areas.snapshots),
         (false, Tab::Snapshots) => {
-            render_configs(state, frame, areas.configs);
+            render_areas(state, frame, areas.configs);
             render_snapshots(state, frame, areas.snapshots);
         }
         (false, Tab::Health) => tabs::health::render(state, frame, areas.body),

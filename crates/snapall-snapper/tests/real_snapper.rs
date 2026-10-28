@@ -11,8 +11,8 @@
 
 use snapall_core::testing::backend_contract;
 use snapall_core::{
-    all_snapshots, config_covering, file_history, fresh_point, preview_restore, protect_area,
-    restore_point, restore_points, restore_snapshot, snapshot_all, ChangeKind, ConfigName,
+    all_snapshots, area_covering, file_history, fresh_point, preview_restore, protect_area,
+    restore_point, restore_points, restore_snapshot, snapshot_all, AreaName, ChangeKind,
     Description, FileState, HistoryError, MemberResult, Point, RestoreError, SetupError,
     SnapshotBackend,
 };
@@ -81,7 +81,7 @@ fn contract_holds_against_real_snapper() {
         return;
     }
     let _turn = take_turns();
-    let config = ConfigName::parse("snapall_it_a").unwrap();
+    let config = AreaName::parse("snapall_it_a").unwrap();
     backend_contract(&backend(), &config);
 }
 
@@ -105,12 +105,12 @@ fn snapshot_all_covers_every_fixture_config() {
         let outcome = report
             .outcomes
             .iter()
-            .find(|o| o.config.as_str() == name)
+            .find(|o| o.area.as_str() == name)
             .unwrap_or_else(|| panic!("{name} missing from {report:?}"));
         assert!(outcome.result.is_ok(), "{name}: {:?}", outcome.result);
         // the tag went in with the snapshot and comes back out of real snapper's listing
         let id = outcome.result.as_ref().copied().unwrap();
-        let listed = backend.list_snapshots(&outcome.config).unwrap();
+        let listed = backend.list_snapshots(&outcome.area).unwrap();
         let snapshot = listed
             .iter()
             .find(|s| s.id == id)
@@ -124,12 +124,12 @@ fn snapshot_all_covers_every_fixture_config() {
     // a snapshot taken without a point carries none
     let plain = backend
         .create_snapshot(
-            &ConfigName::parse("snapall_it_a").unwrap(),
+            &AreaName::parse("snapall_it_a").unwrap(),
             &Description::parse("it: untagged").unwrap(),
         )
         .unwrap();
     let listed = backend
-        .list_snapshots(&ConfigName::parse("snapall_it_a").unwrap())
+        .list_snapshots(&AreaName::parse("snapall_it_a").unwrap())
         .unwrap();
     assert_eq!(listed.iter().find(|s| s.id == plain).unwrap().point, None);
 }
@@ -144,8 +144,8 @@ fn restoring_works_end_to_end_on_a_real_filesystem() {
     }
     let _turn = take_turns();
     let backend = backend();
-    let config = ConfigName::parse("snapall_it_b").unwrap();
-    let base = backend.config_subvolume(&config).unwrap();
+    let config = AreaName::parse("snapall_it_b").unwrap();
+    let base = backend.area_location(&config).unwrap();
     let file = |name: &str| std::path::PathBuf::from(&base).join(format!("restore-it-{name}"));
     let path = |name: &str| file(name).to_string_lossy().into_owned();
     let read = |name: &str| std::fs::read_to_string(file(name)).ok();
@@ -220,7 +220,7 @@ fn restoring_works_end_to_end_on_a_real_filesystem() {
     // Refusals happen before anything is touched.
     assert!(matches!(
         restore_snapshot(&backend, &config, before, Some("/etc/hostname")),
-        Err(RestoreError::OutsideConfig { .. })
+        Err(RestoreError::OutsideArea { .. })
     ));
     let nowhere = snapall_core::SnapshotId::new(999_999).unwrap();
     assert!(matches!(
@@ -242,8 +242,8 @@ fn a_files_history_is_read_from_real_snapshots_and_a_version_can_be_restored() {
     }
     let _turn = take_turns();
     let backend = backend();
-    let config = ConfigName::parse("snapall_it_a").unwrap();
-    let base = backend.config_subvolume(&config).unwrap();
+    let config = AreaName::parse("snapall_it_a").unwrap();
+    let base = backend.area_location(&config).unwrap();
     let file = format!("{base}/history-it.txt");
 
     std::fs::write(&file, "first").unwrap();
@@ -257,7 +257,7 @@ fn a_files_history_is_read_from_real_snapshots_and_a_version_can_be_restored() {
 
     let history = file_history(&backend, &file).unwrap();
     assert_eq!(
-        history.config, config,
+        history.area, config,
         "the config that covers the file is found by its mount point"
     );
     let state = |id| {
@@ -312,8 +312,8 @@ fn a_separate_subvolume_inside_a_configs_directory_is_not_covered_by_that_config
     }
     let _turn = take_turns();
     let backend = backend();
-    let config = ConfigName::parse("snapall_it_b").unwrap();
-    let base = backend.config_subvolume(&config).unwrap();
+    let config = AreaName::parse("snapall_it_b").unwrap();
+    let base = backend.area_location(&config).unwrap();
     let nested = format!("{base}/separate-it");
     let _cleanup = Cleanup {
         config: None,
@@ -348,15 +348,15 @@ fn a_separate_subvolume_inside_a_configs_directory_is_not_covered_by_that_config
         "a nested subvolume is another device"
     );
 
-    assert_eq!(config_covering(&backend, &inside).unwrap(), config);
-    let error = config_covering(&backend, &apart).unwrap_err();
+    assert_eq!(area_covering(&backend, &inside).unwrap(), config);
+    let error = area_covering(&backend, &apart).unwrap_err();
     assert!(
-        matches!(error, HistoryError::OtherSubvolume { .. }),
+        matches!(error, HistoryError::OtherLocation { .. }),
         "{error}"
     );
     let history = file_history(&backend, &apart).unwrap_err();
     assert!(
-        matches!(history, HistoryError::OtherSubvolume { .. }),
+        matches!(history, HistoryError::OtherLocation { .. }),
         "never \"did not exist\": {history}"
     );
     assert!(file_history(&backend, &inside).is_ok());
@@ -376,7 +376,7 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
     let _turn = take_turns();
     let backend = backend();
     let base = backend
-        .config_subvolume(&ConfigName::parse("snapall_it_b").unwrap())
+        .area_location(&AreaName::parse("snapall_it_b").unwrap())
         .unwrap();
     let area = format!("{base}/area-it");
     let plain = format!("{base}/plain-it");
@@ -398,11 +398,11 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
     };
     btrfs(&["subvolume", "create", &area]);
     std::fs::create_dir(&plain).unwrap();
-    let before = backend.list_configs().unwrap();
+    let before = backend.list_areas().unwrap();
 
     let name = protect_area(&backend, &area).unwrap();
     assert_eq!(name.as_str(), "area-it", "named after the directory");
-    assert!(backend.list_configs().unwrap().contains(&name));
+    assert!(backend.list_areas().unwrap().contains(&name));
     assert!(
         std::path::Path::new(&format!("{area}/.snapshots")).exists(),
         "where the snapshots will be kept"
@@ -427,7 +427,7 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
     // it takes part in a file lookup and in a snapshot straight away
     let file = format!("{area}/notes.txt");
     std::fs::write(&file, "mine").unwrap();
-    assert_eq!(config_covering(&backend, &file).unwrap(), name);
+    assert_eq!(area_covering(&backend, &file).unwrap(), name);
     let id = backend
         .create_snapshot(
             &name,
@@ -452,14 +452,14 @@ fn an_area_can_be_set_up_on_a_real_subvolume_and_not_on_a_plain_directory() {
         "{error}"
     );
     assert_eq!(
-        backend.list_configs().unwrap().len(),
+        backend.list_areas().unwrap().len(),
         before.len() + 1,
         "the failed one registered nothing"
     );
 
     // undo, as the rollback does (this also removes the snapshots it held: nothing else does)
-    backend.delete_config(&name).unwrap();
-    assert_eq!(backend.list_configs().unwrap(), before);
+    backend.delete_area(&name).unwrap();
+    assert_eq!(backend.list_areas().unwrap(), before);
     btrfs(&["subvolume", "delete", &area]);
     std::fs::remove_dir(&plain).unwrap();
 }
@@ -474,11 +474,11 @@ fn a_restore_point_puts_two_real_areas_back_with_one_action_and_that_is_undoable
     }
     let _turn = take_turns();
     let backend = backend();
-    let a = ConfigName::parse("snapall_it_a").unwrap();
-    let b = ConfigName::parse("snapall_it_b").unwrap();
+    let a = AreaName::parse("snapall_it_a").unwrap();
+    let b = AreaName::parse("snapall_it_b").unwrap();
     let (dir_a, dir_b) = (
-        backend.config_subvolume(&a).unwrap(),
-        backend.config_subvolume(&b).unwrap(),
+        backend.area_location(&a).unwrap(),
+        backend.area_location(&b).unwrap(),
     );
     let (file_a, file_b) = (
         format!("{dir_a}/point-it.txt"),
@@ -504,7 +504,7 @@ fn a_restore_point_puts_two_real_areas_back_with_one_action_and_that_is_undoable
         .find(|p| p.point == point)
         .expect("the point is found by its tag, in real snapper's listing");
     assert!(ours.tagged);
-    let areas: Vec<&str> = ours.members.iter().map(|m| m.config.as_str()).collect();
+    let areas: Vec<&str> = ours.members.iter().map(|m| m.area.as_str()).collect();
     assert!(
         areas.contains(&"snapall_it_a") && areas.contains(&"snapall_it_b"),
         "{areas:?}"
@@ -559,8 +559,8 @@ fn real_snapper_reports_retention_and_measures_a_snapshots_room_only_with_quotas
     }
     let _turn = take_turns();
     let backend = backend();
-    let a = ConfigName::parse("snapall_it_a").unwrap();
-    let dir = backend.config_subvolume(&a).unwrap();
+    let a = AreaName::parse("snapall_it_a").unwrap();
+    let dir = backend.area_location(&a).unwrap();
     let mount = std::path::Path::new(&dir)
         .parent()
         .unwrap()

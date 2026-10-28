@@ -27,7 +27,7 @@ pub enum Key {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pane {
-    Configs,
+    Areas,
     Snapshots,
 }
 

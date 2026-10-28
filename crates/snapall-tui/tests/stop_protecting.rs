@@ -11,7 +11,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{
-    plan_snapshots, run_plan, ConfigName, Description, GroupName, Groups, SnapshotBackend,
+    plan_snapshots, run_plan, AreaName, Description, GroupName, Groups, SnapshotBackend,
 };
 use snapall_tui::model::{Key, Modal};
 use snapall_tui::{view, Session, UiContext};
@@ -55,13 +55,13 @@ fn flat(session: &Session<'_>) -> String {
         .join(" ")
 }
 
-fn area(name: &str) -> ConfigName {
-    ConfigName::parse(name).unwrap()
+fn area(name: &str) -> AreaName {
+    AreaName::parse(name).unwrap()
 }
 
 /// Three areas, the last the system, each with two snapshots.
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["data", "home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["data", "home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     for note in ["one", "two"] {
         run_plan(&backend, &plan, &Description::parse(note).unwrap(), None);
@@ -109,7 +109,7 @@ fn asking_about<'a>(
 
 fn protected(backend: &InMemoryBackend) -> Vec<String> {
     backend
-        .list_configs()
+        .list_areas()
         .unwrap()
         .iter()
         .map(ToString::to_string)

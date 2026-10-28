@@ -8,7 +8,7 @@ use super::*;
 use crate::output::Outcome;
 use crate::{advice, boot_probe, setup};
 use snapall_core::boot;
-use snapall_core::{config_covering, SnapshotBackend};
+use snapall_core::{area_covering, SnapshotBackend};
 use std::error::Error;
 use std::io::IsTerminal;
 use std::process::ExitCode;
@@ -48,8 +48,8 @@ pub(super) fn file_target(
     if std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
         return Err("directories are not supported yet: choose a file".into());
     }
-    let config = config_covering(backend, &path).map_err(|e| advice::explain(&e, &path))?;
-    Ok(snapall_tui::FileTarget { path, config })
+    let area = area_covering(backend, &path).map_err(|e| advice::explain(&e, &path))?;
+    Ok(snapall_tui::FileTarget { path, area })
 }
 
 /// What the UI is told about this machine. It is looked at once, here, because the UI's model must

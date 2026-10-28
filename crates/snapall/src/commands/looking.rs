@@ -9,21 +9,21 @@ use crate::output::Outcome;
 use crate::{advice, render};
 use snapall_core::{
     all_snapshots, assess, file_history, gather, preview_restore, restore_points, snapshots_of,
-    ConfigName, Level, Preview, SnapshotId,
+    AreaName, Level, Preview, SnapshotId,
 };
 use std::process::ExitCode;
 
 pub fn list(ctx: &Context) -> Outcome {
-    let configs = ctx.backend.list_configs()?;
+    let areas = ctx.backend.list_areas()?;
     ctx.show
-        .result(render::configs(&configs), render::configs_json(&configs))
+        .result(render::protected_areas(&areas), render::areas_json(&areas))
 }
 
-pub fn snapshots(ctx: &Context, config: Option<ConfigName>) -> Outcome {
-    let all = match config {
-        Some(config) => {
-            let snapshots = snapshots_of(ctx.backend, &config)?;
-            vec![(config, snapshots)]
+pub fn snapshots(ctx: &Context, area: Option<AreaName>) -> Outcome {
+    let all = match area {
+        Some(area) => {
+            let snapshots = snapshots_of(ctx.backend, &area)?;
+            vec![(area, snapshots)]
         }
         None => all_snapshots(ctx.backend)?,
     };
@@ -40,9 +40,9 @@ pub fn history(ctx: &Context, path: &str) -> Outcome {
 }
 
 /// What restoring a snapshot would change, without changing it.
-pub fn changes(ctx: &Context, config: &ConfigName, id: SnapshotId, path: Option<&str>) -> Outcome {
-    let preview = preview_restore(ctx.backend, config, id, path)?;
-    show_changes(ctx, config, id, &preview)
+pub fn changes(ctx: &Context, area: &AreaName, id: SnapshotId, path: Option<&str>) -> Outcome {
+    let preview = preview_restore(ctx.backend, area, id, path)?;
+    show_changes(ctx, area, id, &preview)
 }
 
 /// How protection stands: whether it is working, the room it takes, whether old snapshots are cleaned
@@ -78,12 +78,12 @@ pub fn points(ctx: &Context) -> Outcome {
 
 pub(super) fn show_changes(
     ctx: &Context,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     preview: &Preview,
 ) -> Outcome {
     ctx.show.result(
-        render::changes(config, id, preview),
-        render::changes_json(config, id, preview),
+        render::changes(area, id, preview),
+        render::changes_json(area, id, preview),
     )
 }

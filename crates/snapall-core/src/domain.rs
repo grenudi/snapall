@@ -14,9 +14,9 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error("the area's name is empty")]
-    EmptyConfigName,
+    EmptyAreaName,
     #[error("the area name `{name}` is not allowed: {reason}")]
-    InvalidConfigName { name: String, reason: &'static str },
+    InvalidAreaName { name: String, reason: &'static str },
     #[error("description is empty")]
     EmptyDescription,
     #[error("description is too long ({len} characters, maximum {max})")]
@@ -74,18 +74,18 @@ impl std::fmt::Display for Point {
 /// The charset is deliberately narrow and the name can never start with `-`, so it is
 /// always safe to hand to a command line as a single argument.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConfigName(String);
+pub struct AreaName(String);
 
-impl ConfigName {
+impl AreaName {
     pub const MAX_LEN: usize = 128;
 
     pub fn parse(input: &str) -> Result<Self, ParseError> {
-        let invalid = |reason| ParseError::InvalidConfigName {
+        let invalid = |reason| ParseError::InvalidAreaName {
             name: input.to_owned(),
             reason,
         };
         if input.is_empty() {
-            return Err(ParseError::EmptyConfigName);
+            return Err(ParseError::EmptyAreaName);
         }
         if input.len() > Self::MAX_LEN {
             return Err(invalid("longer than 128 bytes"));
@@ -107,7 +107,7 @@ impl ConfigName {
     }
 }
 
-impl fmt::Display for ConfigName {
+impl fmt::Display for AreaName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
@@ -345,7 +345,7 @@ impl Retention {
 
 /// A setting of a config that snapall chooses for the configs it creates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConfigOption {
+pub enum AreaOption {
     /// Whether snapper takes snapshots by itself on a schedule (hourly, daily, ...). snapall turns
     /// it off for what it sets up: snapshots happen when you ask, so nothing piles up on its own.
     TimelineCreate(bool),
@@ -358,18 +358,18 @@ pub enum ConfigOption {
     CleanupOfSnapshots(bool),
 }
 
-impl ConfigOption {
+impl AreaOption {
     /// What the setting means, for the audit log.
     pub fn describe(self) -> String {
         match self {
-            ConfigOption::TimelineCreate(on) => {
+            AreaOption::TimelineCreate(on) => {
                 format!("snapshots on a schedule: {}", if on { "on" } else { "off" })
             }
-            ConfigOption::KeepNewest(count) => format!("keep the newest {count}"),
-            ConfigOption::NeverRemoveYoungerThan(seconds) => {
+            AreaOption::KeepNewest(count) => format!("keep the newest {count}"),
+            AreaOption::NeverRemoveYoungerThan(seconds) => {
                 format!("never remove one younger than {seconds} seconds")
             }
-            ConfigOption::CleanupOfSnapshots(on) => {
+            AreaOption::CleanupOfSnapshots(on) => {
                 format!("cleanup of snapshots: {}", if on { "on" } else { "off" })
             }
         }
@@ -381,26 +381,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn config_names_accept_ordinary_names() {
+    fn area_names_accept_ordinary_names() {
         for name in ["root", "home", "home_user", "data-2", "a.b"] {
-            assert_eq!(ConfigName::parse(name).unwrap().as_str(), name);
+            assert_eq!(AreaName::parse(name).unwrap().as_str(), name);
         }
     }
 
     #[test]
-    fn config_names_reject_anything_unsafe_for_an_argv() {
-        assert_eq!(ConfigName::parse(""), Err(ParseError::EmptyConfigName));
+    fn area_names_reject_anything_unsafe_for_an_argv() {
+        assert_eq!(AreaName::parse(""), Err(ParseError::EmptyAreaName));
         for bad in ["-rf", "--help", "a b", "a/b", "a;b", "ro\not", "naïve"] {
             assert!(
                 matches!(
-                    ConfigName::parse(bad),
-                    Err(ParseError::InvalidConfigName { .. })
+                    AreaName::parse(bad),
+                    Err(ParseError::InvalidAreaName { .. })
                 ),
                 "{bad:?} should be rejected"
             );
         }
-        assert!(ConfigName::parse(&"x".repeat(ConfigName::MAX_LEN + 1)).is_err());
-        assert!(ConfigName::parse(&"x".repeat(ConfigName::MAX_LEN)).is_ok());
+        assert!(AreaName::parse(&"x".repeat(AreaName::MAX_LEN + 1)).is_err());
+        assert!(AreaName::parse(&"x".repeat(AreaName::MAX_LEN)).is_ok());
     }
 
     #[test]

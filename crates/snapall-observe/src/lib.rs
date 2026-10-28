@@ -18,8 +18,8 @@ mod lines;
 use std::time::Instant;
 
 use snapall_core::{
-    BackendError, Change, ConfigName, ConfigOption, Description, Event, FileVersion, Observer,
-    Point, RestoreSummary, Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
+    AreaName, AreaOption, BackendError, Change, Description, Event, FileVersion, Observer, Point,
+    RestoreSummary, Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 
 pub use clock::rfc3339_utc;
@@ -41,14 +41,14 @@ impl<B, O> Observed<B, O> {
 impl<B, O: Observer> Observed<B, O> {
     fn created(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
         point: Option<&Point>,
         result: &Result<SnapshotId, BackendError>,
         start: Instant,
     ) {
         self.observer.observe(&Event::SnapshotCreated {
-            config: config.clone(),
+            area: area.clone(),
             description: description.as_str().to_owned(),
             point: point.map(ToString::to_string),
             result: result.as_ref().copied().map_err(ToString::to_string),
@@ -59,14 +59,14 @@ impl<B, O: Observer> Observed<B, O> {
     /// Run a change to a config and report it, with how long it took and how it ended.
     fn audited(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         change: String,
         operation: impl FnOnce() -> Result<(), BackendError>,
     ) -> Result<(), BackendError> {
         let start = Instant::now();
         let result = operation();
-        self.observer.observe(&Event::ConfigChanged {
-            config: config.clone(),
+        self.observer.observe(&Event::AreaChanged {
+            area: area.clone(),
             change,
             result: result.as_ref().copied().map_err(ToString::to_string),
             took: start.elapsed(),
@@ -88,10 +88,10 @@ fn message<T>(result: &Result<T, BackendError>) -> Result<(), String> {
 }
 
 impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
-    fn list_configs(&self) -> Result<Vec<ConfigName>, BackendError> {
+    fn list_areas(&self) -> Result<Vec<AreaName>, BackendError> {
         let start = Instant::now();
-        let result = self.inner.list_configs();
-        self.observer.observe(&Event::ConfigsListed {
+        let result = self.inner.list_areas();
+        self.observer.observe(&Event::AreasListed {
             result: result.as_ref().map(Vec::len).map_err(ToString::to_string),
             took: start.elapsed(),
         });
@@ -100,43 +100,43 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
 
     fn create_snapshot(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError> {
         let start = Instant::now();
-        let result = self.inner.create_snapshot(config, description);
-        self.created(config, description, None, &result, start);
+        let result = self.inner.create_snapshot(area, description);
+        self.created(area, description, None, &result, start);
         result
     }
 
     fn create_snapshot_in(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
         point: &Point,
     ) -> Result<SnapshotId, BackendError> {
         let start = Instant::now();
-        let result = self.inner.create_snapshot_in(config, description, point);
-        self.created(config, description, Some(point), &result, start);
+        let result = self.inner.create_snapshot_in(area, description, point);
+        self.created(area, description, Some(point), &result, start);
         result
     }
 
-    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {
+    fn list_snapshots(&self, area: &AreaName) -> Result<Vec<SnapshotInfo>, BackendError> {
         let start = Instant::now();
-        let result = self.inner.list_snapshots(config);
+        let result = self.inner.list_snapshots(area);
         self.observer.observe(&Event::SnapshotsListed {
-            config: config.clone(),
+            area: area.clone(),
             result: result.as_ref().map(Vec::len).map_err(ToString::to_string),
             took: start.elapsed(),
         });
         result
     }
 
-    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError> {
+    fn delete_snapshot(&self, area: &AreaName, id: SnapshotId) -> Result<(), BackendError> {
         let start = Instant::now();
-        let result = self.inner.delete_snapshot(config, id);
+        let result = self.inner.delete_snapshot(area, id);
         self.observer.observe(&Event::SnapshotDeleted {
-            config: config.clone(),
+            area: area.clone(),
             id,
             result: message(&result),
             took: start.elapsed(),
@@ -145,66 +145,52 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
     }
 
     // Reading where a config lives and what changed is not an event; only the mutation is.
-    fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
-        self.inner.config_subvolume(config)
+    fn area_location(&self, area: &AreaName) -> Result<String, BackendError> {
+        self.inner.area_location(area)
     }
 
-    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
-        self.audited(name, format!("created for {subvolume}"), || {
-            self.inner.create_config(name, subvolume)
+    fn create_area(&self, name: &AreaName, location: &str) -> Result<(), BackendError> {
+        self.audited(name, format!("created for {location}"), || {
+            self.inner.create_area(name, location)
         })
     }
 
-    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
-        self.audited(name, "removed".to_owned(), || {
-            self.inner.delete_config(name)
-        })
+    fn delete_area(&self, name: &AreaName) -> Result<(), BackendError> {
+        self.audited(name, "removed".to_owned(), || self.inner.delete_area(name))
     }
 
-    fn set_config_option(
-        &self,
-        name: &ConfigName,
-        option: ConfigOption,
-    ) -> Result<(), BackendError> {
+    fn set_area_option(&self, name: &AreaName, option: AreaOption) -> Result<(), BackendError> {
         self.audited(name, option.describe(), || {
-            self.inner.set_config_option(name, option)
+            self.inner.set_area_option(name, option)
         })
     }
 
-    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
-        self.inner.retention(config)
+    fn retention(&self, area: &AreaName) -> Result<Retention, BackendError> {
+        self.inner.retention(area)
     }
 
-    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
-        self.inner.covers(config, path)
+    fn covers(&self, area: &AreaName, path: &str) -> Result<bool, BackendError> {
+        self.inner.covers(area, path)
     }
 
-    fn changes_since(
-        &self,
-        config: &ConfigName,
-        id: SnapshotId,
-    ) -> Result<Vec<Change>, BackendError> {
-        self.inner.changes_since(config, id)
+    fn changes_since(&self, area: &AreaName, id: SnapshotId) -> Result<Vec<Change>, BackendError> {
+        self.inner.changes_since(area, id)
     }
 
-    fn file_versions(
-        &self,
-        config: &ConfigName,
-        path: &str,
-    ) -> Result<Vec<FileVersion>, BackendError> {
-        self.inner.file_versions(config, path)
+    fn file_versions(&self, area: &AreaName, path: &str) -> Result<Vec<FileVersion>, BackendError> {
+        self.inner.file_versions(area, path)
     }
 
     fn undo_changes(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         id: SnapshotId,
         path: Option<&str>,
     ) -> Result<RestoreSummary, BackendError> {
         let start = Instant::now();
-        let result = self.inner.undo_changes(config, id, path);
+        let result = self.inner.undo_changes(area, id, path);
         self.observer.observe(&Event::ChangesUndone {
-            config: config.clone(),
+            area: area.clone(),
             id,
             path: path.map(str::to_owned),
             result: result
@@ -235,14 +221,14 @@ mod tests {
         }
     }
 
-    fn name(s: &str) -> ConfigName {
-        ConfigName::parse(s).unwrap()
+    fn name(s: &str) -> AreaName {
+        AreaName::parse(s).unwrap()
     }
 
     #[test]
     fn an_observed_backend_still_satisfies_the_backend_contract() {
         let recorder = Recorder::default();
-        let backend = Observed::new(InMemoryBackend::with_configs(&["root"]), &recorder);
+        let backend = Observed::new(InMemoryBackend::with_areas(&["root"]), &recorder);
         backend_contract(&backend, &name("root"));
         assert!(
             !recorder.0.borrow().is_empty(),
@@ -254,12 +240,12 @@ mod tests {
     fn every_operation_is_reported_with_its_outcome() {
         let recorder = Recorder::default();
         let backend = Observed::new(
-            InMemoryBackend::with_configs(&["home", "root"]).failing_on("root"),
+            InMemoryBackend::with_areas(&["home", "root"]).failing_on("root"),
             &recorder,
         );
         let description = Description::parse("before theming").unwrap();
 
-        backend.list_configs().unwrap();
+        backend.list_areas().unwrap();
         let id = backend
             .create_snapshot(&name("home"), &description)
             .unwrap();
@@ -285,7 +271,7 @@ mod tests {
         );
         assert!(matches!(
             &events[0],
-            Event::ConfigsListed { result: Ok(2), .. }
+            Event::AreasListed { result: Ok(2), .. }
         ));
         assert!(matches!(
             &events[1],
@@ -309,11 +295,8 @@ mod tests {
 
     #[test]
     fn what_the_wrapped_backend_returns_is_returned_unchanged() {
-        let plain = InMemoryBackend::with_configs(&["home"]);
-        let observed = Observed::new(
-            InMemoryBackend::with_configs(&["home"]),
-            Recorder::default(),
-        );
+        let plain = InMemoryBackend::with_areas(&["home"]);
+        let observed = Observed::new(InMemoryBackend::with_areas(&["home"]), Recorder::default());
         let description = Description::default();
         assert_eq!(
             plain.create_snapshot(&name("home"), &description).unwrap(),
@@ -330,7 +313,7 @@ mod tests {
     #[test]
     fn a_restore_is_an_audited_event_with_what_it_did_and_reading_is_not() {
         let recorder = Recorder::default();
-        let inner = InMemoryBackend::with_configs(&["home"]);
+        let inner = InMemoryBackend::with_areas(&["home"]);
         inner.write_file("home", "/mnt/home/a.txt", "one");
         let backend = Observed::new(inner, &recorder);
         let id = backend
@@ -338,7 +321,7 @@ mod tests {
             .unwrap();
         backend.write_file_for_test("/mnt/home/a.txt", "two");
 
-        backend.config_subvolume(&name("home")).unwrap();
+        backend.area_location(&name("home")).unwrap();
         backend.changes_since(&name("home"), id).unwrap();
         let before_undo = recorder.0.borrow().len();
         assert_eq!(
@@ -368,18 +351,18 @@ mod tests {
     #[test]
     fn setting_an_area_up_is_an_audited_event_for_each_step_and_for_a_failure() {
         let recorder = Recorder::default();
-        let backend = Observed::new(InMemoryBackend::with_configs(&["root"]), &recorder);
+        let backend = Observed::new(InMemoryBackend::with_areas(&["root"]), &recorder);
         let home = name("home");
-        backend.create_config(&home, "/home").unwrap();
+        backend.create_area(&home, "/home").unwrap();
         backend
-            .set_config_option(&home, snapall_core::ConfigOption::TimelineCreate(false))
+            .set_area_option(&home, snapall_core::AreaOption::TimelineCreate(false))
             .unwrap();
-        backend.create_config(&home, "/home").unwrap_err(); // already exists
+        backend.create_area(&home, "/home").unwrap_err(); // already exists
         let events = recorder.0.borrow();
         let changes: Vec<(&str, bool)> = events
             .iter()
             .filter_map(|e| match e {
-                Event::ConfigChanged { change, result, .. } => {
+                Event::AreaChanged { change, result, .. } => {
                     Some((change.as_str(), result.is_ok()))
                 }
                 _ => None,

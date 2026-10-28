@@ -9,9 +9,9 @@
 //! something about it, what. The words are plain ones (see ADR 16); a figure that cannot be measured is
 //! said to be unmeasured and why, never guessed.
 
-use crate::calendar::seconds_from_snapper_date;
+use crate::calendar::seconds_from_snapshot_date;
 use crate::coverage::describe;
-use crate::domain::{ConfigName, Retention, SnapshotInfo};
+use crate::domain::{AreaName, Retention, SnapshotInfo};
 use crate::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup, Limit};
 use crate::port::{BackendError, SnapshotBackend};
 use crate::services::{self, Job};
@@ -22,9 +22,9 @@ use crate::system::{DiskUsage, QuotaMode, ServiceState, SystemProbe, UnitDetails
 /// What is known about one protected area.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AreaFacts {
-    pub config: ConfigName,
+    pub config: AreaName,
     /// The directory it protects: `/`, `/home`.
-    pub subvolume: String,
+    pub location: String,
     pub snapshots: usize,
     /// When the oldest and the newest were taken, as snapper wrote it.
     pub oldest: Option<String>,
@@ -40,12 +40,12 @@ pub struct AreaFacts {
 impl AreaFacts {
     /// What a person calls it: `Home`.
     pub fn title(&self) -> String {
-        describe(&self.subvolume).title
+        describe(&self.location).title
     }
 
     /// Where its snapshots are kept.
     pub fn lives_in(&self) -> String {
-        format!("{}/.snapshots", self.subvolume.trim_end_matches('/'))
+        format!("{}/.snapshots", self.location.trim_end_matches('/'))
     }
 }
 
@@ -313,12 +313,12 @@ fn snapshots_made_on_a_schedule(facts: &Facts) -> Option<Finding> {
 
 /// Areas with no snapshot at all, or none for a month.
 fn areas_gone_quiet(facts: &Facts) -> Vec<Finding> {
-    let now = facts.now.as_deref().and_then(seconds_from_snapper_date);
+    let now = facts.now.as_deref().and_then(seconds_from_snapshot_date);
     facts
         .areas
         .iter()
         .filter_map(|area| {
-            let Some(newest) = area.newest.as_deref().and_then(seconds_from_snapper_date) else {
+            let Some(newest) = area.newest.as_deref().and_then(seconds_from_snapshot_date) else {
                 return (area.snapshots == 0).then(|| Finding {
                     level: Level::Note,
                     topic: Topic::Snapshots,
@@ -476,7 +476,7 @@ pub fn gather(
     system: &dyn SystemProbe,
 ) -> Result<Facts, BackendError> {
     let areas = backend
-        .list_configs()?
+        .list_areas()?
         .into_iter()
         .filter_map(|config| area_facts(backend, system, config))
         .collect();
@@ -498,19 +498,19 @@ pub fn gather(
 fn area_facts(
     backend: &dyn SnapshotBackend,
     system: &dyn SystemProbe,
-    config: ConfigName,
+    config: AreaName,
 ) -> Option<AreaFacts> {
-    let subvolume = backend.config_subvolume(&config).ok()?;
+    let location = backend.area_location(&config).ok()?;
     let snapshots = backend.list_snapshots(&config).ok()?;
     Some(AreaFacts {
         retention: backend.retention(&config).ok(),
-        disk: system.disk_usage(&subvolume),
-        quotas: system.quota_mode(&subvolume),
+        disk: system.disk_usage(&location),
+        quotas: system.quota_mode(&location),
         oldest: snapshots.iter().filter_map(|s| s.date.clone()).min(),
         newest: snapshots.iter().filter_map(|s| s.date.clone()).max(),
         measured_bytes: measured_bytes(&snapshots),
         snapshots: snapshots.len(),
-        subvolume,
+        location,
         config,
     })
 }
@@ -525,8 +525,8 @@ mod tests {
     use super::*;
     use crate::testing::{FakeSystem, InMemoryBackend};
 
-    fn name(s: &str) -> ConfigName {
-        ConfigName::parse(s).unwrap()
+    fn name(s: &str) -> AreaName {
+        AreaName::parse(s).unwrap()
     }
 
     fn retention() -> Retention {
@@ -543,14 +543,14 @@ mod tests {
 
     fn area(
         config: &str,
-        subvolume: &str,
+        location: &str,
         snapshots: usize,
         newest: &str,
         used_percent: u64,
     ) -> AreaFacts {
         AreaFacts {
             config: name(config),
-            subvolume: subvolume.to_owned(),
+            location: location.to_owned(),
             snapshots,
             oldest: Some("2026-09-01 10:00:00".to_owned()),
             newest: Some(newest.to_owned()),
@@ -888,7 +888,7 @@ mod tests {
 
     #[test]
     fn gathering_reads_each_area_through_the_ports_and_skips_nothing_that_can_be_read() {
-        let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
         let plan = crate::usecase::plan_snapshots(&backend, None).unwrap();
         crate::usecase::run_plan(
             &backend,

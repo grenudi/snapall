@@ -7,7 +7,7 @@
 use serde_json::{json, Value};
 use snapall_core::doctor::{Check, OsRelease, Status};
 use snapall_core::{
-    ChangeKind, ConfigName, Description, FileHistory, Plan, Preview, Report, Restored, SnapshotId,
+    AreaName, ChangeKind, Description, FileHistory, Plan, Preview, Report, Restored, SnapshotId,
     SnapshotInfo, SnapshotKind,
 };
 
@@ -15,14 +15,14 @@ pub fn report(report: &Report) -> String {
     let width = report
         .outcomes
         .iter()
-        .map(|o| o.config.as_str().len())
+        .map(|o| o.area.as_str().len())
         .max()
         .unwrap_or(0);
     let mut out = String::new();
     for outcome in &report.outcomes {
         match &outcome.result {
-            Ok(id) => out.push_str(&format!("ok    {:<width$}  #{id}\n", outcome.config)),
-            Err(err) => out.push_str(&format!("FAIL  {:<width$}  {err}\n", outcome.config)),
+            Ok(id) => out.push_str(&format!("ok    {:<width$}  #{id}\n", outcome.area)),
+            Err(err) => out.push_str(&format!("FAIL  {:<width$}  {err}\n", outcome.area)),
         }
     }
     out
@@ -33,8 +33,8 @@ pub fn report_json(report: &Report) -> Value {
         .outcomes
         .iter()
         .map(|o| match &o.result {
-            Ok(id) => json!({"config": o.config.as_str(), "snapshot": id.get()}),
-            Err(err) => json!({"config": o.config.as_str(), "error": err.to_string()}),
+            Ok(id) => json!({"config": o.area.as_str(), "snapshot": id.get()}),
+            Err(err) => json!({"config": o.area.as_str(), "error": err.to_string()}),
         })
         .collect();
     json!({"ok": report.is_success(), "outcomes": outcomes})
@@ -68,7 +68,7 @@ fn kind_word(kind: ChangeKind) -> &'static str {
 /// How many changed paths a human sees before the rest is summarised. `--json` is never cut.
 const SHOWN: usize = 200;
 
-pub fn changes(config: &ConfigName, id: SnapshotId, preview: &Preview) -> String {
+pub fn changes(config: &AreaName, id: SnapshotId, preview: &Preview) -> String {
     if preview.changes.is_empty() {
         return format!("{config} already matches #{id}: nothing would change\n");
     }
@@ -89,7 +89,7 @@ pub fn changes(config: &ConfigName, id: SnapshotId, preview: &Preview) -> String
     out
 }
 
-pub fn changes_json(config: &ConfigName, id: SnapshotId, preview: &Preview) -> Value {
+pub fn changes_json(config: &AreaName, id: SnapshotId, preview: &Preview) -> Value {
     let changes: Vec<Value> = preview
         .changes
         .iter()
@@ -98,13 +98,13 @@ pub fn changes_json(config: &ConfigName, id: SnapshotId, preview: &Preview) -> V
     json!({
         "config": config.as_str(),
         "snapshot": id.get(),
-        "subvolume": preview.subvolume,
+        "subvolume": preview.location,
         "system_root": preview.is_system_root,
         "changes": changes,
     })
 }
 
-pub fn restored(config: &ConfigName, id: SnapshotId, done: &Restored) -> String {
+pub fn restored(config: &AreaName, id: SnapshotId, done: &Restored) -> String {
     let s = done.summary;
     format!(
         "restored {config} to #{id}: {} reverted, {} removed, {} brought back\n\
@@ -113,7 +113,7 @@ pub fn restored(config: &ConfigName, id: SnapshotId, done: &Restored) -> String 
     )
 }
 
-pub fn restored_json(config: &ConfigName, id: SnapshotId, done: &Restored) -> Value {
+pub fn restored_json(config: &AreaName, id: SnapshotId, done: &Restored) -> Value {
     json!({
         "config": config.as_str(),
         "snapshot": id.get(),
@@ -124,16 +124,16 @@ pub fn restored_json(config: &ConfigName, id: SnapshotId, done: &Restored) -> Va
     })
 }
 
-pub fn deleted(config: &ConfigName, id: SnapshotId) -> String {
+pub fn deleted(config: &AreaName, id: SnapshotId) -> String {
     format!("deleted #{id} from {config}\n")
 }
 
-pub fn deleted_json(config: &ConfigName, id: SnapshotId) -> Value {
+pub fn deleted_json(config: &AreaName, id: SnapshotId) -> Value {
     json!({"config": config.as_str(), "deleted": id.get()})
 }
 
 pub fn history(history: &FileHistory) -> String {
-    let mut out = format!("{}  (config {})\n", history.path, history.config);
+    let mut out = format!("{}  (config {})\n", history.path, history.area);
     if history.versions.is_empty() {
         out.push_str("no snapshots of this area yet\n");
         return out;
@@ -175,13 +175,13 @@ pub fn history_json(history: &FileHistory) -> Value {
             })
         })
         .collect();
-    json!({"path": history.path, "config": history.config.as_str(), "versions": versions})
+    json!({"path": history.path, "config": history.area.as_str(), "versions": versions})
 }
 
 // ---- groups -----------------------------------------------------------------------------------
 
 /// Every group, `all` first: what it covers, and which of its areas are no longer protected.
-pub fn groups(made: &snapall_core::Groups, protected: &[snapall_core::ConfigName]) -> String {
+pub fn groups(made: &snapall_core::Groups, protected: &[snapall_core::AreaName]) -> String {
     let every: Vec<String> = protected.iter().map(ToString::to_string).collect();
     let mut out = format!(
         "all: every protected area ({})
@@ -216,7 +216,7 @@ No groups of your own yet. Make one with: snapall groups add NAME AREA,AREA
     out
 }
 
-pub fn groups_json(made: &snapall_core::Groups, protected: &[snapall_core::ConfigName]) -> Value {
+pub fn groups_json(made: &snapall_core::Groups, protected: &[snapall_core::AreaName]) -> Value {
     let mut all = vec![
         json!({ "name": "all", "areas": protected.iter().map(ToString::to_string).collect::<Vec<_>>(), "stored": false }),
     ];
@@ -397,7 +397,7 @@ pub fn health(facts: &snapall_core::Facts, report: &snapall_core::Health) -> Str
         out.push_str(&format!(
             "  {} ({})\n      {} snapshot{}, {room}{disk}{keeps}\n      newest: {}   kept in {}\n",
             area.title(),
-            area.subvolume,
+            area.location,
             area.snapshots,
             if area.snapshots == 1 { "" } else { "s" },
             area.newest.as_deref().unwrap_or("none yet"),
@@ -461,7 +461,7 @@ pub fn health_json(facts: &snapall_core::Facts, report: &snapall_core::Health) -
         "status": report.chips.iter().map(|c| json!({"label": c.label, "level": level_word(c.level), "topic": topic_word(c.topic)})).collect::<Vec<_>>(),
         "areas": facts.areas.iter().map(|a| json!({
             "area": a.config.as_str(),
-            "path": a.subvolume,
+            "path": a.location,
             "snapshots": a.snapshots,
             "oldest": a.oldest,
             "newest": a.newest,
@@ -479,7 +479,7 @@ fn areas_of(point: &snapall_core::RestorePoint) -> String {
     point
         .members
         .iter()
-        .map(|m| m.config.as_str())
+        .map(|m| m.area.as_str())
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -524,7 +524,7 @@ pub fn points_json(points: &[snapall_core::RestorePoint]) -> Value {
         "description": p.description,
         "date": p.date,
         "tagged": p.tagged,
-        "areas": p.members.iter().map(|m| json!({"area": m.config.as_str(), "snapshot": m.id.get()})).collect::<Vec<_>>(),
+        "areas": p.members.iter().map(|m| json!({"area": m.area.as_str(), "snapshot": m.id.get()})).collect::<Vec<_>>(),
     })).collect::<Vec<_>>() })
 }
 
@@ -553,7 +553,7 @@ pub fn point_preview(
     );
     let width = previews
         .iter()
-        .map(|p| p.config.as_str().len())
+        .map(|p| p.area.as_str().len())
         .max()
         .unwrap_or(0);
     let mut system = false;
@@ -579,7 +579,7 @@ pub fn point_preview(
             }
             MemberView::Failed(why) => format!("could not be looked at: {why}"),
         };
-        out.push_str(&format!("  {:<width$}  {what}\n", p.config.as_str()));
+        out.push_str(&format!("  {:<width$}  {what}\n", p.area.as_str()));
     }
     if system {
         out.push_str(&format!(
@@ -597,9 +597,9 @@ pub fn point_preview_json(
     json!({
         "point": point.point.as_str(),
         "areas": previews.iter().map(|p| match &p.view {
-            MemberView::Changes(c) => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": if c.changes.is_empty() { "unchanged" } else { "change" }, "paths": c.changes.len()}),
-            MemberView::SystemRoot => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": "system"}),
-            MemberView::Failed(why) => json!({"area": p.config.as_str(), "snapshot": p.id.get(), "action": "error", "error": why}),
+            MemberView::Changes(c) => json!({"area": p.area.as_str(), "snapshot": p.id.get(), "action": if c.changes.is_empty() { "unchanged" } else { "change" }, "paths": c.changes.len()}),
+            MemberView::SystemRoot => json!({"area": p.area.as_str(), "snapshot": p.id.get(), "action": "system"}),
+            MemberView::Failed(why) => json!({"area": p.area.as_str(), "snapshot": p.id.get(), "action": "error", "error": why}),
         }).collect::<Vec<_>>(),
     })
 }
@@ -614,7 +614,7 @@ pub fn point_restored(
     let width = done
         .members
         .iter()
-        .map(|m| m.config.as_str().len())
+        .map(|m| m.area.as_str().len())
         .max()
         .unwrap_or(0);
     for m in &done.members {
@@ -638,7 +638,7 @@ pub fn point_restored(
             }
             MemberResult::Failed(why) => format!("FAILED: {why}"),
         };
-        out.push_str(&format!("  {:<width$}  {what}\n", m.config.as_str()));
+        out.push_str(&format!("  {:<width$}  {what}\n", m.area.as_str()));
     }
     if done.changed_anything() {
         out.push_str(&format!(
@@ -660,10 +660,10 @@ pub fn point_restored_json(
         "point": point.point.as_str(),
         "undo_point": done.changed_anything().then(|| done.safety.as_str().to_owned()),
         "areas": done.members.iter().map(|m| match &m.result {
-            MemberResult::Restored(r) => json!({"area": m.config.as_str(), "result": "restored", "snapshot": m.id.get(), "safety_snapshot": r.safety_snapshot.get(), "paths": r.summary.created + r.summary.modified + r.summary.deleted}),
-            MemberResult::AlreadyThere => json!({"area": m.config.as_str(), "result": "unchanged", "snapshot": m.id.get()}),
-            MemberResult::SystemRoot => json!({"area": m.config.as_str(), "result": "system", "snapshot": m.id.get()}),
-            MemberResult::Failed(why) => json!({"area": m.config.as_str(), "result": "failed", "snapshot": m.id.get(), "error": why}),
+            MemberResult::Restored(r) => json!({"area": m.area.as_str(), "result": "restored", "snapshot": m.id.get(), "safety_snapshot": r.safety_snapshot.get(), "paths": r.summary.created + r.summary.modified + r.summary.deleted}),
+            MemberResult::AlreadyThere => json!({"area": m.area.as_str(), "result": "unchanged", "snapshot": m.id.get()}),
+            MemberResult::SystemRoot => json!({"area": m.area.as_str(), "result": "system", "snapshot": m.id.get()}),
+            MemberResult::Failed(why) => json!({"area": m.area.as_str(), "result": "failed", "snapshot": m.id.get(), "error": why}),
         }).collect::<Vec<_>>(),
     })
 }
@@ -740,18 +740,18 @@ pub fn dry_run_json(plan: &Plan, description: &Description) -> Value {
     json!({
         "dry_run": true,
         "description": description.as_str(),
-        "would_snapshot": plan.targets().iter().map(ConfigName::as_str).collect::<Vec<_>>(),
+        "would_snapshot": plan.targets().iter().map(AreaName::as_str).collect::<Vec<_>>(),
     })
 }
 
-pub fn configs(configs: &[ConfigName]) -> String {
-    let mut sorted: Vec<&ConfigName> = configs.iter().collect();
+pub fn protected_areas(configs: &[AreaName]) -> String {
+    let mut sorted: Vec<&AreaName> = configs.iter().collect();
     sorted.sort();
     sorted.iter().map(|c| format!("{c}\n")).collect()
 }
 
-pub fn configs_json(configs: &[ConfigName]) -> Value {
-    let mut sorted: Vec<&str> = configs.iter().map(ConfigName::as_str).collect();
+pub fn areas_json(configs: &[AreaName]) -> Value {
+    let mut sorted: Vec<&str> = configs.iter().map(AreaName::as_str).collect();
     sorted.sort_unstable();
     json!({ "configs": sorted })
 }
@@ -765,7 +765,7 @@ fn kind_label(info: &SnapshotInfo) -> String {
 }
 
 /// One block per config: a header, then an aligned table, newest snapshot last.
-pub fn snapshots(all: &[(ConfigName, Vec<SnapshotInfo>)]) -> String {
+pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
     let mut blocks = Vec::new();
     for (config, list) in all {
         let mut block = format!("{config}\n");
@@ -811,7 +811,7 @@ pub fn snapshots(all: &[(ConfigName, Vec<SnapshotInfo>)]) -> String {
     blocks.join("\n")
 }
 
-pub fn snapshots_json(all: &[(ConfigName, Vec<SnapshotInfo>)]) -> Value {
+pub fn snapshots_json(all: &[(AreaName, Vec<SnapshotInfo>)]) -> Value {
     let configs: serde_json::Map<String, Value> = all
         .iter()
         .map(|(config, list)| {
@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     fn report_lists_successes_and_failures_aligned() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]).failing_on("home");
+        let backend = InMemoryBackend::with_areas(&["root", "home"]).failing_on("home");
         let r = snapshot_all(&backend, None, &Description::default(), None).unwrap();
         assert_eq!(
             report(&r),
@@ -867,7 +867,7 @@ mod tests {
 
     #[test]
     fn dry_run_names_every_target_in_both_formats() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]);
+        let backend = InMemoryBackend::with_areas(&["root", "home"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         let description = Description::parse("x").unwrap();
         let text = dry_run(&plan, &description);
@@ -879,19 +879,19 @@ mod tests {
     }
 
     #[test]
-    fn configs_are_sorted_in_both_formats() {
+    fn areas_are_sorted_in_both_formats() {
         let names = [
-            ConfigName::parse("root").unwrap(),
-            ConfigName::parse("home").unwrap(),
+            AreaName::parse("root").unwrap(),
+            AreaName::parse("home").unwrap(),
         ];
-        assert_eq!(configs(&names), "home\nroot\n");
-        assert_eq!(configs_json(&names), json!({"configs": ["home", "root"]}));
+        assert_eq!(protected_areas(&names), "home\nroot\n");
+        assert_eq!(areas_json(&names), json!({"configs": ["home", "root"]}));
     }
 
     #[test]
-    fn snapshot_tables_align_and_empty_configs_say_so() {
-        let backend = InMemoryBackend::with_configs(&["home", "root"]);
-        let home = ConfigName::parse("home").unwrap();
+    fn snapshot_tables_align_and_empty_areas_say_so() {
+        let backend = InMemoryBackend::with_areas(&["home", "root"]);
+        let home = AreaName::parse("home").unwrap();
         for text in ["before theming", "after theming"] {
             backend
                 .create_snapshot(&home, &Description::parse(text).unwrap())
@@ -920,8 +920,8 @@ mod tests {
             os: OsRelease::parse("ID=arch\nPRETTY_NAME=\"Arch Linux\"\n"),
             snapper: Err("No such file or directory".into()),
             is_root: Some(false),
-            configs: None,
-            subvolumes: Vec::new(),
+            areas: None,
+            locations: Vec::new(),
         };
         let checks = diagnose(&probe);
         let text = doctor(&probe.os, &checks);
@@ -945,8 +945,7 @@ mod tests {
         snapall_core::RestorePoint,
     ) {
         use snapall_core::testing::InMemoryBackend;
-        let backend =
-            InMemoryBackend::with_configs(&["docs", "home", "root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["docs", "home", "root"]).with_root_area("root");
         backend.write_file("docs", "/mnt/docs/a.txt", "then");
         backend.write_file("home", "/mnt/home/b.txt", "then");
         let plan = snapall_core::plan_snapshots(&backend, None).unwrap();

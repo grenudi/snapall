@@ -51,7 +51,7 @@ fn context(administrator: bool, offers: Vec<Offer>) -> UiContext {
 }
 
 fn machine() -> InMemoryBackend {
-    InMemoryBackend::with_configs(&["root"]).with_root_config("root")
+    InMemoryBackend::with_areas(&["root"]).with_root_area("root")
 }
 
 fn screen(session: &Session<'_>) -> String {
@@ -147,9 +147,9 @@ fn enter_protects_it_for_real_schedules_off_the_list_updates_and_the_hint_goes()
     session.press(Key::Enter);
     session.confirm();
     assert!(session.state.modal.is_none());
-    let home = snapall_core::ConfigName::parse("home").unwrap();
+    let home = snapall_core::AreaName::parse("home").unwrap();
     assert!(
-        backend.list_configs().unwrap().contains(&home),
+        backend.list_areas().unwrap().contains(&home),
         "the area was set up"
     );
     assert_eq!(
@@ -189,7 +189,7 @@ fn a_failure_says_so_in_plain_words_leaves_nothing_changed_and_keeps_the_offer()
         "{note}"
     );
     assert_eq!(
-        backend.list_configs().unwrap().len(),
+        backend.list_areas().unwrap().len(),
         1,
         "what was started was undone"
     );
@@ -213,7 +213,7 @@ fn without_administrator_rights_it_explains_instead_of_failing_and_offers_no_pro
     assert!(!text.contains("[ Enter: Protect it ]"), "{text}");
     session.press(Key::Enter); // closes: there is nothing to confirm
     assert!(session.state.modal.is_none());
-    assert_eq!(backend.list_configs().unwrap().len(), 1);
+    assert_eq!(backend.list_areas().unwrap().len(), 1);
 }
 
 #[test]
@@ -237,7 +237,7 @@ fn escape_changes_nothing_and_the_button_works_by_mouse_with_its_explanation_on_
     let mut session = Session::with_context(&backend, context(true, two_offers()));
     session.press(Key::Char('p'));
     session.press(Key::Esc);
-    assert_eq!(backend.list_configs().unwrap().len(), 1);
+    assert_eq!(backend.list_areas().unwrap().len(), 1);
 
     let col_row = {
         let text = screen(&session);

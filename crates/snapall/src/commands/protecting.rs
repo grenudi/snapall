@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, render, setup};
-use snapall_core::{Act, ConfigName};
+use snapall_core::{Act, AreaName};
 use std::process::ExitCode;
 
 /// Stop protecting an area: every snapshot of it is deleted for good, its own files are not touched. It
@@ -16,7 +16,7 @@ use std::process::ExitCode;
 pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Outcome {
     use snapall_core::unprotect::{plan, stop_protecting};
     use snapall_core::SystemProbe;
-    let config = ConfigName::parse(area)?;
+    let config = AreaName::parse(area)?;
     let system = snapall_system::LinuxSystem::new();
     let groups = system.groups()?;
     let plan = plan(ctx.backend, &groups, &config)?;
@@ -47,7 +47,7 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
         &question,
         Some(config.as_str()),
     )?;
-    let title = snapall_core::coverage::describe(&plan.subvolume).title;
+    let title = snapall_core::coverage::describe(&plan.location).title;
     let change = Change::begin(
         approved,
         &format!("Stopping protection of {title}"),

@@ -41,7 +41,7 @@ pub(crate) fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
             vec![Effect::LoadFileVersions {
-                config: view.target.config.clone(),
+                area: view.target.area.clone(),
                 path: view.target.path.clone(),
             }]
         }
@@ -54,7 +54,7 @@ pub(crate) fn open_file_restore(state: &mut State) -> Vec<Effect> {
     let Some(view) = state.file.as_ref() else {
         return Vec::new();
     };
-    let (config, path) = (view.target.config.clone(), view.target.path.clone());
+    let (area, path) = (view.target.area.clone(), view.target.path.clone());
     let cursor = view.cursor;
     let Some(version) = state
         .displayed_versions()
@@ -73,13 +73,13 @@ pub(crate) fn open_file_restore(state: &mut State) -> Vec<Effect> {
         return Vec::new();
     }
     state.modal = Some(Modal::Restore {
-        config: config.clone(),
+        area: area.clone(),
         id,
         path: Some(path.clone()),
         stage: RestoreStage::Loading,
     });
     vec![Effect::LoadChanges {
-        config,
+        area,
         id,
         path: Some(path),
     }]
@@ -87,12 +87,12 @@ pub(crate) fn open_file_restore(state: &mut State) -> Vec<Effect> {
 
 pub(crate) fn on_file_versions_loaded(
     state: &mut State,
-    config: &ConfigName,
+    area: &AreaName,
     path: &str,
     result: Result<Vec<FileVersion>, String>,
 ) -> Vec<Effect> {
     if let Some(view) = state.file.as_mut() {
-        if &view.target.config == config && view.target.path == path {
+        if &view.target.area == area && view.target.path == path {
             view.versions = match result {
                 Ok(list) => Load::Loaded(list),
                 Err(error) => Load::Failed(error),

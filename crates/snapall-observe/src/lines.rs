@@ -61,11 +61,11 @@ impl<W: Write> Observer for Lines<W> {
 /// The fields of an event as (name, value) pairs, in the order a person reads them.
 fn fields(event: &Event) -> Vec<(&'static str, Value)> {
     let mut fields: Vec<(&'static str, Value)> = Vec::new();
-    if let Some(config) = event.config() {
-        fields.push(("config", json!(config.as_str())));
+    if let Some(area) = event.area() {
+        fields.push(("config", json!(area.as_str())));
     }
     match event {
-        Event::ConfigsListed {
+        Event::AreasListed {
             result: Ok(count), ..
         }
         | Event::SnapshotsListed {
@@ -99,9 +99,9 @@ fn fields(event: &Event) -> Vec<(&'static str, Value)> {
                 fields.push(("deleted", json!(summary.deleted)));
             }
         }
-        Event::ConfigChanged { change, .. } => fields.push(("change", json!(change))),
+        Event::AreaChanged { change, .. } => fields.push(("change", json!(change))),
         Event::InstallStepRun { command, .. } => fields.push(("command", json!(command))),
-        Event::ConfigsListed { .. } | Event::SnapshotsListed { .. } => {}
+        Event::AreasListed { .. } | Event::SnapshotsListed { .. } => {}
     }
     fields.push((
         "took_ms",
@@ -157,7 +157,7 @@ mod tests {
     use std::sync::{Arc, Mutex as StdMutex};
     use std::time::{Duration, UNIX_EPOCH};
 
-    use snapall_core::{ConfigName, SnapshotId};
+    use snapall_core::{AreaName, SnapshotId};
 
     use super::*;
 
@@ -165,9 +165,9 @@ mod tests {
         UNIX_EPOCH + Duration::from_secs(1_761_187_392)
     }
 
-    fn created(config: &str, description: &str, result: Result<u64, &str>) -> Event {
+    fn created(area: &str, description: &str, result: Result<u64, &str>) -> Event {
         Event::SnapshotCreated {
-            config: ConfigName::parse(config).unwrap(),
+            area: AreaName::parse(area).unwrap(),
             description: description.to_owned(),
             result: result
                 .map(|n| SnapshotId::new(n).unwrap())
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn lists_report_a_count_and_installs_report_the_command() {
-        let listed = Event::ConfigsListed {
+        let listed = Event::AreasListed {
             result: Ok(3),
             took: Duration::ZERO,
         };

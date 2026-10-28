@@ -8,8 +8,8 @@ use crate::files::*;
 use crate::reading::*;
 use crate::running::*;
 use snapall_core::{
-    BackendError, Change, ConfigName, ConfigOption, Description, FileVersion, Point,
-    RestoreSummary, Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
+    AreaName, AreaOption, BackendError, Change, Description, FileVersion, Point, RestoreSummary,
+    Retention, SnapshotBackend, SnapshotId, SnapshotInfo,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -30,7 +30,7 @@ impl<R: CommandRunner> SnapperCli<R> {
     /// One `snapper create`, tagged when it belongs to a restore point.
     fn create(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         description: &Description,
         point: Option<&Point>,
     ) -> Result<SnapshotId, BackendError> {
@@ -109,7 +109,7 @@ impl<R: CommandRunner> SnapperCli<R> {
 }
 
 impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
-    fn list_configs(&self) -> Result<Vec<ConfigName>, BackendError> {
+    fn list_areas(&self) -> Result<Vec<AreaName>, BackendError> {
         let output = self.run(self.args(&["--jsonout", "list-configs"]))?;
         let document: ConfigsDocument = serde_json::from_str(&output.stdout)
             .map_err(|e| unexpected(format!("list-configs is not the expected JSON: {e}")))?;
@@ -117,7 +117,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
             .configs
             .iter()
             .map(|row| {
-                ConfigName::parse(&row.config)
+                AreaName::parse(&row.config)
                     .map_err(|e| unexpected(format!("config `{}`: {e}", row.config)))
             })
             .collect()
@@ -125,7 +125,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
 
     fn create_snapshot(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError> {
         self.create(config, description, None)
@@ -133,14 +133,14 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
 
     fn create_snapshot_in(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         description: &Description,
         point: &Point,
     ) -> Result<SnapshotId, BackendError> {
         self.create(config, description, Some(point))
     }
 
-    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {
+    fn list_snapshots(&self, config: &AreaName) -> Result<Vec<SnapshotInfo>, BackendError> {
         let output = self.run(self.args(&["--jsonout", "-c", config.as_str(), "list"]))?;
         let mut document: BTreeMap<String, Vec<SnapshotRow>> = serde_json::from_str(&output.stdout)
             .map_err(|e| unexpected(format!("list is not the expected JSON: {e}")))?;
@@ -155,13 +155,13 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         Ok(snapshots)
     }
 
-    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError> {
+    fn delete_snapshot(&self, config: &AreaName, id: SnapshotId) -> Result<(), BackendError> {
         let number = id.to_string();
         self.run(self.args(&["-c", config.as_str(), "delete", number.as_str()]))
             .map(|_| ())
     }
 
-    fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
+    fn area_location(&self, config: &AreaName) -> Result<String, BackendError> {
         let output = self.run(self.args(&["--jsonout", "list-configs"]))?;
         let document: ConfigsDocument = serde_json::from_str(&output.stdout)
             .map_err(|e| unexpected(format!("list-configs is not the expected JSON: {e}")))?;
@@ -169,7 +169,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
             .configs
             .into_iter()
             .find(|row| row.config == config.as_str())
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .ok_or_else(|| BackendError::UnknownArea(config.clone()))?;
         if row.subvolume.starts_with('/') {
             Ok(row.subvolume)
         } else {
@@ -182,7 +182,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
 
     fn changes_since(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         id: SnapshotId,
     ) -> Result<Vec<Change>, BackendError> {
         let range = format!("{id}..0");
@@ -190,29 +190,25 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         parse_status(&output.stdout)
     }
 
-    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
+    fn create_area(&self, name: &AreaName, subvolume: &str) -> Result<(), BackendError> {
         // `subvolume` is absolute (the use case checks), so it can never be read as an option.
         self.run(self.args(&["-c", name.as_str(), "create-config", subvolume]))
             .map(|_| ())
     }
 
-    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
+    fn delete_area(&self, name: &AreaName) -> Result<(), BackendError> {
         self.run(self.args(&["-c", name.as_str(), "delete-config"]))
             .map(|_| ())
     }
 
-    fn set_config_option(
-        &self,
-        name: &ConfigName,
-        option: ConfigOption,
-    ) -> Result<(), BackendError> {
+    fn set_area_option(&self, name: &AreaName, option: AreaOption) -> Result<(), BackendError> {
         let setting = match option {
-            ConfigOption::TimelineCreate(on) => {
+            AreaOption::TimelineCreate(on) => {
                 format!("TIMELINE_CREATE={}", if on { "yes" } else { "no" })
             }
-            ConfigOption::KeepNewest(count) => format!("NUMBER_LIMIT={count}"),
-            ConfigOption::NeverRemoveYoungerThan(seconds) => format!("NUMBER_MIN_AGE={seconds}"),
-            ConfigOption::CleanupOfSnapshots(on) => {
+            AreaOption::KeepNewest(count) => format!("NUMBER_LIMIT={count}"),
+            AreaOption::NeverRemoveYoungerThan(seconds) => format!("NUMBER_MIN_AGE={seconds}"),
+            AreaOption::CleanupOfSnapshots(on) => {
                 format!("NUMBER_CLEANUP={}", if on { "yes" } else { "no" })
             }
         };
@@ -220,7 +216,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
             .map(|_| ())
     }
 
-    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
+    fn retention(&self, config: &AreaName) -> Result<Retention, BackendError> {
         let output = self.run(self.args(&["--jsonout", "-c", config.as_str(), "get-config"]))?;
         let settings: std::collections::BTreeMap<String, String> =
             serde_json::from_str(&output.stdout)
@@ -228,17 +224,17 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
         Ok(Retention::from_settings(&settings))
     }
 
-    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
-        let subvolume = self.config_subvolume(config)?;
+    fn covers(&self, config: &AreaName, path: &str) -> Result<bool, BackendError> {
+        let subvolume = self.area_location(config)?;
         same_subvolume(Path::new(&subvolume), Path::new(path))
     }
 
     fn file_versions(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         path: &str,
     ) -> Result<Vec<FileVersion>, BackendError> {
-        let subvolume = self.config_subvolume(config)?;
+        let subvolume = self.area_location(config)?;
         let base = subvolume.trim_end_matches('/');
         let relative = path
             .strip_prefix(base)
@@ -267,7 +263,7 @@ impl<R: CommandRunner> SnapshotBackend for SnapperCli<R> {
 
     fn undo_changes(
         &self,
-        config: &ConfigName,
+        config: &AreaName,
         id: SnapshotId,
         path: Option<&str>,
     ) -> Result<RestoreSummary, BackendError> {

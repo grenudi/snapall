@@ -440,7 +440,7 @@ contract! {
     // ---- snapshots -------------------------------------------------------------------
 
     /// Which config's snapshots to list.
-    SNAPSHOTS_CONFIG: String, Command = Input {
+    SNAPSHOTS_AREA: String, Command = Input {
         key:         "snapshots_config",
         ty:          Type::String,
         subcommands: &[Command::Snapshots],
@@ -453,7 +453,7 @@ contract! {
     // ---- delete ----------------------------------------------------------------------
 
     /// The config a snapshot belongs to.
-    TARGET_CONFIG: String, Command = Input {
+    TARGET_AREA: String, Command = Input {
         key:         "config",
         ty:          Type::String,
         required:    true,

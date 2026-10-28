@@ -44,7 +44,7 @@ pub(crate) fn protecting(state: &mut State, key: Key, index: usize) -> Reaction 
 pub(crate) fn on_protected(
     state: &mut State,
     mount_point: &str,
-    result: Result<ConfigName, String>,
+    result: Result<AreaName, String>,
 ) -> Vec<Effect> {
     match result {
         Ok(_) => {
@@ -55,7 +55,7 @@ pub(crate) fn on_protected(
                 mount_point,
             )));
             // the new area is in the list from now on, and takes part in "snapshot everything"
-            vec![Effect::LoadConfigs]
+            vec![Effect::LoadAreas]
         }
         Err(why) => {
             state.notice = Some(Notice::Error(why));

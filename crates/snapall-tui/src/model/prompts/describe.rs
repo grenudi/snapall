@@ -68,11 +68,11 @@ pub(crate) fn create_with(state: &mut State, target: Target, input: String) -> R
     match description {
         Ok(description) => {
             let targets = match &target {
-                Target::One(config) => vec![config.clone()],
-                Target::All => state.config_names(),
+                Target::One(area) => vec![area.clone()],
+                Target::All => state.area_names(),
                 Target::Group(name) => {
                     let wanted = snapall_core::Wanted::Named(name.clone());
-                    match state.groups.resolve(&wanted, &state.config_names()) {
+                    match state.groups.resolve(&wanted, &state.area_names()) {
                         Ok(areas) => areas,
                         // a group naming an area that is no longer protected is refused, with its name
                         Err(problem) => {
@@ -108,7 +108,7 @@ pub(crate) fn open_describe(state: &mut State, all: bool) -> Vec<Effect> {
         }
         Target::All
     } else {
-        match state.selected_config() {
+        match state.selected_area() {
             Some(entry) => Target::One(entry.name.clone()),
             None => {
                 state.notice = Some(Notice::Error("no area selected".into()));

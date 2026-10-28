@@ -30,7 +30,7 @@ pub(crate) fn contains(rect: Rect, col: u16, row: u16) -> bool {
 pub fn pane_at(state: &State, size: Rect, col: u16, row: u16) -> Option<Pane> {
     let areas = layout(state, size);
     if contains(areas.configs, col, row) {
-        Some(Pane::Configs)
+        Some(Pane::Areas)
     } else if contains(areas.snapshots, col, row) {
         Some(Pane::Snapshots)
     } else {
@@ -80,16 +80,16 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
         return index.map(|index| Click::TabRow { index });
     }
     let block = Block::default().borders(Borders::ALL);
-    let (configs, groups) = configs_split(state, block.inner(areas.configs));
+    let (configs, groups) = areas_split(state, block.inner(areas.configs));
     // the groups under the areas open the groups, like the button
     if groups.is_some_and(|groups| contains(groups, col, row)) {
         return Some(Click::Button(Button::Groups));
     }
     if state.file.is_none() && contains(configs, col, row) && !state.entries().is_empty() {
         let index =
-            window_start(state.config_cursor, configs.height as usize) + (row - configs.y) as usize;
+            window_start(state.area_cursor, configs.height as usize) + (row - configs.y) as usize;
         return (index < state.entries().len()).then_some(Click::Row {
-            pane: Pane::Configs,
+            pane: Pane::Areas,
             index,
         });
     }

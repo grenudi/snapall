@@ -10,7 +10,7 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{plan_snapshots, run_plan, ConfigName, Description, Point, SnapshotBackend};
+use snapall_core::{plan_snapshots, run_plan, AreaName, Description, Point, SnapshotBackend};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session};
 
@@ -58,7 +58,7 @@ fn flat(screen: &str) -> String {
 
 /// docs, home and the system (root), one action snapshots all three as one restore point.
 fn three_areas() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["docs", "home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["docs", "home", "root"]).with_root_area("root");
     backend.write_file("docs", "/mnt/docs/a.txt", "docs, then");
     backend.write_file("home", "/mnt/home/b.txt", "home, then");
     let plan = plan_snapshots(&backend, None).unwrap();
@@ -174,11 +174,11 @@ fn the_way_back_is_the_same_action_on_the_safety_point_it_names() {
 
 #[test]
 fn a_snapshot_taken_alone_is_offered_no_restore_point_and_a_does_nothing() {
-    let backend = InMemoryBackend::with_configs(&["docs", "home"]);
+    let backend = InMemoryBackend::with_areas(&["docs", "home"]);
     backend.write_file("home", "/mnt/home/b.txt", "then");
     backend
         .create_snapshot(
-            &ConfigName::parse("home").unwrap(),
+            &AreaName::parse("home").unwrap(),
             &Description::parse("on its own").unwrap(),
         )
         .unwrap();

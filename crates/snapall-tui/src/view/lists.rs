@@ -69,7 +69,7 @@ fn group_lines(state: &State, width: usize) -> Vec<Line<'static>> {
 
 /// The left pane's inside, split: the areas, and beneath them (if there is room for every area and a gap
 /// as well) the groups. Drawing and clicking both use this, so a click lands on what was drawn.
-pub(crate) fn configs_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) {
+pub(crate) fn areas_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) {
     let wanted =
         u16::try_from(group_lines(state, usize::from(inner.width)).len()).unwrap_or(u16::MAX);
     let areas = u16::try_from(state.entries().len().max(1)).unwrap_or(u16::MAX);
@@ -89,10 +89,10 @@ pub(crate) fn configs_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) 
     (list, Some(groups))
 }
 
-pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
-    let focused = state.focus == Pane::Configs && state.modal.is_none();
+pub(crate) fn render_areas(state: &State, frame: &mut Frame, area: Rect) {
+    let focused = state.focus == Pane::Areas && state.modal.is_none();
     let block = pane_block(" Protected areas ".into(), focused);
-    match &state.configs {
+    match &state.areas {
         Load::NotLoaded => {
             frame.render_widget(Paragraph::new("loading...").block(block), area);
         }
@@ -116,7 +116,7 @@ pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
         Load::Loaded(entries) => {
             let inner = block.inner(area);
             frame.render_widget(block, area);
-            let (list_area, groups_area) = configs_split(state, inner);
+            let (list_area, groups_area) = areas_split(state, inner);
             let items: Vec<ListItem> = entries
                 .iter()
                 .map(|entry| {
@@ -139,7 +139,7 @@ pub(crate) fn render_configs(state: &State, frame: &mut Frame, area: Rect) {
             let list = List::new(items)
                 .highlight_style(highlight)
                 .highlight_symbol("> ");
-            let mut list_state = ListState::default().with_selected(Some(state.config_cursor));
+            let mut list_state = ListState::default().with_selected(Some(state.area_cursor));
             frame.render_stateful_widget(list, list_area, &mut list_state);
             if let Some(groups) = groups_area {
                 let hovered = state.hover == Some(Click::Button(Button::Groups));
@@ -167,7 +167,7 @@ pub(crate) fn kind_label(info: &SnapshotInfo) -> String {
 
 pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
     let focused = state.focus == Pane::Snapshots && state.modal.is_none();
-    let Some(entry) = state.selected_config() else {
+    let Some(entry) = state.selected_area() else {
         frame.render_widget(pane_block(" Snapshots ".into(), focused), area);
         return;
     };

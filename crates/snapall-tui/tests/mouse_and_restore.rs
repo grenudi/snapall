@@ -14,18 +14,18 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{update, Button, Click, Key, Modal, Msg, Pane, RestoreStage, State};
 use snapall_tui::{view, Session, UiContext};
 
-fn name(s: &str) -> ConfigName {
-    ConfigName::parse(s).unwrap()
+fn name(s: &str) -> AreaName {
+    AreaName::parse(s).unwrap()
 }
 
 /// `home` (with `count` snapshots and a file that changes after the first), `iso`, `root`: in the
 /// order the list shows them, so `home` is the one selected at the start.
 fn backend(count: u64) -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home", "iso", "root"]);
+    let backend = InMemoryBackend::with_areas(&["home", "iso", "root"]);
     backend.write_file("home", "/mnt/home/a.txt", "one");
     for n in 0..count {
         backend
@@ -111,7 +111,7 @@ fn clicking_a_snapshot_row_selects_exactly_the_row_that_was_drawn_even_when_the_
 }
 
 #[test]
-fn clicking_a_config_row_selects_the_config_drawn_there_and_loads_its_snapshots() {
+fn clicking_a_area_row_selects_the_area_drawn_there_and_loads_its_snapshots() {
     let backend = backend(3);
     let mut session = Session::new(&backend);
     let drawn = rows(&session.state, 100, 24);
@@ -120,8 +120,8 @@ fn clicking_a_config_row_selects_the_config_drawn_there_and_loads_its_snapshots(
         .position(|l| l.contains("iso"))
         .expect("iso is listed") as u16;
     click(&mut session, SIZE, 5, y);
-    assert_eq!(session.state.selected_config().unwrap().name, name("iso"));
-    assert_eq!(session.state.focus, Pane::Configs);
+    assert_eq!(session.state.selected_area().unwrap().name, name("iso"));
+    assert_eq!(session.state.focus, Pane::Areas);
     // it loaded: the pane's title names the config
     let screen = rows(&session.state, 100, 24).join("\n");
     assert!(screen.contains("Snapshots of iso"), "{screen}");
@@ -226,12 +226,12 @@ fn clicks_behind_a_prompt_do_nothing_and_are_never_typed_into_it() {
         other => panic!("the prompt should still be open: {other:?}"),
     }
     // and a row click behind it changes nothing either
-    let before = session.state.config_cursor;
+    let before = session.state.area_cursor;
     session.dispatch(Msg::Click(Click::Row {
-        pane: Pane::Configs,
+        pane: Pane::Areas,
         index: 2,
     }));
-    assert_eq!(session.state.config_cursor, before);
+    assert_eq!(session.state.area_cursor, before);
 }
 
 #[test]
@@ -287,7 +287,7 @@ fn the_mark_column_toggles_a_mark_without_moving_the_cursor_unlike_the_space_key
 fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() {
     let backend = backend(10);
     let mut session = Session::new(&backend);
-    assert_eq!(session.state.focus, Pane::Configs);
+    assert_eq!(session.state.focus, Pane::Areas);
     session.dispatch(Msg::Scroll {
         pane: Pane::Snapshots,
         delta: 3,
@@ -295,7 +295,7 @@ fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() 
     assert_eq!(session.state.snapshot_cursor, 3);
     assert_eq!(
         session.state.focus,
-        Pane::Configs,
+        Pane::Areas,
         "the keyboard focus did not move"
     );
     session.dispatch(Msg::Scroll {
@@ -304,14 +304,11 @@ fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() 
     });
     assert_eq!(session.state.snapshot_cursor, 0, "clamped at the top");
     session.dispatch(Msg::Scroll {
-        pane: Pane::Configs,
+        pane: Pane::Areas,
         delta: 1,
     });
-    assert_eq!(session.state.selected_config().unwrap().name, name("iso"));
-    assert_eq!(
-        view::pane_at(&session.state, SIZE, 5, 5),
-        Some(Pane::Configs)
-    );
+    assert_eq!(session.state.selected_area().unwrap().name, name("iso"));
+    assert_eq!(view::pane_at(&session.state, SIZE, 5, 5), Some(Pane::Areas));
     assert_eq!(
         view::pane_at(&session.state, SIZE, 60, 5),
         Some(Pane::Snapshots)
@@ -363,7 +360,7 @@ fn restore_asks_first_showing_what_would_change_and_changes_nothing_until_confir
     let mut session = at_first_snapshot_of_home(&backend, UiContext::default());
     session.press(Key::Char('u'));
     let Some(Modal::Restore {
-        config,
+        area,
         stage: RestoreStage::Ready(preview),
         ..
     }) = &session.state.modal
@@ -373,7 +370,7 @@ fn restore_asks_first_showing_what_would_change_and_changes_nothing_until_confir
             session.state.modal
         );
     };
-    assert_eq!(config, &name("home"));
+    assert_eq!(area, &name("home"));
     assert_eq!(preview.changes.len(), 2, "a.txt reverted, b.txt removed");
     let screen = rows(&session.state, 100, 24).join("\n");
     assert!(
@@ -451,7 +448,7 @@ fn a_restore_prompt_can_be_confirmed_by_clicking_its_button() {
 
 #[test]
 fn the_system_root_gets_the_supported_route_and_no_way_to_confirm() {
-    let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
     backend.write_file("root", "/etc/fstab", "good");
     backend
         .create_snapshot(&name("root"), &Description::parse("base").unwrap())
@@ -491,7 +488,7 @@ fn the_system_root_gets_the_supported_route_and_no_way_to_confirm() {
 
 #[test]
 fn nothing_to_restore_is_said_and_cannot_be_confirmed() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     backend
         .create_snapshot(&name("home"), &Description::parse("base").unwrap())
         .unwrap();
@@ -515,7 +512,7 @@ fn an_answer_that_arrives_after_the_prompt_was_closed_is_dropped() {
     update(
         &mut state,
         Msg::ChangesLoaded {
-            config: name("home"),
+            area: name("home"),
             id: snapall_core::SnapshotId::new(1).unwrap(),
             result: Err("late".into()),
         },

@@ -11,7 +11,7 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, FileTarget, Session, UiContext};
 
@@ -31,8 +31,8 @@ const SCREEN: Rect = Rect {
 };
 
 fn backend() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]);
-    let home = ConfigName::parse("home").unwrap();
+    let backend = InMemoryBackend::with_areas(&["home", "root"]);
+    let home = AreaName::parse("home").unwrap();
     backend.write_file("home", "/mnt/home/a.txt", "one");
     backend
         .create_snapshot(&home, &Description::parse("first").unwrap())
@@ -133,7 +133,7 @@ fn every_button_a_person_can_click_has_an_explanation_that_fits_the_footer_in_ev
         restore_route: String::new(),
         file: Some(FileTarget {
             path: "/mnt/home/a.txt".into(),
-            config: ConfigName::parse("home").unwrap(),
+            area: AreaName::parse("home").unwrap(),
         }),
         ..UiContext::default()
     };

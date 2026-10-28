@@ -15,7 +15,7 @@ use argenv_resolve::{
     lint, EnvSource, Finding, Input, InputResolveDefaultExt, InputResolveExt, Invocation,
     LintPolicy, Record, Resolution, Severity, Source,
 };
-use snapall_core::{ConfigName, Description, Point, SnapshotId};
+use snapall_core::{AreaName, Description, Point, SnapshotId};
 
 use std::path::PathBuf;
 
@@ -27,7 +27,7 @@ pub enum Request {
     Help,
     Version,
     Create {
-        only: Option<Vec<ConfigName>>,
+        only: Option<Vec<AreaName>>,
         description: Description,
         dry_run: bool,
         job: Option<String>,
@@ -35,22 +35,22 @@ pub enum Request {
     },
     List,
     Snapshots {
-        config: Option<ConfigName>,
+        config: Option<AreaName>,
     },
     Delete {
-        config: ConfigName,
+        config: AreaName,
         id: SnapshotId,
         destroy: bool,
     },
     /// What restoring snapshot `id` would change.
     Changes {
-        config: ConfigName,
+        config: AreaName,
         id: SnapshotId,
         path: Option<String>,
     },
     /// Put the config, or one path of it, back to how snapshot `id` had it.
     Restore {
-        config: ConfigName,
+        config: AreaName,
         id: SnapshotId,
         path: Option<String>,
         dry_run: bool,
@@ -215,18 +215,18 @@ pub fn parse(args: &[String], env: &dyn EnvSource) -> Result<Parsed, UsageError>
 }
 
 /// The config and snapshot a command acts on (`delete`, `changes`, `restore`).
-fn target(resolution: &Resolution) -> Result<(ConfigName, SnapshotId), UsageError> {
+fn target(resolution: &Resolution) -> Result<(AreaName, SnapshotId), UsageError> {
     let missing = |record: argenv_resolve::Record| {
         usage_error(format!("missing required argument {}", record.usage()))
     };
-    let config = Contract::TARGET_CONFIG
+    let config = Contract::TARGET_AREA
         .get_from(resolution)
-        .ok_or_else(|| missing(Contract::TARGET_CONFIG.to_record()))?;
+        .ok_or_else(|| missing(Contract::TARGET_AREA.to_record()))?;
     let id = Contract::SNAPSHOT_ID
         .get_from(resolution)
         .ok_or_else(|| missing(Contract::SNAPSHOT_ID.to_record()))?;
     Ok((
-        parse_config("AREA", &config)?,
+        parse_area("AREA", &config)?,
         SnapshotId::new(id).ok_or_else(|| {
             usage_error("ID 0 is the current system, not a snapshot; there is nothing to act on")
         })?,
@@ -417,9 +417,9 @@ fn build_request(
         },
         Command::List => Request::List,
         Command::Snapshots => Request::Snapshots {
-            config: Contract::SNAPSHOTS_CONFIG
+            config: Contract::SNAPSHOTS_AREA
                 .get_from(resolution)
-                .map(|name| parse_config("AREA", &name))
+                .map(|name| parse_area("AREA", &name))
                 .transpose()?,
         },
         Command::Delete => {
@@ -548,14 +548,14 @@ fn build_request(
     })
 }
 
-fn parse_config(what: &str, name: &str) -> Result<ConfigName, UsageError> {
-    ConfigName::parse(name).map_err(|e| usage_error(format!("{what}: {e}")))
+fn parse_area(what: &str, name: &str) -> Result<AreaName, UsageError> {
+    AreaName::parse(name).map_err(|e| usage_error(format!("{what}: {e}")))
 }
 
 /// `--only a,b`: a comma-separated list of config names, each validated.
-pub(crate) fn parse_only(raw: &str) -> Result<Vec<ConfigName>, UsageError> {
+pub(crate) fn parse_only(raw: &str) -> Result<Vec<AreaName>, UsageError> {
     raw.split(',')
-        .map(|name| parse_config("--only", name.trim()))
+        .map(|name| parse_area("--only", name.trim()))
         .collect()
 }
 
@@ -591,8 +591,8 @@ mod tests {
             .to_string()
     }
 
-    fn names(list: &[&str]) -> Vec<ConfigName> {
-        list.iter().map(|n| ConfigName::parse(n).unwrap()).collect()
+    fn names(list: &[&str]) -> Vec<AreaName> {
+        list.iter().map(|n| AreaName::parse(n).unwrap()).collect()
     }
 
     fn create(only: Option<&[&str]>, description: &str, dry_run: bool) -> Request {
@@ -655,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn bad_descriptions_and_config_names_are_rejected_at_the_boundary() {
+    fn bad_descriptions_and_area_names_are_rejected_at_the_boundary() {
         assert!(err(&["create", "   "]).contains("description"));
         assert!(err(&["create", "--only", "root,"]).contains("--only"));
         assert!(err(&["create", "--only", ""]).contains("--only"));
@@ -759,11 +759,11 @@ mod tests {
     }
 
     #[test]
-    fn delete_needs_a_config_and_a_nonzero_id() {
+    fn delete_needs_a_area_and_a_nonzero_id() {
         assert_eq!(
             ok(&["delete", "home", "12"]).request,
             Request::Delete {
-                config: ConfigName::parse("home").unwrap(),
+                config: AreaName::parse("home").unwrap(),
                 id: SnapshotId::new(12).unwrap(),
                 destroy: false,
             }
@@ -772,7 +772,7 @@ mod tests {
         assert_eq!(
             ok(&["delete", "home", "12", "--destroy"]).request,
             Request::Delete {
-                config: ConfigName::parse("home").unwrap(),
+                config: AreaName::parse("home").unwrap(),
                 id: SnapshotId::new(12).unwrap(),
                 destroy: true,
             }
@@ -922,8 +922,8 @@ mod tests {
     }
 
     #[test]
-    fn changes_and_restore_take_a_config_a_snapshot_and_an_optional_path() {
-        let home = ConfigName::parse("home").unwrap();
+    fn changes_and_restore_take_a_area_a_snapshot_and_an_optional_path() {
+        let home = AreaName::parse("home").unwrap();
         let id = SnapshotId::new(12).unwrap();
         assert_eq!(
             ok(&["changes", "home", "12"]).request,

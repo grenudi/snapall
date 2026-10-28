@@ -116,7 +116,7 @@ fn make_the_switch(
     let result: Result<(), String> = facts
         .areas
         .iter()
-        .try_for_each(|area| system.set_quotas(&area.subvolume, turn_on));
+        .try_for_each(|area| system.set_quotas(&area.location, turn_on));
     if result.is_ok() {
         change.rollback(snapall_core::rollback::after_room_counting(turn_on));
     }

@@ -6,10 +6,10 @@
 
 use crate::view::*;
 
-pub(crate) fn delete_spec(config: &ConfigName, ids: &[SnapshotId]) -> ModalSpec {
+pub(crate) fn delete_spec(area: &AreaName, ids: &[SnapshotId]) -> ModalSpec {
     let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
     let lines = vec![
-        Line::from(format!("Delete {} snapshot(s) of {config}?", ids.len())),
+        Line::from(format!("Delete {} snapshot(s) of {area}?", ids.len())),
         Line::styled(list.join(", "), Style::new().bold()),
         Line::from(""),
         Line::from("Your files are not touched: only the saved moments are removed, and the space they held is freed."),

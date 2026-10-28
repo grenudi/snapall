@@ -14,7 +14,7 @@ pub(crate) fn describe_spec(
     state: &State,
 ) -> ModalSpec {
     let title = match target {
-        Target::One(config) => format!(" New snapshot of {config} "),
+        Target::One(area) => format!(" New snapshot of {area} "),
         Target::All => {
             let names: Vec<String> = state.entries().iter().map(|e| e.name.to_string()).collect();
             format!(

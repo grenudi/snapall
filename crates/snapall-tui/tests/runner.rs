@@ -57,7 +57,7 @@ fn flat(session: &Session<'_>) -> String {
 }
 
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     run_plan(&backend, &plan, &Description::parse("first").unwrap(), None);
     backend
@@ -108,7 +108,7 @@ fn worker_ends(system: &FakeSystem, id: &str, outcome: JournalOutcome) {
 
 fn snapshots_of_home(backend: &InMemoryBackend) -> usize {
     backend
-        .list_snapshots(&snapall_core::ConfigName::parse("home").unwrap())
+        .list_snapshots(&snapall_core::AreaName::parse("home").unwrap())
         .unwrap()
         .len()
 }

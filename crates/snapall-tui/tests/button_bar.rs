@@ -12,7 +12,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
-use snapall_core::{plan_snapshots, run_plan, ConfigName, Description, GroupName, Groups};
+use snapall_core::{plan_snapshots, run_plan, AreaName, Description, GroupName, Groups};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session, Tab, UiContext};
 
@@ -53,7 +53,7 @@ fn at(buffer: &Buffer, y: u16, text: &str) -> u16 {
 }
 
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["data", "home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["data", "home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     run_plan(&backend, &plan, &Description::parse("one").unwrap(), None);
     backend
@@ -76,8 +76,8 @@ fn theming() -> Groups {
         .set(
             GroupName::parse("theming").unwrap(),
             vec![
-                ConfigName::parse("home").unwrap(),
-                ConfigName::parse("data").unwrap(),
+                AreaName::parse("home").unwrap(),
+                AreaName::parse("data").unwrap(),
             ],
         )
         .unwrap();
@@ -268,7 +268,7 @@ fn the_g_groups_button_is_on_the_bar_and_opens_them_and_the_areas_are_never_sque
 ) {
     let names: Vec<String> = (0..16).map(|i| format!("area{i:02}")).collect();
     let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-    let backend = InMemoryBackend::with_configs(&refs);
+    let backend = InMemoryBackend::with_areas(&refs);
     let system = FakeSystem::new().with_groups(theming());
     let mut session = session(&backend, &system);
     let screen = draw(&session);

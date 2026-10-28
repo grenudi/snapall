@@ -65,7 +65,7 @@ pub(crate) fn what_this_window_started_has_ended(
                     }
                     _ => Notice::Error(format!("{}: {}", entry.what, entry.detail)),
                 });
-                effects = vec![Effect::LoadConfigs, Effect::LoadHealth];
+                effects = vec![Effect::LoadAreas, Effect::LoadHealth];
                 false
             }
         }

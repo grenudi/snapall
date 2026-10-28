@@ -11,8 +11,8 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{
-    plan_snapshots, run_plan, Act, ConfigName, Description, JournalEvent, Rollback,
-    SnapshotBackend, SystemProbe, Weight,
+    plan_snapshots, run_plan, Act, AreaName, Description, JournalEvent, Rollback, SnapshotBackend,
+    SystemProbe, Weight,
 };
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session, UiContext};
@@ -52,13 +52,13 @@ fn flat(session: &Session<'_>) -> String {
         .join(" ")
 }
 
-fn home() -> ConfigName {
-    ConfigName::parse("home").unwrap()
+fn home() -> AreaName {
+    AreaName::parse("home").unwrap()
 }
 
 /// One area with a file that was "v1" when its snapshots were taken and is "v2" now.
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     backend.write_file("home", "/mnt/home/n.txt", "v1");
     let plan = plan_snapshots(&backend, None).unwrap();
     for note in ["one", "two"] {

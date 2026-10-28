@@ -13,7 +13,7 @@
 //! Nothing here reads the system: the shell hands over the text of `/proc/self/mountinfo` and the
 //! subvolume of each config.
 
-use crate::domain::ConfigName;
+use crate::domain::AreaName;
 
 /// A filesystem mounted at a directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,7 +79,7 @@ pub struct Area {
     /// Where it is mounted: `/`, `/home`.
     pub mount_point: String,
     /// The config that protects it, if one does.
-    pub protected_by: Option<ConfigName>,
+    pub protected_by: Option<AreaName>,
 }
 
 impl Area {
@@ -101,7 +101,7 @@ fn normal(path: &str) -> &str {
 ///
 /// Snapper's own `.snapshots` directories are not areas, and a subvolume that is mounted twice is
 /// one area.
-pub fn areas(mounts: &[Mount], configs: &[(ConfigName, String)]) -> Vec<Area> {
+pub fn areas(mounts: &[Mount], configs: &[(AreaName, String)]) -> Vec<Area> {
     let mut seen: Vec<(&str, &str)> = Vec::new();
     let mut found: Vec<Area> = Vec::new();
     for mount in mounts.iter().filter(|m| m.fstype == "btrfs") {
@@ -114,7 +114,7 @@ pub fn areas(mounts: &[Mount], configs: &[(ConfigName, String)]) -> Vec<Area> {
         seen.push((mount.source.as_str(), mount.root.as_str()));
         let protected_by = configs
             .iter()
-            .find(|(_, subvolume)| normal(subvolume) == normal(&mount.point))
+            .find(|(_, location)| normal(location) == normal(&mount.point))
             .map(|(name, _)| name.clone());
         found.push(Area {
             mount_point: mount.point.clone(),
@@ -227,7 +227,7 @@ fn folder_title(path: &str) -> String {
 /// A name for the config that will protect the area at `mount_point`: `root` for `/`, otherwise its
 /// last directory name, made safe and made different from `taken`. `None` only if no valid name could
 /// be found, which a directory name made of safe characters never causes.
-pub fn suggest_name(mount_point: &str, taken: &[ConfigName]) -> Option<ConfigName> {
+pub fn suggest_name(mount_point: &str, taken: &[AreaName]) -> Option<AreaName> {
     let last = normal(mount_point).rsplit('/').next().unwrap_or_default();
     let cleaned: String = last
         .chars()
@@ -248,7 +248,7 @@ pub fn suggest_name(mount_point: &str, taken: &[ConfigName]) -> Option<ConfigNam
     };
     std::iter::once(base.clone())
         .chain((2..1000).map(|n| format!("{base}_{n}")))
-        .filter_map(|candidate| ConfigName::parse(&candidate).ok())
+        .filter_map(|candidate| AreaName::parse(&candidate).ok())
         .find(|name| !taken.contains(name))
 }
 
@@ -256,8 +256,8 @@ pub fn suggest_name(mount_point: &str, taken: &[ConfigName]) -> Option<ConfigNam
 mod tests {
     use super::*;
 
-    fn name(s: &str) -> ConfigName {
-        ConfigName::parse(s).unwrap()
+    fn name(s: &str) -> AreaName {
+        AreaName::parse(s).unwrap()
     }
 
     const MOUNTINFO: &str = "\
@@ -270,7 +270,7 @@ mod tests {
 28 24 0:30 / /mnt/my\\040data rw,relatime shared:3 - ext4 /dev/sda1 rw
 ";
 
-    fn configs(pairs: &[(&str, &str)]) -> Vec<(ConfigName, String)> {
+    fn configs(pairs: &[(&str, &str)]) -> Vec<(AreaName, String)> {
         pairs
             .iter()
             .map(|(n, s)| (name(n), (*s).to_owned()))
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn mounts_are_read_with_filesystem_source_subvolume_and_escaped_paths() {
+    fn mounts_are_read_with_filesystem_source_location_and_escaped_paths() {
         let mounts = mounts_from_mountinfo(MOUNTINFO);
         let home = mounts.iter().find(|m| m.point == "/home").unwrap();
         assert_eq!(
@@ -306,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn an_area_is_protected_when_a_config_covers_exactly_it() {
+    fn an_area_is_protected_when_a_area_covers_exactly_it() {
         let mounts = mounts_from_mountinfo(MOUNTINFO);
         let none = areas(&mounts, &configs(&[("root", "/")]));
         assert_eq!(
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn a_name_is_made_from_the_directory_is_always_valid_and_never_a_repeat() {
-        let none: Vec<ConfigName> = Vec::new();
+        let none: Vec<AreaName> = Vec::new();
         for (path, expected) in [
             ("/", "root"),
             ("/home", "home"),

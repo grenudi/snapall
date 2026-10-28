@@ -10,7 +10,7 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::{FakeSystem, InMemoryBackend};
-use snapall_core::{plan_snapshots, run_plan, ConfigName, Description, SnapshotBackend};
+use snapall_core::{plan_snapshots, run_plan, AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Key, Modal};
 use snapall_tui::tabs::health::RowAction;
 use snapall_tui::{view, Session, UiContext};
@@ -54,13 +54,13 @@ fn flat(session: &Session<'_>) -> String {
         .join(" ")
 }
 
-fn home() -> ConfigName {
-    ConfigName::parse("home").unwrap()
+fn home() -> AreaName {
+    AreaName::parse("home").unwrap()
 }
 
 /// One area with eight snapshots of the kind cleanup looks after.
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     let plan = plan_snapshots(&backend, None).unwrap();
     for _ in 0..8 {
         run_plan(&backend, &plan, &Description::parse("one").unwrap(), None);
@@ -92,7 +92,7 @@ fn editing<'a>(
         .health
         .rows()
         .iter()
-        .position(|row| matches!(&row.action, RowAction::EditLimits(config) if *config == home()))
+        .position(|row| matches!(&row.action, RowAction::EditLimits(area) if *area == home()))
         .expect("the area's row leads to the editor");
     session.state.health.cursor = at;
     session.press(Key::Enter);

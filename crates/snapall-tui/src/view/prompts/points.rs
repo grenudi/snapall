@@ -76,7 +76,7 @@ pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
             let width = preview
                 .views
                 .iter()
-                .map(|v| v.config.as_str().len())
+                .map(|v| v.area.as_str().len())
                 .max()
                 .unwrap_or(0);
             for view in &preview.views {
@@ -98,7 +98,7 @@ pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
                         format!("could not be looked at: {why}")
                     }
                 };
-                lines.push(Line::from(format!("  {:<width$}  {what}", view.config)));
+                lines.push(Line::from(format!("  {:<width$}  {what}", view.area)));
             }
         }
     }

@@ -33,7 +33,7 @@ pub(crate) fn unprotect_spec(prompt: &StopProtecting) -> ModalSpec {
             lines.push(Line::from(vec![
                 Span::raw(format!(
                     "{}: ",
-                    Weight::Destroys.instruction(Some(prompt.config.as_str()))
+                    Weight::Destroys.instruction(Some(prompt.area.as_str()))
                 )),
                 Span::styled(prompt.typed.clone(), Style::new().bold()),
                 Span::styled(
@@ -53,7 +53,7 @@ pub(crate) fn unprotect_spec(prompt: &StopProtecting) -> ModalSpec {
         _ => vec![close_button()],
     };
     ModalSpec {
-        title: format!(" Stop protecting {}? ", prompt.config),
+        title: format!(" Stop protecting {}? ", prompt.area),
         lines,
         color: Color::Red,
         width,

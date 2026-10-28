@@ -10,7 +10,7 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg, Pane, RestoreStage};
 use snapall_tui::{view, FileTarget, Session, UiContext};
 
@@ -22,19 +22,19 @@ const SIZE: Rect = Rect {
     height: 24,
 };
 
-fn home() -> ConfigName {
-    ConfigName::parse("home").unwrap()
+fn home() -> AreaName {
+    AreaName::parse("home").unwrap()
 }
 
-fn snap(backend: &InMemoryBackend, config: &ConfigName, text: &str) {
+fn snap(backend: &InMemoryBackend, area: &AreaName, text: &str) {
     backend
-        .create_snapshot(config, &Description::parse(text).unwrap())
+        .create_snapshot(area, &Description::parse(text).unwrap())
         .unwrap();
 }
 
 /// notes.txt over time: not there (#1), "v1" (#2), "v2" (#3), and "v3" now, as in #4.
 fn history() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     snap(&backend, &home(), "before the file existed");
     backend.write_file("home", FILE, "v1");
     snap(&backend, &home(), "first draft");
@@ -45,13 +45,13 @@ fn history() -> InMemoryBackend {
     backend
 }
 
-fn open<'a>(backend: &'a InMemoryBackend, path: &str, config: &str) -> Session<'a> {
+fn open<'a>(backend: &'a InMemoryBackend, path: &str, area: &str) -> Session<'a> {
     let context = UiContext {
         boot_tip: None,
         restore_route: String::new(),
         file: Some(FileTarget {
             path: path.to_owned(),
-            config: ConfigName::parse(config).unwrap(),
+            area: AreaName::parse(area).unwrap(),
         }),
         ..UiContext::default()
     };
@@ -206,7 +206,7 @@ fn escape_leaves_the_file_alone_and_takes_no_safety_snapshot() {
 }
 
 #[test]
-fn keys_that_belong_to_the_config_view_do_nothing_on_a_file() {
+fn keys_that_belong_to_the_area_view_do_nothing_on_a_file() {
     let backend = history();
     let mut session = open(&backend, FILE, "home");
     for key in [
@@ -284,7 +284,7 @@ fn the_wheel_moves_the_cursor_and_clicks_behind_a_prompt_do_nothing() {
 
 #[test]
 fn a_click_lands_on_the_version_that_was_drawn_even_in_a_long_scrolled_list() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     backend.write_file("home", FILE, "x");
     for n in 0..60 {
         backend.write_file("home", FILE, &format!("content {n}"));
@@ -326,8 +326,8 @@ fn a_click_lands_on_the_version_that_was_drawn_even_in_a_long_scrolled_list() {
 
 #[test]
 fn a_file_of_the_system_root_can_be_restored_though_the_root_itself_cannot() {
-    let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
-    let root = ConfigName::parse("root").unwrap();
+    let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
+    let root = AreaName::parse("root").unwrap();
     backend.write_file("root", "/etc/fstab", "good");
     snap(&backend, &root, "base");
     backend.write_file("root", "/etc/fstab", "broken");
@@ -348,7 +348,7 @@ fn a_file_of_the_system_root_can_be_restored_though_the_root_itself_cannot() {
 }
 
 #[test]
-fn a_file_no_config_covers_shows_the_reason_on_the_screen() {
+fn a_file_no_area_covers_shows_the_reason_on_the_screen() {
     let backend = history();
     let session = open(&backend, "/etc/fstab", "home");
     let text = screen(&session);
@@ -357,7 +357,7 @@ fn a_file_no_config_covers_shows_the_reason_on_the_screen() {
 
 #[test]
 fn q_quits_and_a_file_with_no_snapshots_says_so() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     let mut session = open(&backend, FILE, "home");
     assert!(screen(&session).contains("no snapshots of this area yet"));
     session.press(Key::Char('q'));
@@ -365,11 +365,11 @@ fn q_quits_and_a_file_with_no_snapshots_says_so() {
 }
 
 #[test]
-fn a_file_on_a_separate_subvolume_says_so_instead_of_listing_snapshots_that_cannot_hold_it() {
-    let backend = InMemoryBackend::with_configs(&["root"])
-        .with_root_config("root")
-        .with_separate_subvolume("/mnt/home");
-    let root = ConfigName::parse("root").unwrap();
+fn a_file_on_a_separate_location_says_so_instead_of_listing_snapshots_that_cannot_hold_it() {
+    let backend = InMemoryBackend::with_areas(&["root"])
+        .with_root_area("root")
+        .with_separate_location("/mnt/home");
+    let root = AreaName::parse("root").unwrap();
     backend.write_file("root", "/mnt/home/u/notes.txt", "mine");
     snap(&backend, &root, "base");
     let session = open(&backend, "/mnt/home/u/notes.txt", "root");

@@ -631,7 +631,7 @@ fn history_as_json_has_stable_tokens_and_says_what_can_be_restored() {
 }
 
 #[test]
-fn history_refuses_a_directory_and_a_file_no_config_covers_with_the_reason() {
+fn history_refuses_a_directory_and_a_file_no_area_covers_with_the_reason() {
     let v = Volume::new("errors");
     let dir = v.run(
         &v.root,

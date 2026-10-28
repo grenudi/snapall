@@ -13,7 +13,7 @@
 use thiserror::Error;
 
 use crate::coverage::describe;
-use crate::domain::ConfigName;
+use crate::domain::AreaName;
 use crate::groups::{GroupName, Groups};
 use crate::health::format_bytes;
 use crate::points::restore_points;
@@ -23,9 +23,9 @@ use crate::usecase::{all_snapshots, is_root, SnapshotError};
 /// What stopping the protection of one area would do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
-    pub config: ConfigName,
+    pub config: AreaName,
     /// Where the area is.
-    pub subvolume: String,
+    pub location: String,
     /// How many snapshots would be deleted.
     pub snapshots: usize,
     /// The room that would be freed, when every snapshot's own room is known (see quotas).
@@ -54,20 +54,20 @@ pub enum UnprotectError {
 pub fn plan(
     backend: &dyn SnapshotBackend,
     groups: &Groups,
-    config: &ConfigName,
+    config: &AreaName,
 ) -> Result<Plan, UnprotectError> {
-    if !backend.list_configs()?.contains(config) {
+    if !backend.list_areas()?.contains(config) {
         return Err(UnprotectError::Unknown(config.to_string()));
     }
-    let subvolume = backend.config_subvolume(config)?;
-    if is_root(&subvolume) {
+    let location = backend.area_location(config)?;
+    if is_root(&location) {
         return Err(UnprotectError::SystemArea);
     }
     let snapshots = backend.list_snapshots(config)?;
     let measured: Option<u64> = snapshots.iter().map(|s| s.used_bytes).sum();
     let points = restore_points(&all_snapshots(backend)?)
         .iter()
-        .filter(|point| point.members.iter().any(|member| member.config == *config))
+        .filter(|point| point.members.iter().any(|member| member.area == *config))
         .count();
     let naming = groups
         .names()
@@ -76,7 +76,7 @@ pub fn plan(
         .collect();
     Ok(Plan {
         config: config.clone(),
-        subvolume,
+        location,
         snapshots: snapshots.len(),
         freed_bytes: if snapshots.is_empty() { None } else { measured },
         points,
@@ -90,11 +90,11 @@ pub fn stop_protecting(
     backend: &dyn SnapshotBackend,
     plan: &Plan,
 ) -> Result<usize, UnprotectError> {
-    if is_root(&backend.config_subvolume(&plan.config)?) {
+    if is_root(&backend.area_location(&plan.config)?) {
         return Err(UnprotectError::SystemArea);
     }
-    backend.delete_config(&plan.config)?;
-    if backend.list_configs()?.contains(&plan.config) {
+    backend.delete_area(&plan.config)?;
+    if backend.list_areas()?.contains(&plan.config) {
         return Err(UnprotectError::StillProtected(plan.config.to_string()));
     }
     Ok(plan.snapshots)
@@ -103,7 +103,7 @@ pub fn stop_protecting(
 impl Plan {
     /// What it will do, in plain sentences: the same words for the window and the command line.
     pub fn words(&self) -> Vec<String> {
-        let title = describe(&self.subvolume).title;
+        let title = describe(&self.location).title;
         let snapshots = match (self.snapshots, self.freed_bytes) {
             (0, _) => "It has no snapshots to delete.".to_owned(),
             (1, Some(bytes)) => format!(
@@ -119,7 +119,7 @@ impl Plan {
         };
         let mut lines = vec![format!(
             "{title} ({}) will no longer be protected. {snapshots} The files in it are not touched.",
-            self.subvolume
+            self.location
         )];
         if self.points > 0 {
             lines.push(format!(
@@ -154,13 +154,12 @@ mod tests {
     use crate::testing::InMemoryBackend;
     use crate::usecase::{plan_snapshots, run_plan};
 
-    fn area(name: &str) -> ConfigName {
-        ConfigName::parse(name).unwrap()
+    fn area(name: &str) -> AreaName {
+        AreaName::parse(name).unwrap()
     }
 
     fn machine() -> InMemoryBackend {
-        let backend =
-            InMemoryBackend::with_configs(&["data", "home", "root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["data", "home", "root"]).with_root_area("root");
         let everything = plan_snapshots(&backend, None).unwrap();
         let point = crate::domain::Point::parse("20261025T181500Z").unwrap();
         run_plan(
@@ -211,7 +210,7 @@ mod tests {
         // a plan made some other way cannot get past the second check
         let forged = Plan {
             config: area("root"),
-            subvolume: "/".into(),
+            location: "/".into(),
             snapshots: 2,
             freed_bytes: None,
             points: 0,
@@ -222,7 +221,7 @@ mod tests {
             Err(UnprotectError::SystemArea)
         ));
         assert!(
-            backend.list_configs().unwrap().contains(&area("root")),
+            backend.list_areas().unwrap().contains(&area("root")),
             "nothing was removed"
         );
         assert!(UnprotectError::SystemArea
@@ -244,7 +243,7 @@ mod tests {
         let backend = machine();
         let plan = plan(&backend, &Groups::default(), &area("home")).unwrap();
         assert_eq!(stop_protecting(&backend, &plan).unwrap(), 2);
-        let left = backend.list_configs().unwrap();
+        let left = backend.list_areas().unwrap();
         assert_eq!(left, [area("data"), area("root")]);
         assert_eq!(
             backend.list_snapshots(&area("data")).unwrap().len(),
@@ -260,7 +259,7 @@ mod tests {
         );
         assert!(points
             .iter()
-            .all(|p| p.members.iter().all(|m| m.config != area("home"))));
+            .all(|p| p.members.iter().all(|m| m.area != area("home"))));
     }
 
     #[test]
@@ -284,7 +283,7 @@ mod tests {
         }
         let bytes = Plan {
             config: area("home"),
-            subvolume: "/mnt/home".into(),
+            location: "/mnt/home".into(),
             snapshots: 1,
             freed_bytes: Some(3_145_728),
             points: 0,

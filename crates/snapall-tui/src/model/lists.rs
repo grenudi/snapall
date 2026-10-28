@@ -6,29 +6,29 @@
 
 use crate::model::*;
 
-pub(crate) fn on_configs_loaded(
+pub(crate) fn on_areas_loaded(
     state: &mut State,
-    result: Result<Vec<ConfigName>, String>,
+    result: Result<Vec<AreaName>, String>,
 ) -> Vec<Effect> {
     match result {
         Err(error) => {
-            state.configs = Load::Failed(error.clone());
-            state.config_cursor = 0;
+            state.areas = Load::Failed(error.clone());
+            state.area_cursor = 0;
             state.after_reload = None;
             state.notice = Some(Notice::Error(error));
             Vec::new()
         }
         Ok(mut names) => {
-            let previous = state.selected_config().map(|c| c.name.clone());
+            let previous = state.selected_area().map(|c| c.name.clone());
             names.sort();
             names.dedup();
-            state.config_cursor = previous
+            state.area_cursor = previous
                 .and_then(|p| names.iter().position(|n| *n == p))
                 .unwrap_or(0);
-            state.configs = Load::Loaded(
+            state.areas = Load::Loaded(
                 names
                     .into_iter()
-                    .map(|name| ConfigEntry {
+                    .map(|name| AreaEntry {
                         name,
                         snapshots: Load::NotLoaded,
                     })
@@ -56,11 +56,11 @@ pub(crate) fn on_configs_loaded(
 
 pub(crate) fn on_snapshots_loaded(
     state: &mut State,
-    config: &ConfigName,
+    area: &AreaName,
     result: Result<Vec<SnapshotInfo>, String>,
 ) -> Vec<Effect> {
-    let selected = state.selected_config().map(|c| c.name.clone());
-    let Some(entry) = state.entry_mut(config) else {
+    let selected = state.selected_area().map(|c| c.name.clone());
+    let Some(entry) = state.entry_mut(area) else {
         return Vec::new();
     };
     match result {
@@ -70,10 +70,10 @@ pub(crate) fn on_snapshots_loaded(
         }
         Err(error) => {
             entry.snapshots = Load::Failed(error.clone());
-            state.notice = Some(Notice::Error(format!("{config}: {error}")));
+            state.notice = Some(Notice::Error(format!("{area}: {error}")));
         }
     }
-    if selected.as_ref() == Some(config) {
+    if selected.as_ref() == Some(area) {
         let existing: BTreeSet<SnapshotId> =
             state.displayed_snapshots().iter().map(|s| s.id).collect();
         state.marked.retain(|id| existing.contains(id));
@@ -85,15 +85,15 @@ pub(crate) fn on_snapshots_loaded(
 
 pub(crate) fn on_created(
     state: &mut State,
-    results: Vec<(ConfigName, Result<SnapshotId, String>)>,
+    results: Vec<(AreaName, Result<SnapshotId, String>)>,
 ) -> Vec<Effect> {
     let created: Vec<String> = results
         .iter()
-        .filter_map(|(config, r)| r.as_ref().ok().map(|id| format!("{config} #{id}")))
+        .filter_map(|(area, r)| r.as_ref().ok().map(|id| format!("{area} #{id}")))
         .collect();
     let failures: Vec<String> = results
         .iter()
-        .filter_map(|(config, r)| r.as_ref().err().map(|e| format!("{config}: {e}")))
+        .filter_map(|(area, r)| r.as_ref().err().map(|e| format!("{area}: {e}")))
         .collect();
     state.notice = Some(if failures.is_empty() {
         Notice::Info(format!("created {}", created.join(", ")))
@@ -110,6 +110,6 @@ pub(crate) fn on_created(
     state.snapshot_cursor = 0;
     results
         .into_iter()
-        .filter_map(|(config, r)| r.ok().map(|_| Effect::LoadSnapshots(config)))
+        .filter_map(|(area, r)| r.ok().map(|_| Effect::LoadSnapshots(area)))
         .collect()
 }

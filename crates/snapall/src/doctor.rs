@@ -27,13 +27,13 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
     let snapper = snapper_version();
     let configs = snapper
         .is_ok()
-        .then(|| backend.list_configs().map_err(|e| e.to_string()));
+        .then(|| backend.list_areas().map_err(|e| e.to_string()));
     // Where each config lives, to see what none of them covers. Unreadable ones are left out: this
     // only adds a finding, and the configs check already says if listing fails.
-    let subvolumes = match &configs {
+    let locations = match &configs {
         Some(Ok(names)) => names
             .iter()
-            .filter_map(|name| Some((name.clone(), backend.config_subvolume(name).ok()?)))
+            .filter_map(|name| Some((name.clone(), backend.area_location(name).ok()?)))
             .collect(),
         _ => Vec::new(),
     };
@@ -44,8 +44,8 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
             .ok()
             .and_then(|status| effective_uid(&status))
             .map(|uid| uid == 0),
-        configs,
-        subvolumes,
+        areas: configs,
+        locations,
     }
 }
 
@@ -212,13 +212,13 @@ fn boot_menu_check() -> Option<Check> {
 /// broken, so this is a warning and never a failure; it says what is left out in plain words and
 /// points at the one command that sets it up and explains it.
 fn protection_check(probe: &Probe) -> Option<Check> {
-    if !matches!(probe.configs, Some(Ok(_))) {
+    if !matches!(probe.areas, Some(Ok(_))) {
         return None;
     }
     let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").ok()?;
     let areas = coverage::areas(
         &coverage::mounts_from_mountinfo(&mountinfo),
-        &probe.subvolumes,
+        &probe.locations,
     );
     let gaps = coverage::gaps(&areas);
     if gaps.is_empty() {

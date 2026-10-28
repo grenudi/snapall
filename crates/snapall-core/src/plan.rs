@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use thiserror::Error;
 
-use crate::domain::ConfigName;
+use crate::domain::AreaName;
 
 /// The configs that will be snapshotted.
 ///
@@ -16,11 +16,11 @@ use crate::domain::ConfigName;
 /// every entry is a config the backend reported.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
-    targets: Vec<ConfigName>,
+    targets: Vec<AreaName>,
 }
 
 impl Plan {
-    pub fn targets(&self) -> &[ConfigName] {
+    pub fn targets(&self) -> &[AreaName] {
         &self.targets
     }
 }
@@ -28,35 +28,35 @@ impl Plan {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PlanError {
     #[error("There are no protected areas yet, so there is nothing to snapshot. Run `sudo snapall setup` to set one up.")]
-    NoConfigs,
+    NoAreas,
     #[error("an empty list of areas was requested")]
     NothingRequested,
     #[error(
         "unknown area(s): {} (`snapall list` shows the ones that exist)",
-        .0.iter().map(ConfigName::as_str).collect::<Vec<_>>().join(", ")
+        .0.iter().map(AreaName::as_str).collect::<Vec<_>>().join(", ")
     )]
-    UnknownConfigs(Vec<ConfigName>),
+    UnknownAreas(Vec<AreaName>),
 }
 
 /// Choose targets. `requested = None` means "everything that exists"; an explicit
 /// request must name only configs that exist (fail fast, never silently skip).
-pub fn plan(requested: Option<&[ConfigName]>, available: &[ConfigName]) -> Result<Plan, PlanError> {
+pub fn plan(requested: Option<&[AreaName]>, available: &[AreaName]) -> Result<Plan, PlanError> {
     if available.is_empty() {
-        return Err(PlanError::NoConfigs);
+        return Err(PlanError::NoAreas);
     }
-    let available: BTreeSet<&ConfigName> = available.iter().collect();
+    let available: BTreeSet<&AreaName> = available.iter().collect();
 
-    let targets: BTreeSet<ConfigName> = match requested {
+    let targets: BTreeSet<AreaName> = match requested {
         None => available.into_iter().cloned().collect(),
         Some([]) => return Err(PlanError::NothingRequested),
         Some(requested) => {
-            let unknown: BTreeSet<ConfigName> = requested
+            let unknown: BTreeSet<AreaName> = requested
                 .iter()
                 .filter(|name| !available.contains(name))
                 .cloned()
                 .collect();
             if !unknown.is_empty() {
-                return Err(PlanError::UnknownConfigs(unknown.into_iter().collect()));
+                return Err(PlanError::UnknownAreas(unknown.into_iter().collect()));
             }
             requested.iter().cloned().collect()
         }
@@ -70,12 +70,12 @@ pub fn plan(requested: Option<&[ConfigName]>, available: &[ConfigName]) -> Resul
 mod tests {
     use super::*;
 
-    fn names(list: &[&str]) -> Vec<ConfigName> {
-        list.iter().map(|n| ConfigName::parse(n).unwrap()).collect()
+    fn names(list: &[&str]) -> Vec<AreaName> {
+        list.iter().map(|n| AreaName::parse(n).unwrap()).collect()
     }
 
     #[test]
-    fn default_is_every_available_config_sorted_and_unique() {
+    fn default_is_every_available_area_sorted_and_unique() {
         let p = plan(None, &names(&["root", "home", "home"])).unwrap();
         assert_eq!(p.targets(), names(&["home", "root"]).as_slice());
     }
@@ -88,17 +88,17 @@ mod tests {
     }
 
     #[test]
-    fn unknown_configs_fail_fast_and_are_all_reported() {
+    fn unknown_areas_fail_fast_and_are_all_reported() {
         let req = names(&["root", "nope", "nada"]);
         assert_eq!(
             plan(Some(&req), &names(&["root"])),
-            Err(PlanError::UnknownConfigs(names(&["nada", "nope"])))
+            Err(PlanError::UnknownAreas(names(&["nada", "nope"])))
         );
     }
 
     #[test]
-    fn no_configs_and_empty_requests_are_errors_not_empty_plans() {
-        assert_eq!(plan(None, &[]), Err(PlanError::NoConfigs));
+    fn no_areas_and_empty_requests_are_errors_not_empty_plans() {
+        assert_eq!(plan(None, &[]), Err(PlanError::NoAreas));
         assert_eq!(
             plan(Some(&[]), &names(&["root"])),
             Err(PlanError::NothingRequested)
