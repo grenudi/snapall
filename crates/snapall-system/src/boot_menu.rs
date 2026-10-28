@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be
-//! judged (`snapall_core::going_back::boot::assess`). Read-only, and every path is under a root that tests replace
-//! with a temporary directory.
+//! judged (`snapall_core::going_back::boot::assess`). It reads files under a root that tests replace with a
+//! temporary directory, and asks the service manager whether a unit is active.
 //!
 //! These are heuristics about where distributions put things; they are written from the tools'
 //! own documentation, not from a run on each distribution, so a miss is reported as "could not
@@ -38,7 +38,7 @@ const SYSTEMD_BOOT: &[&str] = &[
 ];
 
 /// Gather the facts under `root` (the real `/` in production).
-pub fn gather(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> BootFacts {
+pub fn under(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> BootFacts {
     let exists = |relative: &str| root.join(relative).exists();
     let any = |paths: &[&str]| paths.iter().any(|p| exists(p));
 
@@ -106,8 +106,8 @@ fn systemctl_state(unit: &str) -> Option<String> {
 }
 
 /// The facts of the machine snapall is running on.
-pub fn system() -> BootFacts {
-    gather(Path::new("/"), &systemctl_state)
+pub fn on_this_machine() -> BootFacts {
+    under(Path::new("/"), &systemctl_state)
 }
 
 #[cfg(test)]
@@ -158,7 +158,7 @@ mod tests {
 
     /// The machine's verdict, with the named units active and any other unit inactive.
     fn status(machine: &Machine, running: &[&str]) -> BootStatus {
-        assess(&gather(&machine.0, &|unit| {
+        assess(&under(&machine.0, &|unit| {
             Some(
                 if running.contains(&unit) {
                     "active"
@@ -214,7 +214,7 @@ mod tests {
     fn the_daemons_real_state_is_carried_into_the_explanation() {
         let machine = Machine::new("limine-failed", BTRFS)
             .with(&["etc/default/limine", "usr/bin/limine-snapper-sync"]);
-        let facts = gather(&machine.0, &|_| Some("failed".to_owned()));
+        let facts = under(&machine.0, &|_| Some("failed".to_owned()));
         assert_eq!(
             assess(&facts),
             BootStatus::Installed {
@@ -223,7 +223,7 @@ mod tests {
             }
         );
         // no systemd, no answer: the explanation says so rather than guessing
-        let facts = gather(&machine.0, &|_| None);
+        let facts = under(&machine.0, &|_| None);
         assert_eq!(
             assess(&facts),
             BootStatus::Installed {

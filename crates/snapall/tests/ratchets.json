@@ -1,6 +1,5 @@
 {
   "entry_files_too_long": {
-    "crates/snapall-system/src/lib.rs": 244,
     "crates/snapall-tui/src/model/mod.rs": 142
   },
   "files_too_long": {
@@ -28,7 +27,7 @@
     "crates/snapall/src/main.rs": 4
   },
   "tool_words_in_names": {
-    "snapall": 9,
+    "snapall": 7,
     "snapall-core": 1
   }
 }

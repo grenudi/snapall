@@ -6,9 +6,10 @@
 
 use super::*;
 use crate::output::Outcome;
-use crate::{advice, boot_probe, setup};
+use crate::{advice, setup};
 use snapall_core::going_back::boot;
 use snapall_core::{area_covering, SnapshotBackend};
+use snapall_system::boot_menu;
 use std::error::Error;
 use std::io::IsTerminal;
 use std::process::ExitCode;
@@ -58,7 +59,7 @@ pub(super) fn ui_context(
     ctx: &Context,
     file: Option<snapall_tui::FileTarget>,
 ) -> snapall_tui::UiContext {
-    let boot_menu = boot::assess(&boot_probe::system());
+    let boot_menu = boot::assess(&boot_menu::on_this_machine());
     // What could be protected matters to the whole window, not to one file's history.
     let facts = setup::gather();
     let offers = if file.is_some() {
