@@ -81,10 +81,13 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-system
 
+- `asking.rs`: Running a program and reading what it says: what it printed, what the service manager says of a unit, and the numbers `df` prints.
+- `boot_menu.rs`: Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be judged (`snapall_core::going_back::boot::assess`).
 - `groups.rs`: The groups file: plain text under `/etc/snapall`, read and written whole.
 - `journal.rs`: The journal on disk: one JSON object per line, appended.
 - `lib.rs`: Asking the machine what the core wants to know: `df` for a disk, `systemctl` for a background job, `date` for the time, unit files for a job's schedule, `btrfs` for how room is counted, and a lock file for who is making a change.
 - `lock.rs`: Taking turns at changing things: the right to make a change is held in a file, so that two restores, or a restore and a deletion, do not race each other.
+- `machine.rs`: The machine snapall is running on, answering the core's questions: its disk, its jobs, its clock, how room is counted, and who else is making a change.
 - `quotas.rs`: How a disk counts the room snapshots take, and switching it on and off.
 - `runner.rs`: Starting a change that outlives the program that asked for it, and asking it to stop.
 - `units.rs`: What a job's unit file says about it.
@@ -171,7 +174,6 @@ What each part of snapall says it is for, read from the first line of each modul
 
 - `advice.rs`: What to tell someone whose file no snapshot can contain: why, and what to do about it, in snapall's own words and with snapall's own command.
 - `ask.rs`: Asking before a change, and the end of a command that was not told to go ahead.
-- `boot_probe.rs`: Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be judged (`snapall_core::going_back::boot::assess`).
   - `cli/building.rs`: Building the request from what was resolved: one command to one request.
   - `cli/mod.rs`: Turning what was typed, and the environment, into a request that is known to be valid ([`Parsed`]).
   - `cli/parsing.rs`: Parsing what was typed: the command, its words, and what to suggest when it is mistyped.

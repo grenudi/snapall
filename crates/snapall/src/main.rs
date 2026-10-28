@@ -10,7 +10,6 @@
 
 mod advice;
 mod ask;
-mod boot_probe;
 mod cli;
 mod commands;
 mod contract;

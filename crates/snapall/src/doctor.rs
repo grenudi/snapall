@@ -18,9 +18,9 @@ use snapall_core::protecting::doctor::{
 };
 use snapall_core::{Event, Observer, SnapshotBackend};
 
-use crate::boot_probe;
 use crate::output::{emit, emit_json};
 use crate::render;
+use snapall_system::boot_menu;
 
 /// Gather the facts about this machine.
 pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
@@ -192,7 +192,7 @@ pub fn run(
 /// Can this system boot its snapshots? A row of the report, never a failure: it is information
 /// about what to add, not a sign that snapper is broken.
 fn boot_menu_check() -> Option<Check> {
-    let status = boot::assess(&boot_probe::system());
+    let status = boot::assess(&boot_menu::on_this_machine());
     let mut lines = boot::details(&status).into_iter();
     let detail = lines.next()?;
     let rest: Vec<String> = lines.collect();

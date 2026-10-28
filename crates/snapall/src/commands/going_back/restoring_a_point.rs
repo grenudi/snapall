@@ -6,13 +6,14 @@
 
 use super::*;
 use crate::output::Outcome;
-use crate::{ask, boot_probe, render};
+use crate::{ask, render};
 use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
     all_snapshots, fresh_point, preview_point, restore_point_along, restore_points, MemberView,
     Point, RestorePoint,
 };
+use snapall_system::boot_menu;
 use std::error::Error;
 use std::process::ExitCode;
 
@@ -29,7 +30,7 @@ pub fn restore_all(
     let found = restore_points(&all_snapshots(ctx.backend)?);
     let point = the_point_named(&found, wanted)?;
     let previews = preview_point(ctx.backend, point);
-    let route = boot::restore_route(&boot::assess(&boot_probe::system()));
+    let route = boot::restore_route(&boot::assess(&boot_menu::on_this_machine()));
     let anything_to_change = previews
         .iter()
         .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()));

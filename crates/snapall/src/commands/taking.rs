@@ -6,7 +6,6 @@
 
 use super::*;
 use crate::ask;
-use crate::boot_probe;
 use crate::output::{self, Outcome};
 use crate::render;
 use snapall_core::going_back::boot;
@@ -14,6 +13,7 @@ use snapall_core::Act;
 use snapall_core::{
     fresh_point, plan_snapshots, run_plan_along, AreaName, Description, Plan, Report,
 };
+use snapall_system::boot_menu;
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
@@ -128,7 +128,7 @@ pub(super) fn suggest_the_boot_menu(ctx: &Context) {
     if !ctx.hints || !to_a_person {
         return;
     }
-    if let Some(tip) = boot::hint(&boot::assess(&boot_probe::system())) {
+    if let Some(tip) = boot::hint(&boot::assess(&boot_menu::on_this_machine())) {
         output::note(&tip);
     }
 }

@@ -24,7 +24,7 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | 2 | `setup.rs` (432 lines) asks area by area as it works, which is why it is the one change that begins without a leave (`begin_asking_along`). Plan first, ask once, then begin | open |
 | 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
 | 4 | The window's `changes.rs` is over 300 lines (419) | open |
-| 5 | Code that wraps tools but lives in the binary (`doctor.rs`, `boot_probe.rs`) still names them (`systemctl`, `grub_btrfs`, `snapper`). It belongs in an adapter | open |
+| 5 | Code that wraps tools but lives in the binary still names them: `doctor.rs` (`systemctl`, `snapper`) and the machine-reading parts of `setup.rs`. The boot-menu probe has moved to the machine adapter (`snapall-system/src/boot_menu.rs`); these belong beside it | open |
 | 6 | Ten plain `config` names remain in the binary, in files that already used `area` for something else | open |
 | 7 | Run `dev/golden-output.sh check` in CI. It needs its own fresh fixture, after the steps that change the disk | open |
 | 8 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |

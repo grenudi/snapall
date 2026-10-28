@@ -6,12 +6,13 @@
 
 use super::*;
 use crate::output::Outcome;
-use crate::{ask, boot_probe, render};
+use crate::{ask, render};
 use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
     preview_restore, restore_snapshot, AreaName, Preview, RestoreError, SnapshotId,
 };
+use snapall_system::boot_menu;
 use std::error::Error;
 
 /// Put an area, or one path of it, back to how a snapshot had it. It shows what will change, asks
@@ -71,7 +72,7 @@ pub(super) fn refuse_to_restore_the_whole_system_root(
     path: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     if preview.is_system_root && path.is_none() {
-        let route = boot::restore_route(&boot::assess(&boot_probe::system()));
+        let route = boot::restore_route(&boot::assess(&boot_menu::on_this_machine()));
         let refusal = RestoreError::SystemRoot { area: area.clone() };
         return Err(format!("{refusal}\n{route}").into());
     }
