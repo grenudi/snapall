@@ -1,0 +1,209 @@
+{
+  "top": 3,
+  "questions": [
+    {
+      "question": "What happens when I delete a snapshot?",
+      "answers": [
+        "snapall/commands/deleting.rs",
+        "snapall-tui/model/prompts/delete.rs"
+      ]
+    },
+    {
+      "question": "Where is the list of everything that can be asked of the command line?",
+      "answers": [
+        "snapall/commands/asked_for.rs",
+        "snapall/contract/commands.rs"
+      ]
+    },
+    {
+      "question": "Where are the command line flags declared?",
+      "answers": [
+        "snapall/contract/inputs.rs"
+      ]
+    },
+    {
+      "question": "Which code decides which areas get a snapshot?",
+      "answers": [
+        "snapall-core/taking/plan.rs"
+      ]
+    },
+    {
+      "question": "How is a snapshot taken, area by area?",
+      "answers": [
+        "snapall-core/taking/run.rs",
+        "snapall/commands/taking.rs"
+      ]
+    },
+    {
+      "question": "How does restoring a file work?",
+      "answers": [
+        "snapall/commands/going_back/restoring.rs",
+        "snapall-core/going_back/restoring.rs"
+      ]
+    },
+    {
+      "question": "Where are restore points found?",
+      "answers": [
+        "snapall-core/going_back/points/finding.rs"
+      ]
+    },
+    {
+      "question": "What is the way back from a change?",
+      "answers": [
+        "snapall-core/going_back/rollback.rs"
+      ]
+    },
+    {
+      "question": "How does undo work?",
+      "answers": [
+        "snapall/commands/going_back/undoing.rs"
+      ]
+    },
+    {
+      "question": "Where is the Snapshots tab drawn?",
+      "answers": [
+        "snapall-tui/tabs/snapshots/drawing.rs"
+      ]
+    },
+    {
+      "question": "Where is the Health tab drawn?",
+      "answers": [
+        "snapall-tui/tabs/health/drawing.rs"
+      ]
+    },
+    {
+      "question": "Where does the Activity tab show what snapall did?",
+      "answers": [
+        "snapall-tui/tabs/activity/drawing.rs",
+        "snapall-tui/tabs/activity/entries.rs"
+      ]
+    },
+    {
+      "question": "What does a key do in the window?",
+      "answers": [
+        "snapall-tui/model/keys/screen.rs"
+      ]
+    },
+    {
+      "question": "What happens when the mouse clicks?",
+      "answers": [
+        "snapall-tui/model/keys/clicking.rs"
+      ]
+    },
+    {
+      "question": "Where are the questions the window asks kept?",
+      "answers": [
+        "snapall-tui/model/state/questions.rs"
+      ]
+    },
+    {
+      "question": "How is a person told what protecting means?",
+      "answers": [
+        "snapall/setup/flow.rs",
+        "snapall-core/vocabulary/explain.rs"
+      ]
+    },
+    {
+      "question": "Where is it decided how many snapshots an area keeps?",
+      "answers": [
+        "snapall-core/keeping/limits.rs",
+        "snapall/commands/keeping/limits.rs"
+      ]
+    },
+    {
+      "question": "How are groups of areas stored?",
+      "answers": [
+        "snapall-core/keeping/groups.rs",
+        "snapall-system/groups.rs"
+      ]
+    },
+    {
+      "question": "Where does the program check whether a boot menu can boot snapshots?",
+      "answers": [
+        "snapall-system/boot_menu.rs",
+        "snapall-core/going_back/boot.rs"
+      ]
+    },
+    {
+      "question": "How is what snapall did remembered?",
+      "answers": [
+        "snapall-core/looking/journal.rs",
+        "snapall-system/journal.rs"
+      ]
+    },
+    {
+      "question": "What talks to snapper?",
+      "answers": [
+        "snapall-snapper/backend.rs"
+      ]
+    },
+    {
+      "question": "How is what snapper prints read?",
+      "answers": [
+        "snapall-snapper/reading.rs"
+      ]
+    },
+    {
+      "question": "Where does the doctor diagnose the setup?",
+      "answers": [
+        "snapall-core/protecting/doctor/diagnosing.rs",
+        "snapall/doctor.rs"
+      ]
+    },
+    {
+      "question": "How is the operating system detected?",
+      "answers": [
+        "snapall-system/environment.rs"
+      ]
+    },
+    {
+      "question": "What is asked before a change that cannot be undone?",
+      "answers": [
+        "snapall/ask.rs",
+        "snapall-core/vocabulary/consequence.rs"
+      ]
+    },
+    {
+      "question": "Where are the words for how heavy a change is?",
+      "answers": [
+        "snapall-core/vocabulary/consequence.rs"
+      ]
+    },
+    {
+      "question": "How does a change keep running in the background?",
+      "answers": [
+        "snapall-system/runner.rs"
+      ]
+    },
+    {
+      "question": "What stands in for snapper in tests?",
+      "answers": [
+        "snapall-core/ports/testing/backend.rs",
+        "snapall-core/ports/testing/state.rs"
+      ]
+    },
+    {
+      "question": "What does the window do when the snapshots arrive?",
+      "answers": [
+        "snapall-tui/tabs/snapshots/arriving.rs",
+        "snapall-tui/model/looked.rs"
+      ]
+    },
+    {
+      "question": "Where is a change started and recorded when it runs from the command line?",
+      "answers": [
+        "snapall/commands/change.rs"
+      ]
+    },
+    {
+      "question": "What shows how protection stands?",
+      "answers": [
+        "snapall-core/health/verdicts.rs",
+        "snapall-core/health/findings.rs",
+        "snapall-core/health/mod.rs",
+        "snapall/render/health.rs",
+        "snapall-tui/tabs/health/rows.rs"
+      ]
+    }
+  ]
+}

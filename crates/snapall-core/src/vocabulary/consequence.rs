@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What an action weighs, and so what has to be typed before it happens.
+//! How heavy an action is (what it weighs), and so what has to be typed before it happens.
 //!
 //! Three weights, because a confirmation only protects when it is rare enough to be read:
 //!

@@ -27,3 +27,34 @@ Real snapper and the real TUI (root, loop devices, `snapper`, `btrfs-progs`, `pi
 14. **Licensing is checked, not remembered.** The project is GPL-3.0-or-later. Every `.rs`, `.sh` and `.py` file needs its SPDX header (`reuse annotate`, see CONTRIBUTING); `reuse lint` and `cargo deny check licenses` run in CI. Never add a dependency whose license is not GPL-3.0-compatible.
 15. **One logical change per PR; the PR title is a Conventional Commit** (see CONTRIBUTING.md).
 16. **Record decisions.** A significant choice, including what was considered and rejected, gets an ADR in `docs/adr/`. Every known gap goes in `docs/backlog.md`, not in a prose TODO.
+
+## Working in loops: how an iteration goes
+Each iteration is one coherent step with its own branch and pull request, and none depends on anyone remembering the last. State lives in the repository and never in a session: the plan is `docs/backlog.md` (the Structure section), the history is `docs/development-log.md`, the debts are `crates/snapall/tests/ratchets.json`, the outline is `OUTLINE.md`. `/tmp` is not memory.
+
+1. **Read** the plan and the last entries of the log. Read `OUTLINE.md` as a stranger would. The structure trend is the summary of the latest `Structure` workflow run on main (`.github/workflows/structure.yml`), or `dev/structure-metrics.py --trend`.
+2. **Choose by evidence, not by order.** Measure (grep, the metrics, the findability test), read the code as it is, and be willing to reverse the plan: `setup` was decided against its own backlog item.
+3. **Branch**: `git checkout -b refactor/what-it-is`. **Change** with the tools below. Update the plan and the log in the same change; every path a document names must exist (a test checks).
+4. **Gate**: `dev/gate.sh`, about a minute. The heavy checks run in CI on every pull request; reproduce a CI failure with `dev/gate.sh --full`.
+5. **Ship**: `GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md`, in the foreground. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, merges the release pull request, and verifies the release. A process started in one tool call does not outlive it, so it stops itself after about four minutes with exit code 75 ("still waiting"): run the same command again until it exits 0. It keeps no state, so that is safe at any point.
+6. **Log** what was done, why, and the evidence, in `docs/development-log.md`.
+
+## The tools, all in `dev/`
+| | |
+|---|---|
+| `gate.sh` | the fast gate (format, clippy, docs, links, licences, tests that need no disk); `--full` adds the fixture checks |
+| `ship.py` | push, pull request, CI, merge, release, verify; resumable; re-runs a job the runner itself failed to start |
+| `split-module.py` | split one module into a folder of modules by purpose, by a JSON spec, moving whole items |
+| `golden-output.sh` | `record` or `check` what 20 commands print, so a refactor is shown to change nothing |
+| `structure-metrics.py` | the proxies for "every layer is the top of the layers beneath it", at any tag |
+
+On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_RATCHETS=1` lowers or removes paid debts and never raises one; `FINDABILITY_REPORT=1 cargo test -p snapall --test findability -- --nocapture` prints the ranking for each question. The findability test is the cold read: the outline alone must lead a stranger's question to the right module (`crates/snapall/tests/findability.json`). To add a question, add it there.
+
+## Traps already fallen into
+- A background process (`nohup ... &`) does not outlive the tool call that started it. Anything long must be resumable and run in the foreground within the limit, as `dev/ship.py` is.
+- The tool shell is `sh`: use `bash -c` for `<(...)`, `time` and arrays, or the whole line fails to parse and none of it runs.
+- `cargo fmt` reflows source, so a script that patches source by string must assert that its replacement applied; a mutation that silently did not apply proves nothing. Prove a test bites by planting the violation, seeing it fail, and restoring the file with `cmp`.
+- A `crate::` path belongs to the crate it is written in; a rewrite across the workspace must not touch another crate's own modules.
+- The release commit is the commit titled `chore: release`, not the merge commit before it, whose release workflows are skipped.
+- The openSUSE x86_64 container job sometimes fails in the runner's own setup (the step `A user's tools`), before any of our code runs: re-run only that job once. `ship.py` does.
+- Size limits get gamed: files huddle just under them. Judge by the findability test and by reading, not only by the numbers.
+- A measurement that reads zero before a file became a folder is an artifact of the move, not a result.

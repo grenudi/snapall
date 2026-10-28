@@ -6,6 +6,9 @@
     "crates/snapall-tui/src/changes.rs": 419,
     "crates/snapall/src/contract/inputs.rs": 514
   },
+  "findability_gaps": {
+    "What does a key do in the window?": 5
+  },
   "handlers_that_branch_too_much": {
     "restore_all": 8,
     "setup": 7,
