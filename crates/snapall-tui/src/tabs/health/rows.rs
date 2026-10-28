@@ -6,6 +6,11 @@
 //! A pure function of the report, so it is tested without a terminal.
 
 use super::*;
+use snapall_core::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
+use snapall_core::health::format_bytes;
+use snapall_core::services::{self, Job};
+use snapall_core::QuotaMode;
+use snapall_core::{AreaFacts, Facts, Health, Level, Remedy, Topic};
 
 // ---- what the rows say --------------------------------------------------------------------------
 

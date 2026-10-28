@@ -328,7 +328,7 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-    /// Start a session and load the configs.
+    /// Start a session and load the areas.
     pub fn new(backend: &'a (dyn SnapshotBackend + Sync)) -> Self {
         Self::with_context(backend, UiContext::default())
     }

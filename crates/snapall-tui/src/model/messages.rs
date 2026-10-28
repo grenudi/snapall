@@ -106,7 +106,7 @@ pub enum Effect {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
-    /// The UI has opened: load the configs.
+    /// The window has opened: load the areas.
     Start,
     /// Time passed while work is in flight; animates the indicator.
     Tick,

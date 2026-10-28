@@ -66,11 +66,14 @@ What each part of snapall says it is for, read from the first line of each modul
 
 - `changes.rs`: What a change is called in the Activity tab, and how it went: the words, apart from the doing.
 - `lib.rs`: A terminal UI for snapall: a second *driving adapter* over the same port as the CLI.
+  - `model/changed.rs`: What a finished change leaves behind in the window: its result, what to show of it, and what to look at again.
   - `model/file.rs`: The file history screen: one file's versions, newest first, and putting one back.
   - `model/following.rs`: Following the changes that run on their own: looking at the journal once a second while anything runs, and noticing when one that this window started has ended.
   - `model/input.rs`: What a person does: a key, a click, a button.
   - `model/keys.rs`: What each key and click does, and how a prompt answers one.
   - `model/lists.rs`: The lists of areas and snapshots: what happens when they arrive.
+  - `model/living.rs`: The window's own life: starting, the clock, the pointer and a refusal.
+  - `model/looked.rs`: What looking brought back arriving in the window: the areas, snapshots, history, health, groups and points.
   - `model/messages.rs`: What the window asks the shell to do (effects) and what the shell reports back (messages).
   - `model/mod.rs`: The pure core of the UI: state, messages, effects and `update`.
     - `model/prompts/confirm.rs`: The question before a change: what it will do, and the answer that goes with its weight.
@@ -92,6 +95,8 @@ What each part of snapall says it is for, read from the first line of each modul
 - `status_bar.rs`: The status bar: one line under every view with the numbers that matter (how many snapshots, how much room they take, how full the disk is, whether cleanup runs, how many things need a look).
 - `tab.rs`: The views of the window.
   - `tabs/activity.rs`: The Activity tab: what snapall did, newest first, and how each went.
+    - `tabs/health/drawing.rs`: Drawing the Health tab: the rows, the verdict above them and the detail of the chosen one.
+    - `tabs/health/keys.rs`: What pressing a key does on the Health tab: moving along the rows and acting on the chosen one.
     - `tabs/health/mod.rs`: The Health tab: is protection working, how much room does it take, will old snapshots be cleaned up, and what to do about anything that is not.
     - `tabs/health/rows.rs`: What the Health tab lists: each row's name, how it stands, what it means and what Enter does.
   - `tabs/mod.rs`: One module per tab that has more to it than the snapshot lists: each owns its state, its keys and its drawing, so a tab is read in one place.
@@ -149,5 +154,12 @@ What each part of snapall says it is for, read from the first line of each modul
 - `logging.rs`: Where the audit trail goes: nowhere, to stderr, or to a private file.
 - `main.rs`: Composition root and imperative shell: wires the argenv-driven CLI, the TUI and the snapper adapter to the core, performs the I/O, and maps outcomes to exit codes.
 - `output.rs`: Printing, and the choice between text for a person and JSON for a program.
-- `render.rs`: Presentation: pure functions from domain values to text or JSON.
+  - `render/activity.rs`: What snapall has done, as the journal remembers it.
+  - `render/changing.rs`: What a restore would change, what a restore or a deletion did.
+  - `render/groups.rs`: Groups of areas.
+  - `render/health.rs`: How protection stands, and the checks that find out.
+  - `render/listing.rs`: Listing snapshots and the history of a file.
+  - `render/mod.rs`: Presentation: pure functions from domain values to text or JSON.
+  - `render/points.rs`: Restore points: listing them, what putting one back would do, and what it did.
+  - `render/taking.rs`: What taking a snapshot reports: what was taken, or what would be.
 - `setup.rs`: `snapall setup`: find the parts of the disk that snapshots do not cover, explain what that means in plain words, ask, and set them up.
