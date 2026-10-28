@@ -35,7 +35,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 2. **Choose by evidence, not by order.** Measure (grep, the metrics, the findability test), read the code as it is, and be willing to reverse the plan: `setup` was decided against its own backlog item.
 3. **Branch**: `git checkout -b refactor/what-it-is`. **Change** with the tools below. Update the plan and the log in the same change; every path a document names must exist (a test checks).
 4. **Gate**: `dev/gate.sh`, about a minute. The heavy checks run in CI on every pull request; reproduce a CI failure with `dev/gate.sh --full`.
-5. **Ship**: `nohup env GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md > /tmp/ship.log 2>&1 &`, then read `tail /tmp/ship.log`. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, merges the release pull request, and verifies the release. It keeps no state, so run it again after any interruption.
+5. **Ship**: `GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md`, in the foreground. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, merges the release pull request, and verifies the release. A process started in one tool call does not outlive it, so it stops itself after about four minutes with exit code 75 ("still waiting"): run the same command again until it exits 0. It keeps no state, so that is safe at any point.
 6. **Log** what was done, why, and the evidence, in `docs/development-log.md`.
 
 ## The tools, all in `dev/`
@@ -50,6 +50,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_RATCHETS=1` lowers or removes paid debts and never raises one; `FINDABILITY_REPORT=1 cargo test -p snapall --test findability -- --nocapture` prints the ranking for each question. The findability test is the cold read: the outline alone must lead a stranger's question to the right module (`crates/snapall/tests/findability.json`). To add a question, add it there.
 
 ## Traps already fallen into
+- A background process (`nohup ... &`) does not outlive the tool call that started it. Anything long must be resumable and run in the foreground within the limit, as `dev/ship.py` is.
 - The tool shell is `sh`: use `bash -c` for `<(...)`, `time` and arrays, or the whole line fails to parse and none of it runs.
 - `cargo fmt` reflows source, so a script that patches source by string must assert that its replacement applied; a mutation that silently did not apply proves nothing. Prove a test bites by planting the violation, seeing it fail, and restoring the file with `cmp`.
 - A `crate::` path belongs to the crate it is written in; a rewrite across the workspace must not touch another crate's own modules.

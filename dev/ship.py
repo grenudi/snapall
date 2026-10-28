@@ -9,22 +9,31 @@
     GITHUB_TOKEN=... dev/ship.py --check            only verify the token and the repository
 
 It keeps no state of its own: every step reads GitHub, so it can be stopped and run again, from any session, and carries on
-from where the pull request, main or the release already is. A tool call may not last long, so run it in the background and
-read its log:
-
-    nohup env GITHUB_TOKEN=... dev/ship.py "title" --body-file /tmp/body.md > /tmp/ship.log 2>&1 &
-    tail -n 25 /tmp/ship.log
+from where the pull request, main or the release already is. A tool call does not last long and a process started in one does not
+outlive it, so run it in the foreground. It stops itself after SHIP_BUDGET seconds (255 by default) with exit code 75, "still
+waiting": run the same command again, as often as it takes, until it exits 0 (done) or 1 (something failed, and it says what).
 
 Rules it keeps, so nobody has to remember them: squash merge only, with the title as the commit subject; the pull request is merged only when
 every check passed (judged by the newest run of each check name); the release pull request is merged only after main's own CI passed;
 a job that failed in the runner's own setup, before any of our code ran (the openSUSE container, seen twice), is re-run once, and
 anything else that fails is reported with the tail of its log and stops everything.
 """
-import json, re, subprocess, sys, time, urllib.error, urllib.request
+import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
 KNOWN_RUNNER_FLAKES = ("A user's tools", "Set up job", "Initialize containers", "Initialize job")
 RELEASE_WORKFLOWS = ("Release", "Verify release", "Package repositories", "Install snippets")
 MIN_CHECKS = 20
+# A tool call does not last, and a process started in one does not outlive it. So this runs in the foreground, stops
+# itself before the call is cut off, and is run again: every step reads GitHub, so it carries on where it was.
+BUDGET_SECONDS = int(os.environ.get("SHIP_BUDGET", "255"))
+STARTED = time.time()
+STILL_WAITING = 75
+
+def nap(seconds):
+    if time.time() + seconds - STARTED > BUDGET_SECONDS:
+        say("still waiting: run me again, I carry on from where GitHub is")
+        sys.exit(STILL_WAITING)
+    time.sleep(seconds)
 
 def remote():
     url = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
@@ -95,7 +104,7 @@ def wait_for_checks(sha, what):
         if failed and not pending:
             if not reran and rerun_failed_runner_flakes(sha, failed):
                 reran = True
-                time.sleep(30)
+                nap(30)
                 continue
             for name in failed:
                 say(f"FAILED {name}: {checks[name]['html_url']}")
@@ -107,7 +116,7 @@ def wait_for_checks(sha, what):
                 return
         else:
             stable = 0
-        time.sleep(25)
+        nap(25)
 
 def wait_for_workflow_run(sha, name, limit=1500):
     deadline = time.time() + limit
@@ -115,7 +124,7 @@ def wait_for_workflow_run(sha, name, limit=1500):
         runs = [r for r in api(f"actions/runs?head_sha={sha}&per_page=50").get("workflow_runs", []) if r["name"] == name]
         if runs and runs[0]["status"] == "completed":
             return runs[0]
-        time.sleep(20)
+        nap(20)
     sys.exit(f"{name} did not finish for {sha[:7]}")
 
 def verify_release(sha):
@@ -133,7 +142,7 @@ def verify_release(sha):
             if flaky and len(flaky) == len([j for j in jobs if j.get("conclusion") == "failure"]):
                 say(f"re-running {name}: the runner failed in its own setup")
                 api(f"actions/runs/{run['id']}/rerun-failed-jobs", {}, "POST")
-                time.sleep(40)
+                nap(40)
             else:
                 say(f"{name} failed for a reason of ours: {run['html_url']}")
                 sys.exit(1)
@@ -179,7 +188,7 @@ def main(argv):
             sh("git", "push", "-q", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
     number = pr["number"]
     if not pr.get("merged_at"):
-        time.sleep(15)
+        nap(15)
         sha = api(f"pulls/{number}")["head"]["sha"]
         wait_for_checks(sha, f"#{number}")
         say("all checks passed: merging (squash)")
@@ -197,7 +206,7 @@ def main(argv):
         if runs and runs[0]["status"] == "completed":
             ci = runs[0]
             break
-        time.sleep(25)
+        nap(25)
     if not ci or ci["conclusion"] != "success":
         sys.exit(f"main's CI did not pass: {ci and ci['html_url']}")
     say("main is green")
@@ -209,7 +218,7 @@ def main(argv):
         release = next((p for p in open_prs if isinstance(open_prs, list) and p["title"].startswith("chore: release")), None) if isinstance(open_prs, list) else None
         if release:
             break
-        time.sleep(15)
+        nap(15)
     if not release:
         say("no release pull request was opened: this change does not release")
         return
