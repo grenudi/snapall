@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.24.3]
+
+
+### Refactoring
+- The core has no file that speaks more than one language ([#80](https://github.com/grenudi/snapall/pull/80)) ([f21a6a8])
+
+
+
 ## [0.24.2]
 
 
