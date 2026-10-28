@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.24.2"
+version = "0.24.3"
 edition = "2021"
 rust-version = "1.85"
 repository = "https://github.com/grenudi/snapall"
@@ -18,11 +18,11 @@ authors = ["grenudi"]
 license = "GPL-3.0-or-later"
 
 [workspace.dependencies]
-snapall-core = { path = "crates/snapall-core", version = "0.24.2" }
-snapall-observe = { path = "crates/snapall-observe", version = "0.24.2" }
-snapall-system = { path = "crates/snapall-system", version = "0.24.2" }
-snapall-snapper = { path = "crates/snapall-snapper", version = "0.24.2" }
-snapall-tui = { path = "crates/snapall-tui", version = "0.24.2" }
+snapall-core = { path = "crates/snapall-core", version = "0.24.3" }
+snapall-observe = { path = "crates/snapall-observe", version = "0.24.3" }
+snapall-system = { path = "crates/snapall-system", version = "0.24.3" }
+snapall-snapper = { path = "crates/snapall-snapper", version = "0.24.3" }
+snapall-tui = { path = "crates/snapall-tui", version = "0.24.3" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
