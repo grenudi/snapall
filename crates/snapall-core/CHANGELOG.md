@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.24.0]
+
+
+### Refactoring
+- The core speaks of areas and locations, and says so in one language ([#74](https://github.com/grenudi/snapall/pull/74)) ([0ead631])
+
+
+
 ## [0.23.4]
 
 
