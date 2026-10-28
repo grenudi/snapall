@@ -97,7 +97,11 @@ What each part of snapall says it is for, read from the first line of each modul
   - `model/file.rs`: The file history screen: one file's versions, newest first, and putting one back.
   - `model/following.rs`: Following the changes that run on their own: looking at the journal once a second while anything runs, and noticing when one that this window started has ended.
   - `model/input.rs`: What a person does: a key, a click, a button.
-  - `model/keys.rs`: What each key and click does, and how a prompt answers one.
+    - `model/keys/answering.rs`: How a prompt answers a key: what it returns, and which prompt a key goes to.
+    - `model/keys/clicking.rs`: What a click does: a button, a row, or the prompt over them.
+    - `model/keys/cursor.rs`: Moving through the lists: the cursor, jumping, scrolling, and marking snapshots.
+    - `model/keys/mod.rs`: What each key and click does, and how a prompt answers one.
+    - `model/keys/screen.rs`: What a key does on the screen the person is looking at: the tab's own keys first, then the keys every screen shares.
   - `model/lists.rs`: The lists of areas and snapshots: what happens when they arrive.
   - `model/living.rs`: The window's own life: starting, the clock, the pointer and a refusal.
   - `model/looked.rs`: What looking brought back arriving in the window: the areas, snapshots, history, health, groups and points.

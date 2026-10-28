@@ -11,17 +11,25 @@ impl State {
     /// The restore point the points screen has the cursor on.
     pub fn chosen_point(&self) -> Option<&snapall_core::RestorePoint> {
         match &self.modal {
-            Some(Modal::Points { index }) => self.points.as_ref()?.get(*index),
+            Some(Modal::Points {
+                index,
+                points: Some(points),
+                ..
+            }) => points.get(*index),
             _ => None,
         }
     }
 }
 
-/// The restore points arrived: show them, and look up what the first would do.
+/// The restore points arrived: show them, and look up what the first would do. If the screen was closed meanwhile
+/// there is nowhere for them to go, and they are dropped.
 pub(crate) fn on_points_loaded(
     state: &mut State,
     result: Result<Vec<snapall_core::RestorePoint>, String>,
 ) -> Vec<Effect> {
+    let Some(Modal::Points { points: slot, .. }) = &mut state.modal else {
+        return Vec::new();
+    };
     match result {
         Err(why) => {
             state.modal = None;
@@ -30,7 +38,7 @@ pub(crate) fn on_points_loaded(
         }
         Ok(points) => {
             let first = points.first().cloned();
-            state.points = Some(points);
+            *slot = Some(points);
             first
                 .map(|point| vec![Effect::LoadPointPreview { point }])
                 .unwrap_or_default()
@@ -40,13 +48,16 @@ pub(crate) fn on_points_loaded(
 
 /// The restore points screen: Up and Down choose, Enter or `A` puts every area of the chosen one back,
 /// Esc leaves. Nothing happens to a point whose areas already match.
-pub(crate) fn browsing_points(state: &mut State, key: Key, index: usize) -> Reaction {
-    let count = state.points.as_ref().map_or(0, Vec::len);
+pub(crate) fn browsing_points(
+    key: Key,
+    index: usize,
+    points: Option<Vec<snapall_core::RestorePoint>>,
+    preview: Option<PointOffer>,
+) -> Reaction {
+    let count = points.as_ref().map_or(0, Vec::len);
     let index = index.min(count.saturating_sub(1));
-    let moved = |to: usize, state: &mut State| {
-        state.point_preview = None;
-        let effects = state
-            .points
+    let moved = |to: usize, points: Option<Vec<snapall_core::RestorePoint>>| {
+        let effects = points
             .as_ref()
             .and_then(|points| points.get(to))
             .map(|point| {
@@ -55,26 +66,32 @@ pub(crate) fn browsing_points(state: &mut State, key: Key, index: usize) -> Reac
                 }]
             })
             .unwrap_or_default();
-        Reaction::stays_and_starts(Modal::Points { index: to }, effects)
+        Reaction::stays_and_starts(
+            Modal::Points {
+                index: to,
+                points,
+                preview: None,
+            },
+            effects,
+        )
     };
     match key {
         Key::Esc | Key::CtrlC | Key::Char('q') => Reaction::closes(),
-        Key::Down | Key::Char('j') | Key::Tab if index + 1 < count => moved(index + 1, state),
-        Key::Up | Key::Char('k') if index > 0 => moved(index - 1, state),
+        Key::Down | Key::Char('j') | Key::Tab if index + 1 < count => moved(index + 1, points),
+        Key::Up | Key::Char('k') if index > 0 => moved(index - 1, points),
         Key::Enter | Key::Char('A') => {
-            let chosen = state
-                .points
+            let chosen = points
                 .as_ref()
                 .and_then(|points| points.get(index))
                 .cloned();
-            match (chosen, &state.point_preview) {
-                (Some(point), Some(preview))
-                    if preview.point.point == point.point && preview.areas_to_change() > 0 =>
+            match (chosen, &preview) {
+                (Some(point), Some(shown))
+                    if shown.point.point == point.point && shown.areas_to_change() > 0 =>
                 {
                     let lines = vec![
                         format!(
                             "Put {} area(s) back to restore point {}.",
-                            preview.areas_to_change(),
+                            shown.areas_to_change(),
                             point.point
                         ),
                         "Each area's current state is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
@@ -86,10 +103,18 @@ pub(crate) fn browsing_points(state: &mut State, key: Key, index: usize) -> Reac
                         vec![Effect::RestorePoint { point }],
                     )
                 }
-                _ => Reaction::stays(Modal::Points { index }),
+                _ => Reaction::stays(Modal::Points {
+                    index,
+                    points,
+                    preview,
+                }),
             }
         }
-        _ => Reaction::stays(Modal::Points { index }),
+        _ => Reaction::stays(Modal::Points {
+            index,
+            points,
+            preview,
+        }),
     }
 }
 

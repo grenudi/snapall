@@ -197,13 +197,21 @@ pub enum Modal {
         /// One path of the area, or `None` for all of it.
         path: Option<String>,
         stage: RestoreStage,
+        /// The restore point this snapshot belongs to, once looked up, when it has one with more than one area.
+        offer: Option<PointOffer>,
     },
     /// The explanation of what snapshots are (page 0) and of the keys (page 1).
     Help { page: usize },
     /// Offering to protect one of the parts of the disk that have no snapshots yet.
     Protect { index: usize },
     /// The restore points, one chosen: what putting it back would do, and the way to do it.
-    Points { index: usize },
+    Points {
+        index: usize,
+        /// Every restore point, newest first, once looked up.
+        points: Option<Vec<snapall_core::RestorePoint>>,
+        /// What putting the chosen one back would do, once looked up.
+        preview: Option<PointOffer>,
+    },
     /// One background job: what it is, how to check on it, and the keys that control it.
     Job { unit: String },
     /// Asking before switching the counting of room on or off for the disk.
@@ -279,12 +287,6 @@ pub struct State {
     /// A message to show once the list has been reloaded: the reload clears older notices, and a
     /// confirmation must not be one of them.
     pub after_reload: Option<Notice>,
-    /// The restore point of the snapshot the restore prompt is about, once looked up.
-    pub point_offer: Option<(AreaName, SnapshotId, PointOffer)>,
-    /// The restore points, newest first, once looked up (`None` while looking).
-    pub points: Option<Vec<snapall_core::RestorePoint>>,
-    /// What putting the chosen restore point back would do.
-    pub point_preview: Option<PointOffer>,
     /// Which view is showing.
     pub tab: Tab,
     pub health: HealthTab,
@@ -317,9 +319,6 @@ impl Default for State {
             pressed: None,
             offers: Vec::new(),
             after_reload: None,
-            point_offer: None,
-            points: None,
-            point_preview: None,
             tab: Tab::Snapshots,
             health: HealthTab::default(),
             activity: ActivityTab::default(),
