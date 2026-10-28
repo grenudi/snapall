@@ -1,0 +1,212 @@
+snapall VERSION
+Snapshot every protected area in one command.
+
+USAGE
+    snapall [OPTIONS] [DESCRIPTION]    shorthand for `snapall create`
+    snapall <COMMAND> [OPTIONS]
+
+COMMANDS
+    create     Take one snapshot of every protected area (the default command)
+    list       List the protected areas snapall can see
+    snapshots  List the snapshots of one protected area, or of all of them
+    delete     Delete one snapshot of a protected area
+    changes    Show what restoring a snapshot would change
+    restore    Put a protected area, or one path of it, back to how a snapshot had it
+    restore-all Put every protected area back to one restore point, in one action
+    points     List the restore points: the snapshots one action took together
+    history    Show how one file stood in each snapshot
+    health     Show whether protection is working, and how much room it takes
+    activity   Show what snapall has done, including earlier sessions, newest first
+    groups     Name sets of areas, such as theming, to take snapshots of together
+    limits     Show or change how many snapshots an area keeps
+    unprotect  Stop protecting an area: deletes all its snapshots for good
+    undo       Roll a change back, to the state it recorded, after showing what that is
+    cancel     Ask a running change to stop after the area it is on
+    quotas     Show how the disk counts the room snapshots take, and switch it on or off
+    setup      Protect what has no snapshots yet, explaining each step
+    doctor     Check that snapper works, and install it if it is missing
+    completions Print shell completions (bash, zsh, fish, nushell)
+    man        Print the manual page
+    tui        Open the interactive terminal UI
+    contract   Print this program's invocation contract as argenv JSON
+
+GENERAL
+    -h, --help                 Show this help and exit.
+    -V, --version              Print the version and exit.
+    --no-dbus                  Talk to libsnapper directly instead of through snapperd
+                               (root only; for containers and CI).
+                               (env: SNAPALL_NO_DBUS)
+
+OUTPUT
+    --hints                    Show a one-line tip when snapshots cannot be booted from
+                               the boot menu. --no-hints (or SNAPALL_HINTS=off) silences
+                               it.
+                               (env: SNAPALL_HINTS; commands: create, tui)
+    --json                     Print JSON instead of text.
+                               (env: SNAPALL_JSON; commands: create, list, snapshots,
+                               delete, changes, restore, restore-all, points, history,
+                               health, activity, groups, limits, unprotect, undo, cancel,
+                               quotas, setup, doctor)
+
+LOGGING
+    --log <FORMAT>             Write one line per operation (create, delete, list,
+                               install step) to stderr, as `text` or `json`. Default:
+                               off. Logs are an event stream: route them with the
+                               environment (journald, a file, a pipe).
+                               (env: SNAPALL_LOG; commands: create, list, snapshots,
+                               delete, changes, restore, restore-all, points, history,
+                               health, limits, unprotect, undo, quotas, setup, doctor,
+                               tui; e.g. snapall --log json create)
+    --log-file <PATH>          Append the log to this file (created with mode 0600)
+                               instead of stderr: an audit trail of everything snapall
+                               did. Implies `--log json` unless `--log` says otherwise.
+                               Required to log from `tui`, which owns the terminal.
+                               (env: SNAPALL_LOG_FILE; commands: create, list, snapshots,
+                               delete, changes, restore, restore-all, points, history,
+                               health, limits, unprotect, undo, quotas, setup, doctor,
+                               tui; e.g. sudo snapall --log-file /var/log/snapall.jsonl
+                               create)
+
+CREATE
+    <DESCRIPTION>              Text stored with each snapshot (default: snapall).
+                               `snapall <DESCRIPTION>` is shorthand for `snapall create
+                               <DESCRIPTION>`.
+                               (commands: create; e.g. snapall create "before theming")
+    --only <CONFIGS>           Comma-separated names of the areas to snapshot (default:
+                               all of them; `snapall list` shows the names). A name that
+                               does not exist is an error.
+                               (env: SNAPALL_ONLY; commands: create; e.g. snapall create
+                               --only root,home)
+    --dry-run                  Show what would happen without changing anything.
+                               (commands: create, restore, restore-all, unprotect, setup)
+    --group <VALUE>            Take a snapshot of the areas of this group (see `snapall
+                               groups`) instead of all of them. Not together with --only.
+                               (commands: create; e.g. snapall create --group theming
+                               "before the new theme")
+    --job <VALUE>              Name this change in the journal, so that `snapall cancel
+                               NAME` can ask it to stop. snapall gives its own name when
+                               the window starts a change in the background.
+                               (commands: create, restore-all; e.g. snapall create --job
+                               nightly-1)
+
+DESTROY
+    --destroy                  Go ahead without asking, where it deletes snapshots for
+                               good. `--yes` is for changes that can be put back and is
+                               not enough for this.
+                               (commands: delete, limits, unprotect, undo)
+
+SNAPSHOTS
+    <AREA>                     List only this area's snapshots (default: all areas).
+                               (commands: snapshots)
+
+SNAPSHOT
+    <AREA>                     The name of the protected area, as `snapall list` shows it
+                               (required).
+                               (commands: delete, changes, restore)
+    <ID>                       The snapshot number (required). 0 is the current system,
+                               not a snapshot, and is refused.
+                               (commands: delete, changes, restore; e.g. snapall restore
+                               home 12)
+    <PATH>                     Only this file or directory (an absolute path inside the
+                               area). Default: everything that differs.
+                               (commands: changes, restore; e.g. snapall restore home 12
+                               /home/me/notes.txt)
+
+HISTORY
+    <FILE>                     The file (required). The protected area it is in is found
+                               from where it is.
+                               (commands: history; e.g. snapall history ~/notes.txt)
+
+TUI
+    --file <VALUE>             Open on the history of this file, with its versions to
+                               restore, instead of on all areas.
+                               (commands: tui; e.g. snapall tui --file ~/notes.txt)
+
+RESTORE
+    <POINT>                    The restore point to go back to, as `snapall points` shows
+                               it (required).
+                               (commands: restore-all; e.g. snapall restore-all
+                               20261025T181500Z)
+
+SETUP
+    <AREA>                     A part of the disk to protect, such as /srv, instead of
+                               the ones snapall recommends. It is explained and asked
+                               about like the others.
+                               (commands: setup; e.g. snapall setup /srv)
+
+UNDO
+    <CHANGE>                   The name of the change, as `snapall activity` shows it
+                               (required). Where nothing can be rolled back it says why
+                               instead.
+                               (commands: undo; e.g. snapall undo CHANGE)
+
+UNPROTECT
+    <AREA>                     The area, as `snapall list` names it (required). The
+                               system area is never stopped.
+                               (commands: unprotect; e.g. snapall unprotect games
+                               --dry-run)
+
+LIMITS
+    <AREA>                     The area, as `snapall list` names it (required).
+                               (commands: limits; e.g. snapall limits home --keep 30)
+    --keep <VALUE>             How many of the snapshots that cleanup looks after to
+                               keep: the newest this many stay, the older ones go at the
+                               next cleanup.
+                               (commands: limits; e.g. snapall limits home --keep 30)
+    --min-age <VALUE>          Minutes: cleanup never removes a snapshot younger than
+                               this, however many there are.
+                               (commands: limits; e.g. snapall limits home --min-age 60)
+    --cleanup <VALUE>          `on` or `off`: whether cleanup removes anything of this
+                               area at all.
+                               (commands: limits; e.g. snapall limits home --cleanup off)
+
+GROUPS
+    <ACTION>                   `add` or `remove`. Without it, the groups are listed.
+                               (commands: groups; e.g. snapall groups add theming
+                               home,data)
+    <NAME>                     The group's name: lower-case letters, digits, - and _,
+                               starting with a letter. `all` is always there and cannot
+                               be changed.
+                               (commands: groups; e.g. snapall groups remove theming)
+    <AREAS>                    With `add`: the areas, separated by commas, as `snapall
+                               list` names them.
+                               (commands: groups; e.g. snapall groups add theming
+                               home,data)
+
+CANCEL
+    <CHANGE>                   The name of the change, as `snapall activity --json` shows
+                               it (required).
+                               (commands: cancel; e.g. snapall cancel
+                               CHANGE)
+
+QUOTAS
+    <STATE>                    `on` or `off`. Without it, only shows how the disk counts
+                               room now and what switching it would mean.
+                               (commands: quotas; e.g. sudo snapall quotas on)
+
+DOCTOR
+    --install                  Install snapper with this system's package manager if it
+                               is missing. Shows the commands and asks first; needs root.
+                               (commands: doctor; e.g. sudo snapall doctor --install)
+    -y, --yes                  Answer yes where snapall asks before a change that can be
+                               put back (for scripts and CI). It does not answer for
+                               deleting snapshots: that needs --destroy. With doctor,
+                               only with --install.
+                               (commands: restore, restore-all, groups, limits, undo,
+                               cancel, quotas, setup, doctor)
+
+COMPLETIONS
+    <SHELL>                    The shell to print completions for. Derived from this very
+                               contract, so they cannot disagree with what snapall
+                               accepts.
+                               (commands: completions; e.g. snapall completions bash)
+
+MAN
+    SOURCE_DATE_EPOCH          Seconds since the Unix epoch to use as the man page date,
+                               so that builds are reproducible (the SOURCE_DATE_EPOCH
+                               convention). Default: now.
+                               (commands: man)
+
+EXIT STATUS
+    0  done    1  a snapshot or snapper call failed    2  the invocation is wrong
+exit: 0

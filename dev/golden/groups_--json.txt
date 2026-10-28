@@ -1,0 +1,11 @@
+[
+  {
+    "areas": [
+      "snapall_it_a",
+      "snapall_it_b"
+    ],
+    "name": "all",
+    "stored": false
+  }
+]
+exit: 0

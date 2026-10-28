@@ -1,0 +1,9 @@
+{
+  "area": "snapall_it_a",
+  "changed": false,
+  "cleanup": true,
+  "keep": 50,
+  "min_age_minutes": 30,
+  "would_remove": 0
+}
+exit: 0

@@ -1,0 +1,36 @@
+{
+  "entry_files_too_long": {
+    "crates/snapall-system/src/lib.rs": 244,
+    "crates/snapall-tui/src/model/mod.rs": 143
+  },
+  "files_too_long": {
+    "crates/snapall-tui/src/changes.rs": 419,
+    "crates/snapall-tui/src/model/state.rs": 400,
+    "crates/snapall-tui/src/tabs/activity.rs": 339,
+    "crates/snapall/src/contract/inputs.rs": 514,
+    "crates/snapall/src/setup.rs": 432
+  },
+  "handlers_that_branch_too_much": {
+    "restore_all": 8,
+    "setup": 7,
+    "undo": 7
+  },
+  "handlers_too_long": {
+    "restore_all": 79,
+    "undo": 61
+  },
+  "handlers_with_too_much_plumbing": {
+    "check_the_way_back_still_exists": 3
+  },
+  "prints_outside_the_presenter": {
+    "crates/snapall/src/commands/going_back/restoring_a_point.rs": 1,
+    "crates/snapall/src/commands/going_back/undoing.rs": 4,
+    "crates/snapall/src/commands/protecting.rs": 1,
+    "crates/snapall/src/doctor.rs": 5,
+    "crates/snapall/src/main.rs": 4
+  },
+  "tool_words_in_names": {
+    "snapall": 9,
+    "snapall-core": 1
+  }
+}

@@ -1,0 +1,3 @@
+snapall: error: unexpected argument(s): `/nonexistent`
+Try `snapall --help`.
+exit: 2

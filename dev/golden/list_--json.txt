@@ -1,0 +1,7 @@
+{
+  "configs": [
+    "snapall_it_a",
+    "snapall_it_b"
+  ]
+}
+exit: 0

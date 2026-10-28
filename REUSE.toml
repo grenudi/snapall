@@ -12,6 +12,8 @@ path = [
   "flake.lock", "PKGBUILD", "**/PKGBUILD", ".gitignore", "LICENSE",
   # the repositories' public signing key (an armoured key cannot carry a comment header)
   "packaging/repo/snapall-repo.asc",
+  # what the program printed when recorded: output, not source
+  "dev/golden/**",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 grenudi"

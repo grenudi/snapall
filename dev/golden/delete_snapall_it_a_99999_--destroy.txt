@@ -1,0 +1,2 @@
+snapall: `snapper` failed (exit status: 1): Snapshot '99999' not found.
+exit: 1

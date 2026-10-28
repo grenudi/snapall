@@ -15,6 +15,21 @@ Every known gap lives here, not in a prose TODO.
 
 What is deliberately *not* here (package-manager hooks, more log sinks, Btrfs checks, branch protection) is in [ADR 11](adr/0011-scope-what-snapall-is-not.md).
 
+## Structure
+Where the code still does not say what snapall is for. Each iteration is a branch and a pull request, and none depends on anyone remembering the last. To work on one: read `OUTLINE.md` as a stranger would; run `dev/golden-output.sh check` before and after, because behaviour must not change; split a module by purpose with `dev/split-module.py`; refresh the outline and record paid debts with `UPDATE_OUTLINE=1` and `UPDATE_RATCHETS=1` on the architecture test. The debts themselves are data in `crates/snapall/tests/ratchets.json`, which can only be lowered.
+
+| # | Item | Status |
+|---|---|---|
+| 1 | The window is organised by mechanism (`model/`, `view/`), so its screens and questions are scattered. Group it by screen (snapshots, file history, health, activity) and by question, finishing what `tabs/health/` already does. The first step is `model/state.rs` (400 lines), which mixes the window's state with its questions | open |
+| 2 | `setup.rs` (432 lines) asks area by area as it works, which is why it is the one change that begins without a leave (`begin_asking_along`). Plan first, ask once, then begin | open |
+| 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
+| 4 | Window files over 300 lines: `changes.rs` (419) and `tabs/activity.rs` (339) | open |
+| 5 | Code that wraps tools but lives in the binary (`doctor.rs`, `boot_probe.rs`) still names them (`systemctl`, `grub_btrfs`, `snapper`). It belongs in an adapter | open |
+| 6 | Ten plain `config` names remain in the binary, in files that already used `area` for something else | open |
+| 7 | Run `dev/golden-output.sh check` in CI. It needs its own fresh fixture, after the steps that change the disk | open |
+| 8 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
+| 9 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+
 ## Upstream: argenv
 | # | Item | Status |
 |---|---|---|

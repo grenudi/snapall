@@ -1,0 +1,4 @@
+dry run: would snapshot 2 area(s) with description "snapall"
+  snapall_it_a
+  snapall_it_b
+exit: 0

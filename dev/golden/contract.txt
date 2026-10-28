@@ -1,0 +1,806 @@
+{
+  "contract_version": 1,
+  "generated": "DATEZ",
+  "inputs": [
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "help",
+        "negatable": false,
+        "repeatable": false,
+        "short": "h"
+      },
+      "default": false,
+      "group": "general",
+      "key": "help",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Show this help and exit.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "version",
+        "negatable": false,
+        "repeatable": false,
+        "short": "V"
+      },
+      "default": false,
+      "group": "general",
+      "key": "version",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Print the version and exit.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "no-dbus",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "env": {
+        "name": "SNAPALL_NO_DBUS"
+      },
+      "group": "general",
+      "key": "no_dbus",
+      "required": false,
+      "stability": "unknown",
+      "summary": "Talk to libsnapper directly instead of through snapperd (root only; for containers and CI).",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "hints",
+        "negatable": true,
+        "repeatable": false
+      },
+      "default": true,
+      "env": {
+        "name": "SNAPALL_HINTS"
+      },
+      "group": "output",
+      "key": "hints",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "tui"
+      ],
+      "summary": "Show a one-line tip when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences it.",
+      "type": "bool"
+    },
+    {
+      "allowed": [
+        "off",
+        "text",
+        "json"
+      ],
+      "arg": {
+        "arity": 1,
+        "long": "log",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "FORMAT"
+      },
+      "default": "off",
+      "env": {
+        "name": "SNAPALL_LOG"
+      },
+      "example": "snapall --log json create",
+      "group": "logging",
+      "key": "log",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots",
+        "delete",
+        "changes",
+        "restore",
+        "restore-all",
+        "points",
+        "history",
+        "health",
+        "limits",
+        "unprotect",
+        "undo",
+        "quotas",
+        "setup",
+        "doctor",
+        "tui"
+      ],
+      "summary": "Write one line per operation (create, delete, list, install step) to stderr, as `text` or `json`. Default: off. Logs are an event stream: route them with the environment (journald, a file, a pipe).",
+      "type": "enum"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "log-file",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "PATH"
+      },
+      "env": {
+        "name": "SNAPALL_LOG_FILE"
+      },
+      "example": "sudo snapall --log-file /var/log/snapall.jsonl create",
+      "group": "logging",
+      "key": "log_file",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots",
+        "delete",
+        "changes",
+        "restore",
+        "restore-all",
+        "points",
+        "history",
+        "health",
+        "limits",
+        "unprotect",
+        "undo",
+        "quotas",
+        "setup",
+        "doctor",
+        "tui"
+      ],
+      "summary": "Append the log to this file (created with mode 0600) instead of stderr: an audit trail of everything snapall did. Implies `--log json` unless `--log` says otherwise. Required to log from `tui`, which owns the terminal.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "DESCRIPTION"
+      },
+      "example": "snapall create \"before theming\"",
+      "group": "create",
+      "key": "description",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Text stored with each snapshot (default: snapall). `snapall <DESCRIPTION>` is shorthand for `snapall create <DESCRIPTION>`.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "only",
+        "negatable": false,
+        "repeatable": false,
+        "value_name": "CONFIGS"
+      },
+      "env": {
+        "name": "SNAPALL_ONLY"
+      },
+      "example": "snapall create --only root,home",
+      "group": "create",
+      "key": "only",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Comma-separated names of the areas to snapshot (default: all of them; `snapall list` shows the names). A name that does not exist is an error.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "destroy",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "group": "destroy",
+      "key": "destroy",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "delete",
+        "limits",
+        "unprotect",
+        "undo"
+      ],
+      "summary": "Go ahead without asking, where it deletes snapshots for good. `--yes` is for changes that can be put back and is not enough for this.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "dry-run",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "group": "create",
+      "key": "dry_run",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "restore",
+        "restore-all",
+        "unprotect",
+        "setup"
+      ],
+      "summary": "Show what would happen without changing anything.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "json",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "env": {
+        "name": "SNAPALL_JSON"
+      },
+      "group": "output",
+      "key": "json",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "list",
+        "snapshots",
+        "delete",
+        "changes",
+        "restore",
+        "restore-all",
+        "points",
+        "history",
+        "health",
+        "activity",
+        "groups",
+        "limits",
+        "unprotect",
+        "undo",
+        "cancel",
+        "quotas",
+        "setup",
+        "doctor"
+      ],
+      "summary": "Print JSON instead of text.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "group": "snapshots",
+      "key": "snapshots_config",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "snapshots"
+      ],
+      "summary": "List only this area's snapshots (default: all areas).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "group": "snapshot",
+      "key": "config",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "delete",
+        "changes",
+        "restore"
+      ],
+      "summary": "The name of the protected area, as `snapall list` shows it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 1,
+        "repeatable": false,
+        "value_name": "ID"
+      },
+      "example": "snapall restore home 12",
+      "group": "snapshot",
+      "key": "snapshot_id",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "delete",
+        "changes",
+        "restore"
+      ],
+      "summary": "The snapshot number (required). 0 is the current system, not a snapshot, and is refused.",
+      "type": "uint"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 2,
+        "repeatable": false,
+        "value_name": "PATH"
+      },
+      "example": "snapall restore home 12 /home/me/notes.txt",
+      "group": "snapshot",
+      "key": "path",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "changes",
+        "restore"
+      ],
+      "summary": "Only this file or directory (an absolute path inside the area). Default: everything that differs.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "FILE"
+      },
+      "example": "snapall history ~/notes.txt",
+      "group": "history",
+      "key": "history_file",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "history"
+      ],
+      "summary": "The file (required). The protected area it is in is found from where it is.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "file",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall tui --file ~/notes.txt",
+      "group": "tui",
+      "key": "tui_file",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "tui"
+      ],
+      "summary": "Open on the history of this file, with its versions to restore, instead of on all areas.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "POINT"
+      },
+      "example": "snapall restore-all 20261025T181500Z",
+      "group": "restore",
+      "key": "point",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "restore-all"
+      ],
+      "summary": "The restore point to go back to, as `snapall points` shows it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "example": "snapall setup /srv",
+      "group": "setup",
+      "key": "area",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "setup"
+      ],
+      "summary": "A part of the disk to protect, such as /srv, instead of the ones snapall recommends. It is explained and asked about like the others.",
+      "type": "path"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CHANGE"
+      },
+      "example": "snapall undo CHANGE",
+      "group": "undo",
+      "key": "undo_change",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "undo"
+      ],
+      "summary": "The name of the change, as `snapall activity` shows it (required). Where nothing can be rolled back it says why instead.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "example": "snapall unprotect games --dry-run",
+      "group": "unprotect",
+      "key": "unprotect_area",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "unprotect"
+      ],
+      "summary": "The area, as `snapall list` names it (required). The system area is never stopped.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "AREA"
+      },
+      "example": "snapall limits home --keep 30",
+      "group": "limits",
+      "key": "limits_area",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "The area, as `snapall list` names it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "keep",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --keep 30",
+      "group": "limits",
+      "key": "keep",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "How many of the snapshots that cleanup looks after to keep: the newest this many stay, the older ones go at the next cleanup.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "min-age",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --min-age 60",
+      "group": "limits",
+      "key": "min_age",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "Minutes: cleanup never removes a snapshot younger than this, however many there are.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "cleanup",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall limits home --cleanup off",
+      "group": "limits",
+      "key": "limits_cleanup",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "limits"
+      ],
+      "summary": "`on` or `off`: whether cleanup removes anything of this area at all.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "ACTION"
+      },
+      "example": "snapall groups add theming home,data",
+      "group": "groups",
+      "key": "action",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "groups"
+      ],
+      "summary": "`add` or `remove`. Without it, the groups are listed.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 1,
+        "repeatable": false,
+        "value_name": "NAME"
+      },
+      "example": "snapall groups remove theming",
+      "group": "groups",
+      "key": "group_name",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "groups"
+      ],
+      "summary": "The group's name: lower-case letters, digits, - and _, starting with a letter. `all` is always there and cannot be changed.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 2,
+        "repeatable": false,
+        "value_name": "AREAS"
+      },
+      "example": "snapall groups add theming home,data",
+      "group": "groups",
+      "key": "group_areas",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "groups"
+      ],
+      "summary": "With `add`: the areas, separated by commas, as `snapall list` names them.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "group",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall create --group theming \"before the new theme\"",
+      "group": "create",
+      "key": "group",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create"
+      ],
+      "summary": "Take a snapshot of the areas of this group (see `snapall groups`) instead of all of them. Not together with --only.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "long": "job",
+        "negatable": false,
+        "repeatable": false
+      },
+      "example": "snapall create --job nightly-1",
+      "group": "create",
+      "key": "job",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "create",
+        "restore-all"
+      ],
+      "summary": "Name this change in the journal, so that `snapall cancel NAME` can ask it to stop. snapall gives its own name when the window starts a change in the background.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "CHANGE"
+      },
+      "example": "snapall cancel CHANGE",
+      "group": "cancel",
+      "key": "change",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "cancel"
+      ],
+      "summary": "The name of the change, as `snapall activity --json` shows it (required).",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "STATE"
+      },
+      "example": "sudo snapall quotas on",
+      "group": "quotas",
+      "key": "state",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "quotas"
+      ],
+      "summary": "`on` or `off`. Without it, only shows how the disk counts room now and what switching it would mean.",
+      "type": "string"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "install",
+        "negatable": false,
+        "repeatable": false
+      },
+      "default": false,
+      "example": "sudo snapall doctor --install",
+      "group": "doctor",
+      "key": "install",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "doctor"
+      ],
+      "summary": "Install snapper with this system's package manager if it is missing. Shows the commands and asks first; needs root.",
+      "type": "bool"
+    },
+    {
+      "allowed": [],
+      "arg": {
+        "arity": 0,
+        "long": "yes",
+        "negatable": false,
+        "repeatable": false,
+        "short": "y"
+      },
+      "default": false,
+      "group": "doctor",
+      "key": "yes",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "restore",
+        "restore-all",
+        "groups",
+        "limits",
+        "undo",
+        "cancel",
+        "quotas",
+        "setup",
+        "doctor"
+      ],
+      "summary": "Answer yes where snapall asks before a change that can be put back (for scripts and CI). It does not answer for deleting snapshots: that needs --destroy. With doctor, only with --install.",
+      "type": "bool"
+    },
+    {
+      "allowed": [
+        "bash",
+        "zsh",
+        "fish",
+        "nushell"
+      ],
+      "arg": {
+        "arity": 1,
+        "negatable": false,
+        "position": 0,
+        "repeatable": false,
+        "value_name": "SHELL"
+      },
+      "example": "snapall completions bash",
+      "group": "completions",
+      "key": "shell",
+      "required": true,
+      "stability": "unknown",
+      "subcommands": [
+        "completions"
+      ],
+      "summary": "The shell to print completions for. Derived from this very contract, so they cannot disagree with what snapall accepts.",
+      "type": "enum"
+    },
+    {
+      "allowed": [],
+      "env": {
+        "name": "SOURCE_DATE_EPOCH"
+      },
+      "group": "man",
+      "key": "source_date_epoch",
+      "required": false,
+      "stability": "unknown",
+      "subcommands": [
+        "man"
+      ],
+      "summary": "Seconds since the Unix epoch to use as the man page date, so that builds are reproducible (the SOURCE_DATE_EPOCH convention). Default: now.",
+      "type": "uint"
+    }
+  ],
+  "precedence": [
+    "arg",
+    "env",
+    "default"
+  ],
+  "source": "snapall@VERSION"
+}
+exit: 0
