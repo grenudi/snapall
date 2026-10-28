@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.23.4]
+
+
+### Refactoring
+- A change cannot begin without having asked, and the handlers read as stories ([#72](https://github.com/grenudi/snapall/pull/72)) ([fb94b71])
+
+
+
 ## [0.23.3]
 
 
