@@ -773,7 +773,7 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 16] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 13] = [
     ("crates/snapall-core/src/doctor.rs", 397),
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-core/src/health.rs", 522),
@@ -781,22 +781,18 @@ const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 16] = [
     ("crates/snapall-core/src/usecase.rs", 506),
     ("crates/snapall-tui/src/changes.rs", 419),
     ("crates/snapall-tui/src/model/keys.rs", 353),
-    ("crates/snapall-tui/src/model/mod.rs", 379),
     ("crates/snapall-tui/src/model/state.rs", 401),
     ("crates/snapall-tui/src/session.rs", 396),
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
-    ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/cli.rs", 568),
     ("crates/snapall/src/contract.rs", 763),
-    ("crates/snapall/src/render.rs", 844),
     ("crates/snapall/src/setup.rs", 432),
 ];
-const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 5] = [
+const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 4] = [
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-system/src/lib.rs", 244),
-    ("crates/snapall-tui/src/model/mod.rs", 379),
-    ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/main.rs", 196),
+    ("crates/snapall-tui/src/model/mod.rs", 143),
 ];
 const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 5] = [
     (
