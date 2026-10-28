@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.6]
+
+
+### Miscellaneous
+- Measure the real goal, and automate the loop ([#99](https://github.com/grenudi/snapall/pull/99)) ([135baa8])
+
+
+
 ## [0.26.5]
 
 
