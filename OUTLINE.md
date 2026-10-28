@@ -121,7 +121,11 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/prompts/restore.rs`: Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
     - `model/prompts/stop.rs`: Asking before a change that is running is asked to stop: what stopping means, so that nobody is afraid to do it, and that it is only a request.
     - `model/prompts/unprotect.rs`: Stopping the protection of an area: what it would do, in plain words, and the area's name typed out before it does it.
-  - `model/state.rs`: What the window knows: the lists, the cursor, the open prompt, the message, and what it was told about the machine.
+    - `model/state/looked_up.rs`: What looking brought back, as the window holds it: areas, a file's versions, a restore point's offer, what a restore did.
+    - `model/state/mod.rs`: What the window knows: the lists, the cursor, the open prompt, the message, and what it was told about the machine.
+    - `model/state/questions.rs`: The questions the window asks, and what each one holds while it is open.
+    - `model/state/told.rs`: What the window is told about the machine, once, at the start: its tips, what could be protected, whether it may change things.
+    - `model/state/window.rs`: The window at one moment: its lists, cursor, open question, message, and what it is waiting for.
   - `session/changing.rs`: What the window asks to be changed, done through the backend and the machine.
   - `session/executor.rs`: The window's executor: it performs each effect against the backend and the machine, and answers with the message that describes the outcome.
   - `session/looking.rs`: What the window asks to be looked at, answered from the backend and the machine.
