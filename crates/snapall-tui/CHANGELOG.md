@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.25.0]
+
+
+### Refactoring
+- The core is folders named for what snapall is for ([#82](https://github.com/grenudi/snapall/pull/82)) ([6ec1a44])
+
+
+
 ## [0.24.3]
 
 
