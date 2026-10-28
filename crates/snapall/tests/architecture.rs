@@ -411,14 +411,7 @@ const LONGEST_HANDLER: usize = 60;
 /// The handlers that are longer today, with how long. A ratchet: a handler may not grow, no new one may join,
 /// and each leaves this list the moment it is short enough: the list can only get shorter. They are to be
 /// split by what they do (see ADR 19), not allowed to stay.
-const TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
-    ("groups", 103),
-    ("limits", 102),
-    ("create", 89),
-    ("quotas", 83),
-    ("restore_all", 82),
-    ("undo", 61),
-];
+const TOO_LONG_FOR_NOW: [(&str, usize); 2] = [("restore_all", 79), ("undo", 61)];
 
 /// Every top-level function of every file in `commands/`, with its text (not counting tests).
 fn handlers() -> Vec<(String, String)> {
@@ -806,17 +799,13 @@ const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 5] = [
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/main.rs", 196),
 ];
-const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 9] = [
-    ("crates/snapall/src/commands/going_back/restoring.rs", 4),
+const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 5] = [
     (
         "crates/snapall/src/commands/going_back/restoring_a_point.rs",
-        5,
+        1,
     ),
     ("crates/snapall/src/commands/going_back/undoing.rs", 4),
-    ("crates/snapall/src/commands/keeping/limits.rs", 1),
-    ("crates/snapall/src/commands/keeping/room_counting.rs", 1),
     ("crates/snapall/src/commands/protecting.rs", 1),
-    ("crates/snapall/src/commands/taking.rs", 2),
     ("crates/snapall/src/doctor.rs", 5),
     ("crates/snapall/src/main.rs", 4),
 ];
@@ -928,18 +917,28 @@ fn a_story_spells_out_little_plumbing_and_the_debt_only_shrinks() {
     );
 }
 
-const TURNS_TOO_MANY_FOR_NOW: [(&str, usize); 8] = [
-    ("create", 8),
-    ("groups", 5),
-    ("limits", 9),
-    ("point_confirmation", 5),
-    ("quotas", 12),
-    ("restore_all", 9),
-    ("setup", 7),
-    ("undo", 7),
-];
-const PLUMBING_TOO_MUCH_FOR_NOW: [(&str, usize); 3] = [
-    ("check_the_way_back_still_exists", 3),
-    ("groups", 6),
-    ("limits", 7),
-];
+const TURNS_TOO_MANY_FOR_NOW: [(&str, usize); 3] = [("restore_all", 8), ("setup", 7), ("undo", 7)];
+const PLUMBING_TOO_MUCH_FOR_NOW: [(&str, usize); 1] = [("check_the_way_back_still_exists", 3)];
+
+// ---- a change cannot be made unasked: the type says so, and the one exception is counted -----------------------
+
+/// `Change::begin` takes the leave that asking gives, so a change cannot begin without having asked. `setup` asks
+/// area by area as it works and so cannot show one leave first: it is the one named exception, and this keeps it one.
+#[test]
+fn only_one_change_begins_without_a_leave_and_it_is_the_one_that_asks_as_it_goes() {
+    let uses: Vec<String> = all_sources()
+        .into_iter()
+        .filter(|(_, code)| code.contains("Change::begin_asking_along("))
+        .map(|(path, code)| {
+            format!(
+                "{path} x{}",
+                code.matches("Change::begin_asking_along(").count()
+            )
+        })
+        .collect();
+    assert_eq!(
+        uses,
+        ["crates/snapall/src/commands/protecting.rs x1"],
+        "a change that begins without the leave of asking is a change that can be made unasked"
+    );
+}

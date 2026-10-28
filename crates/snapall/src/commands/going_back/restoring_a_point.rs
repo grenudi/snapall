@@ -8,6 +8,7 @@ use super::*;
 use crate::output::Outcome;
 use crate::{ask, boot_probe, render};
 use snapall_core::boot;
+use snapall_core::Act;
 use snapall_core::{
     all_snapshots, fresh_point, preview_point, restore_point_along, restore_points, MemberView,
     Point, RestorePoint,
@@ -38,12 +39,9 @@ pub fn restore_all(
             render::point_preview_json(point, &previews),
         );
     }
-    match point_confirmation(yes, point, &previews, &route) {
-        Confirmation::Given => {}
-        Confirmation::NoTerminalToAskOn => return Ok(ExitCode::from(2)),
-        Confirmation::Declined => return Ok(ExitCode::FAILURE),
-    }
+    let approved = ask_before_putting_back(yes, point, &previews, &route)?;
     let change = Change::begin(
+        approved,
         &format!("Putting every area back to restore point {}", point.point),
         &format!("Put every area back to restore point {}", point.point),
         job,
@@ -114,39 +112,37 @@ pub(super) fn the_point_named<'a>(
     })
 }
 
-/// Putting areas back changes files, so the person is asked, unless they said `--yes`.
-pub(super) fn point_confirmation(
-    yes: bool,
+fn restore_point_question(
     point: &RestorePoint,
     previews: &[snapall_core::MemberPreview],
-    route: &str,
-) -> Confirmation {
-    if yes {
-        return Confirmation::Given;
-    }
-    if !ask::can_ask() {
-        eprintln!(
-            "snapall: restore-all changes files and there is no terminal to ask on; \
-             look first with --dry-run, then pass --yes"
-        );
-        return Confirmation::NoTerminalToAskOn;
-    }
-    eprint!("{}", render::point_preview(point, previews, route));
-    eprintln!("\n{}\n", snapall_core::explain::RESTORE_CAUTION);
+) -> String {
     let areas = previews
         .iter()
         .filter(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
         .count();
-    let question = format!(
+    format!(
         "Put {areas} area{} back to restore point {}? Each one's current state is snapshotted first, so this can be undone.",
         if areas == 1 { "" } else { "s" },
         point.point
-    );
-    match ask::yes_no(&question) {
-        Ok(true) => Confirmation::Given,
-        _ => {
-            eprintln!("snapall: not restoring");
-            Confirmation::Declined
-        }
-    }
+    )
+}
+
+fn ask_before_putting_back(
+    yes: bool,
+    point: &RestorePoint,
+    previews: &[snapall_core::MemberPreview],
+    route: &str,
+) -> Result<ask::Approved, Box<dyn std::error::Error>> {
+    ask::before_showing(
+        Act::RestorePoint,
+        yes,
+        || {
+            format!(
+                "{}\n{}\n",
+                render::point_preview(point, previews, route),
+                snapall_core::explain::RESTORE_CAUTION
+            )
+        },
+        &restore_point_question(point, previews),
+    )
 }

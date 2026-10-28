@@ -20,11 +20,27 @@ pub(super) struct Change {
 impl Change {
     /// `now` is what is being done, for whoever is refused meanwhile; `done` is the same in the past
     /// tense, for the record.
+    /// A change begins only with leave to make it.
     pub(super) fn begin(
+        _approved: crate::ask::Approved,
         now: &str,
         done: &str,
         name: Option<&str>,
     ) -> Result<Change, Box<dyn Error>> {
+        Change::start(now, done, name)
+    }
+
+    /// The one change that asks as it goes: `setup` asks area by area while it works, so there is no single leave to
+    /// show first. A test keeps it to that one place.
+    pub(super) fn begin_asking_along(
+        now: &str,
+        done: &str,
+        name: Option<&str>,
+    ) -> Result<Change, Box<dyn Error>> {
+        Change::start(now, done, name)
+    }
+
+    fn start(now: &str, done: &str, name: Option<&str>) -> Result<Change, Box<dyn Error>> {
         use snapall_core::SystemProbe;
         let system = snapall_system::LinuxSystem::new();
         let hold = system.hold_changes(now).map_err(|busy| busy.to_string())?;
