@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.1]
+
+
+### Refactoring
+- The window's questions are a module of their own ([#90](https://github.com/grenudi/snapall/pull/90)) ([e3b8ff3])
+
+
+
 ## [0.26.0]
 
 
