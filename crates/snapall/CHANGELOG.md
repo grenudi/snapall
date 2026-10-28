@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.1]
+
+
+### Miscellaneous
+- The refactoring tools and plan live in the repository, not in anyone's scratch space ([#88](https://github.com/grenudi/snapall/pull/88)) ([326359c])
+
+
+### Refactoring
+- The window's questions are a module of their own ([#90](https://github.com/grenudi/snapall/pull/90)) ([e3b8ff3])
+
+
+
 ## [0.26.0]
 
 
