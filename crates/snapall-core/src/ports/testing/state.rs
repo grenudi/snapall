@@ -12,13 +12,13 @@ use std::sync::Mutex;
 pub(super) struct AreaState {
     pub(super) next_id: u64,
     pub(super) snapshots: Vec<SnapshotInfo>,
-    /// Where the config is mounted.
+    /// Where the area is mounted.
     pub(super) location: String,
     /// The live files: absolute path to content.
     pub(super) files: BTreeMap<String, String>,
     /// The files as each snapshot saw them, by snapshot number.
     pub(super) saved: BTreeMap<u64, BTreeMap<String, String>>,
-    /// Whether snapshots are taken on a schedule, as snapper does for a new config.
+    /// Whether snapshots are taken on a schedule, as snapper does for a new area.
     pub(super) timeline_create: bool,
     pub(super) keep: u32,
     pub(super) min_age: u64,
@@ -29,7 +29,7 @@ pub(super) struct AreaState {
 pub(super) struct State {
     pub(super) areas: BTreeMap<AreaName, AreaState>,
     pub(super) failing: BTreeSet<AreaName>,
-    /// Directories that are the root of a separate subvolume: not part of any snapshot of a config
+    /// Directories that are the root of a separate subvolume: not part of any snapshot of an area
     /// above them, as a separate `/home` is not part of a snapshot of `/`.
     pub(super) separate: Vec<String>,
     /// Operations made to fail, to test what is undone when one does.

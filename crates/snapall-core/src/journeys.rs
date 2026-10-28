@@ -404,7 +404,7 @@ fn a_history_for_a_path_outside_the_given_area_is_refused() {
 
 #[test]
 fn a_file_on_a_separate_location_is_not_attributed_to_the_area_above_it() {
-    // root is `/`, and /mnt/home is a separate subvolume with no config of its own
+    // root is `/`, and /mnt/home is a separate subvolume with no area of its own
     let backend = InMemoryBackend::with_areas(&["root"])
         .with_root_area("root")
         .with_separate_location("/mnt/home");
@@ -424,7 +424,7 @@ fn a_file_on_a_separate_location_is_not_attributed_to_the_area_above_it() {
         area_covering(&backend, "/etc/fstab").unwrap().as_str(),
         "root"
     );
-    // and asking for the history through the config directly says the same, not "did not exist"
+    // and asking for the history through the area directly says the same, not "did not exist"
     let direct = file_versions_of(
         &backend,
         &AreaName::parse("root").unwrap(),
@@ -476,7 +476,7 @@ fn protecting_an_area_sets_it_up_named_after_it_and_stops_snapshots_on_a_schedul
 fn an_area_that_is_already_protected_is_refused_and_nothing_changes() {
     let backend = InMemoryBackend::with_areas(&["root", "home"]).with_root_area("root");
     let before = backend.list_areas().unwrap();
-    // the in-memory `home` config lives at /mnt/home
+    // the in-memory `home` area lives at /mnt/home
     let error = protect_area(&backend, "/mnt/home/").unwrap_err();
     assert!(
         matches!(&error, SetupError::AlreadyProtected { area, .. } if area.as_str() == "home"),
@@ -487,7 +487,7 @@ fn an_area_that_is_already_protected_is_refused_and_nothing_changes() {
 
 #[test]
 fn a_name_that_is_taken_is_not_reused() {
-    // a config called `home` exists for somewhere else
+    // an area called `home` exists for somewhere else
     let backend = InMemoryBackend::with_areas(&["home"]);
     let name = protect_area(&backend, "/home").unwrap();
     assert_eq!(name.as_str(), "home_2");

@@ -19,7 +19,7 @@ pub enum HistoryError {
     BadPath { path: String },
     #[error("no protected area contains `{path}`")]
     NoArea { path: String },
-    /// The path is under a config's directory but on another subvolume, which that config's
+    /// The path is under an area's directory but on another subvolume, which that area's
     /// snapshots do not include. Saying "did not exist" here would be wrong: it never could have.
     #[error("`{path}` is in a different part of the disk than {area} (`{location}`), so no snapshot of {area} contains it")]
     OtherLocation {
@@ -31,7 +31,7 @@ pub enum HistoryError {
     Backend(#[from] BackendError),
 }
 
-/// A file, the config that covers it, and how it stood in each snapshot.
+/// A file, the area that covers it, and how it stood in each snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileHistory {
     pub area: AreaName,
@@ -40,7 +40,7 @@ pub struct FileHistory {
     pub versions: Vec<FileVersion>,
 }
 
-/// The config whose subvolume holds `path`: the one with the longest matching mount point, so a
+/// The area whose subvolume holds `path`: the one with the longest matching mount point, so a
 /// file in `/home` belongs to `home` and not to `root`, which also contains it.
 pub fn area_covering(backend: &dyn SnapshotBackend, path: &str) -> Result<AreaName, HistoryError> {
     if !clean(path) {
@@ -48,7 +48,7 @@ pub fn area_covering(backend: &dyn SnapshotBackend, path: &str) -> Result<AreaNa
             path: path.to_owned(),
         });
     }
-    // The most specific config whose subvolume really holds the file (by length of mount point),
+    // The most specific area whose subvolume really holds the file (by length of mount point),
     // and, failing that, the most specific one that merely has it under its directory.
     let mut covering: Option<(usize, AreaName)> = None;
     let mut only_by_name: Option<(usize, AreaName, String)> = None;
@@ -113,7 +113,7 @@ pub fn file_versions_of(
     Ok(backend.file_versions(area, path)?)
 }
 
-/// The history of one file: which config covers it, and how it stood in each snapshot.
+/// The history of one file: which area covers it, and how it stood in each snapshot.
 pub fn file_history(
     backend: &dyn SnapshotBackend,
     path: &str,

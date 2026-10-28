@@ -122,7 +122,7 @@ fn clicking_a_area_row_selects_the_area_drawn_there_and_loads_its_snapshots() {
     click(&mut session, SIZE, 5, y);
     assert_eq!(session.state.selected_area().unwrap().name, name("iso"));
     assert_eq!(session.state.focus, Pane::Areas);
-    // it loaded: the pane's title names the config
+    // it loaded: the pane's title names the area
     let screen = rows(&session.state, 100, 24).join("\n");
     assert!(screen.contains("Snapshots of iso"), "{screen}");
 }

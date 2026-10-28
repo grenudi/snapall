@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Where a click lands: the same layout the drawing used, so a click can only land on what was drawn.
+//! Where a click lands, worked out from the same layout the drawing used.
 
 use crate::view::*;
 

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The right to make a change, held in a file: only one snapall changes things at a time, so that two
-//! restores, or a restore and a deletion, cannot race each other.
+//! Taking turns at changing things: the right to make a change is held in a file, so that two restores, or a
+//! restore and a deletion, do not race each other.
 //!
 //! It guards snapall from snapall, not the disk from other programs: snapper and other tools do not know
 //! of it. The file lives under `/run`, which is emptied at every start, so a crash cannot leave a lock

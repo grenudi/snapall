@@ -13,10 +13,10 @@ use std::error::Error;
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
-/// Open the terminal UI, on every config or on one file.
+/// Open the terminal UI, on every area or on one file.
 pub fn tui(ctx: &Context, file: Option<&str>) -> Outcome {
     require_a_terminal()?;
-    // Which config covers the file is settled here, before the terminal is taken over, so that a
+    // Which area covers the file is settled here, before the terminal is taken over, so that a
     // file nothing covers is an error message and not a screen that opens empty.
     let target = file
         .map(|named| file_target(ctx.backend, named))
@@ -39,7 +39,7 @@ pub(super) fn require_a_terminal() -> Result<(), Box<dyn Error>> {
     }
 }
 
-/// The file the UI opens on, and the config whose snapshots hold its history.
+/// The file the UI opens on, and the area whose snapshots hold its history.
 pub(super) fn file_target(
     backend: &dyn SnapshotBackend,
     named: &str,

@@ -4,14 +4,14 @@
 
 //! The parts of a disk that snapshots can protect, and which of them are.
 //!
-//! A snapshot covers one *subvolume* (snapper calls the thing that sets one up a "config"), and it
+//! A snapshot covers one *subvolume* (snapper calls the thing that sets one up a "area"), and it
 //! stops at the boundary of that subvolume. On the usual Arch/CachyOS layout `/` and `/home` are
 //! separate subvolumes, so snapshots of `/` contain none of the files under `/home`: that part of the
 //! disk needs protecting in its own right. People read this module's words, so they are plain ones:
 //! a *protected area* is a part of the disk snapshots are kept for.
 //!
 //! Nothing here reads the system: the shell hands over the text of `/proc/self/mountinfo` and the
-//! subvolume of each config.
+//! subvolume of each area.
 
 use crate::vocabulary::domain::AreaName;
 
@@ -78,7 +78,7 @@ pub fn mounts_from_mountinfo(text: &str) -> Vec<Mount> {
 pub struct Area {
     /// Where it is mounted: `/`, `/home`.
     pub mount_point: String,
-    /// The config that protects it, if one does.
+    /// The area that protects it, if one does.
     pub protected_by: Option<AreaName>,
 }
 
@@ -96,8 +96,8 @@ fn normal(path: &str) -> &str {
     }
 }
 
-/// The Btrfs areas of this machine, `/` first, with the config that protects each. `configs` pairs
-/// every config with the subvolume it covers.
+/// The Btrfs areas of this machine, `/` first, with the area that protects each. `areas` pairs
+/// every area with the subvolume it covers.
 ///
 /// Snapper's own `.snapshots` directories are not areas, and a subvolume that is mounted twice is
 /// one area.
@@ -224,7 +224,7 @@ fn folder_title(path: &str) -> String {
     }
 }
 
-/// A name for the config that will protect the area at `mount_point`: `root` for `/`, otherwise its
+/// A name for the area that will protect the area at `mount_point`: `root` for `/`, otherwise its
 /// last directory name, made safe and made different from `taken`. `None` only if no valid name could
 /// be found, which a directory name made of safe characters never causes.
 pub fn suggest_name(mount_point: &str, taken: &[AreaName]) -> Option<AreaName> {
@@ -319,7 +319,7 @@ mod tests {
             Some(name("home")),
             "a trailing slash is the same directory"
         );
-        // a config for some other directory does not protect /home
+        // an area for some other directory does not protect /home
         let wrong = areas(&mounts, &configs(&[("docs", "/home/me/docs")]));
         assert!(!wrong[1].is_protected());
     }

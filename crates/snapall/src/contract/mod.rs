@@ -8,6 +8,9 @@
 //! variables: parsing, `--help`, the published `snapall contract` document and the
 //! validation of invocations all derive from these declarations.
 
+/// The version of snapall that declared this contract.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod commands;
 mod inputs;
 #[cfg(test)]

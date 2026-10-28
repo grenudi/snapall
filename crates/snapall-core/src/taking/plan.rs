@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Functional core: decide *which* configs to snapshot. Pure and total.
+//! Deciding which areas to snapshot. Pure and total.
 
 use std::collections::BTreeSet;
 
@@ -10,10 +10,10 @@ use thiserror::Error;
 
 use crate::vocabulary::domain::AreaName;
 
-/// The configs that will be snapshotted.
+/// The areas that will be snapshotted.
 ///
 /// Invariant (enforced by `plan`, the only constructor): non-empty, sorted, unique, and
-/// every entry is a config the backend reported.
+/// every entry is an area the backend reported.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
     targets: Vec<AreaName>,
@@ -39,7 +39,7 @@ pub enum PlanError {
 }
 
 /// Choose targets. `requested = None` means "everything that exists"; an explicit
-/// request must name only configs that exist (fail fast, never silently skip).
+/// request must name only areas that exist (fail fast, never silently skip).
 pub fn plan(requested: Option<&[AreaName]>, available: &[AreaName]) -> Result<Plan, PlanError> {
     if available.is_empty() {
         return Err(PlanError::NoAreas);

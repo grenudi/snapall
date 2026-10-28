@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The imperative shell for `snapall doctor`: probe the machine, run the install steps.
+//! `snapall doctor` at work: looking at the machine, and running the steps that install what is missing.
 //!
 //! All decisions (what is wrong, what to install, with which command) are pure functions in
 //! `snapall_core::protecting::doctor`; this module only gathers facts and performs the I/O.
@@ -28,8 +28,8 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
     let configs = snapper
         .is_ok()
         .then(|| backend.list_areas().map_err(|e| e.to_string()));
-    // Where each config lives, to see what none of them covers. Unreadable ones are left out: this
-    // only adds a finding, and the configs check already says if listing fails.
+    // Where each area lives, to see what none of them covers. Unreadable ones are left out: this
+    // only adds a finding, and the areas check already says if listing fails.
     let locations = match &configs {
         Some(Ok(names)) => names
             .iter()

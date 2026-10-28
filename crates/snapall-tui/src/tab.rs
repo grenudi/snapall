@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The views of the window. A tab shows the state of things (the snapshots, how protection is doing,
+//! The tabs of the window, and which one is showing. A tab shows the state of things (the snapshots, how protection is doing,
 //! what snapall did); what changes things (create, restore, protect) is a prompt that opens over any
 //! of them.
 

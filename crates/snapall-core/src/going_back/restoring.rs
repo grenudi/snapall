@@ -38,7 +38,7 @@ pub enum RestoreError {
 /// What restoring would do, before anything is touched.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Preview {
-    /// Where the config lives.
+    /// Where the area lives.
     pub location: String,
     /// Restoring all of it is refused (see [`RestoreError::SystemRoot`]); single paths still work.
     pub is_system_root: bool,

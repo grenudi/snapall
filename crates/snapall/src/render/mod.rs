@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Presentation: pure functions from domain values to text or JSON.
+//! What the command line says: each result as text for a person or as JSON for a program.
 
 mod activity;
 mod changing;

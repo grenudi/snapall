@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What the window asks the shell to do (effects) and what the shell reports back (messages).
+//! What the window asks for (effects) and what comes back (messages).
 
 use crate::model::*;
 
@@ -97,7 +97,7 @@ pub enum Effect {
         id: SnapshotId,
         path: Option<String>,
     },
-    /// How the file stood in each snapshot of its config.
+    /// How the file stood in each snapshot of its area.
     LoadFileVersions {
         area: AreaName,
         path: String,

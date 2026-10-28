@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The outbound port: everything snapall needs from "something that takes snapshots".
+//! What snapall needs from whatever takes snapshots, said in snapall's own words.
 
 use thiserror::Error;
 
@@ -12,7 +12,7 @@ use crate::vocabulary::domain::{
 };
 
 pub trait SnapshotBackend {
-    /// Every config the backend manages.
+    /// Every area the backend manages.
     fn list_areas(&self) -> Result<Vec<AreaName>, BackendError>;
 
     /// Take one snapshot of `config` and return its number.
@@ -38,7 +38,7 @@ pub trait SnapshotBackend {
     /// Delete one snapshot of `config`. Deleting one that does not exist is an error.
     fn delete_snapshot(&self, area: &AreaName, id: SnapshotId) -> Result<(), BackendError>;
 
-    /// Where the config's subvolume is mounted. `/` means the system root.
+    /// Where the area's subvolume is mounted. `/` means the system root.
     fn area_location(&self, area: &AreaName) -> Result<String, BackendError>;
 
     /// What differs between snapshot `id` and the live system, by absolute path. Read-only.
@@ -52,25 +52,25 @@ pub trait SnapshotBackend {
     /// [`SnapshotBackend::create_area`].
     fn delete_area(&self, name: &AreaName) -> Result<(), BackendError>;
 
-    /// Choose one of a config's settings.
+    /// Choose one of an area's settings.
     fn set_area_option(&self, name: &AreaName, option: AreaOption) -> Result<(), BackendError>;
 
     /// How the area's snapshots are kept and cleaned up.
     fn retention(&self, area: &AreaName) -> Result<Retention, BackendError>;
 
-    /// Whether `path` is on the config's own subvolume, so that a snapshot of the config contains it.
+    /// Whether `path` is on the area's own subvolume, so that a snapshot of the area contains it.
     ///
     /// Being under the subvolume's directory is not enough: a snapshot stops at a subvolume
     /// boundary, so a file in a separate subvolume that is nested in or mounted over that directory
-    /// (the usual `/home` beside a `/` config) is not in the config's snapshots at all.
+    /// (the usual `/home` beside a `/` area) is not in the area's snapshots at all.
     fn covers(&self, area: &AreaName, path: &str) -> Result<bool, BackendError>;
 
-    /// How the file at `path` (absolute, inside the config's subvolume) stood in every snapshot of
-    /// the config, oldest first, compared with the file as it is now. Read-only. A directory is
+    /// How the file at `path` (absolute, inside the area's subvolume) stood in every snapshot of
+    /// the area, oldest first, compared with the file as it is now. Read-only. A directory is
     /// [`BackendError::NotSupported`].
     fn file_versions(&self, area: &AreaName, path: &str) -> Result<Vec<FileVersion>, BackendError>;
 
-    /// Make the live system match snapshot `id` again, for everything in the config or only
+    /// Make the live system match snapshot `id` again, for everything in the area or only
     /// for `path` (and what is under it). Files created since are removed, deleted ones come
     /// back, edited ones are reverted. It does not take a safety snapshot first: the use case
     /// ([`crate::going_back::restoring::restore_snapshot`]) does, because that is policy, not mechanism.

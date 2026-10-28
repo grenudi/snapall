@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
+//! Turning what was typed, and the environment, into a request that is known to be valid ([`Parsed`]).
 //!
 //! Everything here is a pure function of its inputs (no process state), so every rule is a
 //! plain test. argenv resolves and lints; this module decides policy and parses the

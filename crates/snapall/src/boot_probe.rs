@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The imperative half of the boot-menu check: look at files and services, hand the facts to
-//! `snapall_core::going_back::boot::assess`. Read-only, and every path is under a root that tests replace
+//! Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be
+//! judged (`snapall_core::going_back::boot::assess`). Read-only, and every path is under a root that tests replace
 //! with a temporary directory.
 //!
 //! These are heuristics about where distributions put things; they are written from the tools'

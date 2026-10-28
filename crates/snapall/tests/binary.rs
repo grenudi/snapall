@@ -322,9 +322,9 @@ fn the_man_page_is_reproducible_and_dated_by_source_date_epoch() {
 //
 // A shell script stands in for snapper, answering exactly what the real one was observed to print
 // (see crates/snapall-snapper). That lets the binary be driven through cases a throwaway Btrfs
-// volume cannot produce, such as a config whose subvolume is the system root `/`.
+// volume cannot produce, such as an area whose subvolume is the system root `/`.
 
-/// A fake snapper with two configs: `home` at /home and `root` at `/`, each with snapshot #1.
+/// A fake snapper with two areas: `home` at /home and `root` at `/`, each with snapshot #1.
 /// `status` reports three changes; `undochange` and `create` succeed and log what they were asked.
 fn fake_snapper(label: &str) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -512,7 +512,7 @@ fn a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_e
 // ---- a file's history, and the audit trail of a restore ---------------------------------------
 
 /// A real directory laid out the way snapper lays out snapshots, behind a fake `snapper` that says
-/// it is the subvolume of a config called `vol`: notes.txt is "now" live, snapshot 1 had other
+/// it is the subvolume of an area called `vol`: notes.txt is "now" live, snapshot 1 had other
 /// text, snapshot 2 had the same, snapshot 3 did not have the file.
 struct Volume {
     root: std::path::PathBuf,
@@ -706,7 +706,7 @@ fn a_restore_can_be_logged_and_the_log_says_what_it_restored() {
 
 #[test]
 fn a_file_no_snapshot_can_contain_says_so_in_plain_words_and_never_claims_it_did_not_exist() {
-    // The user's report: a file in /home, where /home is a separate subvolume and only a config for
+    // The user's report: a file in /home, where /home is a separate subvolume and only an area for
     // `/` exists. /proc stands in for the separate subvolume (another device, under `/` by name).
     let dir = fake_snapper("othervol");
     let output = with_fake(&dir, &["--no-dbus", "history", "/proc/self/environ"]);

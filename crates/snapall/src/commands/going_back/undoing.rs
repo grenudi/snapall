@@ -62,7 +62,7 @@ pub(super) fn check_the_way_back_still_exists(
 /// Roll a change back to the state it recorded, if it recorded one. It says what that state is and what it
 /// will run, asks as heavily as what it does weighs (undoing the taking of a snapshot is deleting it), and
 /// runs the recorded commands through this same program, so they are checked and journaled like any other.
-pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool, no_dbus: bool) -> Outcome {
+pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool) -> Outcome {
     use snapall_core::{Rollback, SystemProbe, Weight};
     let system = snapall_system::LinuxSystem::new();
     let history = system.history(500);
@@ -102,7 +102,7 @@ pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool, no_dbus: b
     let program = std::env::current_exe()?;
     for command in &undo.commands {
         let mut step = std::process::Command::new(&program);
-        if no_dbus {
+        if ctx.no_dbus {
             step.arg("--no-dbus");
         }
         step.args(command);

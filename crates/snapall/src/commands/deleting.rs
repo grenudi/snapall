@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Deleting a snapshot.
+//! Deleting a snapshot for good, after saying what that loses.
 
 use super::*;
 use crate::output::Outcome;

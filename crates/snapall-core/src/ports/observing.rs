@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The observability port: what snapall reports about what it did.
+//! What snapall reports about what it did: the events, and whoever receives them.
 //!
 //! The canon makes observability a first-class outbound port, not an afterthought. This module
 //! is the *port*: pure data describing events and the trait that receives them. It has no clock
@@ -45,7 +45,7 @@ pub enum Event {
     ChangesUndone {
         area: AreaName,
         id: SnapshotId,
-        /// The one path restored, or `None` for the whole config.
+        /// The one path restored, or `None` for the whole area.
         path: Option<String>,
         result: Result<RestoreSummary, String>,
         took: Duration,
@@ -113,7 +113,7 @@ impl Event {
         self.error().is_some()
     }
 
-    /// The config this concerns, when there is one.
+    /// The area this concerns, when there is one.
     pub fn area(&self) -> Option<&AreaName> {
         match self {
             Event::SnapshotsListed { area, .. }

@@ -73,7 +73,7 @@ pub(super) fn kind_label(info: &SnapshotInfo) -> String {
     }
 }
 
-/// One block per config: a header, then an aligned table, newest snapshot last.
+/// One block per area: a header, then an aligned table, newest snapshot last.
 pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
     let mut blocks = Vec::new();
     for (config, list) in all {
