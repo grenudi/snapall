@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.5]
+
+
+### Refactoring
+- Setup stops reading the machine itself and is five modules by what it is ([#97](https://github.com/grenudi/snapall/pull/97)) ([2a925ea])
+
+
+
 ## [0.26.4]
 
 
