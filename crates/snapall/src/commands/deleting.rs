@@ -9,9 +9,9 @@ use crate::output::Outcome;
 use crate::{ask, output};
 use snapall_core::rollback::after_deleting;
 use snapall_core::SnapshotInfo;
-use snapall_core::{delete_snapshot, find_snapshot, Act, ConfigName, SnapshotId};
+use snapall_core::{delete_snapshot, find_snapshot, Act, AreaName, SnapshotId};
 
-pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
+pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, destroy: bool) -> Outcome {
     let found = find_snapshot(ctx.backend, area, id)?;
     let approved = match &found {
         Some(snapshot) => ask_before_deleting(area, snapshot, destroy)?,
@@ -31,7 +31,7 @@ pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -
 }
 
 fn ask_before_deleting(
-    area: &ConfigName,
+    area: &AreaName,
     snapshot: &SnapshotInfo,
     destroy: bool,
 ) -> Result<ask::Approved, Box<dyn std::error::Error>> {
@@ -40,7 +40,7 @@ fn ask_before_deleting(
     ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))
 }
 
-fn snapshot_in_words(area: &ConfigName, snapshot: &SnapshotInfo) -> String {
+fn snapshot_in_words(area: &AreaName, snapshot: &SnapshotInfo) -> String {
     let when = snapshot
         .date
         .as_deref()
@@ -53,7 +53,7 @@ fn snapshot_in_words(area: &ConfigName, snapshot: &SnapshotInfo) -> String {
     format!("snapshot #{} of {area}{when}{note}", snapshot.id)
 }
 
-fn what_deleting_loses(it: &str, area: &ConfigName) -> String {
+fn what_deleting_loses(it: &str, area: &AreaName) -> String {
     format!("{it} will be deleted for good. Only this saved moment goes: the files in {area} are not touched.\n")
 }
 
@@ -61,11 +61,11 @@ fn delete_question(it: &str) -> String {
     format!("Delete {it}?")
 }
 
-fn deleting_one(area: &ConfigName) -> String {
+fn deleting_one(area: &AreaName) -> String {
     format!("Deleting 1 snapshot of {area}")
 }
 
-fn deleted_one(area: &ConfigName) -> String {
+fn deleted_one(area: &AreaName) -> String {
     format!("Deleted 1 snapshot of {area}")
 }
 
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn a_snapshot_is_named_with_its_moment_and_its_note_when_it_has_them() {
-        let home = ConfigName::parse("home").unwrap();
+        let home = AreaName::parse("home").unwrap();
         let mut snapshot = SnapshotInfo {
             id: SnapshotId::new(3).unwrap(),
             kind: SnapshotKind::Single,
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn what_is_lost_is_said_in_words_that_assume_nothing() {
-        let home = ConfigName::parse("home").unwrap();
+        let home = AreaName::parse("home").unwrap();
         let said = what_deleting_loses("snapshot #3 of home", &home);
         assert!(
             said.contains("deleted for good") && said.contains("the files in home are not touched"),

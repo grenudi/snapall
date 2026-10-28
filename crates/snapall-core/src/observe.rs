@@ -12,22 +12,22 @@
 
 use std::time::Duration;
 
-use crate::domain::{ConfigName, RestoreSummary, SnapshotId};
+use crate::domain::{AreaName, RestoreSummary, SnapshotId};
 
 /// One thing snapall did, and how it went. Failures carry the error text, never a panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    ConfigsListed {
+    AreasListed {
         result: Result<usize, String>,
         took: Duration,
     },
     SnapshotsListed {
-        config: ConfigName,
+        area: AreaName,
         result: Result<usize, String>,
         took: Duration,
     },
     SnapshotCreated {
-        config: ConfigName,
+        area: AreaName,
         description: String,
         /// The restore point it was taken as part of, if any.
         point: Option<String>,
@@ -35,7 +35,7 @@ pub enum Event {
         took: Duration,
     },
     SnapshotDeleted {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         result: Result<(), String>,
         took: Duration,
@@ -43,7 +43,7 @@ pub enum Event {
     /// The live files were put back to how a snapshot had them: the most consequential thing
     /// snapall does, so it is always an audit line.
     ChangesUndone {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         /// The one path restored, or `None` for the whole config.
         path: Option<String>,
@@ -52,8 +52,8 @@ pub enum Event {
     },
     /// An area of the disk was set up for snapshots, changed or removed: it changes how the whole
     /// system is protected, so it is always an audit line.
-    ConfigChanged {
-        config: ConfigName,
+    AreaChanged {
+        area: AreaName,
         /// What was done, in words: `created for /home`, `removed`, a setting.
         change: String,
         result: Result<(), String>,
@@ -71,12 +71,12 @@ impl Event {
     /// A stable, machine-friendly name (`snapshot_created`), for log fields.
     pub fn name(&self) -> &'static str {
         match self {
-            Event::ConfigsListed { .. } => "configs_listed",
+            Event::AreasListed { .. } => "configs_listed",
             Event::SnapshotsListed { .. } => "snapshots_listed",
             Event::SnapshotCreated { .. } => "snapshot_created",
             Event::SnapshotDeleted { .. } => "snapshot_deleted",
             Event::ChangesUndone { .. } => "changes_undone",
-            Event::ConfigChanged { .. } => "config_changed",
+            Event::AreaChanged { .. } => "config_changed",
             Event::InstallStepRun { .. } => "install_step_run",
         }
     }
@@ -84,12 +84,12 @@ impl Event {
     /// How long it took.
     pub fn took(&self) -> Duration {
         match self {
-            Event::ConfigsListed { took, .. }
+            Event::AreasListed { took, .. }
             | Event::SnapshotsListed { took, .. }
             | Event::SnapshotCreated { took, .. }
             | Event::SnapshotDeleted { took, .. }
             | Event::ChangesUndone { took, .. }
-            | Event::ConfigChanged { took, .. }
+            | Event::AreaChanged { took, .. }
             | Event::InstallStepRun { took, .. } => *took,
         }
     }
@@ -97,12 +97,12 @@ impl Event {
     /// The error text, if it failed.
     pub fn error(&self) -> Option<&str> {
         let error = match self {
-            Event::ConfigsListed { result, .. } | Event::SnapshotsListed { result, .. } => {
+            Event::AreasListed { result, .. } | Event::SnapshotsListed { result, .. } => {
                 result.as_ref().err()
             }
             Event::SnapshotCreated { result, .. } => result.as_ref().err(),
             Event::SnapshotDeleted { result, .. }
-            | Event::ConfigChanged { result, .. }
+            | Event::AreaChanged { result, .. }
             | Event::InstallStepRun { result, .. } => result.as_ref().err(),
             Event::ChangesUndone { result, .. } => result.as_ref().err(),
         };
@@ -114,14 +114,14 @@ impl Event {
     }
 
     /// The config this concerns, when there is one.
-    pub fn config(&self) -> Option<&ConfigName> {
+    pub fn area(&self) -> Option<&AreaName> {
         match self {
-            Event::SnapshotsListed { config, .. }
-            | Event::SnapshotCreated { config, .. }
-            | Event::SnapshotDeleted { config, .. }
-            | Event::ChangesUndone { config, .. }
-            | Event::ConfigChanged { config, .. } => Some(config),
-            Event::ConfigsListed { .. } | Event::InstallStepRun { .. } => None,
+            Event::SnapshotsListed { area, .. }
+            | Event::SnapshotCreated { area, .. }
+            | Event::SnapshotDeleted { area, .. }
+            | Event::ChangesUndone { area, .. }
+            | Event::AreaChanged { area, .. } => Some(area),
+            Event::AreasListed { .. } | Event::InstallStepRun { .. } => None,
         }
     }
 }
@@ -159,14 +159,14 @@ impl Observer for Silent {
 mod tests {
     use super::*;
 
-    fn name(s: &str) -> ConfigName {
-        ConfigName::parse(s).unwrap()
+    fn name(s: &str) -> AreaName {
+        AreaName::parse(s).unwrap()
     }
 
     #[test]
     fn events_describe_themselves_for_a_log_line() {
         let ok = Event::SnapshotCreated {
-            config: name("home"),
+            area: name("home"),
             description: "x".into(),
             result: Ok(SnapshotId::new(7).unwrap()),
             took: Duration::from_millis(12),
@@ -174,12 +174,12 @@ mod tests {
         };
         assert_eq!(ok.name(), "snapshot_created");
         assert_eq!(ok.took(), Duration::from_millis(12));
-        assert_eq!(ok.config(), Some(&name("home")));
+        assert_eq!(ok.area(), Some(&name("home")));
         assert!(!ok.is_failure());
         assert_eq!(ok.error(), None);
 
         let failed = Event::SnapshotDeleted {
-            config: name("root"),
+            area: name("root"),
             id: SnapshotId::new(3).unwrap(),
             result: Err("not found".into()),
             took: Duration::ZERO,
@@ -192,36 +192,36 @@ mod tests {
     fn every_event_kind_has_a_distinct_name() {
         let d = Duration::ZERO;
         let names: Vec<&str> = [
-            Event::ConfigsListed {
+            Event::AreasListed {
                 result: Ok(0),
                 took: d,
             },
             Event::SnapshotsListed {
-                config: name("a"),
+                area: name("a"),
                 result: Ok(0),
                 took: d,
             },
             Event::SnapshotCreated {
-                config: name("a"),
+                area: name("a"),
                 description: String::new(),
                 result: Err(String::new()),
                 took: d,
                 point: None,
             },
             Event::SnapshotDeleted {
-                config: name("a"),
+                area: name("a"),
                 id: SnapshotId::new(1).unwrap(),
                 result: Ok(()),
                 took: d,
             },
-            Event::ConfigChanged {
-                config: name("a"),
+            Event::AreaChanged {
+                area: name("a"),
                 change: String::new(),
                 result: Ok(()),
                 took: d,
             },
             Event::ChangesUndone {
-                config: name("a"),
+                area: name("a"),
                 id: SnapshotId::new(1).unwrap(),
                 path: None,
                 result: Ok(RestoreSummary::default()),
@@ -250,7 +250,7 @@ mod tests {
             }
         }
         let count = Count(Cell::new(0));
-        let event = Event::ConfigsListed {
+        let event = Event::AreasListed {
             result: Ok(1),
             took: Duration::ZERO,
         };

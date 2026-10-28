@@ -148,13 +148,13 @@ that could not be read and a prose comment holding its only *why*. Written as a 
 below, it is this (the text is read from the source file, not retyped):
 
 ```rust
-pub fn delete(ctx: &Context, area: &ConfigName, id: SnapshotId, destroy: bool) -> Outcome {
-    if let Some(snapshot) = find_snapshot(ctx.backend, area, id)? {
-        let it = snapshot_in_words(area, &snapshot);
-        output::note(&what_deleting_loses(&it, area));
-        ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))?;
-    }
-    let change = Change::begin(&deleting_one(area), &deleted_one(area), None)?;
+pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, destroy: bool) -> Outcome {
+    let found = find_snapshot(ctx.backend, area, id)?;
+    let approved = match &found {
+        Some(snapshot) => ask_before_deleting(area, snapshot, destroy)?,
+        None => ask::nothing_to_lose(Act::DeleteSnapshots, &found)?,
+    };
+    let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
     let deleted = delete_snapshot(ctx.backend, area, id);
     if deleted.is_ok() {
         change.rollback(after_deleting());

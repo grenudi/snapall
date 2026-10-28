@@ -9,18 +9,18 @@ use crate::view::*;
 /// The restore prompt, and, when the snapshot is one of several taken together, the offer to put all
 /// of them back.
 pub(crate) fn restore_spec(
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
     stage: &RestoreStage,
     state: &State,
 ) -> ModalSpec {
-    let spec = restore_stage_spec(config, id, path, stage, state);
+    let spec = restore_stage_spec(area, id, path, stage, state);
     if !matches!(stage, RestoreStage::Ready(_)) {
         return spec;
     }
     match &state.point_offer {
-        Some((c, i, offer)) if c == config && *i == id && offer.areas_to_change() > 0 => {
+        Some((c, i, offer)) if c == area && *i == id && offer.areas_to_change() > 0 => {
             with_point(spec, offer)
         }
         _ => spec,
@@ -33,7 +33,7 @@ pub(crate) fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) 
         .point
         .members
         .iter()
-        .map(|m| m.config.as_str())
+        .map(|m| m.area.as_str())
         .collect();
     let k = offer.areas_to_change();
     spec.lines.push(Line::from(""));
@@ -61,13 +61,13 @@ pub(crate) fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) 
 
 /// The restore prompt: looking, failed, the system root (refused), nothing to restore, or ready.
 pub(crate) fn restore_stage_spec(
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
     stage: &RestoreStage,
     state: &State,
 ) -> ModalSpec {
-    let title = format!(" Restore {config} to #{id} ");
+    let title = format!(" Restore {area} to #{id} ");
     match stage {
         RestoreStage::Loading => ModalSpec {
             title,
@@ -92,7 +92,7 @@ pub(crate) fn restore_stage_spec(
             title: " Restoring the system itself ".into(),
             lines: vec![
                 Line::from(format!(
-                    "{config} is the system root, so snapall will not put it back while it runs."
+                    "{area} is the system root, so snapall will not put it back while it runs."
                 )),
                 Line::from(""),
                 Line::from(state.context.restore_route.clone()),
@@ -105,7 +105,7 @@ pub(crate) fn restore_stage_spec(
         RestoreStage::Ready(preview) if preview.changes.is_empty() => ModalSpec {
             title,
             lines: vec![Line::from(format!(
-                "{config} already matches #{id}: there is nothing to restore."
+                "{area} already matches #{id}: there is nothing to restore."
             ))],
             color: ACCENT,
             width: 72,
@@ -113,7 +113,7 @@ pub(crate) fn restore_stage_spec(
             buttons: vec![close_button()],
         },
         RestoreStage::Ready(preview) => {
-            let lines = restore_summary(config, id, path, &preview.changes);
+            let lines = restore_summary(area, id, path, &preview.changes);
             let height = (rows_needed(&lines, 78) + 4).clamp(10, MAX_PROMPT_HEIGHT);
             ModalSpec {
                 title,
@@ -129,7 +129,7 @@ pub(crate) fn restore_stage_spec(
 
 /// What a restore would do: the counts, the first few paths with a verb each, and the safety net.
 pub(crate) fn restore_summary(
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
     changes: &[snapall_core::Change],
@@ -138,7 +138,7 @@ pub(crate) fn restore_summary(
     let mut lines = vec![
         Line::from(format!(
             "Put {} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
-            path.unwrap_or(config.as_str())
+            path.unwrap_or(area.as_str())
         )),
         Line::from(""),
     ];

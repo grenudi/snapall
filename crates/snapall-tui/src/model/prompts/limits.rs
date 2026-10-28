@@ -16,11 +16,11 @@ const MINUTE: u64 = 60;
 /// The machine's clock, as the same sort of seconds the snapshots' dates are.
 pub(crate) fn now_seconds(state: &State) -> Option<i64> {
     let now = state.health.data.as_ref()?.facts.now.as_deref()?;
-    snapall_core::calendar::seconds_from_snapper_date(now)
+    snapall_core::calendar::seconds_from_snapshot_date(now)
 }
 
 /// Open the editor on an area, from what snapper has now.
-pub(crate) fn open_limits(state: &mut State, config: ConfigName) -> Vec<Effect> {
+pub(crate) fn open_limits(state: &mut State, config: AreaName) -> Vec<Effect> {
     let before = state
         .health
         .data
@@ -35,14 +35,14 @@ pub(crate) fn open_limits(state: &mut State, config: ConfigName) -> Vec<Effect> 
         return Vec::new();
     };
     state.modal = Some(Modal::Limits(LimitsEditor {
-        config: config.clone(),
+        area: config.clone(),
         before,
         limits: before,
         field: 0,
         snapshots: None,
         error: None,
     }));
-    vec![Effect::LoadLimitsData { config }]
+    vec![Effect::LoadLimitsData { area: config }]
 }
 
 fn stays(editor: LimitsEditor) -> Reaction {
@@ -126,7 +126,7 @@ fn apply(state: &mut State, mut editor: LimitsEditor) -> Reaction {
     let removes = would_remove > 0;
     let mut lines = vec![format!(
         "Change what {} keeps: {}.",
-        editor.config,
+        editor.area,
         editor.limits.describe()
     )];
     if let Some(snapshots) = &editor.snapshots {
@@ -134,7 +134,7 @@ fn apply(state: &mut State, mut editor: LimitsEditor) -> Reaction {
         lines.push(snapall_core::limits_words(&preview, &editor.limits));
     }
     let then = vec![Effect::SetLimits {
-        config: editor.config.clone(),
+        area: editor.area.clone(),
         options,
         before: editor.before,
     }];

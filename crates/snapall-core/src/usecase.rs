@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::course::{Course, Unattended};
 use crate::domain::{
-    Change, ConfigName, ConfigOption, Description, FileVersion, Point, RestoreSummary, SnapshotId,
+    AreaName, AreaOption, Change, Description, FileVersion, Point, RestoreSummary, SnapshotId,
     SnapshotInfo,
 };
 use crate::plan::{plan, Plan, PlanError};
@@ -17,7 +17,7 @@ use crate::port::{BackendError, SnapshotBackend};
 /// What happened for one config.
 #[derive(Debug)]
 pub struct Outcome {
-    pub config: ConfigName,
+    pub area: AreaName,
     pub result: Result<SnapshotId, BackendError>,
 }
 
@@ -48,9 +48,9 @@ pub enum SnapshotError {
 /// Ask the backend what exists, then decide what to do. No snapshot is taken.
 pub fn plan_snapshots(
     backend: &dyn SnapshotBackend,
-    only: Option<&[ConfigName]>,
+    only: Option<&[AreaName]>,
 ) -> Result<Plan, SnapshotError> {
-    let available = backend.list_configs()?;
+    let available = backend.list_areas()?;
     Ok(plan(only, &available)?)
 }
 
@@ -77,17 +77,17 @@ pub fn run_plan_along(
 ) -> (Report, bool) {
     let total = plan.targets().len();
     let mut outcomes = Vec::with_capacity(total);
-    for (done, config) in plan.targets().iter().enumerate() {
-        if !course.proceed(done, total, config.as_str()) {
+    for (done, area) in plan.targets().iter().enumerate() {
+        if !course.proceed(done, total, area.as_str()) {
             return (Report { outcomes }, true);
         }
         outcomes.push(Outcome {
-            config: config.clone(),
+            area: area.clone(),
             // every snapshot of one action carries the same restore point, so they can be found
             // together again and put back with one action
             result: match point {
-                Some(point) => backend.create_snapshot_in(config, description, point),
-                None => backend.create_snapshot(config, description),
+                Some(point) => backend.create_snapshot_in(area, description, point),
+                None => backend.create_snapshot(area, description),
             },
         });
     }
@@ -96,7 +96,7 @@ pub fn run_plan_along(
 
 pub fn snapshot_all(
     backend: &dyn SnapshotBackend,
-    only: Option<&[ConfigName]>,
+    only: Option<&[AreaName]>,
     description: &Description,
     point: Option<&Point>,
 ) -> Result<Report, SnapshotError> {
@@ -105,36 +105,36 @@ pub fn snapshot_all(
 }
 
 /// Fail fast, with our own message, when `config` is not one the backend manages.
-fn ensure_config(backend: &dyn SnapshotBackend, config: &ConfigName) -> Result<(), SnapshotError> {
-    if backend.list_configs()?.contains(config) {
+fn ensure_area(backend: &dyn SnapshotBackend, area: &AreaName) -> Result<(), SnapshotError> {
+    if backend.list_areas()?.contains(area) {
         Ok(())
     } else {
-        Err(PlanError::UnknownConfigs(vec![config.clone()]).into())
+        Err(PlanError::UnknownAreas(vec![area.clone()]).into())
     }
 }
 
 /// The snapshots of one config, oldest first.
 pub fn snapshots_of(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
 ) -> Result<Vec<SnapshotInfo>, SnapshotError> {
-    ensure_config(backend, config)?;
-    Ok(backend.list_snapshots(config)?)
+    ensure_area(backend, area)?;
+    Ok(backend.list_snapshots(area)?)
 }
 
 /// The snapshots of every config, configs sorted by name. A failure for any config is an
 /// error: a partial listing would look complete.
 pub fn all_snapshots(
     backend: &dyn SnapshotBackend,
-) -> Result<Vec<(ConfigName, Vec<SnapshotInfo>)>, SnapshotError> {
-    let mut configs = backend.list_configs()?;
-    configs.sort();
-    configs.dedup();
-    configs
+) -> Result<Vec<(AreaName, Vec<SnapshotInfo>)>, SnapshotError> {
+    let mut areas = backend.list_areas()?;
+    areas.sort();
+    areas.dedup();
+    areas
         .into_iter()
-        .map(|config| {
-            let snapshots = backend.list_snapshots(&config)?;
-            Ok((config, snapshots))
+        .map(|area| {
+            let snapshots = backend.list_snapshots(&area)?;
+            Ok((area, snapshots))
         })
         .collect()
 }
@@ -142,11 +142,11 @@ pub fn all_snapshots(
 /// Delete one snapshot of an existing config.
 pub fn delete_snapshot(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
 ) -> Result<(), SnapshotError> {
-    ensure_config(backend, config)?;
-    Ok(backend.delete_snapshot(config, id)?)
+    ensure_area(backend, area)?;
+    Ok(backend.delete_snapshot(area, id)?)
 }
 
 /// Why a restore was refused or failed.
@@ -154,20 +154,20 @@ pub fn delete_snapshot(
 pub enum RestoreError {
     #[error(transparent)]
     Snapshot(#[from] SnapshotError),
-    #[error("{config} has no snapshot #{id}")]
-    UnknownSnapshot { config: ConfigName, id: SnapshotId },
+    #[error("{area} has no snapshot #{id}")]
+    UnknownSnapshot { area: AreaName, id: SnapshotId },
     /// Putting the whole system root back while it is running would leave files, kernel and
     /// boot menu out of step with each other. Single paths are fine; the system itself is
     /// restored from the boot menu or a live system.
-    #[error("`{config}` is the system root: restoring all of it while it runs is not safe (restore single paths, or restore the system from the boot menu)")]
-    SystemRoot { config: ConfigName },
+    #[error("`{area}` is the system root: restoring all of it while it runs is not safe (restore single paths, or restore the system from the boot menu)")]
+    SystemRoot { area: AreaName },
     #[error("`{path}` is not an absolute path without `..`")]
     BadPath { path: String },
-    #[error("`{path}` is outside {config}, which is {subvolume}")]
-    OutsideConfig {
-        config: ConfigName,
+    #[error("`{path}` is outside {area}, which is {location}")]
+    OutsideArea {
+        area: AreaName,
         path: String,
-        subvolume: String,
+        location: String,
     },
     #[error("the safety snapshot could not be taken, so nothing was restored: {0}")]
     SafetySnapshot(BackendError),
@@ -179,7 +179,7 @@ pub enum RestoreError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Preview {
     /// Where the config lives.
-    pub subvolume: String,
+    pub location: String,
     /// Restoring all of it is refused (see [`RestoreError::SystemRoot`]); single paths still work.
     pub is_system_root: bool,
     /// The paths that differ now, limited to the requested path if there was one.
@@ -194,8 +194,8 @@ pub struct Restored {
     pub summary: RestoreSummary,
 }
 
-pub(crate) fn is_root(subvolume: &str) -> bool {
-    subvolume.trim_end_matches('/').is_empty()
+pub(crate) fn is_root(location: &str) -> bool {
+    location.trim_end_matches('/').is_empty()
 }
 
 /// A path that cannot escape: absolute, no `..` component, no control line breaks.
@@ -217,50 +217,50 @@ fn under(base: &str, path: &str) -> bool {
 
 fn checked(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
 ) -> Result<String, RestoreError> {
-    ensure_config(backend, config)?;
-    if !backend.list_snapshots(config)?.iter().any(|s| s.id == id) {
+    ensure_area(backend, area)?;
+    if !backend.list_snapshots(area)?.iter().any(|s| s.id == id) {
         return Err(RestoreError::UnknownSnapshot {
-            config: config.clone(),
+            area: area.clone(),
             id,
         });
     }
-    let subvolume = backend.config_subvolume(config)?;
+    let location = backend.area_location(area)?;
     if let Some(path) = path {
         if !clean(path) {
             return Err(RestoreError::BadPath {
                 path: path.to_owned(),
             });
         }
-        if !under(&subvolume, path) {
-            return Err(RestoreError::OutsideConfig {
-                config: config.clone(),
+        if !under(&location, path) {
+            return Err(RestoreError::OutsideArea {
+                area: area.clone(),
                 path: path.to_owned(),
-                subvolume,
+                location,
             });
         }
     }
-    Ok(subvolume)
+    Ok(location)
 }
 
 /// What restoring snapshot `id` of `config` would change. Read-only.
 pub fn preview_restore(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
 ) -> Result<Preview, RestoreError> {
-    let subvolume = checked(backend, config, id, path)?;
-    let mut changes = backend.changes_since(config, id)?;
+    let location = checked(backend, area, id, path)?;
+    let mut changes = backend.changes_since(area, id)?;
     if let Some(path) = path {
         changes.retain(|change| under(path, &change.path));
     }
     Ok(Preview {
-        is_system_root: is_root(&subvolume),
-        subvolume,
+        is_system_root: is_root(&location),
+        location,
         changes,
     })
 }
@@ -272,11 +272,11 @@ pub fn preview_restore(
 /// restored whole: only single paths of it.
 pub fn restore_snapshot(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
 ) -> Result<Restored, RestoreError> {
-    restore_snapshot_with(backend, config, id, path, None)
+    restore_snapshot_with(backend, area, id, path, None)
 }
 
 /// How the snapshot taken just before a restore is named and tagged, when it is one of several taken
@@ -290,30 +290,28 @@ pub struct Safety {
 /// [`restore_snapshot`], with the safety snapshot tagged and named as given.
 pub fn restore_snapshot_with(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
     safety: Option<&Safety>,
 ) -> Result<Restored, RestoreError> {
-    let subvolume = checked(backend, config, id, path)?;
-    if path.is_none() && is_root(&subvolume) {
-        return Err(RestoreError::SystemRoot {
-            config: config.clone(),
-        });
+    let location = checked(backend, area, id, path)?;
+    if path.is_none() && is_root(&location) {
+        return Err(RestoreError::SystemRoot { area: area.clone() });
     }
     let safety_snapshot = match safety {
-        Some(safety) => backend.create_snapshot_in(config, &safety.note, &safety.point),
+        Some(safety) => backend.create_snapshot_in(area, &safety.note, &safety.point),
         None => {
             let note = Description::parse(&format!("before restoring #{id}")).map_err(|_| {
                 RestoreError::BadPath {
                     path: format!("#{id}"),
                 }
             })?;
-            backend.create_snapshot(config, &note)
+            backend.create_snapshot(area, &note)
         }
     }
     .map_err(RestoreError::SafetySnapshot)?;
-    let summary = backend.undo_changes(config, id, path)?;
+    let summary = backend.undo_changes(area, id, path)?;
     Ok(Restored {
         safety_snapshot,
         summary,
@@ -328,14 +326,14 @@ pub enum HistoryError {
     #[error("`{path}` is not an absolute path without `..`")]
     BadPath { path: String },
     #[error("no protected area contains `{path}`")]
-    NoConfig { path: String },
+    NoArea { path: String },
     /// The path is under a config's directory but on another subvolume, which that config's
     /// snapshots do not include. Saying "did not exist" here would be wrong: it never could have.
-    #[error("`{path}` is in a different part of the disk than {config} (`{subvolume}`), so no snapshot of {config} contains it")]
-    OtherSubvolume {
+    #[error("`{path}` is in a different part of the disk than {area} (`{location}`), so no snapshot of {area} contains it")]
+    OtherLocation {
         path: String,
-        config: ConfigName,
-        subvolume: String,
+        area: AreaName,
+        location: String,
     },
     #[error(transparent)]
     Backend(#[from] BackendError),
@@ -344,7 +342,7 @@ pub enum HistoryError {
 /// A file, the config that covers it, and how it stood in each snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileHistory {
-    pub config: ConfigName,
+    pub area: AreaName,
     pub path: String,
     /// Oldest first, as snapper lists them.
     pub versions: Vec<FileVersion>,
@@ -352,10 +350,7 @@ pub struct FileHistory {
 
 /// The config whose subvolume holds `path`: the one with the longest matching mount point, so a
 /// file in `/home` belongs to `home` and not to `root`, which also contains it.
-pub fn config_covering(
-    backend: &dyn SnapshotBackend,
-    path: &str,
-) -> Result<ConfigName, HistoryError> {
+pub fn area_covering(backend: &dyn SnapshotBackend, path: &str) -> Result<AreaName, HistoryError> {
     if !clean(path) {
         return Err(HistoryError::BadPath {
             path: path.to_owned(),
@@ -363,36 +358,36 @@ pub fn config_covering(
     }
     // The most specific config whose subvolume really holds the file (by length of mount point),
     // and, failing that, the most specific one that merely has it under its directory.
-    let mut covering: Option<(usize, ConfigName)> = None;
-    let mut only_by_name: Option<(usize, ConfigName, String)> = None;
-    for config in backend.list_configs().map_err(SnapshotError::from)? {
-        let subvolume = backend.config_subvolume(&config)?;
-        if !under(&subvolume, path) {
+    let mut covering: Option<(usize, AreaName)> = None;
+    let mut only_by_name: Option<(usize, AreaName, String)> = None;
+    for area in backend.list_areas().map_err(SnapshotError::from)? {
+        let location = backend.area_location(&area)?;
+        if !under(&location, path) {
             continue;
         }
-        let length = subvolume.trim_end_matches('/').len();
-        if backend.covers(&config, path)? {
+        let length = location.trim_end_matches('/').len();
+        if backend.covers(&area, path)? {
             if covering
                 .as_ref()
                 .is_none_or(|(longest, _)| length > *longest)
             {
-                covering = Some((length, config));
+                covering = Some((length, area));
             }
         } else if only_by_name
             .as_ref()
             .is_none_or(|(longest, ..)| length > *longest)
         {
-            only_by_name = Some((length, config, subvolume));
+            only_by_name = Some((length, area, location));
         }
     }
     match (covering, only_by_name) {
-        (Some((_, config)), _) => Ok(config),
-        (None, Some((_, config, subvolume))) => Err(HistoryError::OtherSubvolume {
+        (Some((_, area)), _) => Ok(area),
+        (None, Some((_, area, location))) => Err(HistoryError::OtherLocation {
             path: path.to_owned(),
-            config,
-            subvolume,
+            area,
+            location,
         }),
-        (None, None) => Err(HistoryError::NoConfig {
+        (None, None) => Err(HistoryError::NoArea {
             path: path.to_owned(),
         }),
     }
@@ -401,7 +396,7 @@ pub fn config_covering(
 /// How `path` stood in every snapshot of `config`.
 pub fn file_versions_of(
     backend: &dyn SnapshotBackend,
-    config: &ConfigName,
+    area: &AreaName,
     path: &str,
 ) -> Result<Vec<FileVersion>, HistoryError> {
     if !clean(path) {
@@ -409,21 +404,21 @@ pub fn file_versions_of(
             path: path.to_owned(),
         });
     }
-    ensure_config(backend, config)?;
-    let subvolume = backend.config_subvolume(config)?;
-    if !under(&subvolume, path) {
-        return Err(HistoryError::NoConfig {
+    ensure_area(backend, area)?;
+    let location = backend.area_location(area)?;
+    if !under(&location, path) {
+        return Err(HistoryError::NoArea {
             path: path.to_owned(),
         });
     }
-    if !backend.covers(config, path)? {
-        return Err(HistoryError::OtherSubvolume {
+    if !backend.covers(area, path)? {
+        return Err(HistoryError::OtherLocation {
             path: path.to_owned(),
-            config: config.clone(),
-            subvolume,
+            area: area.clone(),
+            location,
         });
     }
-    Ok(backend.file_versions(config, path)?)
+    Ok(backend.file_versions(area, path)?)
 }
 
 /// The history of one file: which config covers it, and how it stood in each snapshot.
@@ -431,10 +426,10 @@ pub fn file_history(
     backend: &dyn SnapshotBackend,
     path: &str,
 ) -> Result<FileHistory, HistoryError> {
-    let config = config_covering(backend, path)?;
-    let versions = file_versions_of(backend, &config, path)?;
+    let area = area_covering(backend, path)?;
+    let versions = file_versions_of(backend, &area, path)?;
     Ok(FileHistory {
-        config,
+        area,
         path: path.to_owned(),
         versions,
     })
@@ -447,18 +442,18 @@ pub enum SetupError {
     Snapshot(#[from] SnapshotError),
     #[error("`{path}` is not an absolute path without `..`")]
     BadPath { path: String },
-    #[error("{path} is already protected (by `{config}`)")]
-    AlreadyProtected { path: String, config: ConfigName },
+    #[error("{path} is already protected (by `{area}`)")]
+    AlreadyProtected { path: String, area: AreaName },
     #[error("no name could be chosen for the area at {path}")]
     NoName { path: String },
     /// It failed, and what had been started was undone: the disk is as it was.
     #[error("{0}")]
     Failed(BackendError),
     /// It failed half way and could not be undone: something was left behind, and says what.
-    #[error("setting up {path} failed ({problem}) and the part that was done could not be undone ({undo}): the area is left as `{config}`")]
+    #[error("setting up {path} failed ({problem}) and the part that was done could not be undone ({undo}): the area is left as `{area}`")]
     LeftBehind {
         path: String,
-        config: ConfigName,
+        area: AreaName,
         // boxed: this is the rare case, and two whole errors would make every Result larger
         problem: Box<BackendError>,
         undo: Box<BackendError>,
@@ -472,37 +467,35 @@ pub enum SetupError {
 pub fn protect_area(
     backend: &dyn SnapshotBackend,
     mount_point: &str,
-) -> Result<ConfigName, SetupError> {
+) -> Result<AreaName, SetupError> {
     if !clean(mount_point) {
         return Err(SetupError::BadPath {
             path: mount_point.to_owned(),
         });
     }
-    let configs = backend.list_configs().map_err(SnapshotError::from)?;
-    for config in &configs {
-        let subvolume = backend
-            .config_subvolume(config)
-            .map_err(SnapshotError::from)?;
-        if subvolume.trim_end_matches('/') == mount_point.trim_end_matches('/') {
+    let areas = backend.list_areas().map_err(SnapshotError::from)?;
+    for area in &areas {
+        let location = backend.area_location(area).map_err(SnapshotError::from)?;
+        if location.trim_end_matches('/') == mount_point.trim_end_matches('/') {
             return Err(SetupError::AlreadyProtected {
                 path: mount_point.to_owned(),
-                config: config.clone(),
+                area: area.clone(),
             });
         }
     }
     let name =
-        crate::coverage::suggest_name(mount_point, &configs).ok_or_else(|| SetupError::NoName {
+        crate::coverage::suggest_name(mount_point, &areas).ok_or_else(|| SetupError::NoName {
             path: mount_point.to_owned(),
         })?;
     backend
-        .create_config(&name, mount_point)
+        .create_area(&name, mount_point)
         .map_err(SetupError::Failed)?;
-    if let Err(problem) = backend.set_config_option(&name, ConfigOption::TimelineCreate(false)) {
-        return match backend.delete_config(&name) {
+    if let Err(problem) = backend.set_area_option(&name, AreaOption::TimelineCreate(false)) {
+        return match backend.delete_area(&name) {
             Ok(()) => Err(SetupError::Failed(problem)),
             Err(undo) => Err(SetupError::LeftBehind {
                 path: mount_point.to_owned(),
-                config: name,
+                area: name,
                 problem: Box::new(problem),
                 undo: Box::new(undo),
             }),
@@ -521,8 +514,8 @@ mod tests {
     }
 
     #[test]
-    fn snapshots_every_config_by_default() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]);
+    fn snapshots_every_area_by_default() {
+        let backend = InMemoryBackend::with_areas(&["root", "home"]);
         let report = snapshot_all(&backend, None, &desc(), None).unwrap();
         assert!(report.is_success());
         assert_eq!(report.outcomes.len(), 2);
@@ -531,8 +524,8 @@ mod tests {
 
     #[test]
     fn only_restricts_the_targets() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]);
-        let only = [ConfigName::parse("home").unwrap()];
+        let backend = InMemoryBackend::with_areas(&["root", "home"]);
+        let only = [AreaName::parse("home").unwrap()];
         let report = snapshot_all(&backend, Some(&only), &desc(), None).unwrap();
         assert_eq!(report.outcomes.len(), 1);
         assert_eq!(backend.snapshots()[0].0.as_str(), "home");
@@ -540,7 +533,7 @@ mod tests {
 
     #[test]
     fn one_failure_does_not_stop_the_rest_and_is_reported() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]).failing_on("home");
+        let backend = InMemoryBackend::with_areas(&["root", "home"]).failing_on("home");
         let report = snapshot_all(&backend, None, &desc(), None).unwrap();
         assert_eq!(report.outcomes.len(), 2);
         assert_eq!(report.failures(), 1);
@@ -550,26 +543,26 @@ mod tests {
 
     #[test]
     fn planning_alone_takes_no_snapshot() {
-        let backend = InMemoryBackend::with_configs(&["root"]);
+        let backend = InMemoryBackend::with_areas(&["root"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         assert_eq!(plan.targets().len(), 1);
         assert!(backend.snapshots().is_empty());
     }
 
     #[test]
-    fn a_backend_without_configs_is_a_plan_error() {
-        let backend = InMemoryBackend::with_configs(&[]);
+    fn a_backend_without_areas_is_a_plan_error() {
+        let backend = InMemoryBackend::with_areas(&[]);
         assert!(matches!(
             snapshot_all(&backend, None, &desc(), None),
-            Err(SnapshotError::Plan(PlanError::NoConfigs))
+            Err(SnapshotError::Plan(PlanError::NoAreas))
         ));
     }
 
     #[test]
     fn listing_and_deleting_go_through_the_use_cases() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]);
+        let backend = InMemoryBackend::with_areas(&["root", "home"]);
         snapshot_all(&backend, None, &desc(), None).unwrap();
-        let root = ConfigName::parse("root").unwrap();
+        let root = AreaName::parse("root").unwrap();
 
         let listed = snapshots_of(&backend, &root).unwrap();
         assert_eq!(listed.len(), 1);
@@ -586,16 +579,16 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_config_is_our_error_not_the_backends() {
-        let backend = InMemoryBackend::with_configs(&["root"]);
-        let nope = ConfigName::parse("nope").unwrap();
+    fn an_unknown_area_is_our_error_not_the_backends() {
+        let backend = InMemoryBackend::with_areas(&["root"]);
+        let nope = AreaName::parse("nope").unwrap();
         assert!(matches!(
             snapshots_of(&backend, &nope),
-            Err(SnapshotError::Plan(PlanError::UnknownConfigs(_)))
+            Err(SnapshotError::Plan(PlanError::UnknownAreas(_)))
         ));
         assert!(matches!(
             delete_snapshot(&backend, &nope, SnapshotId::new(1).unwrap()),
-            Err(SnapshotError::Plan(PlanError::UnknownConfigs(_)))
+            Err(SnapshotError::Plan(PlanError::UnknownAreas(_)))
         ));
     }
 
@@ -603,8 +596,8 @@ mod tests {
 
     use crate::domain::ChangeKind;
 
-    fn home() -> ConfigName {
-        ConfigName::parse("home").unwrap()
+    fn home() -> AreaName {
+        AreaName::parse("home").unwrap()
     }
 
     fn id(n: u64) -> SnapshotId {
@@ -613,7 +606,7 @@ mod tests {
 
     /// `home` with a.txt = "one", snapshotted as #1, then a.txt edited and b.txt added.
     fn edited_home() -> InMemoryBackend {
-        let backend = InMemoryBackend::with_configs(&["home"]);
+        let backend = InMemoryBackend::with_areas(&["home"]);
         backend.write_file("home", "/mnt/home/a.txt", "one");
         backend.write_file("home", "/mnt/home/c.txt", "kept");
         backend.create_snapshot(&home(), &desc()).unwrap();
@@ -719,8 +712,8 @@ mod tests {
 
     #[test]
     fn the_system_root_is_never_restored_whole_and_nothing_is_touched_when_refusing() {
-        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
-        let root = ConfigName::parse("root").unwrap();
+        let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
+        let root = AreaName::parse("root").unwrap();
         backend.write_file("root", "/etc/fstab", "good");
         backend.create_snapshot(&root, &desc()).unwrap();
         backend.write_file("root", "/etc/fstab", "broken");
@@ -754,7 +747,7 @@ mod tests {
     }
 
     #[test]
-    fn paths_cannot_escape_the_config_and_a_refusal_changes_nothing() {
+    fn paths_cannot_escape_the_area_and_a_refusal_changes_nothing() {
         let backend = edited_home();
         for (path, expect_outside) in [
             ("/etc/passwd", true),
@@ -765,7 +758,7 @@ mod tests {
         ] {
             let error = restore_snapshot(&backend, &home(), id(1), Some(path)).unwrap_err();
             assert_eq!(
-                matches!(error, RestoreError::OutsideConfig { .. }),
+                matches!(error, RestoreError::OutsideArea { .. }),
                 expect_outside,
                 "{path}: {error}"
             );
@@ -782,13 +775,13 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_snapshot_or_config_is_refused_before_anything_changes() {
+    fn an_unknown_snapshot_or_area_is_refused_before_anything_changes() {
         let backend = edited_home();
         assert!(matches!(
             restore_snapshot(&backend, &home(), id(9), None),
             Err(RestoreError::UnknownSnapshot { .. })
         ));
-        let nope = ConfigName::parse("nope").unwrap();
+        let nope = AreaName::parse("nope").unwrap();
         assert!(matches!(
             restore_snapshot(&backend, &nope, id(1), None),
             Err(RestoreError::Snapshot(_))
@@ -825,21 +818,19 @@ mod tests {
     }
 
     #[test]
-    fn the_config_with_the_longest_mount_point_covers_a_file() {
-        let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+    fn the_area_with_the_longest_mount_point_covers_a_file() {
+        let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
         assert_eq!(
-            config_covering(&backend, "/mnt/home/a.txt")
-                .unwrap()
-                .as_str(),
+            area_covering(&backend, "/mnt/home/a.txt").unwrap().as_str(),
             "home"
         );
         assert_eq!(
-            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            area_covering(&backend, "/etc/fstab").unwrap().as_str(),
             "root"
         );
         // a sibling that merely starts with the same letters is not inside
         assert_eq!(
-            config_covering(&backend, "/mnt/homeless/a.txt")
+            area_covering(&backend, "/mnt/homeless/a.txt")
                 .unwrap()
                 .as_str(),
             "root"
@@ -847,16 +838,16 @@ mod tests {
     }
 
     #[test]
-    fn a_file_no_config_covers_or_a_path_that_could_escape_is_refused() {
-        let backend = InMemoryBackend::with_configs(&["home"]);
+    fn a_file_no_area_covers_or_a_path_that_could_escape_is_refused() {
+        let backend = InMemoryBackend::with_areas(&["home"]);
         assert!(matches!(
-            config_covering(&backend, "/etc/fstab"),
-            Err(HistoryError::NoConfig { .. })
+            area_covering(&backend, "/etc/fstab"),
+            Err(HistoryError::NoArea { .. })
         ));
         for bad in ["relative.txt", "/mnt/home/../etc/passwd", "/mnt/home/a\nb"] {
             assert!(
                 matches!(
-                    config_covering(&backend, bad),
+                    area_covering(&backend, bad),
                     Err(HistoryError::BadPath { .. })
                 ),
                 "{bad}"
@@ -866,7 +857,7 @@ mod tests {
 
     #[test]
     fn a_files_history_says_in_each_snapshot_how_it_compares_with_now() {
-        let backend = InMemoryBackend::with_configs(&["home"]);
+        let backend = InMemoryBackend::with_areas(&["home"]);
         backend.write_file("home", "/mnt/home/a.txt", "one");
         backend.create_snapshot(&home(), &desc()).unwrap(); // #1: one
         backend.write_file("home", "/mnt/home/a.txt", "two");
@@ -874,7 +865,7 @@ mod tests {
         backend.write_file("home", "/mnt/home/b.txt", "new"); // not in either snapshot
 
         let a = file_history(&backend, "/mnt/home/a.txt").unwrap();
-        assert_eq!(a.config, home());
+        assert_eq!(a.area, home());
         assert_eq!(states(&a), [(1, FileState::Changed), (2, FileState::Same)]);
         let b = file_history(&backend, "/mnt/home/b.txt").unwrap();
         assert_eq!(
@@ -897,25 +888,25 @@ mod tests {
     }
 
     #[test]
-    fn a_history_for_a_path_outside_the_given_config_is_refused() {
-        let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+    fn a_history_for_a_path_outside_the_given_area_is_refused() {
+        let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
         assert!(matches!(
             file_versions_of(&backend, &home(), "/etc/fstab"),
-            Err(HistoryError::NoConfig { .. })
+            Err(HistoryError::NoArea { .. })
         ));
     }
 
     // ---- what a snapshot cannot contain ---------------------------------------------------------
 
     #[test]
-    fn a_file_on_a_separate_subvolume_is_not_attributed_to_the_config_above_it() {
+    fn a_file_on_a_separate_location_is_not_attributed_to_the_area_above_it() {
         // root is `/`, and /mnt/home is a separate subvolume with no config of its own
-        let backend = InMemoryBackend::with_configs(&["root"])
-            .with_root_config("root")
-            .with_separate_subvolume("/mnt/home");
-        let error = config_covering(&backend, "/mnt/home/u/notes.txt").unwrap_err();
+        let backend = InMemoryBackend::with_areas(&["root"])
+            .with_root_area("root")
+            .with_separate_location("/mnt/home");
+        let error = area_covering(&backend, "/mnt/home/u/notes.txt").unwrap_err();
         assert!(
-            matches!(&error, HistoryError::OtherSubvolume { config, .. } if config.as_str() == "root"),
+            matches!(&error, HistoryError::OtherLocation { area, .. } if area.as_str() == "root"),
             "{error}"
         );
         assert!(
@@ -926,34 +917,34 @@ mod tests {
         );
         // a file of the root subvolume itself is still covered by it
         assert_eq!(
-            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            area_covering(&backend, "/etc/fstab").unwrap().as_str(),
             "root"
         );
         // and asking for the history through the config directly says the same, not "did not exist"
         let direct = file_versions_of(
             &backend,
-            &ConfigName::parse("root").unwrap(),
+            &AreaName::parse("root").unwrap(),
             "/mnt/home/u/notes.txt",
         );
         assert!(
-            matches!(direct, Err(HistoryError::OtherSubvolume { .. })),
+            matches!(direct, Err(HistoryError::OtherLocation { .. })),
             "{direct:?}"
         );
     }
 
     #[test]
-    fn once_the_separate_subvolume_has_its_own_config_that_config_covers_its_files() {
-        let backend = InMemoryBackend::with_configs(&["home", "root"])
-            .with_root_config("root")
-            .with_separate_subvolume("/mnt/home");
+    fn once_the_separate_location_has_its_own_area_that_area_covers_its_files() {
+        let backend = InMemoryBackend::with_areas(&["home", "root"])
+            .with_root_area("root")
+            .with_separate_location("/mnt/home");
         assert_eq!(
-            config_covering(&backend, "/mnt/home/u/notes.txt")
+            area_covering(&backend, "/mnt/home/u/notes.txt")
                 .unwrap()
                 .as_str(),
             "home"
         );
         assert_eq!(
-            config_covering(&backend, "/etc/fstab").unwrap().as_str(),
+            area_covering(&backend, "/etc/fstab").unwrap().as_str(),
             "root"
         );
     }
@@ -962,11 +953,11 @@ mod tests {
 
     #[test]
     fn protecting_an_area_sets_it_up_named_after_it_and_stops_snapshots_on_a_schedule() {
-        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
         let name = protect_area(&backend, "/home").unwrap();
         assert_eq!(name.as_str(), "home");
-        assert!(backend.list_configs().unwrap().contains(&name));
-        assert_eq!(backend.config_subvolume(&name).unwrap(), "/home");
+        assert!(backend.list_areas().unwrap().contains(&name));
+        assert_eq!(backend.area_location(&name).unwrap(), "/home");
         assert_eq!(
             backend.timeline_create("home"),
             Some(false),
@@ -979,33 +970,33 @@ mod tests {
 
     #[test]
     fn an_area_that_is_already_protected_is_refused_and_nothing_changes() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]).with_root_config("root");
-        let before = backend.list_configs().unwrap();
+        let backend = InMemoryBackend::with_areas(&["root", "home"]).with_root_area("root");
+        let before = backend.list_areas().unwrap();
         // the in-memory `home` config lives at /mnt/home
         let error = protect_area(&backend, "/mnt/home/").unwrap_err();
         assert!(
-            matches!(&error, SetupError::AlreadyProtected { config, .. } if config.as_str() == "home"),
+            matches!(&error, SetupError::AlreadyProtected { area, .. } if area.as_str() == "home"),
             "{error}"
         );
-        assert_eq!(backend.list_configs().unwrap(), before);
+        assert_eq!(backend.list_areas().unwrap(), before);
     }
 
     #[test]
     fn a_name_that_is_taken_is_not_reused() {
         // a config called `home` exists for somewhere else
-        let backend = InMemoryBackend::with_configs(&["home"]);
+        let backend = InMemoryBackend::with_areas(&["home"]);
         let name = protect_area(&backend, "/home").unwrap();
         assert_eq!(name.as_str(), "home_2");
     }
 
     #[test]
     fn if_the_second_step_fails_the_first_is_undone_so_nothing_half_made_lingers() {
-        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
         backend.refuse_option_changes();
         let error = protect_area(&backend, "/home").unwrap_err();
         assert!(matches!(error, SetupError::Failed(_)), "{error}");
         assert_eq!(
-            backend.list_configs().unwrap().len(),
+            backend.list_areas().unwrap().len(),
             1,
             "the new area was removed again"
         );
@@ -1013,13 +1004,13 @@ mod tests {
 
     #[test]
     fn if_even_the_undo_fails_what_is_left_behind_is_named() {
-        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
         backend.refuse_option_changes();
         backend.refuse_removals();
         let error = protect_area(&backend, "/home").unwrap_err();
         let text = error.to_string();
         assert!(
-            matches!(&error, SetupError::LeftBehind { config, .. } if config.as_str() == "home"),
+            matches!(&error, SetupError::LeftBehind { area, .. } if area.as_str() == "home"),
             "{text}"
         );
         assert!(
@@ -1030,13 +1021,13 @@ mod tests {
 
     #[test]
     fn a_path_that_could_escape_is_refused_before_anything_is_created() {
-        let backend = InMemoryBackend::with_configs(&["root"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["root"]).with_root_area("root");
         for bad in ["home", "/home/../etc", ""] {
             assert!(
                 matches!(protect_area(&backend, bad), Err(SetupError::BadPath { .. })),
                 "{bad:?}"
             );
         }
-        assert_eq!(backend.list_configs().unwrap().len(), 1);
+        assert_eq!(backend.list_areas().unwrap().len(), 1);
     }
 }

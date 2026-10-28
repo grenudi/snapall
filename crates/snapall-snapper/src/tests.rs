@@ -7,7 +7,7 @@
 #![cfg(test)]
 
 use snapall_core::{
-    BackendError, ChangeKind, ConfigName, ConfigOption, Description, FileState, RestoreSummary,
+    AreaName, AreaOption, BackendError, ChangeKind, Description, FileState, RestoreSummary,
     Retention, SnapshotBackend, SnapshotId, SnapshotKind,
 };
 use std::fs::{self};
@@ -63,8 +63,8 @@ fn failed(stderr: &str) -> io::Result<CommandOutput> {
     })
 }
 
-fn name(s: &str) -> ConfigName {
-    ConfigName::parse(s).unwrap()
+fn name(s: &str) -> AreaName {
+    AreaName::parse(s).unwrap()
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn lists_configs_from_snapper_json() {
     let json =
         r#"{"configs":[{"config":"root","subvolume":"/"},{"config":"home","subvolume":"/home"}]}"#;
     let script = Scripted::new(vec![ok(json)]);
-    let configs = SnapperCli::new(&script).list_configs().unwrap();
+    let configs = SnapperCli::new(&script).list_areas().unwrap();
     assert_eq!(configs, vec![name("root"), name("home")]);
     assert_eq!(script.calls.borrow()[0], ["--jsonout", "list-configs"]);
 }
@@ -82,7 +82,7 @@ fn no_dbus_is_a_global_option_placed_first() {
     let script = Scripted::new(vec![ok(r#"{"configs":[]}"#)]);
     let configs = SnapperCli::new(&script)
         .with_no_dbus(true)
-        .list_configs()
+        .list_areas()
         .unwrap();
     assert!(configs.is_empty());
     assert_eq!(
@@ -147,7 +147,7 @@ fn a_missing_binary_is_unavailable() {
         io::ErrorKind::NotFound,
         "no such file",
     ))]);
-    let err = SnapperCli::new(&script).list_configs().unwrap_err();
+    let err = SnapperCli::new(&script).list_areas().unwrap_err();
     assert!(matches!(err, BackendError::Unavailable { .. }));
 }
 
@@ -156,7 +156,7 @@ fn garbage_output_is_unexpected_output_not_a_panic() {
     let script = Scripted::new(vec![ok("not json"), ok("forty-two")]);
     let backend = SnapperCli::new(&script);
     assert!(matches!(
-        backend.list_configs(),
+        backend.list_areas(),
         Err(BackendError::UnexpectedOutput { .. })
     ));
     assert!(matches!(
@@ -169,7 +169,7 @@ fn garbage_output_is_unexpected_output_not_a_panic() {
 fn a_config_name_snapall_cannot_pass_safely_is_rejected_explicitly() {
     let script = Scripted::new(vec![ok(r#"{"configs":[{"config":"--evil"}]}"#)]);
     assert!(matches!(
-        SnapperCli::new(&script).list_configs(),
+        SnapperCli::new(&script).list_areas(),
         Err(BackendError::UnexpectedOutput { .. })
     ));
 }
@@ -284,11 +284,11 @@ fn the_mount_point_comes_from_list_configs() {
         r#"{"configs":[{"config":"home","subvolume":"/home"},{"config":"root","subvolume":"/"}]}"#;
     let script = Scripted::new(vec![ok(json), ok(json), ok(json)]);
     let backend = SnapperCli::new(&script);
-    assert_eq!(backend.config_subvolume(&name("root")).unwrap(), "/");
-    assert_eq!(backend.config_subvolume(&name("home")).unwrap(), "/home");
+    assert_eq!(backend.area_location(&name("root")).unwrap(), "/");
+    assert_eq!(backend.area_location(&name("home")).unwrap(), "/home");
     assert!(matches!(
-        backend.config_subvolume(&name("nope")),
-        Err(BackendError::UnknownConfig(_))
+        backend.area_location(&name("nope")),
+        Err(BackendError::UnknownArea(_))
     ));
     assert_eq!(script.calls.borrow()[0], ["--jsonout", "list-configs"]);
 }
@@ -600,14 +600,14 @@ fn a_file_is_covered_when_its_directory_is_on_the_configs_own_device() {
 fn an_area_is_set_up_removed_and_adjusted_with_the_exact_commands() {
     let script = Scripted::new(vec![ok(""), ok(""), ok(""), ok("")]);
     let backend = SnapperCli::new(&script);
-    backend.create_config(&name("home"), "/home").unwrap();
+    backend.create_area(&name("home"), "/home").unwrap();
     backend
-        .set_config_option(&name("home"), ConfigOption::TimelineCreate(false))
+        .set_area_option(&name("home"), AreaOption::TimelineCreate(false))
         .unwrap();
     backend
-        .set_config_option(&name("home"), ConfigOption::TimelineCreate(true))
+        .set_area_option(&name("home"), AreaOption::TimelineCreate(true))
         .unwrap();
-    backend.delete_config(&name("home")).unwrap();
+    backend.delete_area(&name("home")).unwrap();
     let calls = script.calls.borrow();
     assert_eq!(calls[0], ["-c", "home", "create-config", "/home"]);
     assert_eq!(calls[1], ["-c", "home", "set-config", "TIMELINE_CREATE=no"]);
@@ -624,7 +624,7 @@ fn snappers_own_words_come_back_when_setting_an_area_up_fails() {
         "Creating config failed (path is not a subvolume).",
     )]);
     let error = SnapperCli::new(&script)
-        .create_config(&name("data"), "/data")
+        .create_area(&name("data"), "/data")
         .unwrap_err();
     assert!(
         error.to_string().contains("path is not a subvolume"),

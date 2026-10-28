@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 
 use thiserror::Error;
 
-use crate::domain::ConfigName;
+use crate::domain::AreaName;
 
 /// The group that is every protected area.
 pub const ALL: &str = "all";
@@ -104,7 +104,7 @@ fn which_exist(names: &[String]) -> String {
 /// The groups a person made.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Groups {
-    named: BTreeMap<GroupName, Vec<ConfigName>>,
+    named: BTreeMap<GroupName, Vec<AreaName>>,
 }
 
 impl Groups {
@@ -116,12 +116,12 @@ impl Groups {
         self.named.is_empty()
     }
 
-    pub fn get(&self, name: &GroupName) -> Option<&[ConfigName]> {
+    pub fn get(&self, name: &GroupName) -> Option<&[AreaName]> {
         self.named.get(name).map(Vec::as_slice)
     }
 
     /// Make or replace a group. An area named twice counts once; a group needs an area.
-    pub fn set(&mut self, name: GroupName, areas: Vec<ConfigName>) -> Result<(), GroupsError> {
+    pub fn set(&mut self, name: GroupName, areas: Vec<AreaName>) -> Result<(), GroupsError> {
         let mut seen = Vec::new();
         for area in areas {
             if !seen.contains(&area) {
@@ -144,8 +144,8 @@ impl Groups {
     pub fn resolve(
         &self,
         wanted: &Wanted,
-        protected: &[ConfigName],
-    ) -> Result<Vec<ConfigName>, GroupsError> {
+        protected: &[AreaName],
+    ) -> Result<Vec<AreaName>, GroupsError> {
         let Wanted::Named(name) = wanted else {
             return Ok(protected.to_vec());
         };
@@ -190,7 +190,7 @@ impl Groups {
                 .split(',')
                 .map(str::trim)
                 .filter(|area| !area.is_empty())
-                .map(|area| ConfigName::parse(area).map_err(|e| syntax(format!("`{area}`: {e}"))))
+                .map(|area| AreaName::parse(area).map_err(|e| syntax(format!("`{area}`: {e}"))))
                 .collect::<Result<Vec<_>, _>>()?;
             groups.set(name, areas).map_err(|e| syntax(e.to_string()))?;
         }
@@ -200,7 +200,7 @@ impl Groups {
     pub fn to_text(&self) -> String {
         let mut text = String::from("# snapall groups: a name, then the areas it covers\n");
         for (name, areas) in &self.named {
-            let list: Vec<&str> = areas.iter().map(ConfigName::as_str).collect();
+            let list: Vec<&str> = areas.iter().map(AreaName::as_str).collect();
             text.push_str(&format!("{name}: {}\n", list.join(", ")));
         }
         text
@@ -211,15 +211,15 @@ impl Groups {
 mod tests {
     use super::*;
 
-    fn area(name: &str) -> ConfigName {
-        ConfigName::parse(name).unwrap()
+    fn area(name: &str) -> AreaName {
+        AreaName::parse(name).unwrap()
     }
 
     fn name(text: &str) -> GroupName {
         GroupName::parse(text).unwrap()
     }
 
-    fn protected() -> Vec<ConfigName> {
+    fn protected() -> Vec<AreaName> {
         ["data", "home", "root"].map(area).to_vec()
     }
 

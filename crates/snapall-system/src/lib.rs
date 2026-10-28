@@ -245,7 +245,7 @@ pub fn parse_df(text: &str) -> Option<DiskUsage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::calendar::seconds_from_snapper_date;
+    use snapall_core::calendar::seconds_from_snapshot_date;
 
     #[test]
     fn what_df_prints_is_read_and_what_it_does_not_is_refused() {
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn the_local_time_is_written_the_way_snapper_writes_dates() {
         let now = LinuxSystem::new().local_time().expect("date works here");
-        assert!(seconds_from_snapper_date(&now).is_some(), "{now:?}");
+        assert!(seconds_from_snapshot_date(&now).is_some(), "{now:?}");
     }
 
     #[test]

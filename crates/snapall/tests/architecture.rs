@@ -204,7 +204,7 @@ fn no_message_tells_a_person_to_run_a_raw_snapper_command() {
 /// The words snapall teaches are "protected area" and "snapshot". "snapper config" is the name of a
 /// thing inside another program, and nobody reading snapall's output has been told what it is.
 #[test]
-fn no_message_calls_a_protected_area_a_snapper_config() {
+fn no_message_calls_a_protected_area_a_snapper_area() {
     for (file, code) in text_a_person_can_read() {
         for forbidden in [
             "snapper config",
@@ -773,18 +773,17 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 17] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 16] = [
     ("crates/snapall-core/src/doctor.rs", 397),
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-core/src/health.rs", 522),
-    ("crates/snapall-core/src/points.rs", 333),
-    ("crates/snapall-core/src/testing.rs", 590),
-    ("crates/snapall-core/src/usecase.rs", 513),
+    ("crates/snapall-core/src/testing.rs", 578),
+    ("crates/snapall-core/src/usecase.rs", 506),
     ("crates/snapall-tui/src/changes.rs", 419),
     ("crates/snapall-tui/src/model/keys.rs", 353),
-    ("crates/snapall-tui/src/model/mod.rs", 385),
+    ("crates/snapall-tui/src/model/mod.rs", 379),
     ("crates/snapall-tui/src/model/state.rs", 401),
-    ("crates/snapall-tui/src/session.rs", 405),
+    ("crates/snapall-tui/src/session.rs", 396),
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/cli.rs", 568),
@@ -795,7 +794,7 @@ const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 17] = [
 const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 5] = [
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-system/src/lib.rs", 244),
-    ("crates/snapall-tui/src/model/mod.rs", 385),
+    ("crates/snapall-tui/src/model/mod.rs", 379),
     ("crates/snapall-tui/src/tabs/health/mod.rs", 317),
     ("crates/snapall/src/main.rs", 196),
 ];
@@ -809,8 +808,7 @@ const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 5] = [
     ("crates/snapall/src/doctor.rs", 5),
     ("crates/snapall/src/main.rs", 4),
 ];
-const FOREIGN_WORDS_IN_NAMES_FOR_NOW: [(&str, usize); 3] =
-    [("snapall", 19), ("snapall-core", 37), ("snapall-tui", 7)];
+const FOREIGN_WORDS_IN_NAMES_FOR_NOW: [(&str, usize); 2] = [("snapall", 10), ("snapall-core", 1)];
 
 // ---- the outline: the code, read as a table of contents ----------------------------------------------------
 
@@ -940,5 +938,23 @@ fn only_one_change_begins_without_a_leave_and_it_is_the_one_that_asks_as_it_goes
         uses,
         ["crates/snapall/src/commands/protecting.rs x1"],
         "a change that begins without the leave of asking is a change that can be made unasked"
+    );
+}
+
+// ---- the canon text's worked example is the source, not a copy of it ---------------------------------------
+
+/// The canon text shows the real `delete` story. It is only ever true if it is the source, so it must equal it: the
+/// moment the code changes, this says the text no longer does.
+#[test]
+fn the_worked_example_in_the_canon_is_the_code_it_shows() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source =
+        std::fs::read_to_string(root.join("crates/snapall/src/commands/deleting.rs")).unwrap();
+    let start = source.find("pub fn delete(").unwrap();
+    let story = source[start..].split("\n}\n").next().unwrap().to_owned() + "\n}";
+    let canon = std::fs::read_to_string(root.join("docs/canon/small-languages.md")).unwrap();
+    assert!(
+        canon.contains(&story),
+        "docs/canon/small-languages.md shows a `delete` that is not the one in deleting.rs: copy the function again"
     );
 }

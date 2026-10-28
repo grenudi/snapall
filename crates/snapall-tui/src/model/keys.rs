@@ -63,17 +63,17 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
-            vec![Effect::LoadConfigs, Effect::LoadHealth, Effect::LoadHistory]
+            vec![Effect::LoadAreas, Effect::LoadHealth, Effect::LoadHistory]
         }
         Key::Tab => {
             state.focus = match state.focus {
-                Pane::Configs => Pane::Snapshots,
-                Pane::Snapshots => Pane::Configs,
+                Pane::Areas => Pane::Snapshots,
+                Pane::Snapshots => Pane::Areas,
             };
             Vec::new()
         }
         Key::Left | Key::Char('h') => {
-            state.focus = Pane::Configs;
+            state.focus = Pane::Areas;
             Vec::new()
         }
         Key::Right | Key::Char('l') => {
@@ -166,13 +166,13 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
         Modal::StopProtecting(prompt) => confirming_unprotect(state, key, prompt),
         Modal::Confirm(question) => confirming(state, key, question),
         Modal::Describe { target, input, .. } => describing(state, key, target, input),
-        Modal::ConfirmDelete { config, ids } => confirming_delete(state, key, config, ids),
+        Modal::ConfirmDelete { area, ids } => confirming_delete(state, key, area, ids),
         Modal::Restore {
-            config,
+            area,
             id,
             path,
             stage,
-        } => confirming_restore(state, key, config, id, path, stage),
+        } => confirming_restore(state, key, area, id, path, stage),
     };
     state.modal = reaction.modal;
     reaction.effects
@@ -181,10 +181,10 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
 /// Move the cursor of the focused pane. Changing config loads its snapshots on first visit.
 pub(crate) fn step(state: &mut State, delta: isize) -> Vec<Effect> {
     match state.focus {
-        Pane::Configs => {
+        Pane::Areas => {
             let len = state.entries().len();
-            let next = clamp_step(state.config_cursor, delta, len);
-            select_config(state, next)
+            let next = clamp_step(state.area_cursor, delta, len);
+            select_area(state, next)
         }
         Pane::Snapshots => {
             let len = state.displayed_snapshots().len();
@@ -196,10 +196,10 @@ pub(crate) fn step(state: &mut State, delta: isize) -> Vec<Effect> {
 
 pub(crate) fn jump(state: &mut State, to_end: bool) -> Vec<Effect> {
     match state.focus {
-        Pane::Configs => {
+        Pane::Areas => {
             let len = state.entries().len();
             let target = if to_end { len.saturating_sub(1) } else { 0 };
-            select_config(state, target)
+            select_area(state, target)
         }
         Pane::Snapshots => {
             let len = state.displayed_snapshots().len();
@@ -216,18 +216,18 @@ pub(crate) fn clamp_step(current: usize, delta: isize, len: usize) -> usize {
     current.saturating_add_signed(delta).min(len - 1)
 }
 
-pub(crate) fn select_config(state: &mut State, index: usize) -> Vec<Effect> {
-    if index == state.config_cursor || index >= state.entries().len() {
+pub(crate) fn select_area(state: &mut State, index: usize) -> Vec<Effect> {
+    if index == state.area_cursor || index >= state.entries().len() {
         return Vec::new();
     }
-    state.config_cursor = index;
+    state.area_cursor = index;
     state.snapshot_cursor = 0;
     state.marked.clear();
     load_selected_if_needed(state)
 }
 
 pub(crate) fn load_selected_if_needed(state: &State) -> Vec<Effect> {
-    match state.selected_config() {
+    match state.selected_area() {
         Some(entry) if entry.snapshots == Load::NotLoaded => {
             vec![Effect::LoadSnapshots(entry.name.clone())]
         }
@@ -312,7 +312,7 @@ pub(crate) fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
         Click::Row { pane, index } => {
             state.focus = pane;
             match pane {
-                Pane::Configs if index < state.entries().len() => select_config(state, index),
+                Pane::Areas if index < state.entries().len() => select_area(state, index),
                 Pane::Snapshots if index < state.displayed_snapshots().len() => {
                     state.snapshot_cursor = index;
                     Vec::new()

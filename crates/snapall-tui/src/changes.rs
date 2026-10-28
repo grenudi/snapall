@@ -19,7 +19,7 @@ pub(crate) fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
             .members
             .iter()
             .filter_map(|m| match &m.result {
-                MemberResult::Failed(why) => Some(format!("{}: {why}", m.config)),
+                MemberResult::Failed(why) => Some(format!("{}: {why}", m.area)),
                 _ => None,
             })
             .collect(),
@@ -42,28 +42,28 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        Effect::Delete { config, ids } => {
+        Effect::Delete { area, ids } => {
             format!(
-                "Deleted {} snapshot{} of {config}",
+                "Deleted {} snapshot{} of {area}",
                 ids.len(),
                 plural(ids.len())
             )
         }
         Effect::Restore {
-            config,
+            area,
             id,
             path: Some(path),
             ..
         } => {
-            format!("Restored {path} from snapshot #{id} of {config}")
+            format!("Restored {path} from snapshot #{id} of {area}")
         }
         Effect::Restore {
-            config,
+            area,
             id,
             path: None,
             ..
         } => {
-            format!("Put {config} back to snapshot #{id}")
+            format!("Put {area} back to snapshot #{id}")
         }
         Effect::RestorePoint { point } => {
             format!("Put every area back to restore point {}", point.point)
@@ -74,9 +74,9 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saved the groups of areas".to_owned(),
-        Effect::StopProtecting { config } => format!("Stopped protecting {config}"),
-        Effect::SetLimits { config, .. } => {
-            format!("Changed how many snapshots {config} keeps")
+        Effect::StopProtecting { area } => format!("Stopped protecting {area}"),
+        Effect::SetLimits { area, .. } => {
+            format!("Changed how many snapshots {area} keeps")
         }
         Effect::ControlJob { unit, action } => {
             use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
@@ -98,7 +98,7 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
         // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
         // the change it is about carries the record, and ends as stopped
         Effect::StopChange { .. }
-        | Effect::LoadConfigs
+        | Effect::LoadAreas
         | Effect::LoadSnapshots(_)
         | Effect::LoadChanges { .. }
         | Effect::LoadPointOffer { .. }
@@ -174,28 +174,28 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        Effect::Delete { config, ids } => {
+        Effect::Delete { area, ids } => {
             format!(
-                "Deleting {} snapshot{} of {config}",
+                "Deleting {} snapshot{} of {area}",
                 ids.len(),
                 plural(ids.len())
             )
         }
         Effect::Restore {
-            config,
+            area,
             id,
             path: Some(path),
             ..
         } => {
-            format!("Restoring {path} from snapshot #{id} of {config}")
+            format!("Restoring {path} from snapshot #{id} of {area}")
         }
         Effect::Restore {
-            config,
+            area,
             id,
             path: None,
             ..
         } => {
-            format!("Putting {config} back to snapshot #{id}")
+            format!("Putting {area} back to snapshot #{id}")
         }
         Effect::RestorePoint { point } => {
             format!("Putting every area back to restore point {}", point.point)
@@ -206,9 +206,9 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
         }
         Effect::SwitchOnCleanup => "Switching on automatic cleanup".to_owned(),
         Effect::SaveGroups { .. } => "Saving the groups of areas".to_owned(),
-        Effect::StopProtecting { config } => format!("Stopping protection of {config}"),
-        Effect::SetLimits { config, .. } => {
-            format!("Changing how many snapshots {config} keeps")
+        Effect::StopProtecting { area } => format!("Stopping protection of {area}"),
+        Effect::SetLimits { area, .. } => {
+            format!("Changing how many snapshots {area} keeps")
         }
         Effect::ControlJob { unit, action } => {
             let doing = match action {
@@ -229,7 +229,7 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
         // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
         // the change it is about carries the record, and ends as stopped
         Effect::StopChange { .. }
-        | Effect::LoadConfigs
+        | Effect::LoadAreas
         | Effect::LoadSnapshots(_)
         | Effect::LoadChanges { .. }
         | Effect::LoadPointOffer { .. }
@@ -259,9 +259,9 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
         Msg::Created(results) => {
             let each: Vec<(String, Result<String, String>)> = results
                 .iter()
-                .map(|(config, result)| {
+                .map(|(area, result)| {
                     (
-                        config.to_string(),
+                        area.to_string(),
                         result
                             .as_ref()
                             .map(|id| format!("#{id}"))
@@ -346,7 +346,7 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
         | Msg::Scroll { .. }
         | Msg::ChangesLoaded { .. }
         | Msg::FileVersionsLoaded { .. }
-        | Msg::ConfigsLoaded(..)
+        | Msg::AreasLoaded(..)
         | Msg::PointOfferLoaded { .. }
         | Msg::Refused(..)
         | Msg::LimitsData { .. }
@@ -372,7 +372,7 @@ pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollb
         (Effect::Create { .. }, Msg::Created(made)) => {
             let ids: Vec<_> = made
                 .iter()
-                .filter_map(|(config, result)| result.as_ref().ok().map(|id| (config.clone(), *id)))
+                .filter_map(|(area, result)| result.as_ref().ok().map(|id| (area.clone(), *id)))
                 .collect();
             back::after_taking_ids(&ids)
         }
@@ -381,8 +381,8 @@ pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollb
         {
             Some(back::after_deleting())
         }
-        (Effect::Restore { config, path, .. }, Msg::Restored { result: Ok(done), .. }) => {
-            Some(back::after_restoring(config, path.as_deref(), done.safety_snapshot))
+        (Effect::Restore { area, path, .. }, Msg::Restored { result: Ok(done), .. }) => {
+            Some(back::after_restoring(area, path.as_deref(), done.safety_snapshot))
         }
         (Effect::Protect { .. }, Msg::Protected { result: Ok(name), .. }) => {
             Some(back::after_protecting(&[name.to_string()]))
@@ -390,8 +390,8 @@ pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollb
         (Effect::SetQuotas { turn_on, .. }, Msg::QuotasSet { result: Ok(()), .. }) => {
             Some(back::after_room_counting(*turn_on))
         }
-        (Effect::SetLimits { config, before, .. }, Msg::LimitsSet { result: Ok(()), .. }) => {
-            Some(back::after_limits(config.as_str(), before))
+        (Effect::SetLimits { area, before, .. }, Msg::LimitsSet { result: Ok(()), .. }) => {
+            Some(back::after_limits(area.as_str(), before))
         }
         (Effect::SaveGroups { groups, before }, Msg::GroupsSaved { result: Ok(()), .. }) => {
             // a save changes one group: the first whose areas differ is the one to put back
@@ -420,10 +420,10 @@ pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollb
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::{ConfigName, Description};
+    use snapall_core::{AreaName, Description};
 
-    fn names(list: &[&str]) -> Vec<ConfigName> {
-        list.iter().map(|n| ConfigName::parse(n).unwrap()).collect()
+    fn names(list: &[&str]) -> Vec<AreaName> {
+        list.iter().map(|n| AreaName::parse(n).unwrap()).collect()
     }
 
     #[test]
@@ -467,7 +467,7 @@ mod tests {
             describe_change(&create).as_deref(),
             Some("Took a snapshot of home, root")
         );
-        for reading in [Effect::LoadHealth, Effect::LoadHistory, Effect::LoadConfigs] {
+        for reading in [Effect::LoadHealth, Effect::LoadHistory, Effect::LoadAreas] {
             assert_eq!(
                 (describe_now(&reading), describe_change(&reading)),
                 (None, None),
@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn every_change_the_window_makes_records_its_way_back_and_one_that_failed_records_none() {
         use snapall_core::{GroupName, Groups, JobAction, Limits, Rollback, SnapshotId};
-        let home = ConfigName::parse("home").unwrap();
+        let home = AreaName::parse("home").unwrap();
         let id = SnapshotId::new(7).unwrap();
         fn failed<T>() -> Result<T, String> {
             Err("it did not work".to_owned())
@@ -511,15 +511,15 @@ mod tests {
             (
                 "deleting",
                 Effect::Delete {
-                    config: home.clone(),
+                    area: home.clone(),
                     ids: vec![id],
                 },
                 Msg::Deleted {
-                    config: home.clone(),
+                    area: home.clone(),
                     results: vec![(id, Ok(()))],
                 },
                 Msg::Deleted {
-                    config: home.clone(),
+                    area: home.clone(),
                     results: vec![(id, failed())],
                 },
             ),
@@ -555,16 +555,16 @@ mod tests {
             (
                 "limits",
                 Effect::SetLimits {
-                    config: home.clone(),
+                    area: home.clone(),
                     options: vec![],
                     before: limits,
                 },
                 Msg::LimitsSet {
-                    config: home.clone(),
+                    area: home.clone(),
                     result: Ok(()),
                 },
                 Msg::LimitsSet {
-                    config: home.clone(),
+                    area: home.clone(),
                     result: failed(),
                 },
             ),
@@ -585,15 +585,13 @@ mod tests {
             ),
             (
                 "stopping protection",
-                Effect::StopProtecting {
-                    config: home.clone(),
-                },
+                Effect::StopProtecting { area: home.clone() },
                 Msg::ProtectionStopped {
-                    config: home.clone(),
+                    area: home.clone(),
                     result: Ok(3),
                 },
                 Msg::ProtectionStopped {
-                    config: home.clone(),
+                    area: home.clone(),
                     result: failed(),
                 },
             ),

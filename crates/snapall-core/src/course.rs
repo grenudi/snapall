@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn a_change_is_asked_before_each_step_what_it_is_about_and_how_far_it_has_come() {
-        let backend = InMemoryBackend::with_configs(&["home", "docs", "root"]);
+        let backend = InMemoryBackend::with_areas(&["home", "docs", "root"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         let course = Stopper::after(usize::MAX);
         let (report, stopped) = run_plan_along(&backend, &plan, &description(), None, &course);
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn a_stopped_snapshot_of_everything_leaves_the_taken_ones_and_never_starts_the_rest() {
-        let backend = InMemoryBackend::with_configs(&["home", "docs"]);
+        let backend = InMemoryBackend::with_areas(&["home", "docs"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         let (report, stopped) =
             run_plan_along(&backend, &plan, &description(), None, &Stopper::after(1));
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn a_stopped_restore_keeps_the_areas_already_put_back_and_leaves_the_rest_exactly_as_they_are()
     {
-        let backend = InMemoryBackend::with_configs(&["docs", "home"]);
+        let backend = InMemoryBackend::with_areas(&["docs", "home"]);
         backend.write_file("docs", "/mnt/docs/a.txt", "before");
         backend.write_file("home", "/mnt/home/b.txt", "before");
         let plan = plan_snapshots(&backend, None).unwrap();
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn nobody_watching_means_every_step_goes_ahead() {
-        let backend = InMemoryBackend::with_configs(&["home"]);
+        let backend = InMemoryBackend::with_areas(&["home"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         let (report, stopped) = run_plan_along(&backend, &plan, &description(), None, &Unattended);
         assert!(!stopped && report.is_success());

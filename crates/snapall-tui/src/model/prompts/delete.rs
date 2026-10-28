@@ -11,30 +11,30 @@ use snapall_core::Act;
 pub(crate) fn confirming_delete(
     _state: &mut State,
     key: Key,
-    config: ConfigName,
+    area: AreaName,
     ids: Vec<SnapshotId>,
 ) -> Reaction {
     match key {
         Key::Char('y' | 'Y') | Key::Enter => {
             let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
             let lines = vec![
-                format!("Delete {} snapshot(s) of {config} for good: {}.", ids.len(), list.join(", ")),
+                format!("Delete {} snapshot(s) of {area} for good: {}.", ids.len(), list.join(", ")),
                 "Only these saved moments go: the files are not touched. A deleted snapshot cannot be brought back.".to_owned(),
             ];
             ask_first(
                 Act::DeleteSnapshots,
                 None,
                 lines,
-                vec![Effect::Delete { config, ids }],
+                vec![Effect::Delete { area, ids }],
             )
         }
         Key::Char('n' | 'N') | Key::Esc | Key::CtrlC => Reaction::closes(),
-        _ => Reaction::stays(Modal::ConfirmDelete { config, ids }),
+        _ => Reaction::stays(Modal::ConfirmDelete { area, ids }),
     }
 }
 
 pub(crate) fn open_delete(state: &mut State) -> Vec<Effect> {
-    let Some(config) = state.selected_config().map(|c| c.name.clone()) else {
+    let Some(area) = state.selected_area().map(|c| c.name.clone()) else {
         return Vec::new();
     };
     if state.focus != Pane::Snapshots {
@@ -56,13 +56,13 @@ pub(crate) fn open_delete(state: &mut State) -> Vec<Effect> {
         state.notice = Some(Notice::Error("no snapshot to delete".into()));
         return Vec::new();
     }
-    state.modal = Some(Modal::ConfirmDelete { config, ids });
+    state.modal = Some(Modal::ConfirmDelete { area, ids });
     Vec::new()
 }
 
 pub(crate) fn on_deleted(
     state: &mut State,
-    config: &ConfigName,
+    area: &AreaName,
     results: Vec<(SnapshotId, Result<(), String>)>,
 ) -> Vec<Effect> {
     let deleted: Vec<String> = results
@@ -75,10 +75,10 @@ pub(crate) fn on_deleted(
         .filter_map(|(id, r)| r.as_ref().err().map(|e| format!("#{id}: {e}")))
         .collect();
     state.notice = Some(if failures.is_empty() {
-        Notice::Info(format!("deleted {} from {config}", deleted.join(", ")))
+        Notice::Info(format!("deleted {} from {area}", deleted.join(", ")))
     } else {
-        Notice::Error(format!("{config}: {}", failures.join("; ")))
+        Notice::Error(format!("{area}: {}", failures.join("; ")))
     });
     state.marked.clear();
-    vec![Effect::LoadSnapshots(config.clone())]
+    vec![Effect::LoadSnapshots(area.clone())]
 }

@@ -236,7 +236,7 @@ pub fn failure_text(title: &str, error: &SetupError) -> String {
         SetupError::Failed(reason) => format!(
             "Could not protect {title}. The reason the system gave: {reason}. Nothing was changed."
         ),
-        SetupError::LeftBehind { problem, config, .. } => format!(
+        SetupError::LeftBehind { problem, area: config, .. } => format!(
             "Protecting {title} stopped half way ({problem}) and the part already done could not be taken back: it is left under the name `{config}`. Please report this at https://github.com/grenudi/snapall/issues."
         ),
         other => format!("Could not protect {title}: {other}. Nothing was changed."),
@@ -438,7 +438,7 @@ mod tests {
         assert_eq!(area_line(&home), "Home (/home): NOT protected");
         let system = Area {
             mount_point: "/".into(),
-            protected_by: Some(crate::domain::ConfigName::parse("root").unwrap()),
+            protected_by: Some(crate::domain::AreaName::parse("root").unwrap()),
         };
         assert_eq!(area_line(&system), "System (/): protected");
     }

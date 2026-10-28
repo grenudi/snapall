@@ -9,14 +9,14 @@ use crate::model::*;
 use snapall_core::Weight;
 
 /// Open the prompt for an area, and ask for the plan of what stopping would do.
-pub(crate) fn open_unprotect(state: &mut State, config: ConfigName) -> Vec<Effect> {
+pub(crate) fn open_unprotect(state: &mut State, area: AreaName) -> Vec<Effect> {
     state.modal = Some(Modal::StopProtecting(StopProtecting {
-        config: config.clone(),
+        area: area.clone(),
         plan: None,
         typed: String::new(),
         error: None,
     }));
-    vec![Effect::LoadUnprotectPlan { config }]
+    vec![Effect::LoadUnprotectPlan { area }]
 }
 
 fn stays(prompt: StopProtecting) -> Reaction {
@@ -46,8 +46,8 @@ pub(crate) fn confirming_unprotect(
         }
         Key::Enter if prompt.plan.is_none() => stays(prompt), // still looking
         Key::Enter => {
-            if !Weight::Destroys.accepts(&prompt.typed, Some(prompt.config.as_str())) {
-                prompt.error = Some(Weight::Destroys.instruction(Some(prompt.config.as_str())));
+            if !Weight::Destroys.accepts(&prompt.typed, Some(prompt.area.as_str())) {
+                prompt.error = Some(Weight::Destroys.instruction(Some(prompt.area.as_str())));
                 return stays(prompt);
             }
             if !state.context.administrator {
@@ -59,11 +59,9 @@ pub(crate) fn confirming_unprotect(
             }
             state.notice = Some(Notice::Info(format!(
                 "stopping protection of {}",
-                prompt.config
+                prompt.area
             )));
-            Reaction::closes_and_starts(vec![Effect::StopProtecting {
-                config: prompt.config,
-            }])
+            Reaction::closes_and_starts(vec![Effect::StopProtecting { area: prompt.area }])
         }
         _ => stays(prompt),
     }

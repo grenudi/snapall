@@ -12,7 +12,7 @@ use snapall_core::Act;
 pub(crate) fn confirming_restore(
     state: &mut State,
     key: Key,
-    config: ConfigName,
+    area: AreaName,
     id: SnapshotId,
     path: Option<String>,
     stage: RestoreStage,
@@ -24,7 +24,7 @@ pub(crate) fn confirming_restore(
     // Every area of the snapshot's restore point, when it has one and any of it would change.
     if matches!(key, Key::Char('A')) {
         if let Some((c, i, offer)) = &state.point_offer {
-            if *c == config && *i == id && offer.areas_to_change() > 0 {
+            if *c == area && *i == id && offer.areas_to_change() > 0 {
                 let (areas, point) = (offer.areas_to_change(), offer.point.clone());
                 let lines = vec![
                     format!("Put {areas} area(s) back to restore point {}.", point.point),
@@ -43,7 +43,7 @@ pub(crate) fn confirming_restore(
         Key::Char('y' | 'Y') | Key::Enter if actionable => {
             let what = match &path {
                 Some(path) => format!("Put {path} back to how snapshot #{id} had it."),
-                None => format!("Put {config} back to how snapshot #{id} had it."),
+                None => format!("Put {area} back to how snapshot #{id} had it."),
             };
             let lines = vec![
                 what,
@@ -53,14 +53,14 @@ pub(crate) fn confirming_restore(
                 Act::Restore,
                 None,
                 lines,
-                vec![Effect::Restore { config, id, path }],
+                vec![Effect::Restore { area, id, path }],
             )
         }
         Key::Esc | Key::CtrlC | Key::Char('n' | 'N') => Reaction::closes(),
         // information with nothing to confirm: any key closes it (but not while still looking)
         _ if !actionable && stage != RestoreStage::Loading => Reaction::closes(),
         _ => Reaction::stays(Modal::Restore {
-            config,
+            area,
             id,
             path,
             stage,
@@ -69,7 +69,7 @@ pub(crate) fn confirming_restore(
 }
 
 pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
-    let Some(config) = state.selected_config().map(|c| c.name.clone()) else {
+    let Some(area) = state.selected_area().map(|c| c.name.clone()) else {
         return Vec::new();
     };
     if state.focus != Pane::Snapshots {
@@ -83,7 +83,7 @@ pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
         return Vec::new();
     };
     state.modal = Some(Modal::Restore {
-        config: config.clone(),
+        area: area.clone(),
         id,
         path: None,
         stage: RestoreStage::Loading,
@@ -91,30 +91,30 @@ pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
     state.point_offer = None;
     vec![
         Effect::LoadChanges {
-            config: config.clone(),
+            area: area.clone(),
             id,
             path: None,
         },
         // whether this snapshot is one of several taken together: the prompt offers them all
-        Effect::LoadPointOffer { config, id },
+        Effect::LoadPointOffer { area, id },
     ]
 }
 
 pub(crate) fn on_changes_loaded(
     state: &mut State,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     result: Result<Preview, String>,
 ) -> Vec<Effect> {
     // The answer only matters to the prompt that asked. If it was closed meanwhile, drop it.
     if let Some(Modal::Restore {
-        config: asked_config,
+        area: asked_area,
         id: asked_id,
         stage,
         ..
     }) = &mut state.modal
     {
-        if asked_config == config && *asked_id == id && *stage == RestoreStage::Loading {
+        if asked_area == area && *asked_id == id && *stage == RestoreStage::Loading {
             *stage = match result {
                 Ok(preview) => RestoreStage::Ready(preview),
                 Err(error) => RestoreStage::Failed(error),
@@ -126,7 +126,7 @@ pub(crate) fn on_changes_loaded(
 
 pub(crate) fn on_restored(
     state: &mut State,
-    config: &ConfigName,
+    area: &AreaName,
     id: SnapshotId,
     path: Option<String>,
     result: Result<Restored, String>,
@@ -137,7 +137,7 @@ pub(crate) fn on_restored(
             done.safety_snapshot
         )),
         (Ok(done), None) => Notice::Info(format!(
-            "restored {config} to #{id}; the state before is #{}, restore it to undo",
+            "restored {area} to #{id}; the state before is #{}, restore it to undo",
             done.safety_snapshot
         )),
         (Err(error), _) => Notice::Error(error.clone()),
@@ -146,9 +146,9 @@ pub(crate) fn on_restored(
     // Reload either way: a safety snapshot may exist even when the restore itself failed.
     match &state.file {
         Some(view) => vec![Effect::LoadFileVersions {
-            config: view.target.config.clone(),
+            area: view.target.area.clone(),
             path: view.target.path.clone(),
         }],
-        None => vec![Effect::LoadSnapshots(config.clone())],
+        None => vec![Effect::LoadSnapshots(area.clone())],
     }
 }

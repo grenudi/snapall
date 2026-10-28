@@ -14,7 +14,7 @@ use crate::tab::Tab;
 use crate::tabs::activity::{Activity, ActivityTab};
 use crate::tabs::health::{HealthData, HealthTab};
 use snapall_core::{
-    ConfigName, Description, FileState, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
+    AreaName, Description, FileState, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
 };
 
 mod file;
@@ -40,8 +40,8 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
     // does one thing at a time, and a status refresh must never delay the first screen.
     let first_screen_arrived = matches!(
         &msg,
-        Msg::SnapshotsLoaded { .. } | Msg::FileVersionsLoaded { .. } | Msg::ConfigsLoaded(Err(_))
-    ) || matches!(&msg, Msg::ConfigsLoaded(Ok(configs)) if configs.is_empty());
+        Msg::SnapshotsLoaded { .. } | Msg::FileVersionsLoaded { .. } | Msg::AreasLoaded(Err(_))
+    ) || matches!(&msg, Msg::AreasLoaded(Ok(areas)) if areas.is_empty());
     let mut effects = handle(state, msg);
     if first_screen_arrived && !state.health_asked {
         state.health_asked = true;
@@ -82,10 +82,10 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
     match msg {
         Msg::Start => match &state.file {
             Some(view) => vec![Effect::LoadFileVersions {
-                config: view.target.config.clone(),
+                area: view.target.area.clone(),
                 path: view.target.path.clone(),
             }],
-            None => vec![Effect::LoadConfigs],
+            None => vec![Effect::LoadAreas],
         },
         Msg::JobControlled {
             unit,
@@ -114,53 +114,51 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             });
             Vec::new()
         }
-        Msg::UnprotectPlanLoaded { config, plan } => {
+        Msg::UnprotectPlanLoaded { area, plan } => {
             if let Some(Modal::StopProtecting(prompt)) = &mut state.modal {
-                if prompt.config == config {
+                if prompt.area == area {
                     prompt.plan = Some(plan);
                 }
             }
             Vec::new()
         }
-        Msg::ProtectionStopped { config, result } => {
+        Msg::ProtectionStopped { area, result } => {
             settle(state);
             match result {
                 Ok(deleted) => {
                     let told = Notice::Info(format!(
-                        "{config} is no longer protected: {deleted} snapshot{} deleted, its files are untouched",
+                        "{area} is no longer protected: {deleted} snapshot{} deleted, its files are untouched",
                         if deleted == 1 { "" } else { "s" }
                     ));
                     // looking at the lists again would clear it: it is shown again when they have arrived
                     state.after_reload = Some(told.clone());
                     state.notice = Some(told);
                     // the areas listed have changed
-                    vec![Effect::LoadConfigs]
+                    vec![Effect::LoadAreas]
                 }
                 Err(why) => {
                     state.notice = Some(Notice::Error(format!(
-                        "Could not stop protecting {config}: {why}"
+                        "Could not stop protecting {area}: {why}"
                     )));
                     Vec::new()
                 }
             }
         }
-        Msg::LimitsData { config, snapshots } => {
+        Msg::LimitsData { area, snapshots } => {
             if let Some(Modal::Limits(editor)) = &mut state.modal {
-                if editor.config == config {
+                if editor.area == area {
                     editor.snapshots = Some(snapshots);
                 }
             }
             Vec::new()
         }
-        Msg::LimitsSet { config, result } => {
+        Msg::LimitsSet { area, result } => {
             settle(state);
             state.notice = Some(match result {
                 Ok(()) => Notice::Info(format!(
-                    "{config} now keeps what you set. It takes effect at the next cleanup."
+                    "{area} now keeps what you set. It takes effect at the next cleanup."
                 )),
-                Err(why) => {
-                    Notice::Error(format!("Could not change the limits of {config}: {why}"))
-                }
+                Err(why) => Notice::Error(format!("Could not change the limits of {area}: {why}")),
             });
             Vec::new()
         }
@@ -293,14 +291,14 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             follow_what_runs(state)
         }
         Msg::Key(key) => on_key(state, key),
-        Msg::PointOfferLoaded { config, id, offer } => {
+        Msg::PointOfferLoaded { area, id, offer } => {
             settle(state);
             let asked = matches!(
                 &state.modal,
-                Some(Modal::Restore { config: c, id: i, .. }) if *c == config && *i == id
+                Some(Modal::Restore { area: c, id: i, .. }) if *c == area && *i == id
             );
             if asked {
-                state.point_offer = offer.map(|offer| (config, id, offer));
+                state.point_offer = offer.map(|offer| (area, id, offer));
             }
             Vec::new()
         }
@@ -339,42 +337,38 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             on_click(state, click)
         }
         Msg::Scroll { pane, delta } => on_scroll(state, pane, delta),
-        Msg::ChangesLoaded { config, id, result } => {
+        Msg::ChangesLoaded { area, id, result } => {
             settle(state);
-            on_changes_loaded(state, &config, id, result)
+            on_changes_loaded(state, &area, id, result)
         }
         Msg::Restored {
-            config,
+            area,
             id,
             path,
             result,
         } => {
             settle(state);
-            on_restored(state, &config, id, path, result)
+            on_restored(state, &area, id, path, result)
         }
-        Msg::FileVersionsLoaded {
-            config,
-            path,
-            result,
-        } => {
+        Msg::FileVersionsLoaded { area, path, result } => {
             settle(state);
-            on_file_versions_loaded(state, &config, &path, result)
+            on_file_versions_loaded(state, &area, &path, result)
         }
-        Msg::ConfigsLoaded(result) => {
+        Msg::AreasLoaded(result) => {
             settle(state);
-            on_configs_loaded(state, result)
+            on_areas_loaded(state, result)
         }
-        Msg::SnapshotsLoaded { config, result } => {
+        Msg::SnapshotsLoaded { area, result } => {
             settle(state);
-            on_snapshots_loaded(state, &config, result)
+            on_snapshots_loaded(state, &area, result)
         }
         Msg::Created(results) => {
             settle(state);
             on_created(state, results)
         }
-        Msg::Deleted { config, results } => {
+        Msg::Deleted { area, results } => {
             settle(state);
-            on_deleted(state, &config, results)
+            on_deleted(state, &area, results)
         }
     }
 }

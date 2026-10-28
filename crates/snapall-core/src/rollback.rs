@@ -7,7 +7,7 @@
 //! made in either has the same way back, worded the same, and the wording cannot drift between them.
 
 use crate::consequence::Weight;
-use crate::domain::{ConfigName, SnapshotId};
+use crate::domain::{AreaName, SnapshotId};
 use crate::explain::{DELETE_ADVICE, UNPROTECT_ADVICE};
 use crate::groups::GroupName;
 use crate::journal::{Rollback, Undo};
@@ -29,7 +29,7 @@ fn command(words: &[&str]) -> Vec<String> {
 /// After taking snapshots: deleting the ones that were taken. That is a deletion like any other, so it weighs
 /// what a deletion weighs, and the way back says plainly that they are lost for good.
 pub fn after_taking(report: &Report) -> Option<Rollback> {
-    let made: Vec<(ConfigName, SnapshotId)> = report
+    let made: Vec<(AreaName, SnapshotId)> = report
         .outcomes
         .iter()
         .filter_map(|outcome| {
@@ -37,14 +37,14 @@ pub fn after_taking(report: &Report) -> Option<Rollback> {
                 .result
                 .as_ref()
                 .ok()
-                .map(|id| (outcome.config.clone(), *id))
+                .map(|id| (outcome.area.clone(), *id))
         })
         .collect();
     after_taking_ids(&made)
 }
 
 /// [`after_taking`], from the snapshots that were taken.
-pub fn after_taking_ids(made: &[(ConfigName, SnapshotId)]) -> Option<Rollback> {
+pub fn after_taking_ids(made: &[(AreaName, SnapshotId)]) -> Option<Rollback> {
     if made.is_empty() {
         return None;
     }
@@ -67,7 +67,7 @@ pub fn after_taking_ids(made: &[(ConfigName, SnapshotId)]) -> Option<Rollback> {
 }
 
 /// After putting one area (or one path of it) back: going back to the snapshot of the state just before.
-pub fn after_restoring(config: &ConfigName, path: Option<&str>, safety: SnapshotId) -> Rollback {
+pub fn after_restoring(config: &AreaName, path: Option<&str>, safety: SnapshotId) -> Rollback {
     let mut back = command(&["restore", config.as_str(), &safety.to_string()]);
     back.extend(path.map(str::to_owned));
     undo(
@@ -130,7 +130,7 @@ pub fn after_room_counting(turned_on: bool) -> Rollback {
 }
 
 /// After changing a group: the group as it was (made again with its old areas), or, if it was new, taken away.
-pub fn after_groups(name: &GroupName, before: Option<&[ConfigName]>) -> Rollback {
+pub fn after_groups(name: &GroupName, before: Option<&[AreaName]>) -> Rollback {
     match before {
         Some(areas) => {
             let list = areas
@@ -169,8 +169,8 @@ mod tests {
     use crate::testing::InMemoryBackend;
     use crate::usecase::{plan_snapshots, run_plan};
 
-    fn area(name: &str) -> ConfigName {
-        ConfigName::parse(name).unwrap()
+    fn area(name: &str) -> AreaName {
+        AreaName::parse(name).unwrap()
     }
 
     fn the_undo(rollback: Rollback) -> Undo {
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn taking_snapshots_is_undone_by_deleting_exactly_those_and_weighs_a_deletion() {
-        let backend = InMemoryBackend::with_configs(&["data", "home"]);
+        let backend = InMemoryBackend::with_areas(&["data", "home"]);
         let report = run_plan(
             &backend,
             &plan_snapshots(&backend, None).unwrap(),

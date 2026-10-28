@@ -50,7 +50,7 @@ pub fn compact_utc(seconds: u64) -> String {
 
 /// Seconds for snapper's `2026-10-25 18:15:00`. The zone is not known, and does not matter: only
 /// the difference between two such dates is ever used.
-pub fn seconds_from_snapper_date(text: &str) -> Option<i64> {
+pub fn seconds_from_snapshot_date(text: &str) -> Option<i64> {
     let (date, time) = text.trim().split_once(' ')?;
     let mut d = date.split('-');
     let (year, month, day) = (
@@ -74,8 +74,8 @@ pub fn seconds_from_snapper_date(text: &str) -> Option<i64> {
     valid.then(|| days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second)
 }
 
-/// Snapper's `2026-10-25 18:15:00` for those seconds: the way back from [`seconds_from_snapper_date`].
-pub fn snapper_date_from_seconds(seconds: i64) -> String {
+/// Snapper's `2026-10-25 18:15:00` for those seconds: the way back from [`seconds_from_snapshot_date`].
+pub fn snapshot_date_from_seconds(seconds: i64) -> String {
     let (days, in_day) = (seconds.div_euclid(86_400), seconds.rem_euclid(86_400));
     let (year, month, day) = civil_from_days(days);
     format!(
@@ -98,8 +98,8 @@ mod tests {
             "2000-02-29 23:59:59",
             "2038-01-19 03:14:07",
         ] {
-            let seconds = seconds_from_snapper_date(text).unwrap();
-            assert_eq!(snapper_date_from_seconds(seconds), text);
+            let seconds = seconds_from_snapshot_date(text).unwrap();
+            assert_eq!(snapshot_date_from_seconds(seconds), text);
         }
     }
 
@@ -114,12 +114,12 @@ mod tests {
 
     #[test]
     fn snappers_dates_become_seconds_that_compare_and_bad_ones_are_refused() {
-        let a = seconds_from_snapper_date("2026-10-25 18:26:52").unwrap();
-        let b = seconds_from_snapper_date("2026-10-25 18:27:10").unwrap();
+        let a = seconds_from_snapshot_date("2026-10-25 18:26:52").unwrap();
+        let b = seconds_from_snapshot_date("2026-10-25 18:27:10").unwrap();
         assert_eq!(b - a, 18);
-        let midnight = seconds_from_snapper_date("2026-10-26 00:00:01").unwrap();
+        let midnight = seconds_from_snapshot_date("2026-10-26 00:00:01").unwrap();
         assert_eq!(
-            midnight - seconds_from_snapper_date("2026-10-25 23:59:59").unwrap(),
+            midnight - seconds_from_snapshot_date("2026-10-25 23:59:59").unwrap(),
             2
         );
         for bad in [
@@ -130,7 +130,7 @@ mod tests {
             "x y",
             "2026-10-25 10:00",
         ] {
-            assert_eq!(seconds_from_snapper_date(bad), None, "{bad:?}");
+            assert_eq!(seconds_from_snapshot_date(bad), None, "{bad:?}");
         }
     }
 
@@ -148,7 +148,7 @@ mod tests {
                 &name[13..15]
             );
             assert_eq!(
-                seconds_from_snapper_date(&spaced),
+                seconds_from_snapshot_date(&spaced),
                 Some(seconds as i64),
                 "{name}"
             );

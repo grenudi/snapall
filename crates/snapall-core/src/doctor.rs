@@ -6,7 +6,7 @@
 //! install plan. Nothing here reads a file, runs a program or asks who the user is; the
 //! shell probes the machine and hands the facts in, so every distribution is a unit test.
 
-use crate::domain::ConfigName;
+use crate::domain::AreaName;
 
 /// The package that provides everything snapall drives.
 pub const PACKAGE: &str = "snapper";
@@ -277,9 +277,9 @@ pub struct Probe {
     /// Whether the effective user is root, if that could be determined.
     pub is_root: Option<bool>,
     /// The configs snapper reports, or why asking failed. `None` when snapper is missing.
-    pub configs: Option<Result<Vec<ConfigName>, String>>,
+    pub areas: Option<Result<Vec<AreaName>, String>>,
     /// The subvolume of each config (where it is mounted), for what the configs do not cover.
-    pub subvolumes: Vec<(ConfigName, String)>,
+    pub locations: Vec<(AreaName, String)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -342,14 +342,14 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
         ),
     });
 
-    match &probe.configs {
+    match &probe.areas {
         None => checks.push(check(
             "areas",
             Status::Warn,
             "not checked: snapper is missing",
             None,
         )),
-        Some(Ok(configs)) if configs.is_empty() => checks.push(check(
+        Some(Ok(areas)) if areas.is_empty() => checks.push(check(
             "areas",
             Status::Warn,
             "No part of your disk is protected yet, so there is nothing to snapshot",
@@ -358,8 +358,8 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
                     .to_owned(),
             ),
         )),
-        Some(Ok(configs)) => {
-            let names: Vec<&str> = configs.iter().map(ConfigName::as_str).collect();
+        Some(Ok(areas)) => {
+            let names: Vec<&str> = areas.iter().map(AreaName::as_str).collect();
             checks.push(check(
                 "areas",
                 Status::Ok,
@@ -371,14 +371,14 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
             "areas",
             Status::Fail,
             format!("could not list the protected areas: {why}"),
-            config_fix(why, probe.is_root),
+            area_fix(why, probe.is_root),
         )),
     }
     checks
 }
 
 /// What to try when asking snapper for its configs failed.
-fn config_fix(why: &str, is_root: Option<bool>) -> Option<String> {
+fn area_fix(why: &str, is_root: Option<bool>) -> Option<String> {
     if why.to_ascii_lowercase().contains("dbus") {
         // snapper talks to snapperd over the system bus. Containers and minimal installs
         // have none; as root, libsnapper can be used directly.
@@ -595,22 +595,17 @@ mod tests {
     fn probe(
         snapper: Result<&str, &str>,
         root: Option<bool>,
-        configs: Option<Result<&[&str], &str>>,
+        areas: Option<Result<&[&str], &str>>,
     ) -> Probe {
         Probe {
             os: os(ARCH),
             snapper: snapper.map(str::to_owned).map_err(str::to_owned),
             is_root: root,
-            configs: configs.map(|r| {
-                r.map(|names| {
-                    names
-                        .iter()
-                        .map(|n| ConfigName::parse(n).unwrap())
-                        .collect()
-                })
-                .map_err(str::to_owned)
+            areas: areas.map(|r| {
+                r.map(|names| names.iter().map(|n| AreaName::parse(n).unwrap()).collect())
+                    .map_err(str::to_owned)
             }),
-            subvolumes: Vec::new(),
+            locations: Vec::new(),
         }
     }
 
@@ -643,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn no_configs_and_no_root_are_warnings_not_failures() {
+    fn no_areas_and_no_root_are_warnings_not_failures() {
         let checks = diagnose(&probe(Ok("snapper 0.13.1"), Some(false), Some(Ok(&[]))));
         assert_eq!(worst(&checks), Status::Warn);
         assert_eq!(checks[1].fix.as_deref(), Some("run with sudo"));
@@ -651,7 +646,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failing_config_listing_is_a_failure_and_suggests_sudo_only_when_not_root() {
+    fn a_failing_area_listing_is_a_failure_and_suggests_sudo_only_when_not_root() {
         let not_root = diagnose(&probe(
             Ok("snapper 0.13.1"),
             Some(false),

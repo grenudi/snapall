@@ -9,19 +9,19 @@ use crate::model::*;
 /// What the shell should do. Each effect is answered by exactly one [`Msg`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Effect {
-    LoadConfigs,
-    LoadSnapshots(ConfigName),
+    LoadAreas,
+    LoadSnapshots(AreaName),
     Create {
-        targets: Vec<ConfigName>,
+        targets: Vec<AreaName>,
         description: Description,
     },
     Delete {
-        config: ConfigName,
+        area: AreaName,
         ids: Vec<SnapshotId>,
     },
     /// What would restoring `id` change?
     LoadChanges {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         path: Option<String>,
     },
@@ -31,7 +31,7 @@ pub enum Effect {
     },
     /// Is this snapshot part of a restore point, and what would putting all of it back do?
     LoadPointOffer {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
     },
     /// Put every area of the restore point back.
@@ -44,20 +44,20 @@ pub enum Effect {
     LoadGroups,
     /// Work out what stopping the protection of an area would do.
     LoadUnprotectPlan {
-        config: ConfigName,
+        area: AreaName,
     },
     /// Stop protecting an area: delete its snapshots for good.
     StopProtecting {
-        config: ConfigName,
+        area: AreaName,
     },
     /// Read an area's snapshots, for the preview of what new limits would remove.
     LoadLimitsData {
-        config: ConfigName,
+        area: AreaName,
     },
     /// Change how many an area keeps, and when its oldest go (only the settings that differ).
     SetLimits {
-        config: ConfigName,
-        options: Vec<snapall_core::ConfigOption>,
+        area: AreaName,
+        options: Vec<snapall_core::AreaOption>,
         /// What it kept before, so that the way back is known.
         before: snapall_core::Limits,
     },
@@ -93,13 +93,13 @@ pub enum Effect {
     },
     /// Put `config` back to how `id` had it (after a safety snapshot).
     Restore {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         path: Option<String>,
     },
     /// How the file stood in each snapshot of its config.
     LoadFileVersions {
-        config: ConfigName,
+        area: AreaName,
         path: String,
     },
 }
@@ -121,25 +121,25 @@ pub enum Msg {
         delta: i32,
     },
     ChangesLoaded {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         result: Result<Preview, String>,
     },
     Restored {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         path: Option<String>,
         result: Result<Restored, String>,
     },
     FileVersionsLoaded {
-        config: ConfigName,
+        area: AreaName,
         path: String,
         result: Result<Vec<FileVersion>, String>,
     },
-    ConfigsLoaded(Result<Vec<ConfigName>, String>),
+    AreasLoaded(Result<Vec<AreaName>, String>),
     /// The restore point of a snapshot, if it has one with more than one area.
     PointOfferLoaded {
-        config: ConfigName,
+        area: AreaName,
         id: SnapshotId,
         offer: Option<PointOffer>,
     },
@@ -158,22 +158,22 @@ pub enum Msg {
     Refused(String),
     /// An area's snapshots, for the preview.
     LimitsData {
-        config: ConfigName,
+        area: AreaName,
         snapshots: Vec<snapall_core::SnapshotInfo>,
     },
     /// The limits were changed, or why they could not be.
     LimitsSet {
-        config: ConfigName,
+        area: AreaName,
         result: Result<(), String>,
     },
     /// What stopping the protection of an area would do, or why it would not.
     UnprotectPlanLoaded {
-        config: ConfigName,
+        area: AreaName,
         plan: Result<snapall_core::unprotect::Plan, String>,
     },
     /// An area stopped being protected (how many snapshots went), or why it did not.
     ProtectionStopped {
-        config: ConfigName,
+        area: AreaName,
         result: Result<usize, String>,
     },
     /// The groups, or why they could not be read.
@@ -216,15 +216,15 @@ pub enum Msg {
     /// A part of the disk was protected, or why it could not be (in plain words).
     Protected {
         mount_point: String,
-        result: Result<ConfigName, String>,
+        result: Result<AreaName, String>,
     },
     SnapshotsLoaded {
-        config: ConfigName,
+        area: AreaName,
         result: Result<Vec<SnapshotInfo>, String>,
     },
-    Created(Vec<(ConfigName, Result<SnapshotId, String>)>),
+    Created(Vec<(AreaName, Result<SnapshotId, String>)>),
     Deleted {
-        config: ConfigName,
+        area: AreaName,
         results: Vec<(SnapshotId, Result<(), String>)>,
     },
 }

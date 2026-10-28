@@ -138,46 +138,44 @@ impl<'a> Executor<'a> {
         let backend: &dyn SnapshotBackend = self.backend;
         match effect {
             Effect::LoadGroups => Msg::GroupsLoaded(self.system.groups()),
-            Effect::LoadUnprotectPlan { config } => {
+            Effect::LoadUnprotectPlan { area } => {
                 let plan = self
                     .system
                     .groups()
                     .map_err(|why| why.to_string())
                     .and_then(|groups| {
-                        snapall_core::unprotect::plan(backend, &groups, &config)
+                        snapall_core::unprotect::plan(backend, &groups, &area)
                             .map_err(|e| e.to_string())
                     });
-                Msg::UnprotectPlanLoaded { config, plan }
+                Msg::UnprotectPlanLoaded { area, plan }
             }
-            Effect::StopProtecting { config } => {
+            Effect::StopProtecting { area } => {
                 // worked out again now, not trusted from when the prompt opened
                 let result = self
                     .system
                     .groups()
                     .map_err(|why| why.to_string())
                     .and_then(|groups| {
-                        let plan = snapall_core::unprotect::plan(backend, &groups, &config)
+                        let plan = snapall_core::unprotect::plan(backend, &groups, &area)
                             .map_err(|e| e.to_string())?;
                         snapall_core::unprotect::stop_protecting(backend, &plan)
                             .map_err(|e| e.to_string())
                     });
-                Msg::ProtectionStopped { config, result }
+                Msg::ProtectionStopped { area, result }
             }
-            Effect::LoadLimitsData { config } => match backend.list_snapshots(&config) {
-                Ok(snapshots) => Msg::LimitsData { config, snapshots },
+            Effect::LoadLimitsData { area } => match backend.list_snapshots(&area) {
+                Ok(snapshots) => Msg::LimitsData { area, snapshots },
                 Err(error) => Msg::LimitsSet {
-                    config,
+                    area,
                     result: Err(error.to_string()),
                 },
             },
-            Effect::SetLimits {
-                config, options, ..
-            } => {
+            Effect::SetLimits { area, options, .. } => {
                 let result = options
                     .iter()
-                    .try_for_each(|option| backend.set_config_option(&config, *option))
+                    .try_for_each(|option| backend.set_area_option(&area, *option))
                     .map_err(|error| error.to_string());
-                Msg::LimitsSet { config, result }
+                Msg::LimitsSet { area, result }
             }
             Effect::SaveGroups { groups, .. } => {
                 let result = self.system.save_groups(&groups);
@@ -215,12 +213,10 @@ impl<'a> Executor<'a> {
                 snapall_core::services::CLEANUP.unit,
                 snapall_core::JobAction::EnableNow,
             )),
-            Effect::LoadConfigs => {
-                Msg::ConfigsLoaded(backend.list_configs().map_err(|e| e.to_string()))
-            }
-            Effect::LoadSnapshots(config) => {
-                let result = snapshots_of(backend, &config).map_err(|e| e.to_string());
-                Msg::SnapshotsLoaded { config, result }
+            Effect::LoadAreas => Msg::AreasLoaded(backend.list_areas().map_err(|e| e.to_string())),
+            Effect::LoadSnapshots(area) => {
+                let result = snapshots_of(backend, &area).map_err(|e| e.to_string());
+                Msg::SnapshotsLoaded { area, result }
             }
             Effect::Create {
                 targets,
@@ -237,27 +233,27 @@ impl<'a> Executor<'a> {
                     )
                     .outcomes
                     .into_iter()
-                    .map(|o| (o.config, o.result.map_err(|e| e.to_string())))
+                    .map(|o| (o.area, o.result.map_err(|e| e.to_string())))
                     .collect(),
                     Err(error) => {
                         let message = describe(&error);
                         targets
                             .into_iter()
-                            .map(|config| (config, Err(message.clone())))
+                            .map(|area| (area, Err(message.clone())))
                             .collect()
                     }
                 })
             }
-            Effect::LoadChanges { config, id, path } => {
-                let result = preview_restore(backend, &config, id, path.as_deref())
-                    .map_err(|e| e.to_string());
-                Msg::ChangesLoaded { config, id, result }
+            Effect::LoadChanges { area, id, path } => {
+                let result =
+                    preview_restore(backend, &area, id, path.as_deref()).map_err(|e| e.to_string());
+                Msg::ChangesLoaded { area, id, result }
             }
-            Effect::Restore { config, id, path } => {
-                let result = restore_snapshot(backend, &config, id, path.as_deref())
+            Effect::Restore { area, id, path } => {
+                let result = restore_snapshot(backend, &area, id, path.as_deref())
                     .map_err(|e| e.to_string());
                 Msg::Restored {
-                    config,
+                    area,
                     id,
                     path,
                     result,
@@ -272,19 +268,19 @@ impl<'a> Executor<'a> {
                 views: preview_point(backend, &point),
                 point,
             }),
-            Effect::LoadPointOffer { config, id } => {
+            Effect::LoadPointOffer { area, id } => {
                 // Is this snapshot one of several taken by one action? Failing to look is not an
                 // error to show: the prompt simply does not offer the extra action.
                 let offer = all_snapshots(backend).ok().and_then(|all| {
                     let points = restore_points(&all);
-                    point_of(&points, &config, id)
+                    point_of(&points, &area, id)
                         .cloned()
                         .map(|point| PointOffer {
                             views: preview_point(backend, &point),
                             point,
                         })
                 });
-                Msg::PointOfferLoaded { config, id, offer }
+                Msg::PointOfferLoaded { area, id, offer }
             }
             Effect::RestorePoint { point } => {
                 let name = point.point.to_string();
@@ -303,24 +299,19 @@ impl<'a> Executor<'a> {
                     result,
                 }
             }
-            Effect::LoadFileVersions { config, path } => {
-                let result = file_versions_of(backend, &config, &path).map_err(|e| e.to_string());
-                Msg::FileVersionsLoaded {
-                    config,
-                    path,
-                    result,
-                }
+            Effect::LoadFileVersions { area, path } => {
+                let result = file_versions_of(backend, &area, &path).map_err(|e| e.to_string());
+                Msg::FileVersionsLoaded { area, path, result }
             }
-            Effect::Delete { config, ids } => {
+            Effect::Delete { area, ids } => {
                 let results = ids
                     .into_iter()
                     .map(|id| {
-                        let result =
-                            delete_snapshot(backend, &config, id).map_err(|e| describe(&e));
+                        let result = delete_snapshot(backend, &area, id).map_err(|e| describe(&e));
                         (id, result)
                     })
                     .collect();
-                Msg::Deleted { config, results }
+                Msg::Deleted { area, results }
             }
         }
     }

@@ -9,7 +9,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::Key;
 use snapall_tui::{view, Session};
 
@@ -32,15 +32,15 @@ fn screen(session: &Session<'_>, width: u16, height: u16) -> String {
 }
 
 fn backend_with_data() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["root", "home"]);
-    for (config, text) in [
+    let backend = InMemoryBackend::with_areas(&["root", "home"]);
+    for (area, text) in [
         ("home", "before theming"),
         ("home", "after theming"),
         ("root", "kernel"),
     ] {
         backend
             .create_snapshot(
-                &ConfigName::parse(config).unwrap(),
+                &AreaName::parse(area).unwrap(),
                 &Description::parse(text).unwrap(),
             )
             .unwrap();
@@ -49,7 +49,7 @@ fn backend_with_data() -> InMemoryBackend {
 }
 
 #[test]
-fn the_main_screen_shows_configs_snapshots_and_key_hints() {
+fn the_main_screen_shows_areas_snapshots_and_key_hints() {
     let backend = backend_with_data();
     let session = Session::new(&backend);
     let text = screen(&session, 100, 20);
@@ -110,7 +110,7 @@ fn the_create_prompt_shows_its_target_and_the_text_typed_so_far() {
 }
 
 #[test]
-fn the_all_configs_prompt_names_every_config() {
+fn the_all_areas_prompt_names_every_area() {
     let backend = backend_with_data();
     let mut session = Session::new(&backend);
     session.press(Key::Char('a'));
@@ -132,7 +132,7 @@ fn the_delete_confirmation_names_what_will_go() {
 
 #[test]
 fn errors_and_an_empty_snapper_are_shown_in_words() {
-    let backend = InMemoryBackend::with_configs(&[]);
+    let backend = InMemoryBackend::with_areas(&[]);
     let session = Session::new(&backend);
     let text = screen(&session, 120, 12);
     assert!(text.contains("no protected areas yet"), "{text}");

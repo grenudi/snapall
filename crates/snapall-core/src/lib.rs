@@ -39,7 +39,7 @@ pub mod testing;
 pub use consequence::{Act, Weight};
 pub use course::{Course, Unattended};
 pub use domain::{
-    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, ParseError,
+    AreaName, AreaOption, Change, ChangeKind, Description, FileState, FileVersion, ParseError,
     Point, RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 pub use find::find_snapshot;
@@ -66,8 +66,8 @@ pub use system::{
     Busy, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, Switching, SystemProbe, UnitDetails,
 };
 pub use usecase::{
-    all_snapshots, config_covering, delete_snapshot, file_history, file_versions_of,
-    plan_snapshots, preview_restore, protect_area, restore_snapshot, restore_snapshot_with,
-    run_plan, run_plan_along, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome,
-    Preview, Report, RestoreError, Restored, Safety, SetupError, SnapshotError,
+    all_snapshots, area_covering, delete_snapshot, file_history, file_versions_of, plan_snapshots,
+    preview_restore, protect_area, restore_snapshot, restore_snapshot_with, run_plan,
+    run_plan_along, snapshot_all, snapshots_of, FileHistory, HistoryError, Outcome, Preview,
+    Report, RestoreError, Restored, Safety, SetupError, SnapshotError,
 };

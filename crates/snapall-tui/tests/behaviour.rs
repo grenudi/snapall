@@ -8,18 +8,18 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Key, Load, Modal, Notice, Pane};
 use snapall_tui::Session;
 
-fn name(s: &str) -> ConfigName {
-    ConfigName::parse(s).unwrap()
+fn name(s: &str) -> AreaName {
+    AreaName::parse(s).unwrap()
 }
 
-fn seed(backend: &InMemoryBackend, config: &str, descriptions: &[&str]) {
+fn seed(backend: &InMemoryBackend, area: &str, descriptions: &[&str]) {
     for d in descriptions {
         backend
-            .create_snapshot(&name(config), &Description::parse(d).unwrap())
+            .create_snapshot(&name(area), &Description::parse(d).unwrap())
             .unwrap();
     }
 }
@@ -46,8 +46,8 @@ fn descriptions_of(session: &Session<'_>) -> Vec<String> {
 }
 
 #[test]
-fn startup_loads_the_configs_and_only_the_selected_ones_snapshots() {
-    let backend = InMemoryBackend::with_configs(&["root", "home"]);
+fn startup_loads_the_areas_and_only_the_selected_ones_snapshots() {
+    let backend = InMemoryBackend::with_areas(&["root", "home"]);
     seed(&backend, "home", &["a", "b"]);
     let session = Session::new(&backend);
 
@@ -58,7 +58,7 @@ fn startup_loads_the_configs_and_only_the_selected_ones_snapshots() {
         .map(|e| e.name.to_string())
         .collect();
     assert_eq!(names, ["home", "root"], "sorted by name");
-    assert_eq!(session.state.config_cursor, 0);
+    assert_eq!(session.state.area_cursor, 0);
     assert!(matches!(
         session.state.entries()[0].snapshots,
         Load::Loaded(_)
@@ -68,26 +68,23 @@ fn startup_loads_the_configs_and_only_the_selected_ones_snapshots() {
 }
 
 #[test]
-fn moving_to_another_config_loads_its_snapshots_lazily() {
-    let backend = InMemoryBackend::with_configs(&["root", "home"]);
+fn moving_to_another_area_loads_its_snapshots_lazily() {
+    let backend = InMemoryBackend::with_areas(&["root", "home"]);
     seed(&backend, "root", &["r1"]);
     let mut session = Session::new(&backend);
 
     session.press(Key::Down);
-    assert_eq!(
-        session.state.selected_config().unwrap().name.as_str(),
-        "root"
-    );
+    assert_eq!(session.state.selected_area().unwrap().name.as_str(), "root");
     assert_eq!(descriptions_of(&session), ["r1"]);
 
     // The cursor does not run off the end.
     session.press(Key::Down);
-    assert_eq!(session.state.config_cursor, 1);
+    assert_eq!(session.state.area_cursor, 1);
 }
 
 #[test]
 fn create_asks_for_a_description_then_creates_and_shows_the_new_snapshot_first() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     seed(&backend, "home", &["old"]);
     let mut session = Session::new(&backend);
 
@@ -103,8 +100,8 @@ fn create_asks_for_a_description_then_creates_and_shows_the_new_snapshot_first()
 }
 
 #[test]
-fn an_empty_description_uses_the_default_and_a_snapshots_every_config() {
-    let backend = InMemoryBackend::with_configs(&["root", "home"]);
+fn an_empty_description_uses_the_default_and_a_snapshots_every_area() {
+    let backend = InMemoryBackend::with_areas(&["root", "home"]);
     let mut session = Session::new(&backend);
 
     press(&mut session, &[Key::Char('a'), Key::Enter]);
@@ -119,7 +116,7 @@ fn an_empty_description_uses_the_default_and_a_snapshots_every_config() {
 
 #[test]
 fn escape_cancels_without_touching_anything_and_q_is_text_inside_the_prompt() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     let mut session = Session::new(&backend);
 
     session.press(Key::Char('c'));
@@ -136,7 +133,7 @@ fn escape_cancels_without_touching_anything_and_q_is_text_inside_the_prompt() {
 
 #[test]
 fn backspace_edits_and_the_description_is_length_limited() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     let mut session = Session::new(&backend);
     session.press(Key::Char('c'));
     type_text(&mut session, "abc");
@@ -151,7 +148,7 @@ fn backspace_edits_and_the_description_is_length_limited() {
 
 #[test]
 fn marking_moves_on_and_delete_removes_exactly_the_marked_snapshots() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     seed(&backend, "home", &["one", "two", "three", "four"]);
     let mut session = Session::new(&backend);
 
@@ -176,7 +173,7 @@ fn marking_moves_on_and_delete_removes_exactly_the_marked_snapshots() {
 
 #[test]
 fn delete_without_marks_targets_the_row_under_the_cursor_and_can_be_cancelled() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     seed(&backend, "home", &["one", "two"]);
     let mut session = Session::new(&backend);
 
@@ -193,11 +190,11 @@ fn delete_without_marks_targets_the_row_under_the_cursor_and_can_be_cancelled() 
 }
 
 #[test]
-fn delete_is_not_offered_from_the_configs_pane() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+fn delete_is_not_offered_from_the_areas_pane() {
+    let backend = InMemoryBackend::with_areas(&["home"]);
     seed(&backend, "home", &["one"]);
     let mut session = Session::new(&backend);
-    assert_eq!(session.state.focus, Pane::Configs);
+    assert_eq!(session.state.focus, Pane::Areas);
 
     session.press(Key::Char('d'));
     assert!(session.state.modal.is_none());
@@ -206,8 +203,8 @@ fn delete_is_not_offered_from_the_configs_pane() {
 }
 
 #[test]
-fn a_failing_config_is_reported_while_the_others_still_get_their_snapshot() {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]).failing_on("root");
+fn a_failing_area_is_reported_while_the_others_still_get_their_snapshot() {
+    let backend = InMemoryBackend::with_areas(&["home", "root"]).failing_on("root");
     let mut session = Session::new(&backend);
 
     press(&mut session, &[Key::Char('a'), Key::Enter]);
@@ -221,8 +218,8 @@ fn a_failing_config_is_reported_while_the_others_still_get_their_snapshot() {
 }
 
 #[test]
-fn no_configs_is_explained_not_empty() {
-    let backend = InMemoryBackend::with_configs(&[]);
+fn no_areas_is_explained_not_empty() {
+    let backend = InMemoryBackend::with_areas(&[]);
     let mut session = Session::new(&backend);
 
     assert!(session.state.entries().is_empty());
@@ -238,19 +235,16 @@ fn no_configs_is_explained_not_empty() {
 
 #[test]
 fn reload_keeps_the_selection_by_name() {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]);
+    let backend = InMemoryBackend::with_areas(&["home", "root"]);
     let mut session = Session::new(&backend);
     session.press(Key::Down);
     session.press(Key::Char('r'));
-    assert_eq!(
-        session.state.selected_config().unwrap().name.as_str(),
-        "root"
-    );
+    assert_eq!(session.state.selected_area().unwrap().name.as_str(), "root");
 }
 
 #[test]
 fn quit_keys_quit_and_help_opens_turns_its_pages_and_closes_with_escape() {
-    let backend = InMemoryBackend::with_configs(&["home"]);
+    let backend = InMemoryBackend::with_areas(&["home"]);
     let mut session = Session::new(&backend);
     press(&mut session, &[Key::Char('?')]);
     assert_eq!(session.state.modal, Some(Modal::Help { page: 0 }));

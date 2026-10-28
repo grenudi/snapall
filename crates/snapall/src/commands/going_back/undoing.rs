@@ -7,7 +7,7 @@
 use super::*;
 use crate::ask;
 use crate::output::Outcome;
-use snapall_core::{all_snapshots, restore_points, Act, ConfigName};
+use snapall_core::{all_snapshots, restore_points, Act, AreaName};
 use std::error::Error;
 use std::process::ExitCode;
 
@@ -25,19 +25,19 @@ pub(super) fn check_the_way_back_still_exists(
             .collect::<Vec<_>>()
             .as_slice()
         {
-            ["restore", config, id, ..] => {
-                let config = ConfigName::parse(config)?;
+            ["restore", area, id, ..] => {
+                let area = AreaName::parse(area)?;
                 let number: u64 = id
                     .parse()
                     .map_err(|_| format!("`{id}` is not a snapshot number"))?;
                 let there = ctx
                     .backend
-                    .list_snapshots(&config)?
+                    .list_snapshots(&area)?
                     .iter()
                     .any(|snapshot| snapshot.id.get() == number);
                 if !there {
                     return Err(format!(
-                        "snapshot #{number} of {config}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
+                        "snapshot #{number} of {area}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
                     )
                     .into());
                 }

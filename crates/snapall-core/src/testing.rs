@@ -13,17 +13,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use crate::domain::{
-    Change, ChangeKind, ConfigName, ConfigOption, Description, FileState, FileVersion, Point,
+    AreaName, AreaOption, Change, ChangeKind, Description, FileState, FileVersion, Point,
     RestoreSummary, Retention, SnapshotId, SnapshotInfo, SnapshotKind,
 };
 use crate::port::{BackendError, SnapshotBackend};
 
 #[derive(Default)]
-struct ConfigState {
+struct AreaState {
     next_id: u64,
     snapshots: Vec<SnapshotInfo>,
     /// Where the config is mounted.
-    subvolume: String,
+    location: String,
     /// The live files: absolute path to content.
     files: BTreeMap<String, String>,
     /// The files as each snapshot saw them, by snapshot number.
@@ -37,8 +37,8 @@ struct ConfigState {
 
 #[derive(Default)]
 struct State {
-    configs: BTreeMap<ConfigName, ConfigState>,
-    failing: BTreeSet<ConfigName>,
+    areas: BTreeMap<AreaName, AreaState>,
+    failing: BTreeSet<AreaName>,
     /// Directories that are the root of a separate subvolume: not part of any snapshot of a config
     /// above them, as a separate `/home` is not part of a snapshot of `/`.
     separate: Vec<String>,
@@ -54,19 +54,19 @@ pub struct InMemoryBackend {
 }
 
 impl InMemoryBackend {
-    pub fn with_configs(names: &[&str]) -> Self {
+    pub fn with_areas(names: &[&str]) -> Self {
         let backend = Self::default();
         {
             let mut state = backend.lock();
             for name in names {
-                let name = ConfigName::parse(name).expect("valid test config name");
-                let subvolume = format!("/mnt/{}", name.as_str());
-                state.configs.insert(
+                let name = AreaName::parse(name).expect("valid test config name");
+                let location = format!("/mnt/{}", name.as_str());
+                state.areas.insert(
                     name,
-                    ConfigState {
+                    AreaState {
                         next_id: 1,
                         snapshots: Vec::new(),
-                        subvolume,
+                        location,
                         files: BTreeMap::new(),
                         saved: BTreeMap::new(),
                         timeline_create: true,
@@ -81,32 +81,32 @@ impl InMemoryBackend {
     }
 
     /// Make `name` the system root: its subvolume is `/`.
-    pub fn with_root_config(self, name: &str) -> Self {
-        let name = ConfigName::parse(name).expect("valid test config name");
-        if let Some(entry) = self.lock().configs.get_mut(&name) {
-            entry.subvolume = "/".into();
+    pub fn with_root_area(self, name: &str) -> Self {
+        let name = AreaName::parse(name).expect("valid test config name");
+        if let Some(entry) = self.lock().areas.get_mut(&name) {
+            entry.location = "/".into();
         }
         self
     }
 
     fn create(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
         point: Option<Point>,
     ) -> Result<SnapshotId, BackendError> {
         let mut state = self.lock();
-        if state.failing.contains(config) {
+        if state.failing.contains(area) {
             return Err(BackendError::CommandFailed {
                 program: "in-memory".into(),
                 status: "injected failure".into(),
-                stderr: format!("snapshot of {config} refused"),
+                stderr: format!("snapshot of {area} refused"),
             });
         }
         let entry = state
-            .configs
-            .get_mut(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get_mut(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let id = SnapshotId::new(entry.next_id).expect("ids start at 1");
         entry.next_id += 1;
         entry.saved.insert(id.get(), entry.files.clone());
@@ -134,14 +134,14 @@ impl InMemoryBackend {
     }
 
     /// Whether the config takes snapshots on a schedule, if it exists.
-    pub fn timeline_create(&self, config: &str) -> Option<bool> {
-        let name = ConfigName::parse(config).ok()?;
-        self.lock().configs.get(&name).map(|c| c.timeline_create)
+    pub fn timeline_create(&self, area: &str) -> Option<bool> {
+        let name = AreaName::parse(area).ok()?;
+        self.lock().areas.get(&name).map(|c| c.timeline_create)
     }
 
     /// Declare `directory` the root of a separate subvolume: everything under it is no longer
     /// covered by a config whose subvolume is above it.
-    pub fn with_separate_subvolume(self, directory: &str) -> Self {
+    pub fn with_separate_location(self, directory: &str) -> Self {
         self.lock()
             .separate
             .push(directory.trim_end_matches('/').to_owned());
@@ -149,51 +149,51 @@ impl InMemoryBackend {
     }
 
     /// Write a live file (creating or replacing it).
-    pub fn write_file(&self, config: &str, path: &str, content: &str) {
-        let name = ConfigName::parse(config).expect("valid test config name");
+    pub fn write_file(&self, area: &str, path: &str, content: &str) {
+        let name = AreaName::parse(area).expect("valid test config name");
         let mut state = self.lock();
-        let entry = state.configs.get_mut(&name).expect("the config exists");
+        let entry = state.areas.get_mut(&name).expect("the config exists");
         entry.files.insert(path.to_owned(), content.to_owned());
     }
 
     /// Remove a live file.
-    pub fn remove_file(&self, config: &str, path: &str) {
-        let name = ConfigName::parse(config).expect("valid test config name");
+    pub fn remove_file(&self, area: &str, path: &str) {
+        let name = AreaName::parse(area).expect("valid test config name");
         let mut state = self.lock();
-        let entry = state.configs.get_mut(&name).expect("the config exists");
+        let entry = state.areas.get_mut(&name).expect("the config exists");
         entry.files.remove(path);
     }
 
     /// A live file's content, if it exists.
-    pub fn read_file(&self, config: &str, path: &str) -> Option<String> {
-        let name = ConfigName::parse(config).expect("valid test config name");
-        self.lock().configs.get(&name)?.files.get(path).cloned()
+    pub fn read_file(&self, area: &str, path: &str) -> Option<String> {
+        let name = AreaName::parse(area).expect("valid test config name");
+        self.lock().areas.get(&name)?.files.get(path).cloned()
     }
 
     /// From now on, `create_snapshot` for `name` fails (unlike [`Self::failing_on`], usable after
     /// the backend is already in use).
     pub fn refuse_snapshots_of(&self, name: &str) {
-        let name = ConfigName::parse(name).expect("valid test config name");
+        let name = AreaName::parse(name).expect("valid test config name");
         self.lock().failing.insert(name);
     }
 
     /// Make every `create_snapshot` for `name` fail.
     pub fn failing_on(self, name: &str) -> Self {
-        let name = ConfigName::parse(name).expect("valid test config name");
+        let name = AreaName::parse(name).expect("valid test config name");
         self.lock().failing.insert(name);
         self
     }
 
     /// Every snapshot taken so far: (config, id, description).
-    pub fn snapshots(&self) -> Vec<(ConfigName, SnapshotId, String)> {
+    pub fn snapshots(&self) -> Vec<(AreaName, SnapshotId, String)> {
         self.lock()
-            .configs
+            .areas
             .iter()
-            .flat_map(|(config, state)| {
+            .flat_map(|(area, state)| {
                 state
                     .snapshots
                     .iter()
-                    .map(move |s| (config.clone(), s.id, s.description.clone()))
+                    .map(move |s| (area.clone(), s.id, s.description.clone()))
             })
             .collect()
     }
@@ -204,41 +204,41 @@ impl InMemoryBackend {
 }
 
 impl SnapshotBackend for InMemoryBackend {
-    fn list_configs(&self) -> Result<Vec<ConfigName>, BackendError> {
-        Ok(self.lock().configs.keys().cloned().collect())
+    fn list_areas(&self) -> Result<Vec<AreaName>, BackendError> {
+        Ok(self.lock().areas.keys().cloned().collect())
     }
 
     fn create_snapshot_in(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
         point: &Point,
     ) -> Result<SnapshotId, BackendError> {
-        self.create(config, description, Some(point.clone()))
+        self.create(area, description, Some(point.clone()))
     }
 
     fn create_snapshot(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         description: &Description,
     ) -> Result<SnapshotId, BackendError> {
-        self.create(config, description, None)
+        self.create(area, description, None)
     }
 
-    fn list_snapshots(&self, config: &ConfigName) -> Result<Vec<SnapshotInfo>, BackendError> {
+    fn list_snapshots(&self, area: &AreaName) -> Result<Vec<SnapshotInfo>, BackendError> {
         self.lock()
-            .configs
-            .get(config)
+            .areas
+            .get(area)
             .map(|entry| entry.snapshots.clone())
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))
     }
 
-    fn delete_snapshot(&self, config: &ConfigName, id: SnapshotId) -> Result<(), BackendError> {
+    fn delete_snapshot(&self, area: &AreaName, id: SnapshotId) -> Result<(), BackendError> {
         let mut state = self.lock();
         let entry = state
-            .configs
-            .get_mut(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get_mut(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let before = entry.snapshots.len();
         entry.snapshots.retain(|s| s.id != id);
         entry.saved.remove(&id.get());
@@ -246,33 +246,33 @@ impl SnapshotBackend for InMemoryBackend {
             return Err(BackendError::CommandFailed {
                 program: "in-memory".into(),
                 status: "not found".into(),
-                stderr: format!("snapshot {id} of {config} not found"),
+                stderr: format!("snapshot {id} of {area} not found"),
             });
         }
         Ok(())
     }
 
-    fn config_subvolume(&self, config: &ConfigName) -> Result<String, BackendError> {
+    fn area_location(&self, area: &AreaName) -> Result<String, BackendError> {
         self.lock()
-            .configs
-            .get(config)
-            .map(|entry| entry.subvolume.clone())
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))
+            .areas
+            .get(area)
+            .map(|entry| entry.location.clone())
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))
     }
 
-    fn create_config(&self, name: &ConfigName, subvolume: &str) -> Result<(), BackendError> {
+    fn create_area(&self, name: &AreaName, location: &str) -> Result<(), BackendError> {
         let mut state = self.lock();
-        if state.configs.contains_key(name) {
+        if state.areas.contains_key(name) {
             return Err(BackendError::NotSupported(format!(
                 "config `{name}` exists"
             )));
         }
-        state.configs.insert(
+        state.areas.insert(
             name.clone(),
-            ConfigState {
+            AreaState {
                 next_id: 1,
                 snapshots: Vec::new(),
-                subvolume: subvolume.to_owned(),
+                location: location.to_owned(),
                 files: BTreeMap::new(),
                 saved: BTreeMap::new(),
                 timeline_create: true,
@@ -284,46 +284,42 @@ impl SnapshotBackend for InMemoryBackend {
         Ok(())
     }
 
-    fn delete_config(&self, name: &ConfigName) -> Result<(), BackendError> {
+    fn delete_area(&self, name: &AreaName) -> Result<(), BackendError> {
         let mut state = self.lock();
         if state.refuse_removals {
             return Err(BackendError::NotSupported("removal refused".into()));
         }
         state
-            .configs
+            .areas
             .remove(name)
             .map(|_| ())
-            .ok_or_else(|| BackendError::UnknownConfig(name.clone()))
+            .ok_or_else(|| BackendError::UnknownArea(name.clone()))
     }
 
-    fn set_config_option(
-        &self,
-        name: &ConfigName,
-        option: ConfigOption,
-    ) -> Result<(), BackendError> {
+    fn set_area_option(&self, name: &AreaName, option: AreaOption) -> Result<(), BackendError> {
         let mut state = self.lock();
         if state.refuse_option_changes {
             return Err(BackendError::NotSupported("setting change refused".into()));
         }
         let entry = state
-            .configs
+            .areas
             .get_mut(name)
-            .ok_or_else(|| BackendError::UnknownConfig(name.clone()))?;
+            .ok_or_else(|| BackendError::UnknownArea(name.clone()))?;
         match option {
-            ConfigOption::TimelineCreate(on) => entry.timeline_create = on,
-            ConfigOption::KeepNewest(count) => entry.keep = count,
-            ConfigOption::NeverRemoveYoungerThan(seconds) => entry.min_age = seconds,
-            ConfigOption::CleanupOfSnapshots(on) => entry.cleanup = on,
+            AreaOption::TimelineCreate(on) => entry.timeline_create = on,
+            AreaOption::KeepNewest(count) => entry.keep = count,
+            AreaOption::NeverRemoveYoungerThan(seconds) => entry.min_age = seconds,
+            AreaOption::CleanupOfSnapshots(on) => entry.cleanup = on,
         }
         Ok(())
     }
 
-    fn retention(&self, config: &ConfigName) -> Result<Retention, BackendError> {
+    fn retention(&self, area: &AreaName) -> Result<Retention, BackendError> {
         let state = self.lock();
         let entry = state
-            .configs
-            .get(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         // what a new snapper config starts with
         Ok(Retention {
             keep: Some(entry.keep),
@@ -336,13 +332,13 @@ impl SnapshotBackend for InMemoryBackend {
         })
     }
 
-    fn covers(&self, config: &ConfigName, path: &str) -> Result<bool, BackendError> {
+    fn covers(&self, area: &AreaName, path: &str) -> Result<bool, BackendError> {
         let state = self.lock();
         let entry = state
-            .configs
-            .get(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
-        let base = entry.subvolume.trim_end_matches('/');
+            .areas
+            .get(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
+        let base = entry.location.trim_end_matches('/');
         let inside = base.is_empty() || path == base || path.starts_with(&format!("{base}/"));
         // a separate subvolume below the config's own directory takes the path out of its snapshots
         let cut_off = state.separate.iter().any(|root| {
@@ -351,33 +347,25 @@ impl SnapshotBackend for InMemoryBackend {
         Ok(inside && !cut_off)
     }
 
-    fn changes_since(
-        &self,
-        config: &ConfigName,
-        id: SnapshotId,
-    ) -> Result<Vec<Change>, BackendError> {
+    fn changes_since(&self, area: &AreaName, id: SnapshotId) -> Result<Vec<Change>, BackendError> {
         let state = self.lock();
         let entry = state
-            .configs
-            .get(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let saved = entry
             .saved
             .get(&id.get())
-            .ok_or_else(|| not_found(config, id))?;
+            .ok_or_else(|| not_found(area, id))?;
         Ok(diff(saved, &entry.files))
     }
 
-    fn file_versions(
-        &self,
-        config: &ConfigName,
-        path: &str,
-    ) -> Result<Vec<FileVersion>, BackendError> {
+    fn file_versions(&self, area: &AreaName, path: &str) -> Result<Vec<FileVersion>, BackendError> {
         let state = self.lock();
         let entry = state
-            .configs
-            .get(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let now = entry.files.get(path);
         Ok(entry
             .snapshots
@@ -403,20 +391,20 @@ impl SnapshotBackend for InMemoryBackend {
 
     fn undo_changes(
         &self,
-        config: &ConfigName,
+        area: &AreaName,
         id: SnapshotId,
         path: Option<&str>,
     ) -> Result<RestoreSummary, BackendError> {
         let mut state = self.lock();
         let entry = state
-            .configs
-            .get_mut(config)
-            .ok_or_else(|| BackendError::UnknownConfig(config.clone()))?;
+            .areas
+            .get_mut(area)
+            .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let saved = entry
             .saved
             .get(&id.get())
             .cloned()
-            .ok_or_else(|| not_found(config, id))?;
+            .ok_or_else(|| not_found(area, id))?;
         let mut summary = RestoreSummary::default();
         for change in diff(&saved, &entry.files) {
             if let Some(path) = path {
@@ -446,11 +434,11 @@ impl SnapshotBackend for InMemoryBackend {
     }
 }
 
-fn not_found(config: &ConfigName, id: SnapshotId) -> BackendError {
+fn not_found(area: &AreaName, id: SnapshotId) -> BackendError {
     BackendError::CommandFailed {
         program: "in-memory".into(),
         status: "not found".into(),
-        stderr: format!("snapshot {id} of {config} not found"),
+        stderr: format!("snapshot {id} of {area} not found"),
     }
 }
 
@@ -483,11 +471,11 @@ fn diff(saved: &BTreeMap<String, String>, now: &BTreeMap<String, String>) -> Vec
 
 /// The behaviour every `SnapshotBackend` must have, whatever sits behind it.
 /// `existing` must name a config the backend can snapshot.
-pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
-    let configs = backend.list_configs().expect("list_configs succeeds");
+pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
+    let areas = backend.list_areas().expect("list_configs succeeds");
     assert!(
-        configs.contains(existing),
-        "list_configs should include `{existing}`, got {configs:?}"
+        areas.contains(existing),
+        "list_configs should include `{existing}`, got {areas:?}"
     );
 
     // Creating
@@ -500,7 +488,7 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
         .expect("second snapshot succeeds");
     assert!(second > first, "ids must increase: {first} then {second}");
 
-    let missing = ConfigName::parse("snapall-no-such-config").expect("valid name");
+    let missing = AreaName::parse("snapall-no-such-config").expect("valid name");
     assert!(
         backend.create_snapshot(&missing, &description).is_err(),
         "a snapshot of a missing config must be an error"
@@ -527,12 +515,12 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
 
     // Restoring is checked read-only here (mutation is backend-specific): where the config lives,
     // what changed since a snapshot, and that a snapshot that does not exist is an error.
-    let subvolume = backend
-        .config_subvolume(existing)
+    let location = backend
+        .area_location(existing)
         .expect("config_subvolume succeeds");
     assert!(
-        subvolume.starts_with('/'),
-        "a mount point is absolute: {subvolume}"
+        location.starts_with('/'),
+        "a mount point is absolute: {location}"
     );
     backend
         .changes_since(existing, second)
@@ -546,17 +534,17 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &ConfigName) {
         backend.undo_changes(existing, nowhere, None).is_err(),
         "undoing to a snapshot that does not exist must be an error"
     );
-    assert!(backend.config_subvolume(&missing).is_err());
+    assert!(backend.area_location(&missing).is_err());
     assert!(
         backend
-            .covers(existing, &subvolume)
+            .covers(existing, &location)
             .expect("covers succeeds"),
         "a config covers its own subvolume"
     );
     // A file's history is read-only too: for a path that was never there, every snapshot says so.
     let never = format!(
         "{}/snapall-contract-never-existed",
-        subvolume.trim_end_matches('/')
+        location.trim_end_matches('/')
     );
     let history = backend
         .file_versions(existing, &never)
@@ -594,8 +582,8 @@ mod tests {
 
     #[test]
     fn in_memory_backend_satisfies_the_contract() {
-        let backend = InMemoryBackend::with_configs(&["root"]);
-        backend_contract(&backend, &ConfigName::parse("root").unwrap());
+        let backend = InMemoryBackend::with_areas(&["root"]);
+        backend_contract(&backend, &AreaName::parse("root").unwrap());
     }
 }
 

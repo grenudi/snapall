@@ -111,7 +111,7 @@ pub(crate) fn on_point_restored(
                 outcome.failed.len(),
                 outcome.failed.join("; ")
             )));
-            vec![Effect::LoadConfigs]
+            vec![Effect::LoadAreas]
         }
         Ok(outcome) => {
             let undo = outcome
@@ -122,7 +122,7 @@ pub(crate) fn on_point_restored(
                 "Put {} area(s) back to {point}.{undo}",
                 outcome.restored
             )));
-            vec![Effect::LoadConfigs]
+            vec![Effect::LoadAreas]
         }
     }
 }

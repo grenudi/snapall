@@ -14,7 +14,7 @@ use std::process::Command;
 
 use snapall_core::coverage::{self, Area, Worth};
 use snapall_core::explain::{self, Cleanup};
-use snapall_core::{protect_area, ConfigName, SnapshotBackend, SystemProbe};
+use snapall_core::{protect_area, AreaName, SnapshotBackend, SystemProbe};
 
 use crate::output::emit;
 
@@ -49,14 +49,14 @@ pub trait Talk {
 pub struct AreaReport {
     pub mount_point: String,
     pub title: String,
-    pub protected_by: Option<ConfigName>,
+    pub protected_by: Option<AreaName>,
     pub worth: Worth,
 }
 
 /// What happened.
 pub struct Report {
     pub areas: Vec<AreaReport>,
-    pub protected_now: Vec<(String, ConfigName)>,
+    pub protected_now: Vec<(String, AreaName)>,
     pub declined: Vec<String>,
     /// Things that went wrong, each with the plain-words reason.
     pub failed: Vec<(String, String)>,
@@ -115,9 +115,9 @@ fn find_the_areas(
     facts: &Facts,
 ) -> Result<Vec<Area>, Box<dyn Error>> {
     let mut configs = Vec::new();
-    for name in backend.list_configs()? {
-        let subvolume = backend.config_subvolume(&name)?;
-        configs.push((name, subvolume));
+    for name in backend.list_areas()? {
+        let location = backend.area_location(&name)?;
+        configs.push((name, location));
     }
     let mounts = coverage::mounts_from_mountinfo(&facts.mountinfo);
     Ok(coverage::areas(&mounts, &configs))
@@ -135,16 +135,16 @@ fn area_report(area: &Area) -> AreaReport {
 
 /// What each area keeps and protects from cleanup: its real settings, read from snapper.
 fn limits_of(backend: &dyn SnapshotBackend) -> Vec<explain::Limit> {
-    let Ok(configs) = backend.list_configs() else {
+    let Ok(configs) = backend.list_areas() else {
         return Vec::new();
     };
     configs
         .iter()
         .filter_map(|config| {
-            let subvolume = backend.config_subvolume(config).ok()?;
+            let location = backend.area_location(config).ok()?;
             let retention = backend.retention(config).ok()?;
             Some(explain::Limit {
-                area: coverage::describe(&subvolume).title,
+                area: coverage::describe(&location).title,
                 keep: retention.keep,
                 min_age_seconds: retention.min_age_seconds,
             })
@@ -500,7 +500,7 @@ mod tests {
     }
     /// A machine whose only protected area is the system.
     fn machine() -> InMemoryBackend {
-        InMemoryBackend::with_configs(&["root"]).with_root_config("root")
+        InMemoryBackend::with_areas(&["root"]).with_root_area("root")
     }
 
     #[test]
@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(person.asked, ["Protect Home now?"]);
         assert_eq!(report.declined, ["/home"]);
         assert_eq!(
-            backend.list_configs().unwrap().len(),
+            backend.list_areas().unwrap().len(),
             1,
             "a no changes nothing"
         );
@@ -597,7 +597,7 @@ mod tests {
         )
         .unwrap();
         assert!(person.asked.is_empty() && !person.cleanup_switched_on);
-        assert_eq!(backend.list_configs().unwrap().len(), 1);
+        assert_eq!(backend.list_areas().unwrap().len(), 1);
         assert!(
             person.said.contains("Protect Home (/home)?")
                 && person.said.contains("Dry run: nothing was changed"),
@@ -671,7 +671,7 @@ mod tests {
             person.said
         );
         assert_eq!(
-            backend.list_configs().unwrap().len(),
+            backend.list_areas().unwrap().len(),
             1,
             "the half-made area was taken back"
         );
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn when_everything_worth_protecting_is_protected_it_says_so_and_asks_nothing() {
-        let backend = InMemoryBackend::with_configs(&["root", "home"]).with_root_config("root");
+        let backend = InMemoryBackend::with_areas(&["root", "home"]).with_root_area("root");
         // make the in-memory `home` config's subvolume /home, as a real one would be
         let mut person = Person::answering(&[]);
         let facts = Facts {
@@ -742,10 +742,10 @@ mod tests {
             cleanup: Cleanup::On,
             cleanup_schedule: Vec::new(),
         };
-        let both = InMemoryBackend::with_configs(&[]);
-        both.create_config(&ConfigName::parse("root").unwrap(), "/")
+        let both = InMemoryBackend::with_areas(&[]);
+        both.create_area(&AreaName::parse("root").unwrap(), "/")
             .unwrap();
-        both.create_config(&ConfigName::parse("home").unwrap(), "/home")
+        both.create_area(&AreaName::parse("home").unwrap(), "/home")
             .unwrap();
         let report = run(&both, &facts, &mut person, &options()).unwrap();
         assert!(
@@ -765,10 +765,10 @@ mod tests {
             cleanup: Cleanup::On,
             cleanup_schedule: Vec::new(),
         };
-        let both = InMemoryBackend::with_configs(&[]);
-        both.create_config(&ConfigName::parse("root").unwrap(), "/")
+        let both = InMemoryBackend::with_areas(&[]);
+        both.create_area(&AreaName::parse("root").unwrap(), "/")
             .unwrap();
-        both.create_config(&ConfigName::parse("home").unwrap(), "/home")
+        both.create_area(&AreaName::parse("home").unwrap(), "/home")
             .unwrap();
         let mut person = Person::answering(&[]);
         run(&both, &facts, &mut person, &options()).unwrap();

@@ -9,7 +9,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use snapall_core::testing::InMemoryBackend;
-use snapall_core::{ConfigName, Description, SnapshotBackend};
+use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{update, Effect, Key, Msg, State};
 use snapall_tui::{view, Session, UiContext};
 
@@ -39,11 +39,11 @@ fn flat(rows: &[String]) -> String {
 }
 
 fn backend() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
     backend.write_file("home", "/mnt/home/a.txt", "one");
     backend
         .create_snapshot(
-            &ConfigName::parse("home").unwrap(),
+            &AreaName::parse("home").unwrap(),
             &Description::parse("before").unwrap(),
         )
         .unwrap();

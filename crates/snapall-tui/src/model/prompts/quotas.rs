@@ -27,7 +27,7 @@ pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> R
                     data.facts
                         .areas
                         .iter()
-                        .map(|area| area.subvolume.clone())
+                        .map(|area| area.location.clone())
                         .collect()
                 })
                 .unwrap_or_default();

@@ -12,14 +12,14 @@ use crate::render;
 use snapall_core::boot;
 use snapall_core::Act;
 use snapall_core::{
-    fresh_point, plan_snapshots, run_plan_along, ConfigName, Description, Plan, Report,
+    fresh_point, plan_snapshots, run_plan_along, AreaName, Description, Plan, Report,
 };
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
 pub fn create(
     ctx: &Context,
-    only: Option<&[ConfigName]>,
+    only: Option<&[AreaName]>,
     group: Option<&str>,
     description: &Description,
     dry_run: bool,
@@ -60,9 +60,9 @@ pub fn create(
 /// A group is a name for a set of areas: it is what `--only` would have been.
 fn the_areas_asked_for(
     ctx: &Context,
-    only: Option<&[ConfigName]>,
+    only: Option<&[AreaName]>,
     group: Option<&str>,
-) -> Result<Option<Vec<ConfigName>>, Box<dyn std::error::Error>> {
+) -> Result<Option<Vec<AreaName>>, Box<dyn std::error::Error>> {
     match (group, only) {
         (Some(_), Some(_)) => Err("use either --only or --group, not both".into()),
         (Some(wanted), None) => Ok(Some(areas_of_group(ctx, wanted)?)),
@@ -99,7 +99,7 @@ fn what_failed(report: &Report) -> String {
             o.result
                 .as_ref()
                 .err()
-                .map(|why| format!("{}: {why}", o.config))
+                .map(|why| format!("{}: {why}", o.area))
         })
         .collect();
     failures.join("; ")

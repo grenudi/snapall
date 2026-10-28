@@ -10,8 +10,8 @@
 //! it is *previewed*: this module says how many snapshots would go, in the order cleanup would take them,
 //! so the person decides knowing it, not finding out after.
 
-use crate::calendar::seconds_from_snapper_date;
-use crate::domain::{ConfigOption, Retention, SnapshotInfo};
+use crate::calendar::seconds_from_snapshot_date;
+use crate::domain::{AreaOption, Retention, SnapshotInfo};
 use crate::explain::seconds_words;
 
 /// The longest a snapshot can be protected from cleanup: a year.
@@ -66,16 +66,16 @@ impl Limits {
     }
 
     /// The settings to change to get from `before` to `self`, and only those.
-    pub fn changes_from(&self, before: &Limits) -> Vec<ConfigOption> {
+    pub fn changes_from(&self, before: &Limits) -> Vec<AreaOption> {
         let mut options = Vec::new();
         if self.keep != before.keep {
-            options.push(ConfigOption::KeepNewest(self.keep));
+            options.push(AreaOption::KeepNewest(self.keep));
         }
         if self.min_age_seconds != before.min_age_seconds {
-            options.push(ConfigOption::NeverRemoveYoungerThan(self.min_age_seconds));
+            options.push(AreaOption::NeverRemoveYoungerThan(self.min_age_seconds));
         }
         if self.cleanup != before.cleanup {
-            options.push(ConfigOption::CleanupOfSnapshots(self.cleanup));
+            options.push(AreaOption::CleanupOfSnapshots(self.cleanup));
         }
         options
     }
@@ -119,7 +119,10 @@ pub fn preview(snapshots: &[SnapshotInfo], limits: &Limits, now: Option<i64>) ->
     for snapshot in looked_after.iter().take(beyond) {
         let age = match (
             now,
-            snapshot.date.as_deref().and_then(seconds_from_snapper_date),
+            snapshot
+                .date
+                .as_deref()
+                .and_then(seconds_from_snapshot_date),
         ) {
             (Some(now), Some(then)) => u64::try_from(now - then).ok(),
             _ => None,
@@ -187,7 +190,7 @@ mod tests {
     fn dated(id: u64, cleanup: Option<&str>, ago: i64) -> SnapshotInfo {
         let seconds = NOW - ago;
         // a date snapper would write for that moment, in the one calendar this module reads
-        let date = crate::calendar::snapper_date_from_seconds(seconds);
+        let date = crate::calendar::snapshot_date_from_seconds(seconds);
         SnapshotInfo {
             id: SnapshotId::new(id).unwrap(),
             kind: SnapshotKind::Single,
@@ -232,7 +235,7 @@ mod tests {
         assert!(before.changes_from(&before).is_empty());
         assert_eq!(
             limits(20, 1800).changes_from(&before),
-            [ConfigOption::KeepNewest(20)]
+            [AreaOption::KeepNewest(20)]
         );
         assert_eq!(
             Limits {
@@ -242,8 +245,8 @@ mod tests {
             }
             .changes_from(&before),
             [
-                ConfigOption::NeverRemoveYoungerThan(3600),
-                ConfigOption::CleanupOfSnapshots(false)
+                AreaOption::NeverRemoveYoungerThan(3600),
+                AreaOption::CleanupOfSnapshots(false)
             ]
         );
     }

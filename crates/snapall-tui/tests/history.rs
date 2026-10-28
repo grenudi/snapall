@@ -51,7 +51,7 @@ fn screen(session: &Session<'_>) -> String {
 }
 
 fn machine() -> InMemoryBackend {
-    let backend = InMemoryBackend::with_configs(&["home", "root"]).with_root_config("root");
+    let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
     let plan = plan_snapshots(&backend, None).unwrap();
     run_plan(&backend, &plan, &Description::parse("first").unwrap(), None);
     backend

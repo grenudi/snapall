@@ -24,7 +24,7 @@ fn holder<'a>(mounts: &'a [Mount], path: &str) -> Option<&'a Mount> {
 pub fn explain_with(error: &HistoryError, path: &str, mounts: &[Mount]) -> String {
     if !matches!(
         error,
-        HistoryError::OtherSubvolume { .. } | HistoryError::NoConfig { .. }
+        HistoryError::OtherLocation { .. } | HistoryError::NoArea { .. }
     ) {
         return error.to_string();
     }
@@ -56,7 +56,7 @@ pub fn explain(error: &HistoryError, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::ConfigName;
+    use snapall_core::AreaName;
 
     const MOUNTINFO: &str = "\
 24 1 0:21 /@ / rw - btrfs /dev/x rw,subvol=/@
@@ -65,10 +65,10 @@ mod tests {
 ";
 
     fn not_covered(path: &str) -> HistoryError {
-        HistoryError::OtherSubvolume {
+        HistoryError::OtherLocation {
             path: path.into(),
-            config: ConfigName::parse("root").unwrap(),
-            subvolume: "/".into(),
+            area: AreaName::parse("root").unwrap(),
+            location: "/".into(),
         }
     }
 

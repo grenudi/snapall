@@ -27,7 +27,9 @@ What each part of snapall says it is for, read from the first line of each modul
 - `limits.rs`: How many snapshots an area keeps, and when the oldest go: the settings of automatic cleanup, and what changing them would do.
 - `observe.rs`: The observability port: what snapall reports about what it did.
 - `plan.rs`: Functional core: decide *which* configs to snapshot.
-- `points.rs`: Restore points: the snapshots that one action took together, one in every area, found again and put back with a single action.
+  - `points/finding.rs`: Finding restore points among snapshots: by their tag, or by matching what one action took together.
+  - `points/mod.rs`: Restore points: the snapshots that one action took together, one in every area, found again and put back with a single action.
+  - `points/putting_back.rs`: Putting a restore point back: what it would change in each area, and doing it.
 - `port.rs`: The outbound port: everything snapall needs from "something that takes snapshots".
 - `rollback.rs`: The way back from each kind of change, in one place: what it names as the earlier state, the commands that return to it, and what doing that weighs.
 - `services.rs`: The background jobs snapall depends on or watches: one catalogue, so that a name is written once.

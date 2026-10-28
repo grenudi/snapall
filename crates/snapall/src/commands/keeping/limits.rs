@@ -9,7 +9,7 @@ use crate::ask;
 use crate::output;
 use crate::output::Outcome;
 use snapall_core::{
-    limits_words, preview_limits, Act, ConfigName, Limits, LimitsPreview, SystemProbe,
+    limits_words, preview_limits, Act, AreaName, Limits, LimitsPreview, SystemProbe,
 };
 use std::error::Error;
 
@@ -58,15 +58,15 @@ pub fn limits(
     say_the_limits(ctx, area, &config, &after, &preview, true)
 }
 
-fn a_protected_area(ctx: &Context, area: &str) -> Result<ConfigName, Box<dyn Error>> {
-    let named = ConfigName::parse(area)?;
-    if !ctx.backend.list_configs()?.contains(&named) {
+fn a_protected_area(ctx: &Context, area: &str) -> Result<AreaName, Box<dyn Error>> {
+    let named = AreaName::parse(area)?;
+    if !ctx.backend.list_areas()?.contains(&named) {
         return Err(format!("`{area}` is not a protected area: `snapall list` shows them").into());
     }
     Ok(named)
 }
 
-fn the_limits_now(ctx: &Context, config: &ConfigName) -> Result<Limits, Box<dyn Error>> {
+fn the_limits_now(ctx: &Context, config: &AreaName) -> Result<Limits, Box<dyn Error>> {
     let kept = Limits::from_retention(&ctx.backend.retention(config)?);
     kept.ok_or_else(|| {
         "snapper did not say how many this area keeps, so there is nothing to show or change".into()
@@ -103,13 +103,13 @@ fn a_whole_number(text: &str, what: &str) -> Result<u64, Box<dyn Error>> {
 
 fn what_the_next_cleanup_would_remove(
     ctx: &Context,
-    config: &ConfigName,
+    config: &AreaName,
     after: &Limits,
 ) -> Result<LimitsPreview, Box<dyn Error>> {
     let now = snapall_system::LinuxSystem::new()
         .local_time()
         .as_deref()
-        .and_then(snapall_core::calendar::seconds_from_snapper_date);
+        .and_then(snapall_core::calendar::seconds_from_snapshot_date);
     Ok(preview_limits(
         &ctx.backend.list_snapshots(config)?,
         after,
@@ -134,12 +134,12 @@ fn ask_before_changing(
 
 fn set_the_options(
     ctx: &Context,
-    config: &ConfigName,
-    options: &[snapall_core::ConfigOption],
+    config: &AreaName,
+    options: &[snapall_core::AreaOption],
 ) -> Result<(), String> {
     options.iter().try_for_each(|option| {
         ctx.backend
-            .set_config_option(config, *option)
+            .set_area_option(config, *option)
             .map_err(|e| e.to_string())
     })
 }
@@ -154,7 +154,7 @@ fn describe(limits: &Limits) -> String {
 }
 
 fn what_changing_would_do(
-    config: &ConfigName,
+    config: &AreaName,
     before: &Limits,
     after: &Limits,
     preview: &LimitsPreview,
@@ -170,7 +170,7 @@ fn what_changing_would_do(
 fn say_the_limits(
     ctx: &Context,
     area: &str,
-    config: &ConfigName,
+    config: &AreaName,
     shown: &Limits,
     preview: &LimitsPreview,
     changed: bool,

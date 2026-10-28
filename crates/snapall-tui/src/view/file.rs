@@ -25,7 +25,7 @@ pub(crate) fn render_file(state: &State, frame: &mut Frame, area: Rect) {
         .rsplit('/')
         .next()
         .unwrap_or(view.target.path.as_str());
-    let title = format!(" {name} in {} ", view.target.config);
+    let title = format!(" {name} in {} ", view.target.area);
     let block = pane_block(title, state.modal.is_none());
     match &view.versions {
         Load::NotLoaded => frame.render_widget(Paragraph::new("loading...").block(block), area),

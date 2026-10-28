@@ -6,7 +6,7 @@ The words snapall uses, and what each one means here. The code, the CLI, the doc
 
 | Term | Meaning |
 |---|---|
-| **config** | A named snapper configuration (`root`, `home`): one subvolume snapper snapshots. A `ConfigName` is a validated name. snapall never invents configs; it uses the ones snapper reports. |
+| **config** | A named snapper configuration (`root`, `home`): one subvolume snapper snapshots. A `AreaName` is a validated name. snapall never invents configs; it uses the ones snapper reports. |
 | **snapshot** | One saved state of a config, with a number, a kind, a date and a description. |
 | **snapshot id** | The number snapper gives a snapshot. Never 0: 0 is the *current system*, which is not a snapshot and cannot be deleted. |
 | **current system** | Snapper's pseudo-snapshot 0: the live state. Never listed, never deletable. |
