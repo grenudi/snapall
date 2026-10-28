@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.3]
+
+
+### Refactoring
+- Looking at the machine belongs to the machine adapter ([#93](https://github.com/grenudi/snapall/pull/93)) ([eb902ea])
+
+
+
 ## [0.26.2]
 
 
