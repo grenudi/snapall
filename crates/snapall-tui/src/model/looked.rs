@@ -78,12 +78,17 @@ pub(super) fn point_offer_loaded(
     offer: Option<PointOffer>,
 ) -> Vec<Effect> {
     settle(state);
-    let asked = matches!(
-        &state.modal,
-        Some(Modal::Restore { area: c, id: i, .. }) if *c == area && *i == id
-    );
-    if asked {
-        state.point_offer = offer.map(|offer| (area, id, offer));
+    // the answer belongs to the question that asked, and to no other: if it was closed or is about another snapshot, it is dropped
+    if let Some(Modal::Restore {
+        area: asked,
+        id: asked_id,
+        offer: slot,
+        ..
+    }) = &mut state.modal
+    {
+        if *asked == area && *asked_id == id {
+            *slot = offer;
+        }
     }
     Vec::new()
 }
@@ -98,11 +103,18 @@ pub(super) fn points_loaded(
 
 pub(super) fn point_preview_loaded(state: &mut State, offer: PointOffer) -> Vec<Effect> {
     settle(state);
-    if state
-        .chosen_point()
-        .is_some_and(|p| p.point == offer.point.point)
+    if let Some(Modal::Points {
+        index,
+        points: Some(points),
+        preview,
+    }) = &mut state.modal
     {
-        state.point_preview = Some(offer);
+        if points
+            .get(*index)
+            .is_some_and(|point| point.point == offer.point.point)
+        {
+            *preview = Some(offer);
+        }
     }
     Vec::new()
 }

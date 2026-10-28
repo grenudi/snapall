@@ -13,16 +13,15 @@ pub(crate) fn restore_spec(
     id: SnapshotId,
     path: Option<&str>,
     stage: &RestoreStage,
+    offer: Option<&crate::model::PointOffer>,
     state: &State,
 ) -> ModalSpec {
     let spec = restore_stage_spec(area, id, path, stage, state);
     if !matches!(stage, RestoreStage::Ready(_)) {
         return spec;
     }
-    match &state.point_offer {
-        Some((c, i, offer)) if c == area && *i == id && offer.areas_to_change() > 0 => {
-            with_point(spec, offer)
-        }
+    match offer {
+        Some(offer) if offer.areas_to_change() > 0 => with_point(spec, offer),
         _ => spec,
     }
 }

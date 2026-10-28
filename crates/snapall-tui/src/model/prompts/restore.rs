@@ -10,12 +10,13 @@ use snapall_core::Act;
 /// The restore prompt. Only a prompt with real changes to restore can be confirmed, and the system
 /// root only when it is a single path of it. Anything else is information, and any key closes it.
 pub(crate) fn confirming_restore(
-    state: &mut State,
+    _state: &mut State,
     key: Key,
     area: AreaName,
     id: SnapshotId,
     path: Option<String>,
     stage: RestoreStage,
+    offer: Option<PointOffer>,
 ) -> Reaction {
     let actionable = matches!(
         &stage,
@@ -23,8 +24,8 @@ pub(crate) fn confirming_restore(
     );
     // Every area of the snapshot's restore point, when it has one and any of it would change.
     if matches!(key, Key::Char('A')) {
-        if let Some((c, i, offer)) = &state.point_offer {
-            if *c == area && *i == id && offer.areas_to_change() > 0 {
+        if let Some(offer) = &offer {
+            if offer.areas_to_change() > 0 {
                 let (areas, point) = (offer.areas_to_change(), offer.point.clone());
                 let lines = vec![
                     format!("Put {areas} area(s) back to restore point {}.", point.point),
@@ -64,6 +65,7 @@ pub(crate) fn confirming_restore(
             id,
             path,
             stage,
+            offer,
         }),
     }
 }
@@ -87,8 +89,8 @@ pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
         id,
         path: None,
         stage: RestoreStage::Loading,
+        offer: None,
     });
-    state.point_offer = None;
     vec![
         Effect::LoadChanges {
             area: area.clone(),

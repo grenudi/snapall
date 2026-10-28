@@ -778,10 +778,9 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 5] = [
     ("crates/snapall-tui/src/changes.rs", 419),
-    ("crates/snapall-tui/src/model/keys.rs", 353),
-    ("crates/snapall-tui/src/model/state.rs", 401),
+    ("crates/snapall-tui/src/model/state.rs", 400),
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
     ("crates/snapall/src/setup.rs", 432),
     ("crates/snapall/src/contract/inputs.rs", 514),

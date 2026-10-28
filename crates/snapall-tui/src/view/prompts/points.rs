@@ -7,7 +7,11 @@
 use crate::view::*;
 
 /// The restore points: the list with the cursor on one, and what putting that one back would do.
-pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
+pub(crate) fn points_spec(
+    index: usize,
+    points: Option<&[snapall_core::RestorePoint]>,
+    preview: Option<&crate::model::PointOffer>,
+) -> ModalSpec {
     let simple = |lines: Vec<Line<'static>>, height: u16| ModalSpec {
         title: " Restore points ".into(),
         lines,
@@ -16,7 +20,7 @@ pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
         height,
         buttons: vec![close_button()],
     };
-    let Some(points) = &state.points else {
+    let Some(points) = points else {
         return simple(
             vec![Line::styled(
                 "Looking for restore points...",
@@ -62,10 +66,7 @@ pub(crate) fn points_spec(index: usize, state: &State) -> ModalSpec {
         });
     }
     lines.push(Line::from(""));
-    let preview = state
-        .point_preview
-        .as_ref()
-        .filter(|p| p.point.point == points[index].point);
+    let preview = preview.filter(|p| p.point.point == points[index].point);
     match preview {
         None => lines.push(Line::styled(
             "Looking at what it would change...",

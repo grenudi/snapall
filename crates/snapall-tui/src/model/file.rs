@@ -77,6 +77,7 @@ pub(crate) fn open_file_restore(state: &mut State) -> Vec<Effect> {
         id,
         path: Some(path.clone()),
         stage: RestoreStage::Loading,
+        offer: None,
     });
     vec![Effect::LoadChanges {
         area,
