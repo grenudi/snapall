@@ -28,7 +28,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `keeping/jobs.rs`: The background jobs snapall depends on or watches: one catalogue, so that a name is written once.
   - `keeping/limits.rs`: How many snapshots an area keeps, and when the oldest go: the settings of automatic cleanup, and what changing them would do.
   - `keeping/mod.rs`: What is kept: how many snapshots an area holds, which areas go together, and the jobs that keep things tidy.
-- `lib.rs`: Domain, planning and ports for snapall.
+- `lib.rs`: What snapall does, with no terminal, no file and no tool in sight: protecting parts of the disk, taking snapshots, looking at them, going back to them and keeping them.
   - `looking/find.rs`: Finding what a person points at: one snapshot of an area, by its number.
   - `looking/history.rs`: The history of one file: which area holds it, and what it was in each snapshot.
   - `looking/journal.rs`: What snapall did, remembered: every change writes an event when it starts and another when it ends, whichever snapall made it (the window or a command), and folding them gives the record a person reads.
@@ -37,8 +37,8 @@ What each part of snapall says it is for, read from the first line of each modul
   - `ports/course.rs`: A change that takes several steps (a snapshot of every area, a restore point put back area by area) follows a [`Course`]: before each step it asks whether to begin it.
   - `ports/machine.rs`: What the machine can tell snapall besides what snapper says: how full a disk is, whether a background job is switched on and running, what time it is there.
   - `ports/mod.rs`: What the core needs from outside, in its own words: a backend for snapshots, the machine, an observer, a way to be asked to stop, and stand-ins for them.
-  - `ports/observing.rs`: The observability port: what snapall reports about what it did.
-  - `ports/snapshots.rs`: The outbound port: everything snapall needs from "something that takes snapshots".
+  - `ports/observing.rs`: What snapall reports about what it did: the events, and whoever receives them.
+  - `ports/snapshots.rs`: What snapall needs from whatever takes snapshots, said in snapall's own words.
     - `ports/testing/backend.rs`: The in-memory stand-in doing what a real backend does.
     - `ports/testing/building.rs`: Setting up the in-memory stand-in the way a test needs it.
     - `ports/testing/contract.rs`: The contract every backend must satisfy, as one function to run against it.
@@ -51,9 +51,9 @@ What each part of snapall says it is for, read from the first line of each modul
     - `protecting/doctor/mod.rs`: `snapall doctor`, as pure functions: from facts about the machine to findings and an install plan.
   - `protecting/mod.rs`: Protecting parts of the disk and stopping: which parts can be protected, what the doctor finds, how an area is made and unmade.
   - `protecting/protect.rs`: Protecting a part of the disk: making it an area.
-  - `protecting/unprotect.rs`: Stopping the protection of an area: the one thing snapall does that cannot be taken back.
+  - `protecting/unprotect.rs`: Stopping the protection of an area: every snapshot of it is deleted for good (its own files are not touched), so it is *planned* first: what would go, how much room that frees, which restore points and groups it affects.
   - `taking/mod.rs`: Taking snapshots: which areas, and doing it area by area.
-  - `taking/plan.rs`: Functional core: decide *which* configs to snapshot.
+  - `taking/plan.rs`: Deciding which areas to snapshot.
   - `taking/run.rs`: Taking snapshots: planning which areas, doing it area by area, and reporting how each went.
   - `vocabulary/calendar.rs`: Dates, without a clock: turning seconds into a name for a restore point, and snapper's own date text into seconds so two snapshots can be compared.
   - `vocabulary/consequence.rs`: What an action weighs, and so what has to be typed before it happens.
@@ -68,7 +68,7 @@ What each part of snapall says it is for, read from the first line of each modul
 ## snapall-observe
 
 - `clock.rs`: A UTC timestamp, without a date library: a log line needs only this much.
-- `lib.rs`: Adapter for the observability port.
+- `lib.rs`: Reporting what snapall did: every call to the backend timed and written as a line of text or JSON.
 - `lines.rs`: One line per event, as text for people or JSON for machines.
 
 ## snapall-snapper
@@ -83,8 +83,8 @@ What each part of snapall says it is for, read from the first line of each modul
 
 - `groups.rs`: The groups file: plain text under `/etc/snapall`, read and written whole.
 - `journal.rs`: The journal on disk: one JSON object per line, appended.
-- `lib.rs`: The system port, answered by asking the machine: `df` for a disk, `systemctl` for a background job, `date` for the time, unit files for a job's schedule, `btrfs` for how room is counted, and a lock file for who is making a change.
-- `lock.rs`: The right to make a change, held in a file: only one snapall changes things at a time, so that two restores, or a restore and a deletion, cannot race each other.
+- `lib.rs`: Asking the machine what the core wants to know: `df` for a disk, `systemctl` for a background job, `date` for the time, unit files for a job's schedule, `btrfs` for how room is counted, and a lock file for who is making a change.
+- `lock.rs`: Taking turns at changing things: the right to make a change is held in a file, so that two restores, or a restore and a deletion, do not race each other.
 - `quotas.rs`: How a disk counts the room snapshots take, and switching it on and off.
 - `runner.rs`: Starting a change that outlives the program that asked for it, and asking it to stop.
 - `units.rs`: What a job's unit file says about it.
@@ -92,7 +92,7 @@ What each part of snapall says it is for, read from the first line of each modul
 ## snapall-tui
 
 - `changes.rs`: What a change is called in the Activity tab, and how it went: the words, apart from the doing.
-- `lib.rs`: A terminal UI for snapall: a second *driving adapter* over the same port as the CLI.
+- `lib.rs`: The window: everything snapall does, in a terminal, with the keys and the mouse, over the same core as the command line.
   - `model/changed.rs`: What a finished change leaves behind in the window: its result, what to show of it, and what to look at again.
   - `model/file.rs`: The file history screen: one file's versions, newest first, and putting one back.
   - `model/following.rs`: Following the changes that run on their own: looking at the journal once a second while anything runs, and noticing when one that this window started has ended.
@@ -101,8 +101,8 @@ What each part of snapall says it is for, read from the first line of each modul
   - `model/lists.rs`: The lists of areas and snapshots: what happens when they arrive.
   - `model/living.rs`: The window's own life: starting, the clock, the pointer and a refusal.
   - `model/looked.rs`: What looking brought back arriving in the window: the areas, snapshots, history, health, groups and points.
-  - `model/messages.rs`: What the window asks the shell to do (effects) and what the shell reports back (messages).
-  - `model/mod.rs`: The pure core of the UI: state, messages, effects and `update`.
+  - `model/messages.rs`: What the window asks for (effects) and what comes back (messages).
+  - `model/mod.rs`: What the window does when something happens: its state, what can happen to it, and what it asks for in return.
     - `model/prompts/confirm.rs`: The question before a change: what it will do, and the answer that goes with its weight.
     - `model/prompts/delete.rs`: Deleting snapshots: asking first, and what comes of it.
     - `model/prompts/describe.rs`: The prompt for a snapshot's note: what is typed, and what Enter does with it.
@@ -117,13 +117,13 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/prompts/restore.rs`: Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
     - `model/prompts/stop.rs`: Asking before a change that is running is asked to stop: what stopping means, so that nobody is afraid to do it, and that it is only a request.
     - `model/prompts/unprotect.rs`: Stopping the protection of an area: what it would do, in plain words, and the area's name typed out before it does it.
-  - `model/state.rs`: What the window knows: the lists, the cursor, the open prompt, the message, and what the shell told it about the machine.
+  - `model/state.rs`: What the window knows: the lists, the cursor, the open prompt, the message, and what it was told about the machine.
   - `session/changing.rs`: What the window asks to be changed, done through the backend and the machine.
   - `session/executor.rs`: The window's executor: it performs each effect against the backend and the machine, and answers with the message that describes the outcome.
   - `session/looking.rs`: What the window asks to be looked at, answered from the backend and the machine.
   - `session/mod.rs`: The window run synchronously: the model plus an executor, as the tests drive it.
 - `status_bar.rs`: The status bar: one line under every view with the numbers that matter (how many snapshots, how much room they take, how full the disk is, whether cleanup runs, how many things need a look).
-- `tab.rs`: The views of the window.
+- `tab.rs`: The tabs of the window, and which one is showing.
   - `tabs/activity.rs`: The Activity tab: what snapall did, newest first, and how each went.
     - `tabs/health/drawing.rs`: Drawing the Health tab: the rows, the verdict above them and the detail of the chosen one.
     - `tabs/health/keys.rs`: What pressing a key does on the Health tab: moving along the rows and acting on the chosen one.
@@ -135,7 +135,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `view/file.rs`: The file history screen: one file's versions, newest first.
   - `view/footer.rs`: The two lines under the status bar: the explanation of whatever the mouse is over, and the keys as buttons.
   - `view/header.rs`: The tab bar: the brand badge, the three tabs, and where a click on each lands.
-  - `view/hit.rs`: Where a click lands: the same layout the drawing used, so a click can only land on what was drawn.
+  - `view/hit.rs`: Where a click lands, worked out from the same layout the drawing used.
   - `view/lists.rs`: The Snapshots tab: the protected areas on the left, the chosen area's snapshots on the right.
   - `view/look.rs`: How things that can be clicked look: at rest, under the mouse, and just clicked.
   - `view/mod.rs`: Rendering: `render(state, frame)` draws, and does nothing else.
@@ -159,13 +159,15 @@ What each part of snapall says it is for, read from the first line of each modul
 
 - `advice.rs`: What to tell someone whose file no snapshot can contain: why, and what to do about it, in snapall's own words and with snapall's own command.
 - `ask.rs`: Asking before a change, and the end of a command that was not told to go ahead.
-- `boot_probe.rs`: The imperative half of the boot-menu check: look at files and services, hand the facts to `snapall_core::going_back::boot::assess`.
+- `boot_probe.rs`: Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be judged (`snapall_core::going_back::boot::assess`).
   - `cli/building.rs`: Building the request from what was resolved: one command to one request.
-  - `cli/mod.rs`: Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
+  - `cli/mod.rs`: Turning what was typed, and the environment, into a request that is known to be valid ([`Parsed`]).
   - `cli/parsing.rs`: Parsing what was typed: the command, its words, and what to suggest when it is mistyped.
   - `cli/request.rs`: What was asked for: the request, how it logs, and the error in asking.
+  - `commands/about.rs`: The program speaking about itself: its help, its version and its contract.
+  - `commands/asked_for.rs`: Everything that can be asked for, and the command that does it.
   - `commands/change.rs`: A change being made: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
-  - `commands/deleting.rs`: Deleting a snapshot.
+  - `commands/deleting.rs`: Deleting a snapshot for good, after saying what that loses.
     - `commands/going_back/mod.rs`: Going back: to a snapshot, to a restore point, or to before a change.
     - `commands/going_back/restoring.rs`: Putting one area, or one file of it, back to how a snapshot had it.
     - `commands/going_back/restoring_a_point.rs`: Putting every area back to how a restore point had them.
@@ -183,18 +185,18 @@ What each part of snapall says it is for, read from the first line of each modul
   - `contract/commands.rs`: The commands: what can be asked for, each with the acts it does and the flags their weight gives it.
   - `contract/inputs.rs`: The inputs: every flag, positional and environment variable, and the commands each applies to.
   - `contract/mod.rs`: snapall's invocation surface, declared once with argenv.
-- `doctor.rs`: The imperative shell for `snapall doctor`: probe the machine, run the install steps.
+- `doctor.rs`: `snapall doctor` at work: looking at the machine, and running the steps that install what is missing.
 - `generate.rs`: The shell completions and the man page.
-- `help.rs`: `--help`, generated from the contract so it can never disagree with what is accepted.
+- `help.rs`: `--help`, generated from the contract.
 - `logging.rs`: Where the audit trail goes: nowhere, to stderr, or to a private file.
-- `main.rs`: Composition root and imperative shell: wires the argenv-driven CLI, the TUI and the snapper adapter to the core, performs the I/O, and maps outcomes to exit codes.
+- `main.rs`: The program: read what was asked, set up what it works with, carry it out, and end with the right exit code.
 - `output.rs`: Printing, and the choice between text for a person and JSON for a program.
   - `render/activity.rs`: What snapall has done, as the journal remembers it.
   - `render/changing.rs`: What a restore would change, what a restore or a deletion did.
   - `render/groups.rs`: Groups of areas.
   - `render/health.rs`: How protection stands, and the checks that find out.
   - `render/listing.rs`: Listing snapshots and the history of a file.
-  - `render/mod.rs`: Presentation: pure functions from domain values to text or JSON.
+  - `render/mod.rs`: What the command line says: each result as text for a person or as JSON for a program.
   - `render/points.rs`: Restore points: listing them, what putting one back would do, and what it did.
   - `render/taking.rs`: What taking a snapshot reports: what was taken, or what would be.
 - `setup.rs`: `snapall setup`: find the parts of the disk that snapshots do not cover, explain what that means in plain words, ask, and set them up.

@@ -81,24 +81,24 @@ impl InMemoryBackend {
         Ok(id)
     }
 
-    /// From now on, changing a config's settings fails.
+    /// From now on, changing an area's settings fails.
     pub fn refuse_option_changes(&self) {
         self.lock().refuse_option_changes = true;
     }
 
-    /// From now on, removing a config fails.
+    /// From now on, removing an area fails.
     pub fn refuse_removals(&self) {
         self.lock().refuse_removals = true;
     }
 
-    /// Whether the config takes snapshots on a schedule, if it exists.
+    /// Whether the area takes snapshots on a schedule, if it exists.
     pub fn timeline_create(&self, area: &str) -> Option<bool> {
         let name = AreaName::parse(area).ok()?;
         self.lock().areas.get(&name).map(|c| c.timeline_create)
     }
 
     /// Declare `directory` the root of a separate subvolume: everything under it is no longer
-    /// covered by a config whose subvolume is above it.
+    /// covered by an area whose subvolume is above it.
     pub fn with_separate_location(self, directory: &str) -> Self {
         self.lock()
             .separate
@@ -142,7 +142,7 @@ impl InMemoryBackend {
         self
     }
 
-    /// Every snapshot taken so far: (config, id, description).
+    /// Every snapshot taken so far: (area, id, description).
     pub fn snapshots(&self) -> Vec<(AreaName, SnapshotId, String)> {
         self.lock()
             .areas

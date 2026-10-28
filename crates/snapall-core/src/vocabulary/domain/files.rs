@@ -21,7 +21,7 @@ pub enum ChangeKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Change {
     pub kind: ChangeKind,
-    /// An absolute path inside the config's subvolume.
+    /// An absolute path inside the area's subvolume.
     pub path: String,
 }
 

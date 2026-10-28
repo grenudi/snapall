@@ -185,13 +185,13 @@ fn list_snapshots_tui_and_contract() {
     assert_eq!(ok(&["contract"]).request, Request::Contract);
     assert_eq!(
         ok(&["snapshots"]).request,
-        Request::Snapshots { config: None }
+        Request::Snapshots { area: None }
     );
     assert_eq!(
         ok(&["snapshots", "home", "--json"]),
         Parsed {
             request: Request::Snapshots {
-                config: Some(names(&["home"]).remove(0))
+                area: Some(names(&["home"]).remove(0))
             },
             no_dbus: false,
             json: true,
@@ -207,7 +207,7 @@ fn delete_needs_a_area_and_a_nonzero_id() {
     assert_eq!(
         ok(&["delete", "home", "12"]).request,
         Request::Delete {
-            config: AreaName::parse("home").unwrap(),
+            area: AreaName::parse("home").unwrap(),
             id: SnapshotId::new(12).unwrap(),
             destroy: false,
         }
@@ -216,7 +216,7 @@ fn delete_needs_a_area_and_a_nonzero_id() {
     assert_eq!(
         ok(&["delete", "home", "12", "--destroy"]).request,
         Request::Delete {
-            config: AreaName::parse("home").unwrap(),
+            area: AreaName::parse("home").unwrap(),
             id: SnapshotId::new(12).unwrap(),
             destroy: true,
         }
@@ -372,7 +372,7 @@ fn changes_and_restore_take_a_area_a_snapshot_and_an_optional_path() {
     assert_eq!(
         ok(&["changes", "home", "12"]).request,
         Request::Changes {
-            config: home.clone(),
+            area: home.clone(),
             id,
             path: None
         }
@@ -380,7 +380,7 @@ fn changes_and_restore_take_a_area_a_snapshot_and_an_optional_path() {
     assert_eq!(
         ok(&["changes", "home", "12", "/home/me/notes.txt"]).request,
         Request::Changes {
-            config: home.clone(),
+            area: home.clone(),
             id,
             path: Some("/home/me/notes.txt".into())
         }
@@ -388,7 +388,7 @@ fn changes_and_restore_take_a_area_a_snapshot_and_an_optional_path() {
     assert_eq!(
         ok(&["restore", "home", "12"]).request,
         Request::Restore {
-            config: home.clone(),
+            area: home.clone(),
             id,
             path: None,
             dry_run: false,
@@ -398,7 +398,7 @@ fn changes_and_restore_take_a_area_a_snapshot_and_an_optional_path() {
     assert_eq!(
         ok(&["restore", "home", "12", "/home/me/a", "--dry-run", "--yes"]).request,
         Request::Restore {
-            config: home,
+            area: home,
             id,
             path: Some("/home/me/a".into()),
             dry_run: true,

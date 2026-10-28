@@ -76,7 +76,7 @@ pub fn areas(size: Rect) -> Areas {
 }
 
 /// [`areas`], adjusted for what is on screen: when the UI is open on one file, its versions take the
-/// whole body and there is no configs pane.
+/// whole body and there is no areas pane.
 pub fn layout(state: &State, size: Rect) -> Areas {
     let mut areas = areas(size);
     if state.file.is_some() {

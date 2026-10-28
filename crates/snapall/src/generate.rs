@@ -7,9 +7,9 @@
 
 use argenv_resolve::generate::{self, Command, Program, Shell};
 
+use crate::contract::VERSION;
 use crate::contract::{self, Contract};
 use crate::output::{Outcome, Show};
-use crate::VERSION;
 
 pub fn completions(show: &Show, shell: Shell) -> Outcome {
     let commands = commands();

@@ -734,7 +734,7 @@ mod tests {
     #[test]
     fn when_everything_worth_protecting_is_protected_it_says_so_and_asks_nothing() {
         let backend = InMemoryBackend::with_areas(&["root", "home"]).with_root_area("root");
-        // make the in-memory `home` config's subvolume /home, as a real one would be
+        // make the in-memory `home` area's subvolume /home, as a real one would be
         let mut person = Person::answering(&[]);
         let facts = Facts {
             mountinfo: MOUNTINFO.into(),

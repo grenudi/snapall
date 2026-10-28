@@ -10,19 +10,19 @@ use argenv_resolve::generate::Shell;
 use argenv_resolve::{InputResolveExt, Resolution};
 use snapall_core::{AreaName, Description, Point, SnapshotId};
 
-/// The config and snapshot a command acts on (`delete`, `changes`, `restore`).
+/// The area and snapshot a command acts on (`delete`, `changes`, `restore`).
 pub(super) fn target(resolution: &Resolution) -> Result<(AreaName, SnapshotId), UsageError> {
     let missing = |record: argenv_resolve::Record| {
         usage_error(format!("missing required argument {}", record.usage()))
     };
-    let config = Contract::TARGET_AREA
+    let area = Contract::TARGET_AREA
         .get_from(resolution)
         .ok_or_else(|| missing(Contract::TARGET_AREA.to_record()))?;
     let id = Contract::SNAPSHOT_ID
         .get_from(resolution)
         .ok_or_else(|| missing(Contract::SNAPSHOT_ID.to_record()))?;
     Ok((
-        parse_area("AREA", &config)?,
+        parse_area("AREA", &area)?,
         SnapshotId::new(id).ok_or_else(|| {
             usage_error("ID 0 is the current system, not a snapshot; there is nothing to act on")
         })?,
@@ -72,31 +72,31 @@ pub(super) fn build_request(
         },
         Command::List => Request::List,
         Command::Snapshots => Request::Snapshots {
-            config: Contract::SNAPSHOTS_AREA
+            area: Contract::SNAPSHOTS_AREA
                 .get_from(resolution)
                 .map(|name| parse_area("AREA", &name))
                 .transpose()?,
         },
         Command::Delete => {
-            let (config, id) = target(resolution)?;
+            let (area, id) = target(resolution)?;
             Request::Delete {
-                config,
+                area,
                 id,
                 destroy: flag(&Contract::DESTROY, resolution),
             }
         }
         Command::Changes => {
-            let (config, id) = target(resolution)?;
+            let (area, id) = target(resolution)?;
             Request::Changes {
-                config,
+                area,
                 id,
                 path: path_argument(resolution)?,
             }
         }
         Command::Restore => {
-            let (config, id) = target(resolution)?;
+            let (area, id) = target(resolution)?;
             Request::Restore {
-                config,
+                area,
                 id,
                 path: path_argument(resolution)?,
                 dry_run: flag(&Contract::DRY_RUN, resolution),
@@ -207,7 +207,7 @@ pub(super) fn parse_area(what: &str, name: &str) -> Result<AreaName, UsageError>
     AreaName::parse(name).map_err(|e| usage_error(format!("{what}: {e}")))
 }
 
-/// `--only a,b`: a comma-separated list of config names, each validated.
+/// `--only a,b`: a comma-separated list of area names, each validated.
 pub(crate) fn parse_only(raw: &str) -> Result<Vec<AreaName>, UsageError> {
     raw.split(',')
         .map(|name| parse_area("--only", name.trim()))

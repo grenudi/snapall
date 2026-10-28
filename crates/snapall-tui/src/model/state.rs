@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What the window knows: the lists, the cursor, the open prompt, the message, and what the shell told it about the machine.
+//! What the window knows: the lists, the cursor, the open prompt, the message, and what it was told about the machine.
 
 use crate::model::*;
 
@@ -22,7 +22,7 @@ pub struct AreaEntry {
     pub snapshots: Load<Vec<SnapshotInfo>>,
 }
 
-/// One file the UI was opened on: where it is, and the config whose snapshots hold its history.
+/// One file the UI was opened on: where it is, and the area whose snapshots hold its history.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileTarget {
     pub path: String,
@@ -89,7 +89,7 @@ pub struct UiContext {
     pub boot_tip: Option<String>,
     /// How to restore the *system itself*, shown instead of a confirm button for the system root.
     pub restore_route: String,
-    /// Open on this file's history instead of on all configs.
+    /// Open on this file's history instead of on all areas.
     pub file: Option<FileTarget>,
     /// The parts of the disk that have no snapshots yet and could have, best first.
     pub offers: Vec<Offer>,
@@ -190,11 +190,11 @@ pub enum Modal {
         area: AreaName,
         ids: Vec<SnapshotId>,
     },
-    /// Put a config back to how a snapshot had it.
+    /// Put an area back to how a snapshot had it.
     Restore {
         area: AreaName,
         id: SnapshotId,
-        /// One path of the config, or `None` for all of it.
+        /// One path of the area, or `None` for all of it.
         path: Option<String>,
         stage: RestoreStage,
     },
@@ -374,7 +374,7 @@ impl State {
         self.entries().get(self.area_cursor)
     }
 
-    /// The selected config's snapshots, newest first.
+    /// The selected area's snapshots, newest first.
     pub fn displayed_snapshots(&self) -> Vec<&SnapshotInfo> {
         match self.selected_area().map(|c| &c.snapshots) {
             Some(Load::Loaded(list)) => list.iter().rev().collect(),

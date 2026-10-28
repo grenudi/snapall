@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Stopping the protection of an area: the one thing snapall does that cannot be taken back. Every snapshot
-//! of the area is deleted for good (its own files are not touched), so it is *planned* first: what would go,
+//! Stopping the protection of an area: every snapshot of it is deleted for good (its own files are not
+//! touched), so it is *planned* first: what would go,
 //! how much room that frees, which restore points and groups it affects. Whoever asks, the plan is shown
 //! before anything is done.
 //!

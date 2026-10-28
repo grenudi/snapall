@@ -135,9 +135,9 @@ contract! {
         ..Input::EMPTY
     };
 
-    /// Which configs to snapshot.
+    /// Which areas to snapshot.
     ///
-    /// A `String`, not a list: argenv lists need a closed set of allowed tokens, and config
+    /// A `String`, not a list: argenv lists need a closed set of allowed tokens, and area
     /// names are only known at runtime. snapall splits and validates it itself.
     ONLY: String, Command = Input {
         key:         "only",
@@ -191,7 +191,7 @@ contract! {
 
     // ---- snapshots -------------------------------------------------------------------
 
-    /// Which config's snapshots to list.
+    /// Which area's snapshots to list.
     SNAPSHOTS_AREA: String, Command = Input {
         key:         "snapshots_config",
         ty:          Type::String,
@@ -204,7 +204,7 @@ contract! {
 
     // ---- delete ----------------------------------------------------------------------
 
-    /// The config a snapshot belongs to.
+    /// The area a snapshot belongs to.
     TARGET_AREA: String, Command = Input {
         key:         "config",
         ty:          Type::String,

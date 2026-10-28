@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The pure core of the UI: state, messages, effects and `update`.
+//! What the window does when something happens: its state, what can happen to it, and what it asks for in return.
 //!
 //! Nothing here touches a terminal or a backend. `update` mutates the state and returns
 //! the *effects* the shell should perform; the shell reports what happened as new messages.

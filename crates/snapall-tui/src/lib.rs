@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! A terminal UI for snapall: a second *driving adapter* over the same port as the CLI.
+//! The window: everything snapall does, in a terminal, with the keys and the mouse, over the same core as the
+//! command line.
 //!
 //! Structured as the canon's functional core and imperative shell:
 //!

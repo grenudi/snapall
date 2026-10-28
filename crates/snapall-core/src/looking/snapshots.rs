@@ -29,7 +29,7 @@ pub(crate) fn ensure_area(
     }
 }
 
-/// The snapshots of one config, oldest first.
+/// The snapshots of one area, oldest first.
 pub fn snapshots_of(
     backend: &dyn SnapshotBackend,
     area: &AreaName,
@@ -38,7 +38,7 @@ pub fn snapshots_of(
     Ok(backend.list_snapshots(area)?)
 }
 
-/// The snapshots of every config, configs sorted by name. A failure for any config is an
+/// The snapshots of every area, areas sorted by name. A failure for any area is an
 /// error: a partial listing would look complete.
 pub fn all_snapshots(
     backend: &dyn SnapshotBackend,
@@ -55,7 +55,7 @@ pub fn all_snapshots(
         .collect()
 }
 
-/// Delete one snapshot of an existing config.
+/// Delete one snapshot of an existing area.
 pub fn delete_snapshot(
     backend: &dyn SnapshotBackend,
     area: &AreaName,

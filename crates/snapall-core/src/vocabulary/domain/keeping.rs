@@ -51,7 +51,7 @@ impl Retention {
     }
 }
 
-/// A setting of a config that snapall chooses for the configs it creates.
+/// A setting of an area that snapall chooses for the areas it creates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AreaOption {
     /// Whether snapper takes snapshots by itself on a schedule (hourly, daily, ...). snapall turns

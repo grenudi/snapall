@@ -8,7 +8,7 @@ use crate::ports::snapshots::SnapshotBackend;
 use crate::vocabulary::domain::{AreaName, Description, FileState, SnapshotId, SnapshotKind};
 
 /// The behaviour every `SnapshotBackend` must have, whatever sits behind it.
-/// `existing` must name a config the backend can snapshot.
+/// `existing` must name an area the backend can snapshot.
 pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
     let areas = backend.list_areas().expect("list_configs succeeds");
     assert!(
@@ -51,7 +51,7 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
         "listing a missing config must be an error"
     );
 
-    // Restoring is checked read-only here (mutation is backend-specific): where the config lives,
+    // Restoring is checked read-only here (mutation is backend-specific): where the area lives,
     // what changed since a snapshot, and that a snapshot that does not exist is an error.
     let location = backend
         .area_location(existing)

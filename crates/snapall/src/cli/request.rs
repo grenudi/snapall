@@ -23,22 +23,22 @@ pub enum Request {
     },
     List,
     Snapshots {
-        config: Option<AreaName>,
+        area: Option<AreaName>,
     },
     Delete {
-        config: AreaName,
+        area: AreaName,
         id: SnapshotId,
         destroy: bool,
     },
     /// What restoring snapshot `id` would change.
     Changes {
-        config: AreaName,
+        area: AreaName,
         id: SnapshotId,
         path: Option<String>,
     },
-    /// Put the config, or one path of it, back to how snapshot `id` had it.
+    /// Put the area, or one path of it, back to how snapshot `id` had it.
     Restore {
-        config: AreaName,
+        area: AreaName,
         id: SnapshotId,
         path: Option<String>,
         dry_run: bool,
@@ -117,7 +117,7 @@ pub enum Request {
         source_date_epoch: Option<u64>,
     },
     Tui {
-        /// Open on the history of this file instead of on all configs.
+        /// Open on the history of this file instead of on all areas.
         file: Option<String>,
     },
     Contract,

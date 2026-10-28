@@ -14,7 +14,7 @@ fn name(s: &str) -> AreaName {
     AreaName::parse(s).unwrap()
 }
 
-/// A state with one config selected and its snapshots still being fetched: one effect in flight.
+/// A state with one area selected and its snapshots still being fetched: one effect in flight.
 fn busy() -> State {
     let mut state = State::default();
     update(&mut state, Msg::Start);
@@ -49,7 +49,7 @@ fn a_result_settles_one_pending_effect_and_may_ask_for_more() {
     update(&mut state, Msg::Start);
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
     assert_eq!(state.pending, 1);
-    // The config list came back (-1) and asks for the first config's snapshots (+1).
+    // The area list came back (-1) and asks for the first area's snapshots (+1).
     update(&mut state, Msg::AreasLoaded(Ok(vec![name("home")])));
     assert_eq!(state.pending, 1);
     // The snapshots came back (-1) and ask for nothing more.

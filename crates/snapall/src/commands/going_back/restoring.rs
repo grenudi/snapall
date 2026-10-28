@@ -14,7 +14,7 @@ use snapall_core::{
 };
 use std::error::Error;
 
-/// Put a config, or one path of it, back to how a snapshot had it. It shows what will change, asks
+/// Put an area, or one path of it, back to how a snapshot had it. It shows what will change, asks
 /// first (unless told not to), and the use case takes a snapshot of the current state before it
 /// touches anything.
 pub fn restore(

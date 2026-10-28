@@ -149,7 +149,7 @@ impl SnapshotBackend for InMemoryBackend {
             .ok_or_else(|| BackendError::UnknownArea(area.clone()))?;
         let base = entry.location.trim_end_matches('/');
         let inside = base.is_empty() || path == base || path.starts_with(&format!("{base}/"));
-        // a separate subvolume below the config's own directory takes the path out of its snapshots
+        // a separate subvolume below the area's own directory takes the path out of its snapshots
         let cut_off = state.separate.iter().any(|root| {
             root.len() > base.len() && (path == root || path.starts_with(&format!("{root}/")))
         });

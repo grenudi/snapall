@@ -178,7 +178,7 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
     reaction.effects
 }
 
-/// Move the cursor of the focused pane. Changing config loads its snapshots on first visit.
+/// Move the cursor of the focused pane. Changing area loads its snapshots on first visit.
 pub(crate) fn step(state: &mut State, delta: isize) -> Vec<Effect> {
     match state.focus {
         Pane::Areas => {

@@ -16,7 +16,7 @@ pub struct Outcome {
     pub result: Result<SnapshotId, BackendError>,
 }
 
-/// One outcome per planned config, in plan order.
+/// One outcome per planned area, in plan order.
 #[derive(Debug)]
 pub struct Report {
     pub outcomes: Vec<Outcome>,
@@ -41,7 +41,7 @@ pub fn plan_snapshots(
     Ok(plan(only, &available)?)
 }
 
-/// Execute a plan. One failing config does not stop the others: every config gets its
+/// Execute a plan. One failing area does not stop the others: every area gets its
 /// attempt and the caller sees every outcome.
 pub fn run_plan(
     backend: &dyn SnapshotBackend,
@@ -52,7 +52,7 @@ pub fn run_plan(
     run_plan_along(backend, plan, description, point, &Unattended).0
 }
 
-/// [`run_plan`], one step per config, following a [`Course`]: told before each, and stoppable between
+/// [`run_plan`], one step per area, following a [`Course`]: told before each, and stoppable between
 /// them. The second answer is whether it was stopped before the end; the report then has the outcomes of
 /// the steps that were taken.
 pub fn run_plan_along(

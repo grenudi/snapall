@@ -15,9 +15,9 @@ pub struct Probe {
     pub snapper: Result<String, String>,
     /// Whether the effective user is root, if that could be determined.
     pub is_root: Option<bool>,
-    /// The configs snapper reports, or why asking failed. `None` when snapper is missing.
+    /// The areas snapper reports, or why asking failed. `None` when snapper is missing.
     pub areas: Option<Result<Vec<AreaName>, String>>,
-    /// The subvolume of each config (where it is mounted), for what the configs do not cover.
+    /// The subvolume of each area (where it is mounted), for what the areas do not cover.
     pub locations: Vec<(AreaName, String)>,
 }
 
@@ -116,7 +116,7 @@ pub fn diagnose(probe: &Probe) -> Vec<Check> {
     checks
 }
 
-/// What to try when asking snapper for its configs failed.
+/// What to try when asking snapper for its areas failed.
 pub(super) fn area_fix(why: &str, is_root: Option<bool>) -> Option<String> {
     if why.to_ascii_lowercase().contains("dbus") {
         // snapper talks to snapperd over the system bus. Containers and minimal installs

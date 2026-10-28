@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Domain, planning and ports for snapall.
+//! What snapall does, with no terminal, no file and no tool in sight: protecting parts of the disk, taking
+//! snapshots, looking at them, going back to them and keeping them.
 //!
-//! This crate is the hexagon: it knows *what* snapall does and nothing about *how* a
-//! snapshot is taken. It has no I/O and must not depend on a CLI parser, a serializer
+//! It knows *what* snapall does and nothing about *how* a snapshot is taken. It has no I/O and must not depend on a CLI parser, a serializer
 //! or an adapter; `crates/snapall/tests/architecture.rs` enforces that.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]

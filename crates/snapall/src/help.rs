@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! `--help`, generated from the contract so it can never disagree with what is accepted.
+//! `--help`, generated from the contract.
 
 use argenv_resolve::Record;
 

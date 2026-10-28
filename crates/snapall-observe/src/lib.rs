@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Adapter for the observability port.
+//! Reporting what snapall did: every call to the backend timed and written as a line of text or JSON.
 //!
 //! [`Observed`] wraps any [`SnapshotBackend`], times every call and reports it to an
 //! [`Observer`]; [`Lines`] is an observer that writes one line per event, as text or as JSON.
