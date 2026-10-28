@@ -164,8 +164,8 @@ def main(argv):
     if branch == "main":
         sys.exit("on main: ship a branch")
     owner = REPO.split("/")[0]
-    prs = api(f"pulls?head={owner}:{branch}&state=all").get("HTTP") is None and api(f"pulls?head={owner}:{branch}&state=all") or []
-    pr = prs[0] if isinstance(prs, list) and prs else None
+    found = api(f"pulls?head={owner}:{branch}&state=all")
+    pr = found[0] if isinstance(found, list) and found else None
     if pr is None:
         sh("git", "push", "-q", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
         body = open(body_file).read() if body_file else sh("git", "log", "-1", "--format=%b").stdout
