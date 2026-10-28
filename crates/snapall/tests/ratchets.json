@@ -1,11 +1,10 @@
 {
   "entry_files_too_long": {
     "crates/snapall-system/src/lib.rs": 244,
-    "crates/snapall-tui/src/model/mod.rs": 143
+    "crates/snapall-tui/src/model/mod.rs": 142
   },
   "files_too_long": {
     "crates/snapall-tui/src/changes.rs": 419,
-    "crates/snapall-tui/src/tabs/activity.rs": 339,
     "crates/snapall/src/contract/inputs.rs": 514,
     "crates/snapall/src/setup.rs": 432
   },

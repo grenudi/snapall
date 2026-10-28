@@ -2,9 +2,18 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Snapshots tab: the protected areas on the left, the chosen area's snapshots on the right.
+//! Drawing the Snapshots tab: the protected areas and their groups on the left, the chosen area's snapshots on the right.
 
-use crate::view::*;
+use crate::model::{Button, Click, Load, Pane, State};
+use crate::theme::{ACCENT, DIM};
+use ratatui::layout::{Constraint, Rect};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{
+    Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Row, Table, TableState, Wrap,
+};
+use ratatui::Frame;
+use snapall_core::{SnapshotInfo, SnapshotKind};
 
 pub(crate) fn pane_block(title: String, focused: bool) -> Block<'static> {
     let color = if focused { ACCENT } else { DIM };
