@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.2]
+
+
+### Refactoring
+- The three tabs are three folders named as the tab bar names them ([#91](https://github.com/grenudi/snapall/pull/91)) ([fee6a40])
+
+
+
 ## [0.26.1]
 
 
