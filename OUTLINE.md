@@ -78,12 +78,15 @@ What each part of snapall says it is for, read from the first line of each modul
 - `lib.rs`: The snapshot backend for snapper: our verbs said to it, and what it says read back in our words.
 - `reading.rs`: Reading what snapper prints back into our own words.
 - `running.rs`: Running the snapper program and what it leaves behind.
+- `version.rs`: Which version of snapper is installed, or why that could not be found out.
 
 ## snapall-system
 
 - `asking.rs`: Running a program and reading what it says: what it printed, what the service manager says of a unit, and the numbers `df` prints.
 - `boot_menu.rs`: Looking at the machine for what a boot menu needs, its files and services, and handing the facts on to be judged (`snapall_core::going_back::boot::assess`).
+- `environment.rs`: What this machine is, for the doctor and for setup: its operating system, whether this is the administrator, and its mount table.
 - `groups.rs`: The groups file: plain text under `/etc/snapall`, read and written whole.
+- `installing.rs`: Running one of the steps that install what is missing, as the command it is.
 - `journal.rs`: The journal on disk: one JSON object per line, appended.
 - `lib.rs`: Asking the machine what the core wants to know: `df` for a disk, `systemctl` for a background job, `date` for the time, unit files for a job's schedule, `btrfs` for how room is counted, and a lock file for who is making a change.
 - `lock.rs`: Taking turns at changing things: the right to make a change is held in a file, so that two restores, or a restore and a deletion, do not race each other.

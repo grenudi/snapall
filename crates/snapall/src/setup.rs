@@ -361,7 +361,6 @@ pub fn hint_for(offers: &[snapall_tui::Offer]) -> Option<String> {
 
 /// Read the facts of this machine.
 pub fn gather() -> Facts {
-    let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let ask_systemd = |question: &str| {
         Command::new("systemctl")
             .args([question, "snapper-cleanup.timer"])
@@ -371,8 +370,8 @@ pub fn gather() -> Facts {
     };
     let (enabled, active) = (ask_systemd("is-enabled"), ask_systemd("is-active"));
     Facts {
-        mountinfo: std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default(),
-        is_root: crate::doctor::effective_uid(&status) == Some(0),
+        mountinfo: snapall_system::environment::mounts().unwrap_or_default(),
+        is_root: snapall_system::environment::is_administrator() == Some(true),
         cleanup: explain::cleanup_from(enabled.as_deref(), active.as_deref()),
         cleanup_schedule: snapall_system::LinuxSystem::new()
             .unit_details(snapall_core::keeping::jobs::CLEANUP.unit)
