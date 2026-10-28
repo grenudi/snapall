@@ -130,7 +130,10 @@ What each part of snapall says it is for, read from the first line of each modul
 - `advice.rs`: What to tell someone whose file no snapshot can contain: why, and what to do about it, in snapall's own words and with snapall's own command.
 - `ask.rs`: Asking before a change, and the end of a command that was not told to go ahead.
 - `boot_probe.rs`: The imperative half of the boot-menu check: look at files and services, hand the facts to `snapall_core::boot::assess`.
-- `cli.rs`: Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
+  - `cli/building.rs`: Building the request from what was resolved: one command to one request.
+  - `cli/mod.rs`: Driving adapter: turn an argv and an environment into a validated [`Parsed`] request.
+  - `cli/parsing.rs`: Parsing what was typed: the command, its words, and what to suggest when it is mistyped.
+  - `cli/request.rs`: What was asked for: the request, how it logs, and the error in asking.
   - `commands/change.rs`: A change being made: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
   - `commands/deleting.rs`: Deleting a snapshot.
     - `commands/going_back/mod.rs`: Going back: to a snapshot, to a restore point, or to before a change.
@@ -147,7 +150,9 @@ What each part of snapall says it is for, read from the first line of each modul
   - `commands/running.rs`: Changes that are running: asking one to stop.
   - `commands/taking.rs`: Taking snapshots: of one area, of every protected area, or of a group.
   - `commands/window.rs`: The window: opening it, on the whole or on one file.
-- `contract.rs`: snapall's invocation surface, declared once with argenv.
+  - `contract/commands.rs`: The commands: what can be asked for, each with the acts it does and the flags their weight gives it.
+  - `contract/inputs.rs`: The inputs: every flag, positional and environment variable, and the commands each applies to.
+  - `contract/mod.rs`: snapall's invocation surface, declared once with argenv.
 - `doctor.rs`: The imperative shell for `snapall doctor`: probe the machine, run the install steps.
 - `generate.rs`: The shell completions and the man page.
 - `help.rs`: `--help`, generated from the contract so it can never disagree with what is accepted.
