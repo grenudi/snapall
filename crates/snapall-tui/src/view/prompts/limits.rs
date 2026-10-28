@@ -9,7 +9,7 @@ use crate::view::*;
 use snapall_core::{limits_words, preview_limits};
 
 pub(crate) fn limits_spec(editor: &LimitsEditor, state: &State) -> ModalSpec {
-    let area = snapall_core::coverage::describe(
+    let area = snapall_core::protecting::coverage::describe(
         &state
             .health
             .data

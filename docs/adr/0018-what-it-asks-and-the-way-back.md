@@ -17,7 +17,7 @@ changed with no question; the window confirmed mostly with Enter.
 
 ## Decisions
 
-**Three weights, one table (`snapall_core::consequence`).** *Light* (reading, taking a snapshot): never asked.
+**Three weights, one table (`snapall_core::vocabulary::consequence`).** *Light* (reading, taking a snapshot): never asked.
 *Changes* (can be put back, but putting back costs time and attention): type `y` or `yes`. *Destroys* (lost for
 good): type `destroy`, plus the name where it is done to one thing (`destroy home`). The command line, the window
 and the tests read the same table, so they cannot disagree.
@@ -61,7 +61,7 @@ A rule that has to be remembered is broken the first time someone forgets it, so
 * **One question in the window** (`model/prompts/confirm.rs`). Every change starts through it, asked at the weight
   `Act::weight()` gives it; a prompt cannot start a change without it. Its answers are the core's
   `Weight::accepts`, the same function the command line uses.
-* **One place for every way back** (`snapall_core::rollback`). The command line and the window record the same
+* **One place for every way back** (`snapall_core::going_back::rollback`). The command line and the window record the same
   words and the same commands for the same change; `Rollback::words` is how both show it.
 * **One declaration per command** (`contract.rs`, the `commands!` macro). The enum, the list of all commands, their
   words and every list of who takes `--json`, logs, takes `--dry-run`, `--yes` or `--destroy` are derived from it.

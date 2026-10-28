@@ -41,7 +41,7 @@ SNAPALL_IT=1 cargo test -p snapall-snapper --test real_snapper
 sudo ./dev/btrfs-fixture.sh down
 ```
 
-CI runs all of it on every push, plus `argenv lint` over the committed contract (`snapall.argenv.json`). After changing the CLI surface in `crates/snapall/src/contract.rs`, regenerate it:
+CI runs all of it on every push, plus `argenv lint` over the committed contract (`snapall.argenv.json`). After changing the CLI surface in `crates/snapall/src/contract/`, regenerate it:
 
 ```
 cargo run -q -p snapall -- contract > snapall.argenv.json

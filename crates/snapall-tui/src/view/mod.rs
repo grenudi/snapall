@@ -12,7 +12,7 @@ use ratatui::widgets::{
     TableState, Wrap,
 };
 use ratatui::Frame;
-use snapall_core::explain;
+use snapall_core::vocabulary::explain;
 use snapall_core::{AreaName, ChangeKind, FileState, SnapshotId, SnapshotInfo, SnapshotKind};
 
 use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};

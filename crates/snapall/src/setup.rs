@@ -12,8 +12,8 @@
 use std::error::Error;
 use std::process::Command;
 
-use snapall_core::coverage::{self, Area, Worth};
-use snapall_core::explain::{self, Cleanup};
+use snapall_core::protecting::coverage::{self, Area, Worth};
+use snapall_core::vocabulary::explain::{self, Cleanup};
 use snapall_core::{protect_area, AreaName, SnapshotBackend, SystemProbe};
 
 use crate::output::emit;
@@ -375,7 +375,7 @@ pub fn gather() -> Facts {
         is_root: crate::doctor::effective_uid(&status) == Some(0),
         cleanup: explain::cleanup_from(enabled.as_deref(), active.as_deref()),
         cleanup_schedule: snapall_system::LinuxSystem::new()
-            .unit_details(snapall_core::services::CLEANUP.unit)
+            .unit_details(snapall_core::keeping::jobs::CLEANUP.unit)
             .map(|details| details.schedule())
             .unwrap_or_default(),
     }
@@ -433,7 +433,7 @@ impl Talk for Quiet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::testing::InMemoryBackend;
+    use snapall_core::ports::testing::InMemoryBackend;
 
     /// A person who answers from a script and writes down everything said to them.
     struct Person {

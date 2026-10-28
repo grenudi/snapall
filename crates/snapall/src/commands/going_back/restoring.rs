@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, boot_probe, render};
-use snapall_core::boot;
+use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
     preview_restore, restore_snapshot, AreaName, Preview, RestoreError, SnapshotId,
@@ -44,7 +44,7 @@ pub fn restore(
     let change = Change::begin(approved, &now, &past, None)?;
     let result = restore_snapshot(ctx.backend, area, id, path);
     if let Ok(done) = &result {
-        change.rollback(snapall_core::rollback::after_restoring(
+        change.rollback(snapall_core::going_back::rollback::after_restoring(
             area,
             path,
             done.safety_snapshot,
@@ -99,7 +99,7 @@ fn ask_before_restoring(
             format!(
                 "{}\n{}\n",
                 render::changes(area, id, preview),
-                snapall_core::explain::RESTORE_CAUTION
+                snapall_core::vocabulary::explain::RESTORE_CAUTION
             )
         },
         &restore_question(preview, area, id),

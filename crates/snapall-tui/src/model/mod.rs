@@ -73,7 +73,7 @@ pub(super) const PRESSED_TICKS: u8 = 3;
 
 /// What a unit is called to a person: its job's title, or the unit's own name if it is not one.
 pub(crate) fn job_title(unit: &str) -> String {
-    snapall_core::services::ALL
+    snapall_core::keeping::jobs::ALL
         .iter()
         .find(|job| job.unit == unit || job.worker_unit() == unit)
         .map_or_else(|| unit.to_owned(), |job| job.title.to_owned())

@@ -48,7 +48,7 @@ pub fn limits(
     )?;
     let result = set_the_options(ctx, &config, &options);
     if result.is_ok() {
-        change.rollback(snapall_core::rollback::after_limits(
+        change.rollback(snapall_core::going_back::rollback::after_limits(
             &config.to_string(),
             &before,
         ));
@@ -109,7 +109,7 @@ fn what_the_next_cleanup_would_remove(
     let now = snapall_system::LinuxSystem::new()
         .local_time()
         .as_deref()
-        .and_then(snapall_core::calendar::seconds_from_snapshot_date);
+        .and_then(snapall_core::vocabulary::calendar::seconds_from_snapshot_date);
     Ok(preview_limits(
         &ctx.backend.list_snapshots(config)?,
         after,

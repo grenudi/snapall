@@ -11,7 +11,7 @@ use snapall_core::{AreaName, FileVersion, Preview, SnapshotId, SnapshotInfo};
 pub(super) fn unprotect_plan_loaded(
     state: &mut State,
     area: AreaName,
-    plan: Result<snapall_core::unprotect::Plan, String>,
+    plan: Result<snapall_core::protecting::unprotect::Plan, String>,
 ) -> Vec<Effect> {
     if let Some(Modal::StopProtecting(prompt)) = &mut state.modal {
         if prompt.area == area {

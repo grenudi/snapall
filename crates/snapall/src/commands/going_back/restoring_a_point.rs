@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, boot_probe, render};
-use snapall_core::boot;
+use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
     all_snapshots, fresh_point, preview_point, restore_point_along, restore_points, MemberView,
@@ -53,7 +53,7 @@ pub fn restore_all(
         &change.course(),
     );
     if !done.members.is_empty() {
-        change.rollback(snapall_core::rollback::after_restoring_all(
+        change.rollback(snapall_core::going_back::rollback::after_restoring_all(
             done.safety.as_str(),
         ));
     }
@@ -140,7 +140,7 @@ fn ask_before_putting_back(
             format!(
                 "{}\n{}\n",
                 render::point_preview(point, previews, route),
-                snapall_core::explain::RESTORE_CAUTION
+                snapall_core::vocabulary::explain::RESTORE_CAUTION
             )
         },
         &restore_point_question(point, previews),

@@ -9,7 +9,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::testing::InMemoryBackend;
+use snapall_core::ports::testing::InMemoryBackend;
 use snapall_core::{plan_snapshots, run_plan, AreaName, Description, Point, SnapshotBackend};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session};

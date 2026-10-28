@@ -7,7 +7,7 @@
 //! removed snapshot cannot be brought back.
 
 use crate::model::*;
-use snapall_core::limits::{LONGEST_PROTECTION_SECONDS, MOST_KEPT};
+use snapall_core::keeping::limits::{LONGEST_PROTECTION_SECONDS, MOST_KEPT};
 use snapall_core::{preview_limits, Act, Limits};
 
 /// What a setting moves by: one, or ten with Page Up and Page Down. How young is in minutes.
@@ -16,7 +16,7 @@ const MINUTE: u64 = 60;
 /// The machine's clock, as the same sort of seconds the snapshots' dates are.
 pub(crate) fn now_seconds(state: &State) -> Option<i64> {
     let now = state.health.data.as_ref()?.facts.now.as_deref()?;
-    snapall_core::calendar::seconds_from_snapshot_date(now)
+    snapall_core::vocabulary::calendar::seconds_from_snapshot_date(now)
 }
 
 /// Open the editor on an area, from what snapper has now.

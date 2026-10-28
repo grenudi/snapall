@@ -52,7 +52,7 @@ Measured honestly first, the code did not read that way:
 
 ## Built
 
-* **`Act` is the app's vocabulary** (`snapall_core::consequence`): every act listed once (`Act::EVERY`), with its
+* **`Act` is the app's vocabulary** (`snapall_core::vocabulary::consequence`): every act listed once (`Act::EVERY`), with its
   weight and its title, both exhaustive, so a new act does not compile until it has both.
 * **The contract is written in it.** Each command declares what it *does* (`.does(Act::DeleteSnapshots)`); whether
   it takes `--yes` or `--destroy` is derived from the weight of those acts, not declared again. The derived

@@ -8,8 +8,8 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::services::{self, JobAction};
-use snapall_core::testing::{FakeSystem, InMemoryBackend};
+use snapall_core::keeping::jobs::{self, JobAction};
+use snapall_core::ports::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{plan_snapshots, run_plan, Description, QuotaMode, SystemProbe};
 use snapall_tui::model::{Key, Modal, Msg};
 use snapall_tui::tabs::health::RowAction;
@@ -65,9 +65,9 @@ fn system() -> FakeSystem {
     FakeSystem::new()
         .with_disk(100, 40)
         .at("2026-01-02 12:00:00")
-        .with_service(services::CLEANUP.unit, "disabled", "inactive")
+        .with_service(jobs::CLEANUP.unit, "disabled", "inactive")
         .with_unit_file(
-            services::CLEANUP.unit,
+            jobs::CLEANUP.unit,
             "Daily Cleanup of Snapper Snapshots",
             &[("OnBootSec", "10m"), ("OnUnitActiveSec", "1d")],
         )
@@ -94,7 +94,7 @@ fn choose(session: &mut Session<'_>, wanted: impl Fn(&RowAction) -> bool) {
 }
 
 fn the_cleanup_job(action: &RowAction) -> bool {
-    matches!(action, RowAction::ControlJob(job) if job.unit == services::CLEANUP.unit)
+    matches!(action, RowAction::ControlJob(job) if job.unit == jobs::CLEANUP.unit)
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn a_jobs_controls_show_its_real_name_its_own_words_its_schedule_and_every_comma
     choose(&mut session, the_cleanup_job);
     session.press(Key::Enter);
     assert!(
-        matches!(&session.state.modal, Some(Modal::Job { unit }) if unit == services::CLEANUP.unit)
+        matches!(&session.state.modal, Some(Modal::Job { unit }) if unit == jobs::CLEANUP.unit)
     );
     let text = flat(&screen(&session));
     for must in [
@@ -144,7 +144,7 @@ fn the_keys_do_what_they_say_and_the_report_follows() {
     assert!(session.state.modal.is_none(), "it closed");
     assert_eq!(
         machine.job_actions(),
-        [(services::CLEANUP.unit.to_owned(), JobAction::EnableNow)]
+        [(jobs::CLEANUP.unit.to_owned(), JobAction::EnableNow)]
     );
     assert!(
         flat(&screen(&session)).contains("cleanup on"),
@@ -173,7 +173,7 @@ fn the_keys_do_what_they_say_and_the_report_follows() {
         session.confirm();
         assert_eq!(
             machine.job_actions().last().unwrap(),
-            &(services::CLEANUP.unit.to_owned(), action),
+            &(jobs::CLEANUP.unit.to_owned(), action),
             "{key}"
         );
     }

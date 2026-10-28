@@ -7,7 +7,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use snapall_core::testing::InMemoryBackend;
+use snapall_core::ports::testing::InMemoryBackend;
 use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Key, Load, Modal, Notice, Pane};
 use snapall_tui::Session;

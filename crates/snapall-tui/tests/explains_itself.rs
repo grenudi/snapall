@@ -10,7 +10,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::testing::InMemoryBackend;
+use snapall_core::ports::testing::InMemoryBackend;
 use snapall_core::{AreaName, Description, SnapshotBackend};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, FileTarget, Session, UiContext};
@@ -237,7 +237,7 @@ fn no_prompt_covers_the_two_footer_lines_at_24_rows() {
         let offers = vec![snapall_tui::Offer {
             mount_point: "/home".into(),
             title: "Home".into(),
-            summary: snapall_core::explain::protect_summary("/home"),
+            summary: snapall_core::vocabulary::explain::protect_summary("/home"),
             recommended: true,
         }];
         let mut session = Session::with_context(

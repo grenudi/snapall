@@ -7,7 +7,7 @@
 use super::*;
 use crate::ask;
 use crate::output::Outcome;
-use snapall_core::explain::room_counting_text;
+use snapall_core::vocabulary::explain::room_counting_text;
 use snapall_core::{gather, Act, Facts, QuotaMode, Switching, SystemProbe};
 use std::error::Error;
 
@@ -118,7 +118,9 @@ fn make_the_switch(
         .iter()
         .try_for_each(|area| system.set_quotas(&area.location, turn_on));
     if result.is_ok() {
-        change.rollback(snapall_core::rollback::after_room_counting(turn_on));
+        change.rollback(snapall_core::going_back::rollback::after_room_counting(
+            turn_on,
+        ));
     }
     change.end_with(&result);
     result?;

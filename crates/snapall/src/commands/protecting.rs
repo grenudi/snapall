@@ -14,7 +14,7 @@ use std::process::ExitCode;
 /// always says what that means first; on a terminal it needs the area's name typed out, in a script `--yes`;
 /// `--dry-run` only says. The system area is refused.
 pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Outcome {
-    use snapall_core::unprotect::{plan, stop_protecting};
+    use snapall_core::protecting::unprotect::{plan, stop_protecting};
     use snapall_core::SystemProbe;
     let config = AreaName::parse(area)?;
     let system = snapall_system::LinuxSystem::new();
@@ -47,7 +47,7 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
         &question,
         Some(config.as_str()),
     )?;
-    let title = snapall_core::coverage::describe(&plan.location).title;
+    let title = snapall_core::protecting::coverage::describe(&plan.location).title;
     let change = Change::begin(
         approved,
         &format!("Stopping protection of {title}"),
@@ -57,7 +57,7 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
     let result = stop_protecting(ctx.backend, &plan).map_err(|e| e.to_string());
     if result.is_ok() {
         change.rollback(snapall_core::Rollback::Advice(
-            snapall_core::explain::UNPROTECT_ADVICE.to_owned(),
+            snapall_core::vocabulary::explain::UNPROTECT_ADVICE.to_owned(),
         ));
     }
     change.end(result.clone().map(|n| format!("{n} snapshots deleted")));
@@ -103,7 +103,7 @@ pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Out
                 .iter()
                 .map(|(_, name)| name.to_string())
                 .collect();
-            change.rollback(snapall_core::rollback::after_protecting(&names));
+            change.rollback(snapall_core::going_back::rollback::after_protecting(&names));
         }
         change.end(if report.succeeded() {
             Ok(String::new())

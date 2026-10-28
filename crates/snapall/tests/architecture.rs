@@ -773,11 +773,10 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 7] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 6] = [
     ("crates/snapall-tui/src/changes.rs", 419),
     ("crates/snapall-tui/src/model/keys.rs", 353),
     ("crates/snapall-tui/src/model/state.rs", 401),
-    ("crates/snapall-tui/src/session.rs", 396),
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
     ("crates/snapall/src/setup.rs", 432),
     ("crates/snapall/src/contract/inputs.rs", 514),
@@ -945,5 +944,98 @@ fn the_worked_example_in_the_canon_is_the_code_it_shows() {
     assert!(
         canon.contains(&story),
         "docs/canon/small-languages.md shows a `delete` that is not the one in deleting.rs: copy the function again"
+    );
+}
+
+// ---- the documents name only what is there -------------------------------------------------------------------
+
+/// A document that is written in the present tense must point at what exists: a path that moved is a sentence that
+/// became false. ADRs are exempt: they are dated records of a decision and are never rewritten to match the present.
+#[test]
+fn the_documents_name_only_files_and_folders_that_exist() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut documents = vec![
+        "README.md",
+        "ARCHITECTURE.md",
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+    ]
+    .into_iter()
+    .map(|name| root.join(name))
+    .collect::<Vec<_>>();
+    for entry in std::fs::read_dir(root.join("docs")).unwrap().flatten() {
+        if entry
+            .path()
+            .extension()
+            .is_some_and(|extension| extension == "md")
+        {
+            documents.push(entry.path());
+        }
+    }
+    let everywhere: Vec<PathBuf> = {
+        let mut found = Vec::new();
+        let mut stack = vec![
+            root.join("crates"),
+            root.join("packaging"),
+            root.join("dev"),
+        ];
+        while let Some(folder) = stack.pop() {
+            for entry in std::fs::read_dir(&folder).into_iter().flatten().flatten() {
+                if entry.path().is_dir() {
+                    if entry.file_name() != "target" {
+                        stack.push(entry.path());
+                    }
+                } else {
+                    found.push(entry.path());
+                }
+            }
+        }
+        found
+    };
+    let mut missing = Vec::new();
+    for document in documents.iter().filter(|path| path.exists()) {
+        let text = std::fs::read_to_string(document).unwrap();
+        for line in text.lines() {
+            for quoted in line.split('`').skip(1).step_by(2) {
+                let looks_like_a_path = quoted.ends_with('/')
+                    || [".rs", ".toml", ".sh", ".py", ".json"]
+                        .iter()
+                        .any(|extension| quoted.ends_with(extension));
+                // only what is in this repository: not an extension, a system path, a URL or an option
+                if !looks_like_a_path
+                    || quoted.contains(' ')
+                    || quoted.contains('*')
+                    || quoted.contains("://")
+                    || quoted.starts_with('-')
+                    || quoted.starts_with('/')
+                    || (quoted.starts_with('.') && !quoted.starts_with("./"))
+                {
+                    continue;
+                }
+                let name = quoted.trim_start_matches("./");
+                let given = root.join(name).exists() || root.join("crates").join(name).exists();
+                let bare = !name.contains('/')
+                    && everywhere
+                        .iter()
+                        .any(|path| path.file_name().is_some_and(|file| file == name));
+                let inside = name.contains('/')
+                    && everywhere
+                        .iter()
+                        .any(|path| path.to_string_lossy().contains(name.trim_end_matches('/')));
+                if !given && !bare && !inside {
+                    missing.push(format!(
+                        "{}: `{quoted}`",
+                        document.strip_prefix(&root).unwrap().display()
+                    ));
+                }
+            }
+        }
+    }
+    missing.sort();
+    missing.dedup();
+    assert!(
+        missing.is_empty(),
+        "documents name what is not there:\n  {}",
+        missing.join("\n  ")
     );
 }

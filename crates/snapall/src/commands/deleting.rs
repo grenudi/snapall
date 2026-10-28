@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, output};
-use snapall_core::rollback::after_deleting;
+use snapall_core::going_back::rollback::after_deleting;
 use snapall_core::SnapshotInfo;
 use snapall_core::{delete_snapshot, find_snapshot, Act, AreaName, SnapshotId};
 

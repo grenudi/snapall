@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{advice, boot_probe, setup};
-use snapall_core::boot;
+use snapall_core::going_back::boot;
 use snapall_core::{area_covering, SnapshotBackend};
 use std::error::Error;
 use std::io::IsTerminal;

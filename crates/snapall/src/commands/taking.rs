@@ -9,7 +9,7 @@ use crate::ask;
 use crate::boot_probe;
 use crate::output::{self, Outcome};
 use crate::render;
-use snapall_core::boot;
+use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
     fresh_point, plan_snapshots, run_plan_along, AreaName, Description, Plan, Report,
@@ -50,7 +50,7 @@ pub fn create(
         Some(&point),
         &change.course(),
     );
-    if let Some(way_back) = snapall_core::rollback::after_taking(&report) {
+    if let Some(way_back) = snapall_core::going_back::rollback::after_taking(&report) {
         change.rollback(way_back);
     }
     record_how_taking_went(change, &plan, &report, stopped);

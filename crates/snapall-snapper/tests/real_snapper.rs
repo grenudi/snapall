@@ -9,7 +9,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use snapall_core::testing::backend_contract;
+use snapall_core::ports::testing::backend_contract;
 use snapall_core::{
     all_snapshots, area_covering, file_history, fresh_point, preview_restore, protect_area,
     restore_point, restore_points, restore_snapshot, snapshot_all, AreaName, ChangeKind,

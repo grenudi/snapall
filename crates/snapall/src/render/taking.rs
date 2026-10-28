@@ -5,7 +5,7 @@
 //! What taking a snapshot reports: what was taken, or what would be.
 
 use serde_json::{json, Value};
-use snapall_core::doctor::Status;
+use snapall_core::protecting::doctor::Status;
 use snapall_core::{AreaName, ChangeKind, Description, Plan, Report};
 
 pub fn report(report: &Report) -> String {

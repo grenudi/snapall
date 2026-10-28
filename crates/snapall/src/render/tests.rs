@@ -7,11 +7,11 @@
 #![cfg(test)]
 
 use serde_json::{json, Value};
-use snapall_core::doctor::OsRelease;
+use snapall_core::protecting::doctor::OsRelease;
 use snapall_core::{AreaName, Description};
 
 use super::*;
-use snapall_core::testing::InMemoryBackend;
+use snapall_core::ports::testing::InMemoryBackend;
 use snapall_core::{all_snapshots, plan_snapshots, snapshot_all, SnapshotBackend};
 
 #[test]
@@ -81,7 +81,7 @@ fn snapshot_tables_align_and_empty_areas_say_so() {
 
 #[test]
 fn doctor_output_shows_status_detail_and_fix() {
-    use snapall_core::doctor::{diagnose, Probe};
+    use snapall_core::protecting::doctor::{diagnose, Probe};
     let probe = Probe {
         os: OsRelease::parse("ID=arch\nPRETTY_NAME=\"Arch Linux\"\n"),
         snapper: Err("No such file or directory".into()),
@@ -107,10 +107,10 @@ fn doctor_output_shows_status_detail_and_fix() {
 // ---- restore points ------------------------------------------------------------------------
 
 fn points_fixture() -> (
-    snapall_core::testing::InMemoryBackend,
+    snapall_core::ports::testing::InMemoryBackend,
     snapall_core::RestorePoint,
 ) {
-    use snapall_core::testing::InMemoryBackend;
+    use snapall_core::ports::testing::InMemoryBackend;
     let backend = InMemoryBackend::with_areas(&["docs", "home", "root"]).with_root_area("root");
     backend.write_file("docs", "/mnt/docs/a.txt", "then");
     backend.write_file("home", "/mnt/home/b.txt", "then");

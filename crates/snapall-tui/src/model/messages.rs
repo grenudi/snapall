@@ -169,7 +169,7 @@ pub enum Msg {
     /// What stopping the protection of an area would do, or why it would not.
     UnprotectPlanLoaded {
         area: AreaName,
-        plan: Result<snapall_core::unprotect::Plan, String>,
+        plan: Result<snapall_core::protecting::unprotect::Plan, String>,
     },
     /// An area stopped being protected (how many snapshots went), or why it did not.
     ProtectionStopped {

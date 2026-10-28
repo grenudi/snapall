@@ -6,12 +6,12 @@
 
 #![cfg(test)]
 
-use crate::domain::{AreaName, Retention};
-use crate::services::{self, Job};
-use crate::system::{DiskUsage, QuotaMode, ServiceState};
+use crate::keeping::jobs::{self, Job};
+use crate::ports::machine::{DiskUsage, QuotaMode, ServiceState};
+use crate::vocabulary::domain::{AreaName, Retention};
 
 use super::*;
-use crate::testing::{FakeSystem, InMemoryBackend};
+use crate::ports::testing::{FakeSystem, InMemoryBackend};
 
 fn name(s: &str) -> AreaName {
     AreaName::parse(s).unwrap()
@@ -67,7 +67,7 @@ fn healthy() -> Facts {
             area("root", "/", 3, "2026-10-25 09:00:00", 40),
             area("home", "/home", 2, "2026-10-24 09:00:00", 40),
         ],
-        jobs: vec![job_facts(&services::CLEANUP, "enabled", "active")],
+        jobs: vec![job_facts(&jobs::CLEANUP, "enabled", "active")],
         boot_menu_plugin: false,
     }
 }
@@ -162,7 +162,7 @@ fn a_disk_nearly_full_is_something_to_do_and_a_full_one_is_something_to_do_now()
 #[test]
 fn cleanup_that_is_off_says_so_offers_to_switch_it_on_and_is_never_called_on_when_merely_enabled() {
     let mut facts = healthy();
-    set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
+    set_job(&mut facts, &jobs::CLEANUP, "disabled", "inactive");
     let health = assess(&facts);
     let finding = health
         .findings
@@ -180,7 +180,7 @@ fn cleanup_that_is_off_says_so_offers_to_switch_it_on_and_is_never_called_on_whe
         .any(|c| c.label == "cleanup off" && c.level == Level::Attention));
 
     // enabled but not running is not "on": nothing is cleaning anything
-    set_job(&mut facts, &services::CLEANUP, "enabled", "inactive");
+    set_job(&mut facts, &jobs::CLEANUP, "enabled", "inactive");
     let health = assess(&facts);
     let finding = health
         .findings
@@ -205,7 +205,7 @@ fn an_area_over_its_limit_is_only_a_problem_while_nothing_cleans_it_up() {
             .any(|h| h.contains("More snapshots than the limit")),
         "cleanup is running"
     );
-    set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
+    set_job(&mut facts, &jobs::CLEANUP, "disabled", "inactive");
     let health = assess(&facts);
     assert!(
         headlines(&health)
@@ -298,7 +298,7 @@ fn the_boot_menu_tool_is_only_a_concern_if_it_is_installed_and_not_doing_its_job
             .any(|h| h.contains("boot menu")),
         "not installed: nothing to say"
     );
-    set_job(&mut facts, &services::BOOT_MENU, "enabled", "inactive");
+    set_job(&mut facts, &jobs::BOOT_MENU, "enabled", "inactive");
     let health = assess(&facts);
     let finding = health
         .findings
@@ -314,7 +314,7 @@ fn the_boot_menu_tool_is_only_a_concern_if_it_is_installed_and_not_doing_its_job
         .iter()
         .any(|h| h.contains("boot menu")));
     facts.boot_menu_plugin = false;
-    set_job(&mut facts, &services::BOOT_MENU, "enabled", "active");
+    set_job(&mut facts, &jobs::BOOT_MENU, "enabled", "active");
     assert!(
         !headlines(&assess(&facts))
             .iter()
@@ -326,7 +326,7 @@ fn the_boot_menu_tool_is_only_a_concern_if_it_is_installed_and_not_doing_its_job
 #[test]
 fn the_status_bar_ends_with_how_many_things_need_attention_and_a_click_goes_to_the_worst() {
     let mut facts = healthy();
-    set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
+    set_job(&mut facts, &jobs::CLEANUP, "disabled", "inactive");
     facts.areas[1].disk = Some(DiskUsage {
         size: 100,
         used: 90,
@@ -350,7 +350,7 @@ fn the_status_bar_ends_with_how_many_things_need_attention_and_a_click_goes_to_t
 #[test]
 fn everything_it_says_is_in_words_a_newcomer_was_told() {
     let mut facts = healthy();
-    set_job(&mut facts, &services::CLEANUP, "disabled", "inactive");
+    set_job(&mut facts, &jobs::CLEANUP, "disabled", "inactive");
     facts.areas[1].snapshots = 61;
     facts.areas[1].disk = Some(DiskUsage {
         size: 100,
@@ -359,7 +359,7 @@ fn everything_it_says_is_in_words_a_newcomer_was_told() {
     facts.areas[1].retention.as_mut().unwrap().on_a_schedule = true;
     facts.areas[0].snapshots = 0;
     facts.areas[0].newest = None;
-    set_job(&mut facts, &services::BOOT_MENU, "enabled", "inactive");
+    set_job(&mut facts, &jobs::BOOT_MENU, "enabled", "inactive");
     for finding in assess(&facts).findings {
         // the one tool name a person must type is allowed to contain the word snapper
         let text = format!("{} {}", finding.headline, finding.why)
@@ -374,17 +374,17 @@ fn everything_it_says_is_in_words_a_newcomer_was_told() {
 #[test]
 fn gathering_reads_each_area_through_the_ports_and_skips_nothing_that_can_be_read() {
     let backend = InMemoryBackend::with_areas(&["home", "root"]).with_root_area("root");
-    let plan = crate::usecase::plan_snapshots(&backend, None).unwrap();
-    crate::usecase::run_plan(
+    let plan = crate::taking::run::plan_snapshots(&backend, None).unwrap();
+    crate::taking::run::run_plan(
         &backend,
         &plan,
-        &crate::domain::Description::parse("x").unwrap(),
+        &crate::vocabulary::domain::Description::parse("x").unwrap(),
         None,
     );
-    crate::usecase::run_plan(
+    crate::taking::run::run_plan(
         &backend,
         &plan,
-        &crate::domain::Description::parse("y").unwrap(),
+        &crate::vocabulary::domain::Description::parse("y").unwrap(),
         None,
     );
     let system = FakeSystem::new()
@@ -409,6 +409,6 @@ fn gathering_reads_each_area_through_the_ports_and_skips_nothing_that_can_be_rea
     );
     assert_eq!(home.disk.map(|d| d.percent_used()), Some(30));
     assert_eq!(home.retention.as_ref().and_then(|r| r.keep), Some(50));
-    assert!(facts.boot_menu_plugin && facts.state_of(&services::CLEANUP).is_running());
+    assert!(facts.boot_menu_plugin && facts.state_of(&jobs::CLEANUP).is_running());
     assert_eq!(assess(&facts).verdict.text, "All good");
 }
