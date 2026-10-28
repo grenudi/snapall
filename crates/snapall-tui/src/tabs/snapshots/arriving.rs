@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The lists of areas and snapshots: what happens when they arrive.
+//! What the Snapshots tab does when the areas and their snapshots arrive, and after a snapshot is taken.
 
 use crate::model::*;
+use snapall_core::{AreaName, SnapshotId, SnapshotInfo};
+use std::collections::BTreeSet;
 
 pub(crate) fn on_areas_loaded(
     state: &mut State,

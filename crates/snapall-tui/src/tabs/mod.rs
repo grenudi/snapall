@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! One module per tab that has more to it than the snapshot lists: each owns its state, its keys and
-//! its drawing, so a tab is read in one place.
+//! One folder for each tab, named as the tab bar names it: the snapshots, how protection is doing, and what
+//! snapall did. A tab is read in one place: what it does when something arrives, what its keys do, and how it
+//! is drawn.
 
 pub mod activity;
 pub mod health;
+pub mod snapshots;

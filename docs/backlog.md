@@ -20,10 +20,10 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 
 | # | Item | Status |
 |---|---|---|
-| 1 | The window is organised by mechanism (`model/`, `view/`), so its screens and questions are scattered. Group it by screen (snapshots, file history, health, activity) and by question, finishing what `tabs/health/` already does. The window's state is now four modules (`model/state/`: what looking brought back, what it is told, its questions, the window itself). Next, bring each screen's keys, state and drawing together as `tabs/health/` does, starting with the snapshots screen (`model/lists.rs`, `view/lists.rs`) | open |
+| 1 | The tabs are three folders named as the tab bar names them (`tabs/snapshots/`, `tabs/health/`, `tabs/activity/`). What is left by mechanism is the questions: `model/prompts/` and `view/prompts/` hold one pair of files per question, and `model/file.rs` with `view/file.rs` the file history screen. Also only Health and Activity own their state; the snapshots tab's still lives in the window's `State` | open |
 | 2 | `setup.rs` (432 lines) asks area by area as it works, which is why it is the one change that begins without a leave (`begin_asking_along`). Plan first, ask once, then begin | open |
 | 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
-| 4 | Window files over 300 lines: `changes.rs` (419) and `tabs/activity.rs` (339) | open |
+| 4 | The window's `changes.rs` is over 300 lines (419) | open |
 | 5 | Code that wraps tools but lives in the binary (`doctor.rs`, `boot_probe.rs`) still names them (`systemctl`, `grub_btrfs`, `snapper`). It belongs in an adapter | open |
 | 6 | Ten plain `config` names remain in the binary, in files that already used `area` for something else | open |
 | 7 | Run `dev/golden-output.sh check` in CI. It needs its own fresh fixture, after the steps that change the disk | open |

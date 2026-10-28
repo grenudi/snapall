@@ -1018,3 +1018,34 @@ fn the_documents_name_only_files_and_folders_that_exist() {
         missing.join("\n  ")
     );
 }
+
+// ---- the window decides, and drawing only draws ----------------------------------------------------------------
+
+/// The window is a pure state machine: the model and the executor decide what happens, and the view only draws what
+/// the state says. So nothing in `model/` or `session/` may use the drawing library, the view or the theme: if it
+/// did, what the window does would start to depend on how it looks.
+#[test]
+fn the_model_and_the_executor_know_nothing_of_drawing() {
+    let mut offenders = Vec::new();
+    for (path, code) in all_sources() {
+        if !(path.contains("snapall-tui/src/model/") || path.contains("snapall-tui/src/session/")) {
+            continue;
+        }
+        for line in code
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+        {
+            if ["ratatui", "crate::view", "crate::theme"]
+                .iter()
+                .any(|word| line.contains(word))
+            {
+                offenders.push(format!("{path}: {}", line.trim()));
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "the model and the executor reach for drawing:\n  {}",
+        offenders.join("\n  ")
+    );
+}

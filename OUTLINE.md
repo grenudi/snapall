@@ -102,7 +102,6 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/keys/cursor.rs`: Moving through the lists: the cursor, jumping, scrolling, and marking snapshots.
     - `model/keys/mod.rs`: What each key and click does, and how a prompt answers one.
     - `model/keys/screen.rs`: What a key does on the screen the person is looking at: the tab's own keys first, then the keys every screen shares.
-  - `model/lists.rs`: The lists of areas and snapshots: what happens when they arrive.
   - `model/living.rs`: The window's own life: starting, the clock, the pointer and a refusal.
   - `model/looked.rs`: What looking brought back arriving in the window: the areas, snapshots, history, health, groups and points.
   - `model/messages.rs`: What the window asks for (effects) and what comes back (messages).
@@ -132,19 +131,24 @@ What each part of snapall says it is for, read from the first line of each modul
   - `session/mod.rs`: The window run synchronously: the model plus an executor, as the tests drive it.
 - `status_bar.rs`: The status bar: one line under every view with the numbers that matter (how many snapshots, how much room they take, how full the disk is, whether cleanup runs, how many things need a look).
 - `tab.rs`: The tabs of the window, and which one is showing.
-  - `tabs/activity.rs`: The Activity tab: what snapall did, newest first, and how each went.
+    - `tabs/activity/drawing.rs`: Drawing the Activity tab: a line for each change, and the detail of the chosen one.
+    - `tabs/activity/entries.rs`: The journal's changes as the Activity tab holds them: each one, and which is chosen.
+    - `tabs/activity/keys.rs`: What the keys do on the Activity tab: move along the changes, and ask to stop the chosen one.
+    - `tabs/activity/mod.rs`: The Activity tab: what snapall did, newest first, and how each went.
     - `tabs/health/drawing.rs`: Drawing the Health tab: the rows, the verdict above them and the detail of the chosen one.
     - `tabs/health/keys.rs`: What pressing a key does on the Health tab: moving along the rows and acting on the chosen one.
     - `tabs/health/mod.rs`: The Health tab: is protection working, how much room does it take, will old snapshots be cleaned up, and what to do about anything that is not.
     - `tabs/health/rows.rs`: What the Health tab lists: each row's name, how it stands, what it means and what Enter does.
-  - `tabs/mod.rs`: One module per tab that has more to it than the snapshot lists: each owns its state, its keys and its drawing, so a tab is read in one place.
+  - `tabs/mod.rs`: One folder for each tab, named as the tab bar names it: the snapshots, how protection is doing, and what snapall did.
+    - `tabs/snapshots/arriving.rs`: What the Snapshots tab does when the areas and their snapshots arrive, and after a snapshot is taken.
+    - `tabs/snapshots/drawing.rs`: Drawing the Snapshots tab: the protected areas and their groups on the left, the chosen area's snapshots on the right.
+    - `tabs/snapshots/mod.rs`: The Snapshots tab: the protected areas on the left and the chosen area's snapshots on the right.
 - `term.rs`: The terminal: setup and restore, key translation, and the event loop.
 - `theme.rs`: The colours, in one place, so every screen speaks in the same ones: good is green, something to know is cyan, something to do is yellow, something to do now is red.
   - `view/file.rs`: The file history screen: one file's versions, newest first.
   - `view/footer.rs`: The two lines under the status bar: the explanation of whatever the mouse is over, and the keys as buttons.
   - `view/header.rs`: The tab bar: the brand badge, the three tabs, and where a click on each lands.
   - `view/hit.rs`: Where a click lands, worked out from the same layout the drawing used.
-  - `view/lists.rs`: The Snapshots tab: the protected areas on the left, the chosen area's snapshots on the right.
   - `view/look.rs`: How things that can be clicked look: at rest, under the mouse, and just clicked.
   - `view/mod.rs`: Rendering: `render(state, frame)` draws, and does nothing else.
     - `view/prompts/confirm.rs`: The question before a change, in the colour of its weight: yellow for what can be put back, red for what cannot.
