@@ -6,9 +6,9 @@
 //! A pure function of the report, so it is tested without a terminal.
 
 use super::*;
-use snapall_core::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
 use snapall_core::health::format_bytes;
-use snapall_core::services::{self, Job};
+use snapall_core::keeping::jobs::{self, Job};
+use snapall_core::vocabulary::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
 use snapall_core::QuotaMode;
 use snapall_core::{AreaFacts, Facts, Health, Level, Remedy, Topic};
 
@@ -172,7 +172,7 @@ pub(crate) fn minutes_note(seconds: Option<u64>) -> String {
 }
 
 pub(crate) fn cleanup_state(facts: &Facts) -> Cleanup {
-    let timer = facts.state_of(&services::CLEANUP);
+    let timer = facts.state_of(&jobs::CLEANUP);
     cleanup_from(timer.enabled.as_deref(), timer.active.as_deref())
 }
 
@@ -199,13 +199,13 @@ pub(crate) fn room_row(facts: &Facts) -> Option<Row> {
 /// A job is listed when it is there to speak of: the cleanup job always (its absence matters), the
 /// others when installed.
 pub(crate) fn is_listed(facts: &Facts, job: &Job) -> bool {
-    job.unit == services::CLEANUP.unit
+    job.unit == jobs::CLEANUP.unit
         || facts.state_of(job).is_installed()
-        || (job.unit == services::BOOT_MENU.unit && facts.boot_menu_plugin)
+        || (job.unit == jobs::BOOT_MENU.unit && facts.boot_menu_plugin)
 }
 
 pub(crate) fn job_rows(facts: &Facts) -> Vec<Row> {
-    services::ALL
+    jobs::ALL
         .iter()
         .filter(|job| is_listed(facts, job))
         .map(|job| job_row(facts, job))
@@ -214,14 +214,14 @@ pub(crate) fn job_rows(facts: &Facts) -> Vec<Row> {
 
 pub(crate) fn job_row(facts: &Facts, job: &Job) -> Row {
     let state = facts.state_of(job);
-    let plugin = job.unit == services::BOOT_MENU.unit && facts.boot_menu_plugin;
-    let level = if job.unit == services::CLEANUP.unit {
+    let plugin = job.unit == jobs::BOOT_MENU.unit && facts.boot_menu_plugin;
+    let level = if job.unit == jobs::CLEANUP.unit {
         match cleanup_state(facts) {
             Cleanup::On => Level::Good,
             Cleanup::Off => Level::Attention,
             Cleanup::Unavailable => Level::Note,
         }
-    } else if job.unit == services::BOOT_MENU.unit {
+    } else if job.unit == jobs::BOOT_MENU.unit {
         if state.is_installed() && !state.is_running() && !plugin {
             Level::Attention
         } else {
@@ -244,7 +244,7 @@ pub(crate) fn job_row(facts: &Facts, job: &Job) -> Row {
         Some(description) => format!("{} (\"{description}\"). ", job.unit),
         None => format!("{}. ", job.unit),
     };
-    if job.unit == services::CLEANUP.unit {
+    if job.unit == jobs::CLEANUP.unit {
         detail.push_str(&cleanup_text(
             cleanup_state(facts),
             &schedule,
@@ -256,7 +256,7 @@ pub(crate) fn job_row(facts: &Facts, job: &Job) -> Row {
             detail.push_str(&format!(" It runs {}.", schedule.join(", ")));
         }
     }
-    if level == Level::Attention && job.unit == services::BOOT_MENU.unit {
+    if level == Level::Attention && job.unit == jobs::BOOT_MENU.unit {
         if let Some(start) = job
             .commands()
             .into_iter()
@@ -267,7 +267,7 @@ pub(crate) fn job_row(facts: &Facts, job: &Job) -> Row {
     }
     Row {
         section: Section::Jobs,
-        topic: if job.unit == services::BOOT_MENU.unit {
+        topic: if job.unit == jobs::BOOT_MENU.unit {
             Topic::BootMenu
         } else {
             Topic::Cleanup

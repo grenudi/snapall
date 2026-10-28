@@ -11,7 +11,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use snapall_core::journal::{fold, Entry, Event, Outcome, Rollback, Source, Undo};
+use snapall_core::looking::journal::{fold, Entry, Event, Outcome, Rollback, Source, Undo};
 use snapall_core::Weight;
 
 pub const PATH: &str = "/var/lib/snapall/journal.jsonl";
@@ -188,7 +188,7 @@ pub fn history(path: &Path, limit: usize, is_alive: impl Fn(u32) -> bool) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::journal::Status;
+    use snapall_core::looking::journal::Status;
 
     fn dir(name: &str) -> PathBuf {
         let dir =

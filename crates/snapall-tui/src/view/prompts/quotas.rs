@@ -6,7 +6,7 @@
 //! costs, what will happen, and that it can be undone.
 
 use crate::view::*;
-use snapall_core::explain::room_counting_text;
+use snapall_core::vocabulary::explain::room_counting_text;
 use snapall_core::QuotaMode;
 
 pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {

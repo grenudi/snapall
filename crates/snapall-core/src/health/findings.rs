@@ -5,10 +5,10 @@
 //! Finding what is wrong, one check at a time, and the verdict they add up to.
 
 use super::*;
-use crate::calendar::seconds_from_snapshot_date;
-use crate::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
-use crate::services::{self};
-use crate::system::{DiskUsage, QuotaMode};
+use crate::keeping::jobs::{self};
+use crate::ports::machine::{DiskUsage, QuotaMode};
+use crate::vocabulary::calendar::seconds_from_snapshot_date;
+use crate::vocabulary::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
 
 /// Everything worth saying about how protection stands, most urgent first.
 pub fn assess(facts: &Facts) -> Health {
@@ -55,7 +55,7 @@ pub(super) fn the_disk(facts: &Facts) -> Option<Finding> {
 }
 
 pub(super) fn cleanup_state(facts: &Facts) -> Cleanup {
-    let timer = facts.state_of(&services::CLEANUP);
+    let timer = facts.state_of(&jobs::CLEANUP);
     cleanup_from(timer.enabled.as_deref(), timer.active.as_deref())
 }
 
@@ -80,7 +80,7 @@ pub(super) fn automatic_cleanup(facts: &Facts) -> Option<Finding> {
         headline: headline.to_owned(),
         why: cleanup_text(
             state,
-            &facts.schedule_of(&services::CLEANUP),
+            &facts.schedule_of(&jobs::CLEANUP),
             &facts.cleanup_limits(),
         ),
         remedy,
@@ -177,7 +177,7 @@ pub(super) fn areas_gone_quiet(facts: &Facts) -> Vec<Finding> {
 
 /// The tool that puts snapshots into the boot menu is installed but not working.
 pub(super) fn the_boot_menu(facts: &Facts) -> Option<Finding> {
-    let sync = &facts.state_of(&services::BOOT_MENU);
+    let sync = &facts.state_of(&jobs::BOOT_MENU);
     let installed_but_idle = sync.is_installed() && !sync.is_running() && !facts.boot_menu_plugin;
     installed_but_idle.then(|| Finding {
         level: Level::Attention,

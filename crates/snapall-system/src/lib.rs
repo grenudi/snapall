@@ -245,7 +245,7 @@ pub fn parse_df(text: &str) -> Option<DiskUsage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snapall_core::calendar::seconds_from_snapshot_date;
+    use snapall_core::vocabulary::calendar::seconds_from_snapshot_date;
 
     #[test]
     fn what_df_prints_is_read_and_what_it_does_not_is_refused() {
@@ -295,7 +295,8 @@ mod tests {
     #[test]
     fn the_real_cleanup_timer_describes_itself_if_snapper_is_installed() {
         // On a machine with snapper, its unit file is the authority on the schedule.
-        if let Some(details) = LinuxSystem::new().unit_details(snapall_core::services::CLEANUP.unit)
+        if let Some(details) =
+            LinuxSystem::new().unit_details(snapall_core::keeping::jobs::CLEANUP.unit)
         {
             assert!(details.description.is_some(), "{details:?}");
             assert!(!details.schedule().is_empty(), "{details:?}");

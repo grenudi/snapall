@@ -136,7 +136,7 @@ pub struct LimitsEditor {
 pub struct StopProtecting {
     pub area: AreaName,
     /// What it would do, or why it would not; `None` while it is being worked out.
-    pub plan: Option<Result<snapall_core::unprotect::Plan, String>>,
+    pub plan: Option<Result<snapall_core::protecting::unprotect::Plan, String>>,
     /// What has been typed so far, to be the area's name.
     pub typed: String,
     pub error: Option<String>,

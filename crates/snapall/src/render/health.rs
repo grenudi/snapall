@@ -6,7 +6,7 @@
 
 use super::*;
 use serde_json::{json, Value};
-use snapall_core::doctor::{Check, OsRelease, Status};
+use snapall_core::protecting::doctor::{Check, OsRelease, Status};
 
 pub(super) fn level_mark(level: snapall_core::Level) -> &'static str {
     use snapall_core::Level;
@@ -99,10 +99,10 @@ pub fn health(facts: &snapall_core::Facts, report: &snapall_core::Health) -> Str
     out.push_str("\nBackground jobs:\n");
     for job in &facts.jobs {
         let plugin =
-            job.job.unit == snapall_core::services::BOOT_MENU.unit && facts.boot_menu_plugin;
+            job.job.unit == snapall_core::keeping::jobs::BOOT_MENU.unit && facts.boot_menu_plugin;
         if !job.state.is_installed()
             && !plugin
-            && job.job.unit != snapall_core::services::CLEANUP.unit
+            && job.job.unit != snapall_core::keeping::jobs::CLEANUP.unit
         {
             continue; // not on this computer: nothing to say
         }
@@ -166,10 +166,10 @@ pub fn health_json(facts: &snapall_core::Facts, report: &snapall_core::Health) -
 }
 
 pub fn setup_json(report: &crate::setup::Report) -> Value {
-    let worth = |worth: snapall_core::coverage::Worth| match worth {
-        snapall_core::coverage::Worth::Recommended => "recommended",
-        snapall_core::coverage::Worth::Optional => "optional",
-        snapall_core::coverage::Worth::NotUseful => "not_useful",
+    let worth = |worth: snapall_core::protecting::coverage::Worth| match worth {
+        snapall_core::protecting::coverage::Worth::Recommended => "recommended",
+        snapall_core::protecting::coverage::Worth::Optional => "optional",
+        snapall_core::protecting::coverage::Worth::NotUseful => "not_useful",
     };
     json!({
         "dry_run": report.dry_run,
@@ -184,9 +184,9 @@ pub fn setup_json(report: &crate::setup::Report) -> Value {
         "declined": report.declined,
         "failed": report.failed.iter().map(|(what, why)| json!({"what": what, "why": why})).collect::<Vec<_>>(),
         "cleanup": match report.cleanup {
-            snapall_core::explain::Cleanup::On => "on",
-            snapall_core::explain::Cleanup::Off => "off",
-            snapall_core::explain::Cleanup::Unavailable => "unavailable",
+            snapall_core::vocabulary::explain::Cleanup::On => "on",
+            snapall_core::vocabulary::explain::Cleanup::Off => "off",
+            snapall_core::vocabulary::explain::Cleanup::Unavailable => "unavailable",
         },
         "cleanup_switched_on": report.cleanup_switched_on,
     })
@@ -209,7 +209,7 @@ pub fn doctor(os: &OsRelease, checks: &[Check]) -> String {
 }
 
 pub fn doctor_json(os: &OsRelease, checks: &[Check]) -> Value {
-    let worst = snapall_core::doctor::worst(checks);
+    let worst = snapall_core::protecting::doctor::worst(checks);
     json!({
         "system": os.display_name(),
         "ok": worst != Status::Fail,

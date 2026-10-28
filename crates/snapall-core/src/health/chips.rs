@@ -5,7 +5,7 @@
 //! The chips that say how things stand at a glance.
 
 use super::*;
-use crate::explain::Cleanup;
+use crate::vocabulary::explain::Cleanup;
 
 /// The items of the status bar, in the order they are read.
 pub(super) fn chips(facts: &Facts, findings: &[Finding]) -> Vec<Chip> {

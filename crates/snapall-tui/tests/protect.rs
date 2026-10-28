@@ -9,8 +9,8 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::explain::protect_summary;
-use snapall_core::testing::InMemoryBackend;
+use snapall_core::ports::testing::InMemoryBackend;
+use snapall_core::vocabulary::explain::protect_summary;
 use snapall_core::SnapshotBackend;
 use snapall_tui::model::{update, Button, Click, Key, Modal, Msg, State};
 use snapall_tui::{view, Offer, Session, UiContext};

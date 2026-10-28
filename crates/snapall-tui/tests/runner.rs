@@ -9,7 +9,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::testing::{FakeSystem, InMemoryBackend};
+use snapall_core::ports::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{
     plan_snapshots, run_plan, Description, JournalEvent, JournalOutcome, SnapshotBackend, Source,
     SystemProbe,

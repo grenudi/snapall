@@ -76,7 +76,7 @@ impl<B, O: Observer> Observed<B, O> {
 }
 
 #[cfg(test)]
-impl<O> Observed<snapall_core::testing::InMemoryBackend, O> {
+impl<O> Observed<snapall_core::ports::testing::InMemoryBackend, O> {
     /// Edit a live file of the wrapped in-memory backend (tests only).
     fn write_file_for_test(&self, path: &str, content: &str) {
         self.inner.write_file("home", path, content);
@@ -207,7 +207,7 @@ impl<B: SnapshotBackend, O: Observer> SnapshotBackend for Observed<B, O> {
 mod tests {
     use std::cell::RefCell;
 
-    use snapall_core::testing::{backend_contract, InMemoryBackend};
+    use snapall_core::ports::testing::{backend_contract, InMemoryBackend};
 
     use super::*;
 

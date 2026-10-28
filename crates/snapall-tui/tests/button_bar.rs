@@ -11,7 +11,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::Terminal;
-use snapall_core::testing::{FakeSystem, InMemoryBackend};
+use snapall_core::ports::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{plan_snapshots, run_plan, AreaName, Description, GroupName, Groups};
 use snapall_tui::model::{Button, Click, Key, Modal, Msg};
 use snapall_tui::{view, Session, Tab, UiContext};

@@ -5,15 +5,15 @@
 //! The imperative shell for `snapall doctor`: probe the machine, run the install steps.
 //!
 //! All decisions (what is wrong, what to install, with which command) are pure functions in
-//! `snapall_core::doctor`; this module only gathers facts and performs the I/O.
+//! `snapall_core::protecting::doctor`; this module only gathers facts and performs the I/O.
 
 use std::error::Error;
 use std::process::{Command, ExitCode};
 use std::time::Instant;
 
-use snapall_core::boot::{self, BootStatus};
-use snapall_core::coverage;
-use snapall_core::doctor::{
+use snapall_core::going_back::boot::{self, BootStatus};
+use snapall_core::protecting::coverage;
+use snapall_core::protecting::doctor::{
     diagnose, install_plan, worst, Check, InstallPlan, OsRelease, Probe, Status, Step,
 };
 use snapall_core::{Event, Observer, SnapshotBackend};

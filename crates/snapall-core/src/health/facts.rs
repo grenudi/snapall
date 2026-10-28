@@ -4,12 +4,12 @@
 
 //! Collecting what is true of the machine: each area's snapshots and limits, the jobs, the room taken.
 
-use crate::coverage::describe;
-use crate::domain::{AreaName, Retention, SnapshotInfo};
-use crate::explain::Limit;
-use crate::port::{BackendError, SnapshotBackend};
-use crate::services::{self, Job};
-use crate::system::{DiskUsage, QuotaMode, ServiceState, SystemProbe, UnitDetails};
+use crate::keeping::jobs::{self, Job};
+use crate::ports::machine::{DiskUsage, QuotaMode, ServiceState, SystemProbe, UnitDetails};
+use crate::ports::snapshots::{BackendError, SnapshotBackend};
+use crate::protecting::coverage::describe;
+use crate::vocabulary::domain::{AreaName, Retention, SnapshotInfo};
+use crate::vocabulary::explain::Limit;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AreaFacts {
@@ -54,7 +54,7 @@ pub struct Facts {
     /// The local time, as snapper writes dates, if it could be read.
     pub now: Option<String>,
     pub areas: Vec<AreaFacts>,
-    /// Every job in the catalogue (`services::ALL`).
+    /// Every job in the catalogue (`jobs::ALL`).
     pub jobs: Vec<JobFacts>,
     /// The boot menu is kept in step by a snapper plugin instead of a background job.
     pub boot_menu_plugin: bool,
@@ -110,7 +110,7 @@ pub fn gather(
     Ok(Facts {
         now: system.local_time(),
         areas,
-        jobs: services::ALL
+        jobs: jobs::ALL
             .iter()
             .map(|job| JobFacts {
                 job: *job,

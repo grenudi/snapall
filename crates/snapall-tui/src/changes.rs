@@ -69,7 +69,7 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
             format!("Put every area back to restore point {}", point.point)
         }
         Effect::Protect { mount_point } => {
-            let title = snapall_core::coverage::describe(mount_point).title;
+            let title = snapall_core::protecting::coverage::describe(mount_point).title;
             format!("Protected {title} ({mount_point})")
         }
         Effect::SwitchOnCleanup => "Switched on automatic cleanup".to_owned(),
@@ -201,7 +201,7 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
             format!("Putting every area back to restore point {}", point.point)
         }
         Effect::Protect { mount_point } => {
-            let title = snapall_core::coverage::describe(mount_point).title;
+            let title = snapall_core::protecting::coverage::describe(mount_point).title;
             format!("Protecting {title} ({mount_point})")
         }
         Effect::SwitchOnCleanup => "Switching on automatic cleanup".to_owned(),
@@ -366,7 +366,7 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
 /// How to get back from what the window just did, worked out from what it asked for and what came of it:
 /// only for a change that was made, and in the same words the command line uses.
 pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollback> {
-    use snapall_core::rollback as back;
+    use snapall_core::going_back::rollback as back;
     use snapall_core::Rollback;
     match (effect, msg) {
         (Effect::Create { .. }, Msg::Created(made)) => {

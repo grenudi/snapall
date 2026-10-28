@@ -5,7 +5,7 @@
 //! The controls of one background job: a key for each thing that can be done to it.
 
 use crate::model::*;
-use snapall_core::services::{self, Job, JobAction};
+use snapall_core::keeping::jobs::{self, Job, JobAction};
 use snapall_core::Act;
 
 /// The key for each action, and for running a timer's work right now.
@@ -21,7 +21,7 @@ pub(crate) const KEYS: [(char, JobAction); 5] = [
 pub(crate) const RUN_NOW_KEY: char = 'n';
 
 pub(crate) fn job_of(unit: &str) -> Option<Job> {
-    services::ALL.iter().find(|job| job.unit == unit).copied()
+    jobs::ALL.iter().find(|job| job.unit == unit).copied()
 }
 
 /// Esc leaves; a letter does what it names, if allowed to; anything else is ignored.

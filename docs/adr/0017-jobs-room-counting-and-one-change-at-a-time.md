@@ -35,7 +35,7 @@ explicit rescan after it is refused as "in progress"; enabling twice is harmless
 
 ### 2. Background jobs: one catalogue, details and controls from it
 
-`snapall_core::services` names each job once (unit, plain title, purpose). The Health tab lists every job
+`snapall_core::keeping::jobs` names each job once (unit, plain title, purpose). The Health tab lists every job
 that exists on the computer, with its **real state** and the **schedule and description its own unit
 file declares** (read with systemd's override rules). Enter opens its controls: a key for each of enable,
 disable, start, stop, restart and, for a timer, "run it now", each beside the command that does the same,

@@ -9,7 +9,7 @@
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
-use snapall_core::testing::{FakeSystem, InMemoryBackend};
+use snapall_core::ports::testing::{FakeSystem, InMemoryBackend};
 use snapall_core::{plan_snapshots, run_plan, Description, Topic};
 use snapall_tui::model::{Click, Key, Msg};
 use snapall_tui::{view, Session, Tab, UiContext};
@@ -73,7 +73,7 @@ fn troubled() -> FakeSystem {
         .with_service("snapper-cleanup.timer", "disabled", "inactive")
         // what the machine's own unit file says about the job: its words and its schedule come from here
         .with_unit_file(
-            snapall_core::services::CLEANUP.unit,
+            snapall_core::keeping::jobs::CLEANUP.unit,
             "Daily Cleanup of Snapper Snapshots",
             &[("OnBootSec", "10m"), ("OnUnitActiveSec", "1d")],
         )

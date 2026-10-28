@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The imperative half of the boot-menu check: look at files and services, hand the facts to
-//! `snapall_core::boot::assess`. Read-only, and every path is under a root that tests replace
+//! `snapall_core::going_back::boot::assess`. Read-only, and every path is under a root that tests replace
 //! with a temporary directory.
 //!
 //! These are heuristics about where distributions put things; they are written from the tools'
@@ -13,7 +13,7 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use snapall_core::boot::{root_fs_from_mounts, BootFacts, Bootloader, Tool, ToolFacts};
+use snapall_core::going_back::boot::{root_fs_from_mounts, BootFacts, Bootloader, Tool, ToolFacts};
 
 /// Where Limine's configuration (or its helper tools' configuration) may be found.
 const LIMINE: &[&str] = &[
@@ -115,7 +115,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use snapall_core::boot::{assess, BootStatus};
+    use snapall_core::going_back::boot::{assess, BootStatus};
 
     use super::*;
 

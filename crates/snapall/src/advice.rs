@@ -5,7 +5,7 @@
 //! What to tell someone whose file no snapshot can contain: why, and what to do about it, in
 //! snapall's own words and with snapall's own command.
 
-use snapall_core::coverage::{self, Mount};
+use snapall_core::protecting::coverage::{self, Mount};
 use snapall_core::HistoryError;
 
 /// The mount that holds `path`: the one with the longest mount point that `path` is under.

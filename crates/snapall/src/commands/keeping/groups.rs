@@ -70,7 +70,7 @@ fn make_a_group(
         .map_err(|e| e.to_string())
         .and_then(|()| system.save_groups(&made));
     if saved.is_ok() {
-        change.rollback(snapall_core::rollback::after_groups(
+        change.rollback(snapall_core::going_back::rollback::after_groups(
             &name,
             before.as_deref(),
         ));
@@ -110,7 +110,7 @@ fn take_a_group_away(
     )?;
     let saved = system.save_groups(&made);
     if saved.is_ok() {
-        change.rollback(snapall_core::rollback::after_groups(
+        change.rollback(snapall_core::going_back::rollback::after_groups(
             &name,
             before.as_deref(),
         ));
