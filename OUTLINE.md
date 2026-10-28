@@ -16,12 +16,23 @@ What each part of snapall says it is for, read from the first line of each modul
 - `consequence.rs`: What an action weighs, and so what has to be typed before it happens.
 - `course.rs`: A change that takes several steps (a snapshot of every area, a restore point put back area by area) follows a [`Course`]: before each step it asks whether to begin it.
 - `coverage.rs`: The parts of a disk that snapshots can protect, and which of them are.
-- `doctor.rs`: `snapall doctor`, as pure functions: from facts about the machine to findings and an install plan.
-- `domain.rs`: Validated domain types.
+  - `doctor/diagnosing.rs`: Diagnosing the setup: what each check finds and what to do about it.
+  - `doctor/installing.rs`: Understanding the operating system, and how to install the snapshot tool on it.
+  - `doctor/mod.rs`: `snapall doctor`, as pure functions: from facts about the machine to findings and an install plan.
+  - `domain/files.rs`: What changed in a file between a snapshot and now, and what a restore did.
+  - `domain/keeping.rs`: How many snapshots an area keeps, and the options that say so.
+  - `domain/mod.rs`: Validated domain types.
+  - `domain/names.rs`: Names and numbers that are parsed once, at the boundary: an area, a description, a snapshot number, a restore point.
+  - `domain/snapshots.rs`: What is known about a snapshot.
 - `explain.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
 - `find.rs`: Finding what a person points at: one snapshot of an area, by its number.
 - `groups.rs`: Groups: a name for a set of protected areas, so that "take a snapshot of my theming" is one thing to say.
-- `health.rs`: Health: is protection working, how much room does it take, will old snapshots be cleaned up.
+  - `health/chips.rs`: The chips that say how things stand at a glance.
+  - `health/facts.rs`: Collecting what is true of the machine: each area's snapshots and limits, the jobs, the room taken.
+  - `health/findings.rs`: Finding what is wrong, one check at a time, and the verdict they add up to.
+  - `health/mod.rs`: Health: is protection working, how much room does it take, will old snapshots be cleaned up.
+  - `health/sizes.rs`: Sizes in the words a person reads.
+  - `health/verdicts.rs`: What judging produces: levels, topics, remedies, findings, chips and the verdict.
 - `journal.rs`: What snapall did, remembered: every change writes an event when it starts and another when it ends, whichever snapall made it (the window or a command), and folding them gives the record a person reads.
 - `lib.rs`: Domain, planning and ports for snapall.
 - `limits.rs`: How many snapshots an area keeps, and when the oldest go: the settings of automatic cleanup, and what changing them would do.
@@ -34,9 +45,19 @@ What each part of snapall says it is for, read from the first line of each modul
 - `rollback.rs`: The way back from each kind of change, in one place: what it names as the earlier state, the commands that return to it, and what doing that weighs.
 - `services.rs`: The background jobs snapall depends on or watches: one catalogue, so that a name is written once.
 - `system.rs`: What the machine can tell snapall besides what snapper says: how full a disk is, whether a background job is switched on and running, what time it is there.
-- `testing.rs`: Test support: an in-memory adapter and the contract every backend must satisfy.
+  - `testing/backend.rs`: The in-memory stand-in doing what a real backend does.
+  - `testing/building.rs`: Setting up the in-memory stand-in the way a test needs it.
+  - `testing/contract.rs`: The contract every backend must satisfy, as one function to run against it.
+  - `testing/mod.rs`: Test support: an in-memory adapter and the contract every backend must satisfy.
+  - `testing/state.rs`: What the in-memory stand-in remembers: each area, its snapshots and files.
+  - `testing/system.rs`: A machine whose answers a test sets: its disk, its jobs, its clock, who else is making a change.
 - `unprotect.rs`: Stopping the protection of an area: the one thing snapall does that cannot be taken back.
-- `usecase.rs`: The application use case, written against the port only.
+  - `usecase/history.rs`: The history of one file: which area holds it, and what it was in each snapshot.
+  - `usecase/mod.rs`: The application use case, written against the port only.
+  - `usecase/protecting.rs`: Protecting a part of the disk: making it an area.
+  - `usecase/restoring.rs`: Putting an area, or one path of it, back to how a snapshot had it, with a safety snapshot first.
+  - `usecase/snapshots.rs`: The snapshots of an area: listing them, and deleting one.
+  - `usecase/taking.rs`: Taking snapshots: planning which areas, doing it area by area, and reporting how each went.
 
 ## snapall-observe
 
