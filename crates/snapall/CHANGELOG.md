@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.24.2]
+
+
+### Refactoring
+- The contract and the command line's parsing are modules by what they do ([#78](https://github.com/grenudi/snapall/pull/78)) ([5dbd165])
+
+
+
 ## [0.24.1]
 
 
