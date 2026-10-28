@@ -773,7 +773,7 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     );
 }
 
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 13] = [
+const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 12] = [
     ("crates/snapall-core/src/doctor.rs", 397),
     ("crates/snapall-core/src/domain.rs", 378),
     ("crates/snapall-core/src/health.rs", 522),
@@ -784,9 +784,8 @@ const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 13] = [
     ("crates/snapall-tui/src/model/state.rs", 401),
     ("crates/snapall-tui/src/session.rs", 396),
     ("crates/snapall-tui/src/tabs/activity.rs", 339),
-    ("crates/snapall/src/cli.rs", 568),
-    ("crates/snapall/src/contract.rs", 763),
     ("crates/snapall/src/setup.rs", 432),
+    ("crates/snapall/src/contract/inputs.rs", 514),
 ];
 const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 4] = [
     ("crates/snapall-core/src/domain.rs", 378),
