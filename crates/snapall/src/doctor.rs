@@ -8,23 +8,23 @@
 //! `snapall_core::protecting::doctor`; this module only gathers facts and performs the I/O.
 
 use std::error::Error;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 use std::time::Instant;
 
 use snapall_core::going_back::boot::{self, BootStatus};
 use snapall_core::protecting::coverage;
 use snapall_core::protecting::doctor::{
-    diagnose, install_plan, worst, Check, InstallPlan, OsRelease, Probe, Status, Step,
+    diagnose, install_plan, worst, Check, InstallPlan, Probe, Status, Step,
 };
 use snapall_core::{Event, Observer, SnapshotBackend};
 
 use crate::output::{emit, emit_json};
 use crate::render;
-use snapall_system::boot_menu;
+use snapall_system::{boot_menu, environment, installing};
 
 /// Gather the facts about this machine.
 pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
-    let snapper = snapper_version();
+    let snapper = snapall_snapper::installed_version();
     let configs = snapper
         .is_ok()
         .then(|| backend.list_areas().map_err(|e| e.to_string()));
@@ -38,56 +38,12 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
         _ => Vec::new(),
     };
     Probe {
-        os: read_os_release(),
+        os: environment::operating_system(),
         snapper,
-        is_root: std::fs::read_to_string("/proc/self/status")
-            .ok()
-            .and_then(|status| effective_uid(&status))
-            .map(|uid| uid == 0),
+        is_root: environment::is_administrator(),
         areas: configs,
         locations,
     }
-}
-
-fn read_os_release() -> OsRelease {
-    ["/etc/os-release", "/usr/lib/os-release"]
-        .iter()
-        .find_map(|path| std::fs::read_to_string(path).ok())
-        .map(|text| OsRelease::parse(&text))
-        .unwrap_or_default()
-}
-
-fn first_line(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes)
-        .lines()
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_owned()
-}
-
-fn snapper_version() -> Result<String, String> {
-    match Command::new("snapper").arg("--version").output() {
-        Ok(out) if out.status.success() => Ok(first_line(&out.stdout)),
-        Ok(out) => {
-            let why = first_line(&out.stderr);
-            Err(if why.is_empty() {
-                out.status.to_string()
-            } else {
-                why
-            })
-        }
-        Err(e) => Err(e.to_string()),
-    }
-}
-
-/// The effective uid from the text of `/proc/self/status` (`Uid: real effective saved fs`).
-pub(crate) fn effective_uid(status: &str) -> Option<u32> {
-    status
-        .lines()
-        .find_map(|line| line.strip_prefix("Uid:"))
-        .and_then(|rest| rest.split_whitespace().nth(1))
-        .and_then(|uid| uid.parse().ok())
 }
 
 /// Ask on the terminal. Refuses to guess when there is nobody to ask.
@@ -120,11 +76,7 @@ fn approve(steps: Vec<Step>, yes: bool) -> Result<Option<Approved>, Box<dyn Erro
 fn execute(approved: Approved, observer: &dyn Observer) -> Result<(), Box<dyn Error>> {
     for step in &approved.0 {
         let started = Instant::now();
-        let result = match Command::new(step.program).args(&step.args).status() {
-            Ok(status) if status.success() => Ok(()),
-            Ok(status) => Err(format!("exited with {status}")),
-            Err(e) => Err(format!("could not run `{}`: {e}", step.program)),
-        };
+        let result = installing::run_step(step);
         observer.observe(&Event::InstallStepRun {
             command: step.display(),
             result: result.clone(),
@@ -215,7 +167,7 @@ fn protection_check(probe: &Probe) -> Option<Check> {
     if !matches!(probe.areas, Some(Ok(_))) {
         return None;
     }
-    let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").ok()?;
+    let mountinfo = environment::mounts()?;
     let areas = coverage::areas(
         &coverage::mounts_from_mountinfo(&mountinfo),
         &probe.locations,
@@ -254,34 +206,5 @@ fn emit_report(probe: &Probe, json: bool) -> Result<(), Box<dyn Error>> {
         emit_json(&render::doctor_json(&probe.os, &checks))
     } else {
         emit(&render::doctor(&probe.os, &checks))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_effective_uid_is_the_second_field() {
-        let status =
-            "Name:\tsnapall\nUmask:\t0022\nUid:\t1000\t0\t0\t0\nGid:\t1000\t1000\t1000\t1000\n";
-        assert_eq!(effective_uid(status), Some(0));
-        assert_eq!(effective_uid("Uid:\t0\t1000\t0\t0\n"), Some(1000));
-    }
-
-    #[test]
-    fn an_unreadable_status_is_unknown_not_root() {
-        assert_eq!(effective_uid(""), None);
-        assert_eq!(effective_uid("Uid:\n"), None);
-        assert_eq!(effective_uid("Uid:\tx\ty\n"), None);
-    }
-
-    #[test]
-    fn only_the_first_line_of_a_command_output_is_used() {
-        assert_eq!(
-            first_line(b"snapper 0.13.1\nlibsnapper 7.2.0\n"),
-            "snapper 0.13.1"
-        );
-        assert_eq!(first_line(b""), "");
     }
 }

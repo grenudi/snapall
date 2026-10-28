@@ -12,6 +12,8 @@ mod reading;
 mod running;
 #[cfg(test)]
 mod tests;
+mod version;
 
 pub use backend::SnapperCli;
 pub use running::{CommandOutput, CommandRunner, SystemRunner};
+pub use version::installed_version;

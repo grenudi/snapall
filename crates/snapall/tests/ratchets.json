@@ -5,7 +5,7 @@
   "files_too_long": {
     "crates/snapall-tui/src/changes.rs": 419,
     "crates/snapall/src/contract/inputs.rs": 514,
-    "crates/snapall/src/setup.rs": 432
+    "crates/snapall/src/setup.rs": 431
   },
   "handlers_that_branch_too_much": {
     "restore_all": 8,
@@ -27,7 +27,7 @@
     "crates/snapall/src/main.rs": 4
   },
   "tool_words_in_names": {
-    "snapall": 7,
+    "snapall": 6,
     "snapall-core": 1
   }
 }

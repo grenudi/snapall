@@ -11,7 +11,9 @@
 
 mod asking;
 pub mod boot_menu;
+pub mod environment;
 mod groups;
+pub mod installing;
 mod journal;
 mod lock;
 mod machine;
