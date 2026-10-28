@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.24.1]
+
+
+### Refactoring
+- The window's update loop, the health tab and the command line's text are modules by what they do ([#76](https://github.com/grenudi/snapall/pull/76)) ([7bdbf37])
+
+
+
 ## [0.24.0]
 
 
