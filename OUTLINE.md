@@ -216,4 +216,9 @@ What each part of snapall says it is for, read from the first line of each modul
   - `render/mod.rs`: What the command line says: each result as text for a person or as JSON for a program.
   - `render/points.rs`: Restore points: listing them, what putting one back would do, and what it did.
   - `render/taking.rs`: What taking a snapshot reports: what was taken, or what would be.
-- `setup.rs`: `snapall setup`: find the parts of the disk that snapshots do not cover, explain what that means in plain words, ask, and set them up.
+  - `setup/flow.rs`: The setup conversation: find what is not protected, explain what that means, ask, and set it up.
+  - `setup/inputs.rs`: What the setup flow is given: the facts about the machine, what was asked for, and how it talks and acts.
+  - `setup/mod.rs`: `snapall setup`: find the parts of the disk that snapshots do not cover, explain what that means in plain words, ask, and set them up.
+  - `setup/offers.rs`: What the window is told it could protect, and the sentence that says so.
+  - `setup/report.rs`: What setup did, as a report: each area and what happened to it.
+  - `setup/this_machine.rs`: Setup on this machine: its facts read from it, and a terminal or a silence to talk through.

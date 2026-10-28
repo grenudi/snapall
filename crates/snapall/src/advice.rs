@@ -49,7 +49,7 @@ pub fn explain_with(error: &HistoryError, path: &str, mounts: &[Mount]) -> Strin
 
 /// [`explain_with`] for this machine.
 pub fn explain(error: &HistoryError, path: &str) -> String {
-    let mountinfo = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
+    let mountinfo = snapall_system::environment::mounts().unwrap_or_default();
     explain_with(error, path, &coverage::mounts_from_mountinfo(&mountinfo))
 }
 

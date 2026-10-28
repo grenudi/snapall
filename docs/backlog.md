@@ -21,14 +21,14 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | # | Item | Status |
 |---|---|---|
 | 1 | The tabs are three folders named as the tab bar names them (`tabs/snapshots/`, `tabs/health/`, `tabs/activity/`). What is left by mechanism is the questions: `model/prompts/` and `view/prompts/` hold one pair of files per question, and `model/file.rs` with `view/file.rs` the file history screen. Also only Health and Activity own their state; the snapshots tab's still lives in the window's `State` | open |
-| 2 | `setup.rs` (432 lines) asks area by area as it works, which is why it is the one change that begins without a leave (`begin_asking_along`). Plan first, ask once, then begin | open |
-| 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
-| 4 | The window's `changes.rs` is over 300 lines (419) | open |
-| 5 | `setup.rs` still reaches into the machine itself: it runs `systemctl` (a second copy of what the machine adapter's `asking` already does) and reads the disk layout. The doctor's machine reading has moved to the adapters (`snapall-system/src/environment.rs`, `snapall-snapper/src/version.rs`), and setup already uses the same `environment` functions for root and the mount table. The rest is part of item 2 | open |
-| 6 | Ten plain `config` names remain in the binary, in files that already used `area` for something else | open |
-| 7 | Run `dev/golden-output.sh check` in CI. It needs its own fresh fixture, after the steps that change the disk | open |
-| 8 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
-| 9 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+| 2 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
+| 3 | The window's `changes.rs` is over 300 lines (419) | open |
+| 4 | Ten plain `config` names remain in the binary, in files that already used `area` for something else | open |
+| 5 | Run `dev/golden-output.sh check` in CI. It needs its own fresh fixture, after the steps that change the disk | open |
+| 6 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
+| 7 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+
+Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 
 ## Upstream: argenv
 | # | Item | Status |
