@@ -7,9 +7,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 
 fn workspace_packages() -> Vec<serde_json::Value> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml");
@@ -252,7 +253,7 @@ fn no_file_of_the_window_grows_back_into_a_wall() {
 struct Surface {
     commands: BTreeSet<String>,
     /// Long flags, with whether each takes a value.
-    flags: std::collections::BTreeMap<String, bool>,
+    flags: BTreeMap<String, bool>,
     negatable: BTreeSet<String>,
 }
 
@@ -408,11 +409,6 @@ fn every_command_in_the_contract_is_in_the_readme() {
 /// recording, saying) and no longer reads as what the command is for.
 const LONGEST_HANDLER: usize = 60;
 
-/// The handlers that are longer today, with how long. A ratchet: a handler may not grow, no new one may join,
-/// and each leaves this list the moment it is short enough: the list can only get shorter. They are to be
-/// split by what they do (see ADR 19), not allowed to stay.
-const TOO_LONG_FOR_NOW: [(&str, usize); 2] = [("restore_all", 79), ("undo", 61)];
-
 /// Every top-level function of every file in `commands/`, with its text (not counting tests).
 fn handlers() -> Vec<(String, String)> {
     let mut found = Vec::new();
@@ -538,32 +534,13 @@ fn a_command_handler_is_short_enough_to_read_as_a_sentence_and_the_debt_only_shr
         "the scan found {} handlers: it has stopped finding them",
         lengths.len()
     );
-    for (name, length) in &lengths {
-        let allowed = TOO_LONG_FOR_NOW
-            .iter()
-            .find(|(listed, _)| listed == name)
-            .map_or(LONGEST_HANDLER, |(_, most)| *most);
-        assert!(
-            *length <= allowed,
-            "`{name}` is {length} lines (the most allowed is {allowed}): split it by what it does, so that it reads as a sentence"
-        );
-    }
-    for (listed, most) in TOO_LONG_FOR_NOW {
-        let now = lengths
-            .iter()
-            .find(|(name, _)| name == listed)
-            .map(|(_, length)| *length);
-        match now {
-            None => panic!("`{listed}` is on the too-long list but no longer exists: take it off"),
-            Some(length) if length <= LONGEST_HANDLER => {
-                panic!("`{listed}` is {length} lines, short enough now: take it off the list, so it cannot grow back")
-            }
-            Some(length) if length < most => {
-                panic!("`{listed}` shrank to {length} lines: lower its entry from {most} so that it cannot grow back")
-            }
-            Some(_) => {}
-        }
-    }
+    let observed = lengths.into_iter().collect();
+    ratchet(
+        "Handlers too long to read as a sentence (split them by what they do):",
+        "handlers_too_long",
+        &observed,
+        LONGEST_HANDLER,
+    );
 }
 
 // ---- the shape of the code: every module a small language, every layer the top of those beneath ---------
@@ -573,46 +550,71 @@ fn a_command_handler_is_short_enough_to_read_as_a_sentence_and_the_debt_only_shr
 // with its size; nothing may get worse, nothing new may join, and an entry leaves the list the moment it is
 // paid. Whoever fixes one is told to take it off, so the list can only shrink.
 
-/// A ratchet. `observed` is what the code has now (name -> size); `limit` what is allowed without a
-/// reason; `debt` the names that are over it today, with their size.
-fn ratchet(
-    rule: &str,
-    observed: &std::collections::BTreeMap<String, usize>,
-    limit: usize,
-    debt: &[(&str, usize)],
-) {
+/// The debts, written down as data: for each rule, the offenders that exist today and how bad each is allowed to be.
+/// Rust holds the rules and this file holds the debt, so paying one down is an edit to data and never to code.
+fn read_debts() -> BTreeMap<String, BTreeMap<String, usize>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ratchets.json");
+    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+static DEBTS_ARE_BEING_WRITTEN: Mutex<()> = Mutex::new(());
+
+/// A ratchet. `observed` is what the code has now (name -> size); `limit` what is allowed without a reason; `list`
+/// names the debts in `ratchets.json`: the offenders that are over the limit today, with their size.
+///
+/// A debt may only be paid. Run with `UPDATE_RATCHETS=1` and every debt that has shrunk, or gone, is lowered or removed in
+/// the file; nothing is ever raised and nothing new is added, so growth and new offenders still fail.
+fn ratchet(rule: &str, list: &str, observed: &BTreeMap<String, usize>, limit: usize) {
+    let _writing = DEBTS_ARE_BEING_WRITTEN
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut all = read_debts();
+    let debt = all.get(list).cloned().unwrap_or_default();
+    let paying = std::env::var_os("UPDATE_RATCHETS").is_some();
     let mut problems = Vec::new();
     for (name, size) in observed {
-        let most = debt
-            .iter()
-            .find(|(listed, _)| listed == name)
-            .map_or(limit, |(_, most)| *most);
+        let most = debt.get(name).copied().unwrap_or(limit);
         if *size > most {
             problems.push(format!("`{name}` is {size} (the most allowed is {most})"));
         }
     }
-    for (listed, most) in debt {
-        match observed.get(*listed) {
+    let mut remaining = BTreeMap::new();
+    for (listed, most) in &debt {
+        match observed.get(listed) {
+            None if paying => {}
             None => problems.push(format!(
                 "`{listed}` is on the debt list but no longer exists: take it off"
             )),
+            Some(size) if *size <= limit && paying => {
+                let _ = size;
+            }
             Some(size) if *size <= limit => {
                 problems.push(format!("`{listed}` is {size}, within the limit now: take it off the list, so it cannot grow back"));
+            }
+            Some(size) if size < most && paying => {
+                remaining.insert(listed.clone(), *size);
             }
             Some(size) if size < most => {
                 problems.push(format!("`{listed}` shrank to {size}: lower its entry from {most}, so it cannot grow back"));
             }
-            Some(_) => {}
+            Some(size) => {
+                remaining.insert(listed.clone(), *size);
+            }
         }
+    }
+    if paying && problems.is_empty() && remaining != debt {
+        all.insert(list.to_owned(), remaining);
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ratchets.json");
+        std::fs::write(path, serde_json::to_string_pretty(&all).unwrap() + "\n").unwrap();
     }
     let over: Vec<String> = observed
         .iter()
         .filter(|(_, size)| **size > limit)
-        .map(|(name, size)| format!("(\"{name}\", {size}),"))
+        .map(|(name, size)| format!("\"{name}\": {size},"))
         .collect();
     assert!(
         problems.is_empty(),
-        "{rule}\n  {}\nover the limit of {limit} now:\n  {}",
+        "{rule}\n  {}\nover the limit of {limit} now:\n  {}\nto record paid debts: UPDATE_RATCHETS=1 cargo test -p snapall --test architecture",
         problems.join("\n  "),
         over.join("\n  ")
     );
@@ -676,9 +678,9 @@ fn a_file_is_one_thing_short_enough_to_read_whole_and_the_debt_only_shrinks() {
         .collect();
     ratchet(
         "Files over the length of one thing:",
+        "files_too_long",
         &observed,
         LONGEST_FILE,
-        &FILES_TOO_LONG_FOR_NOW,
     );
 }
 
@@ -695,9 +697,9 @@ fn an_entry_file_longer_than_a_screen_hides_a_level_and_the_debt_only_shrinks() 
         .collect();
     ratchet(
         "Entry files so long that a level is probably hiding in them:",
+        "entry_files_too_long",
         &observed,
         LONGEST_FRONT_FILE,
-        &FRONT_FILES_TOO_BIG_FOR_NOW,
     );
 }
 
@@ -727,9 +729,9 @@ fn nothing_prints_to_a_person_except_what_presents_and_what_asks() {
     }
     ratchet(
         "Files that print by themselves:",
+        "prints_outside_the_presenter",
         &observed,
         0,
-        &PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW,
     );
 }
 
@@ -772,34 +774,11 @@ fn above_the_adapters_the_names_are_the_persons_and_not_the_tools() {
     }
     ratchet(
         "Crates with names in the tools' words above the adapters:",
+        "tool_words_in_names",
         &observed,
         0,
-        &FOREIGN_WORDS_IN_NAMES_FOR_NOW,
     );
 }
-
-const FILES_TOO_LONG_FOR_NOW: [(&str, usize); 5] = [
-    ("crates/snapall-tui/src/changes.rs", 419),
-    ("crates/snapall-tui/src/model/state.rs", 400),
-    ("crates/snapall-tui/src/tabs/activity.rs", 339),
-    ("crates/snapall/src/setup.rs", 432),
-    ("crates/snapall/src/contract/inputs.rs", 514),
-];
-const FRONT_FILES_TOO_BIG_FOR_NOW: [(&str, usize); 2] = [
-    ("crates/snapall-system/src/lib.rs", 244),
-    ("crates/snapall-tui/src/model/mod.rs", 143),
-];
-const PRINTS_OUTSIDE_THE_PRESENTER_FOR_NOW: [(&str, usize); 5] = [
-    (
-        "crates/snapall/src/commands/going_back/restoring_a_point.rs",
-        1,
-    ),
-    ("crates/snapall/src/commands/going_back/undoing.rs", 4),
-    ("crates/snapall/src/commands/protecting.rs", 1),
-    ("crates/snapall/src/doctor.rs", 5),
-    ("crates/snapall/src/main.rs", 4),
-];
-const FOREIGN_WORDS_IN_NAMES_FOR_NOW: [(&str, usize); 2] = [("snapall", 9), ("snapall-core", 1)];
 
 // ---- the outline: the code, read as a table of contents ----------------------------------------------------
 
@@ -886,9 +865,9 @@ fn a_story_branches_little_and_the_debt_only_shrinks() {
         .collect();
     ratchet(
         "Handlers that turn more often than a story should:",
+        "handlers_that_branch_too_much",
         &observed,
         MOST_TURNS_IN_A_STORY,
-        &TURNS_TOO_MANY_FOR_NOW,
     );
 }
 
@@ -900,14 +879,11 @@ fn a_story_spells_out_little_plumbing_and_the_debt_only_shrinks() {
         .collect();
     ratchet(
         "Handlers that spell out plumbing a verb should hide:",
+        "handlers_with_too_much_plumbing",
         &observed,
         MOST_PLUMBING_IN_A_STORY,
-        &PLUMBING_TOO_MUCH_FOR_NOW,
     );
 }
-
-const TURNS_TOO_MANY_FOR_NOW: [(&str, usize); 3] = [("restore_all", 8), ("setup", 7), ("undo", 7)];
-const PLUMBING_TOO_MUCH_FOR_NOW: [(&str, usize); 1] = [("check_the_way_back_still_exists", 3)];
 
 // ---- a change cannot be made unasked: the type says so, and the one exception is counted -----------------------
 

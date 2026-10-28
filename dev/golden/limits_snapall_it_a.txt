@@ -1,0 +1,3 @@
+snapall_it_a keeps the newest 50, never removes one younger than 30 minutes, cleanup on.
+Nothing would be removed: cleanup looks after 0 snapshots and the limit is 50.
+exit: 0

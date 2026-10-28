@@ -1,0 +1,2 @@
+snapall: `nowhere` is not a protected area: `snapall list` shows them
+exit: 1

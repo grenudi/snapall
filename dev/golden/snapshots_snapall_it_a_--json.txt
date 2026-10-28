@@ -1,0 +1,6 @@
+{
+  "configs": {
+    "snapall_it_a": []
+  }
+}
+exit: 0

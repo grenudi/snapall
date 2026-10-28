@@ -1,0 +1,2 @@
+snapall: which areas? `snapall groups add NAME AREA,AREA`
+exit: 1

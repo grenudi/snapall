@@ -1,0 +1,2 @@
+No restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is a restore point.
+exit: 0

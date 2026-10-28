@@ -1,0 +1,4 @@
+all: every protected area (snapall_it_a, snapall_it_b)
+
+No groups of your own yet. Make one with: snapall groups add NAME AREA,AREA
+exit: 0

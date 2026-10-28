@@ -1,0 +1,2 @@
+snapall: snapall_it_a has no snapshot #N
+exit: 1
