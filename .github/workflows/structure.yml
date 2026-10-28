@@ -1,0 +1,31 @@
+name: Structure
+
+# How close the code is to "every layer is the top of the layers beneath it", computed on the machine that is free, for
+# every push to main, and shown in the run's summary: a table with one column per minor release since 0.21 and one for
+# now, so progress is read from here and never computed by hand. The cold-read test (findability) runs in CI itself.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    name: structure over the releases
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: The trend
+        run: |
+          {
+            echo "## Structure over the releases"
+            echo
+            python3 dev/structure-metrics.py --trend --markdown
+            echo
+            echo "How to read it: \`dev/structure-metrics.py\` and \`docs/development-log.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"

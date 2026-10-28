@@ -172,6 +172,9 @@ jobs:
           # the stream on stderr, in text
           $S --log text --dry-run 2>&1 | grep -q "INFO  configs_listed count=2"
 
+      - name: What snapall prints is what it printed when recorded (20 commands, text, JSON, errors and exit codes)
+        run: sudo ./dev/golden-output.sh check target/debug/snapall
+
       - name: Tear down the fixture
         if: always()
         run: sudo ./dev/btrfs-fixture.sh down

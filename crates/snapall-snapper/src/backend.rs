@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Our snapshot verbs, said to snapper one command at a time.
+//! Talking to snapper: our snapshot verbs, said to it one command at a time.
 
 use crate::files::*;
 use crate::reading::*;

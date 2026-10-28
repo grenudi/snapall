@@ -56,7 +56,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `taking/plan.rs`: Deciding which areas to snapshot.
   - `taking/run.rs`: Taking snapshots: planning which areas, doing it area by area, and reporting how each went.
   - `vocabulary/calendar.rs`: Dates, without a clock: turning seconds into a name for a restore point, and snapper's own date text into seconds so two snapshots can be compared.
-  - `vocabulary/consequence.rs`: What an action weighs, and so what has to be typed before it happens.
+  - `vocabulary/consequence.rs`: How heavy an action is (what it weighs), and so what has to be typed before it happens.
     - `vocabulary/domain/files.rs`: What changed in a file between a snapshot and now, and what a restore did.
     - `vocabulary/domain/keeping.rs`: How many snapshots an area keeps, and the options that say so.
     - `vocabulary/domain/mod.rs`: Validated domain types.
@@ -73,7 +73,7 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-snapper
 
-- `backend.rs`: Our snapshot verbs, said to snapper one command at a time.
+- `backend.rs`: Talking to snapper: our snapshot verbs, said to it one command at a time.
 - `files.rs`: Looking at a file as snapper's snapshots keep it, and comparing it with now.
 - `lib.rs`: The snapshot backend for snapper: our verbs said to it, and what it says read back in our words.
 - `reading.rs`: Reading what snapper prints back into our own words.
@@ -92,7 +92,7 @@ What each part of snapall says it is for, read from the first line of each modul
 - `lock.rs`: Taking turns at changing things: the right to make a change is held in a file, so that two restores, or a restore and a deletion, do not race each other.
 - `machine.rs`: The machine snapall is running on, answering the core's questions: its disk, its jobs, its clock, how room is counted, and who else is making a change.
 - `quotas.rs`: How a disk counts the room snapshots take, and switching it on and off.
-- `runner.rs`: Starting a change that outlives the program that asked for it, and asking it to stop.
+- `runner.rs`: Running a change in the background: it outlives the program that asked for it, and can be asked to stop.
 - `units.rs`: What a job's unit file says about it.
 
 ## snapall-tui

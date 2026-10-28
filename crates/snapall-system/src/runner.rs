@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Starting a change that outlives the program that asked for it, and asking it to stop.
+//! Running a change in the background: it outlives the program that asked for it, and can be asked to stop.
 //!
 //! What runs is the ordinary `snapall` command line, given `--job ID`: the same code path a person types,
 //! which takes the change lock and writes the journal itself. Where systemd is running it is started
