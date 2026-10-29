@@ -11,16 +11,16 @@ use crate::view::*;
 /// button is the key the button stands for ([`Button::key`]), never typed a second time here.
 /// The first row is for doing things, the second for finding your way and leaving.
 pub(crate) const ACTIONS: [(Button, &str, u16); 10] = [
-    (Button::Create, "create", 0),
-    (Button::CreateAll, "all", 0),
-    (Button::Delete, "delete", 0),
+    (Button::Create, "create ", 0),
     (Button::Restore, "restore", 0),
-    (Button::Groups, "groups", 0),
-    (Button::Points, "points", 1),
-    (Button::Reload, "reload", 1),
+    (Button::Delete, "delete ", 0),
+    (Button::CreateAll, "cre all", 0),
+    (Button::Points, "points ", 0),
+    (Button::Groups, "groups ", 1),
     (Button::Protect, "protect", 1),
-    (Button::Help, "help", 1),
-    (Button::Quit, "quit", 1),
+    (Button::Help, "help   ", 1),
+    (Button::Reload, "reload ", 1),
+    (Button::Quit, "quit   ", 1),
 ];
 
 /// The footer of the screen that is open on one file.
