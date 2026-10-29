@@ -212,20 +212,35 @@ def main(argv):
     say("main is green")
     if "--no-release" in flags:
         return
-    release = None
-    for _ in range(12):
-        open_prs = api("pulls?state=open&per_page=20")
-        release = next((p for p in open_prs if isinstance(open_prs, list) and p["title"].startswith("chore: release")), None) if isinstance(open_prs, list) else None
+    # a release may already be done (merged in an earlier run) or still to be merged: GitHub says which
+    def release_commit_after(sha):
+        for commit in api("commits?sha=main&per_page=20"):
+            if commit["sha"] == sha:
+                return None
+            if commit["commit"]["message"].startswith("chore: release"):
+                return commit["sha"]
+        return None
+    released = release_commit_after(merge_sha)
+    if not released:
+        release = None
+        for _ in range(12):
+            open_prs = api("pulls?state=open&per_page=20")
+            release = next((p for p in open_prs if p["title"].startswith("chore: release")), None) if isinstance(open_prs, list) else None
+            if release:
+                break
+            released = release_commit_after(merge_sha)
+            if released:
+                break
+            nap(15)
         if release:
-            break
-        nap(15)
-    if not release:
+            merged = api(f"pulls/{release['number']}/merge", {"merge_method": "squash", "commit_title": f"chore: release (#{release['number']})"}, "PUT")
+            if not merged.get("merged"):
+                sys.exit(f"release merge refused: {merged}")
+            released = merged["sha"]
+    if not released:
         say("no release pull request was opened: this change does not release")
         return
-    merged = api(f"pulls/{release['number']}/merge", {"merge_method": "squash", "commit_title": f"chore: release (#{release['number']})"}, "PUT")
-    if not merged.get("merged"):
-        sys.exit(f"release merge refused: {merged}")
-    verify_release(merged["sha"])
+    verify_release(released)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
