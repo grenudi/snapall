@@ -13,7 +13,7 @@ use std::process::ExitCode;
 /// Stop protecting an area: every snapshot of it is deleted for good, its own files are not touched. It
 /// always says what that means first; on a terminal it needs the area's name typed out, in a script `--yes`;
 /// `--dry-run` only says. The system area is refused.
-pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Outcome {
+pub fn unprotect(ctx: &Context, area: &str, mode: Mode, agreed: Agreed) -> Outcome {
     use snapall_core::protecting::unprotect::{plan, stop_protecting};
     use snapall_core::SystemProbe;
     let config = AreaName::parse(area)?;
@@ -28,7 +28,7 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
 "
         )
     );
-    if dry_run {
+    if mode.shows_only() {
         return ctx.show.result(
             "Dry run: nothing was changed.
 "
@@ -43,7 +43,7 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
     );
     let approved = ask::gate(
         Act::StopProtecting,
-        destroy,
+        agreed,
         &question,
         Some(config.as_str()),
     )?;
@@ -74,12 +74,12 @@ pub fn unprotect(ctx: &Context, area: &str, dry_run: bool, destroy: bool) -> Out
 
 /// Protect the parts of the disk that snapshots do not cover yet: explain, ask, and do it. With
 /// `--json` nothing is said or asked, and nothing is changed unless `--yes` is given as well.
-pub fn setup(ctx: &Context, area: Option<&str>, yes: bool, dry_run: bool) -> Outcome {
+pub fn setup(ctx: &Context, area: Option<&str>, agreed: Agreed, mode: Mode) -> Outcome {
     let json = ctx.show.is_json();
     let options = setup::Options {
         area: area.map(str::to_owned),
-        yes,
-        dry_run: dry_run || (json && !yes),
+        yes: agreed.covers(snapall_core::Weight::Changes),
+        dry_run: mode.shows_only() || (json && !agreed.covers(snapall_core::Weight::Changes)),
     };
     let change = if options.dry_run {
         None

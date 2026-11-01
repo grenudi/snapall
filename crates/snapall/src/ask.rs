@@ -41,6 +41,30 @@ pub enum Decision {
     Nobody,
 }
 
+/// What the person already agreed to on the command line. `--yes` answers a question about a change, and only
+/// `--destroy` answers one about what is lost for good: which of the two counts is decided by the weight of the act
+/// being asked about, here, and not by each command.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Agreed {
+    yes: bool,
+    destroy: bool,
+}
+
+impl Agreed {
+    pub fn to(yes: bool, destroy: bool) -> Agreed {
+        Agreed { yes, destroy }
+    }
+
+    /// Whether this already answers a question about something of this weight.
+    pub fn covers(self, weight: Weight) -> bool {
+        match weight {
+            Weight::Light => true,
+            Weight::Changes => self.yes,
+            Weight::Destroys => self.destroy,
+        }
+    }
+}
+
 /// Read one line from stdin.
 fn read_line() -> Result<String, Box<dyn Error>> {
     io::stderr().flush()?;
@@ -50,15 +74,15 @@ fn read_line() -> Result<String, Box<dyn Error>> {
 }
 
 /// Ask what the weight of the thing requires, and nothing less: `y` or `yes` for a change, `destroy` (and
-/// the name, where there is one) for what loses something for good, never a bare Enter. Said already by a
-/// flag (`said_so`), it is not asked again. The caller reports [`Decision::Nobody`] in its own words.
+/// the name, where there is one) for what loses something for good, never a bare Enter. Agreed already on the
+/// command line, it is not asked again. The caller reports [`Decision::Nobody`] in its own words.
 pub fn decide(
     weight: Weight,
-    said_so: bool,
+    agreed: Agreed,
     question: &str,
     target: Option<&str>,
 ) -> Result<Decision, Box<dyn Error>> {
-    if !weight.asks() || said_so {
+    if !weight.asks() || agreed.covers(weight) {
         return Ok(Decision::Go);
     }
     if !can_ask() {
@@ -96,43 +120,43 @@ pub fn nothing_to_lose<T>(act: Act, found: &Option<T>) -> Result<Approved, Box<d
     Ok(Approved(()))
 }
 
-pub fn before(act: Act, said_so: bool, question: &str) -> Result<Approved, Box<dyn Error>> {
-    gate(act, said_so, question, None)
+pub fn before(act: Act, agreed: Agreed, question: &str) -> Result<Approved, Box<dyn Error>> {
+    gate(act, agreed, question, None)
 }
 
 /// [`before`], after showing what is about to happen: only when there is something to answer, and also when there
 /// is nobody to answer, so that "read the above" is true.
 pub fn before_showing(
     act: Act,
-    said_so: bool,
+    agreed: Agreed,
     preview: impl FnOnce() -> String,
     question: &str,
 ) -> Result<Approved, Box<dyn Error>> {
-    approval(act, said_so, Some(preview), question, None)
+    approval(act, agreed, Some(preview), question, None)
 }
 
 /// [`decide`], and if the answer is not a go, what to say, and the story ends there: the caller writes `?`.
 pub fn gate(
     act: Act,
-    said_so: bool,
+    agreed: Agreed,
     question: &str,
     target: Option<&str>,
 ) -> Result<Approved, Box<dyn Error>> {
-    approval(act, said_so, None::<fn() -> String>, question, target)
+    approval(act, agreed, None::<fn() -> String>, question, target)
 }
 
 fn approval(
     act: Act,
-    said_so: bool,
+    agreed: Agreed,
     preview: Option<impl FnOnce() -> String>,
     question: &str,
     target: Option<&str>,
 ) -> Result<Approved, Box<dyn Error>> {
     let weight = act.weight();
-    if let (true, Some(preview)) = (weight.asks() && !said_so, preview) {
+    if let (true, Some(preview)) = (weight.asks() && !agreed.covers(weight), preview) {
         eprintln!("{}", preview());
     }
-    let leaving = match decide(weight, said_so, question, target)? {
+    let leaving = match decide(weight, agreed, question, target)? {
         Decision::Go => return Ok(Approved(())),
         Decision::Declined => {
             eprintln!("snapall: nothing changed");
@@ -172,9 +196,32 @@ mod tests {
     }
 
     #[test]
+    fn yes_answers_a_change_and_only_destroy_answers_a_loss() {
+        let nothing = Agreed::default();
+        assert!(
+            nothing.covers(Weight::Light),
+            "what weighs nothing asks nothing"
+        );
+        assert!(!nothing.covers(Weight::Changes));
+        assert!(!nothing.covers(Weight::Destroys));
+        let yes = Agreed::to(true, false);
+        assert!(yes.covers(Weight::Changes));
+        assert!(
+            !yes.covers(Weight::Destroys),
+            "--yes cannot answer a question about what is lost for good"
+        );
+        let destroy = Agreed::to(false, true);
+        assert!(destroy.covers(Weight::Destroys));
+        assert!(
+            !destroy.covers(Weight::Changes),
+            "--destroy is not a yes to a plain change"
+        );
+    }
+
+    #[test]
     fn a_flag_that_already_said_it_gives_leave_without_asking_anyone() {
-        assert!(before(Act::DeleteSnapshots, true, "Delete it?").is_ok());
-        assert!(before(Act::Restore, true, "Restore it?").is_ok());
+        assert!(before(Act::DeleteSnapshots, Agreed::to(false, true), "Delete it?").is_ok());
+        assert!(before(Act::Restore, Agreed::to(true, false), "Restore it?").is_ok());
     }
 
     #[test]
@@ -182,7 +229,7 @@ mod tests {
         if can_ask() {
             return; // a person is at this terminal: asking would wait for them
         }
-        let error = before(Act::Restore, false, "Restore it?").unwrap_err();
+        let error = before(Act::Restore, Agreed::default(), "Restore it?").unwrap_err();
         assert_eq!(
             format!("{:?}", how_it_ended(error.as_ref())),
             format!("{:?}", Some(ExitCode::from(2)))

@@ -148,10 +148,10 @@ that could not be read and a prose comment holding its only *why*. Written as a 
 below, it is this (the text is read from the source file, not retyped):
 
 ```rust
-pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, destroy: bool) -> Outcome {
+pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, agreed: Agreed) -> Outcome {
     let found = find_snapshot(ctx.backend, area, id)?;
     let approved = match &found {
-        Some(snapshot) => ask_before_deleting(area, snapshot, destroy)?,
+        Some(snapshot) => ask_before_deleting(area, snapshot, agreed)?,
         None => ask::nothing_to_lose(Act::DeleteSnapshots, &found)?,
     };
     let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
@@ -172,8 +172,10 @@ The wording moved beneath the story, the lookup became a verb in the core, the p
 comment became two tests with those names. What was left was a three-line `if let Some(stop) = ...` repeated in eight
 handlers, which was a missing noun: a story *stopped* by an answer that is not a yes. It is now `Stopped`, which
 lives where it is produced, so each story says `ask::before(..)?;` and `main` ends it with its own exit code. The
-syntax that remains (`?`, the trailing `None`, the bare `destroy: bool`) lists the nouns still missing: an `Approved`
-in place of a flag and a question, and a name for "no name".
+syntax that remained then (`?`, the trailing `None`, the bare `destroy: bool`) listed the nouns still missing. Two have
+since been named: `Approved`, leave that only asking can give, and `Agreed`, what the person already agreed to on the
+command line, whose `covers(weight)` is the one place that says `--yes` cannot answer a question about what is lost for
+good, where each handler used to choose its own flag. What is still missing is a name for "no name", the trailing `None`.
 
 ## What goes wrong
 

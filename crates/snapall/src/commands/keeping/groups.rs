@@ -26,13 +26,13 @@ pub fn groups(
     action: Option<&str>,
     name: Option<&str>,
     areas: Option<&str>,
-    yes: bool,
+    agreed: Agreed,
 ) -> Outcome {
     let system = snapall_system::LinuxSystem::new();
     match action {
         None | Some("list") => list_the_groups(ctx, &system),
-        Some("add") => make_a_group(ctx, &system, name, areas, yes),
-        Some("remove") => take_a_group_away(ctx, &system, name, yes),
+        Some("add") => make_a_group(ctx, &system, name, areas, agreed),
+        Some("remove") => take_a_group_away(ctx, &system, name, agreed),
         Some(other) => Err(format!("`{other}` is not `add` or `remove`").into()),
     }
 }
@@ -51,14 +51,14 @@ fn make_a_group(
     system: &dyn SystemProbe,
     name: Option<&str>,
     areas: Option<&str>,
-    yes: bool,
+    agreed: Agreed,
 ) -> Outcome {
     let mut made = system.groups()?;
     let protected = ctx.backend.list_areas()?;
     let (name, list) = the_group_asked_for(name, areas, &protected)?;
     let before = made.get(&name).map(<[AreaName]>::to_vec);
     let question = format!("Make the group {name} of {}?", in_words(&list));
-    let approved = ask::gate(Act::ChangeGroups, yes, &question, None)?;
+    let approved = ask::gate(Act::ChangeGroups, agreed, &question, None)?;
     let change = Change::begin(
         approved,
         &format!("Making the group {name}"),
@@ -90,7 +90,7 @@ fn take_a_group_away(
     ctx: &Context,
     system: &dyn SystemProbe,
     name: Option<&str>,
-    yes: bool,
+    agreed: Agreed,
 ) -> Outcome {
     let mut made = system.groups()?;
     let name = GroupName::parse(name.ok_or("which group? `snapall groups remove NAME`")?)?;
@@ -100,7 +100,7 @@ fn take_a_group_away(
     }
     let question =
         format!("Take the group {name} away? The areas and their snapshots are untouched.");
-    let approved = ask::gate(Act::ChangeGroups, yes, &question, None)?;
+    let approved = ask::gate(Act::ChangeGroups, agreed, &question, None)?;
     made.remove(&name);
     let change = Change::begin(
         approved,

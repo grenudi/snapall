@@ -11,10 +11,10 @@ use snapall_core::going_back::rollback::after_deleting;
 use snapall_core::SnapshotInfo;
 use snapall_core::{delete_snapshot, find_snapshot, Act, AreaName, SnapshotId};
 
-pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, destroy: bool) -> Outcome {
+pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, agreed: Agreed) -> Outcome {
     let found = find_snapshot(ctx.backend, area, id)?;
     let approved = match &found {
-        Some(snapshot) => ask_before_deleting(area, snapshot, destroy)?,
+        Some(snapshot) => ask_before_deleting(area, snapshot, agreed)?,
         None => ask::nothing_to_lose(Act::DeleteSnapshots, &found)?,
     };
     let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
@@ -33,11 +33,11 @@ pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, destroy: bool) -> 
 fn ask_before_deleting(
     area: &AreaName,
     snapshot: &SnapshotInfo,
-    destroy: bool,
+    agreed: Agreed,
 ) -> Result<ask::Approved, Box<dyn std::error::Error>> {
     let it = snapshot_in_words(area, snapshot);
     output::note(&what_deleting_loses(&it, area));
-    ask::before(Act::DeleteSnapshots, destroy, &delete_question(&it))
+    ask::before(Act::DeleteSnapshots, agreed, &delete_question(&it))
 }
 
 fn snapshot_in_words(area: &AreaName, snapshot: &SnapshotInfo) -> String {

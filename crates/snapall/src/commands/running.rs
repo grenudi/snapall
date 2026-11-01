@@ -11,7 +11,7 @@ use snapall_core::Act;
 
 /// Ask a running change to stop after the area it is on. Only a request: the change looks for it between
 /// its areas, never inside one, so nothing is left half-done.
-pub fn cancel(ctx: &Context, job: &str, yes: bool) -> Outcome {
+pub fn cancel(ctx: &Context, job: &str, agreed: Agreed) -> Outcome {
     use snapall_core::{JournalStatus, SystemProbe};
     let system = snapall_system::LinuxSystem::new();
     let history = system.history(500);
@@ -30,7 +30,7 @@ pub fn cancel(ctx: &Context, job: &str, yes: bool) -> Outcome {
         .into());
     }
     let question = format!("Ask {} to stop after the area it is on?", entry.what);
-    let _asked = ask::gate(Act::StopChange, yes, &question, None)?;
+    let _asked = ask::gate(Act::StopChange, agreed, &question, None)?;
     system.request_stop(job)?;
     ctx.show.result(
         format!(

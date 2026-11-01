@@ -23,8 +23,8 @@ use std::process::ExitCode;
 pub fn restore_all(
     ctx: &Context,
     wanted: &Point,
-    dry_run: bool,
-    yes: bool,
+    mode: Mode,
+    agreed: Agreed,
     job: Option<&str>,
 ) -> Outcome {
     let found = restore_points(&all_snapshots(ctx.backend)?);
@@ -34,13 +34,13 @@ pub fn restore_all(
     let anything_to_change = previews
         .iter()
         .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()));
-    if dry_run || !anything_to_change {
+    if mode.shows_only() || !anything_to_change {
         return ctx.show.result(
             render::point_preview(point, &previews, &route),
             render::point_preview_json(point, &previews),
         );
     }
-    let approved = ask_before_putting_back(yes, point, &previews, &route)?;
+    let approved = ask_before_putting_back(agreed, point, &previews, &route)?;
     let change = Change::begin(
         approved,
         &format!("Putting every area back to restore point {}", point.point),
@@ -129,14 +129,14 @@ fn restore_point_question(
 }
 
 fn ask_before_putting_back(
-    yes: bool,
+    agreed: Agreed,
     point: &RestorePoint,
     previews: &[snapall_core::MemberPreview],
     route: &str,
 ) -> Result<ask::Approved, Box<dyn std::error::Error>> {
     ask::before_showing(
         Act::RestorePoint,
-        yes,
+        agreed,
         || {
             format!(
                 "{}\n{}\n",

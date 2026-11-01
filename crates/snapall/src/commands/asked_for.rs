@@ -36,11 +36,13 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             only.as_deref(),
             group.as_deref(),
             &description,
-            dry_run,
+            Mode::from_dry_run(dry_run),
             job.as_deref(),
         ),
 
-        Request::Delete { area, id, destroy } => deleting::delete(ctx, &area, id, destroy),
+        Request::Delete { area, id, destroy } => {
+            deleting::delete(ctx, &area, id, Agreed::to(false, destroy))
+        }
 
         Request::Restore {
             area,
@@ -48,27 +50,48 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             path,
             dry_run,
             yes,
-        } => going_back::restore(ctx, &area, id, path.as_deref(), dry_run, yes),
+        } => going_back::restore(
+            ctx,
+            &area,
+            id,
+            path.as_deref(),
+            Mode::from_dry_run(dry_run),
+            Agreed::to(yes, false),
+        ),
         Request::RestoreAll {
             point,
             yes,
             dry_run,
             job,
-        } => going_back::restore_all(ctx, &point, dry_run, yes, job.as_deref()),
+        } => going_back::restore_all(
+            ctx,
+            &point,
+            Mode::from_dry_run(dry_run),
+            Agreed::to(yes, false),
+            job.as_deref(),
+        ),
         Request::Undo {
             change,
             yes,
             destroy,
-        } => going_back::undo(ctx, &change, yes, destroy),
+        } => going_back::undo(ctx, &change, Agreed::to(yes, destroy)),
 
-        Request::Setup { area, yes, dry_run } => {
-            protecting::setup(ctx, area.as_deref(), yes, dry_run)
-        }
+        Request::Setup { area, yes, dry_run } => protecting::setup(
+            ctx,
+            area.as_deref(),
+            Agreed::to(yes, false),
+            Mode::from_dry_run(dry_run),
+        ),
         Request::Unprotect {
             area,
             dry_run,
             destroy,
-        } => protecting::unprotect(ctx, &area, dry_run, destroy),
+        } => protecting::unprotect(
+            ctx,
+            &area,
+            Mode::from_dry_run(dry_run),
+            Agreed::to(false, destroy),
+        ),
         Request::Doctor { install, yes } => {
             doctor::run(ctx.backend, ctx.observer, install, yes, ctx.json)
         }
@@ -86,7 +109,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
                 min_age: min_age.as_deref(),
                 cleanup: cleanup.as_deref(),
             };
-            keeping::limits(ctx, &area, wanted, yes, destroy)
+            keeping::limits(ctx, &area, wanted, Agreed::to(yes, destroy))
         }
         Request::Groups {
             action,
@@ -98,11 +121,13 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             action.as_deref(),
             name.as_deref(),
             areas.as_deref(),
-            yes,
+            Agreed::to(yes, false),
         ),
-        Request::Quotas { state, yes } => keeping::quotas(ctx, state.as_deref(), yes),
+        Request::Quotas { state, yes } => {
+            keeping::quotas(ctx, state.as_deref(), Agreed::to(yes, false))
+        }
 
-        Request::Cancel { job, yes } => running::cancel(ctx, &job, yes),
+        Request::Cancel { job, yes } => running::cancel(ctx, &job, Agreed::to(yes, false)),
         Request::Tui { file } => window::tui(ctx, file.as_deref()),
     }
 }

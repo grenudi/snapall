@@ -62,8 +62,8 @@ pub(super) fn check_the_way_back_still_exists(
 /// Roll a change back to the state it recorded, if it recorded one. It says what that state is and what it
 /// will run, asks as heavily as what it does weighs (undoing the taking of a snapshot is deleting it), and
 /// runs the recorded commands through this same program, so they are checked and journaled like any other.
-pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool) -> Outcome {
-    use snapall_core::{Rollback, SystemProbe, Weight};
+pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
+    use snapall_core::{Rollback, SystemProbe};
     let system = snapall_system::LinuxSystem::new();
     let history = system.history(500);
     let Some(entry) = history.iter().find(|entry| entry.id == change_id) else {
@@ -92,13 +92,8 @@ pub fn undo(ctx: &Context, change_id: &str, yes: bool, destroy: bool) -> Outcome
         eprintln!("  snapall {}", command.join(" "));
     }
     eprintln!();
-    let said_so = if undo.weight == Weight::Destroys {
-        destroy
-    } else {
-        yes
-    };
     let act = Act::Undo { doing: undo.weight };
-    let _asked = ask::gate(act, said_so, "Roll this back?", None)?;
+    let _asked = ask::gate(act, agreed, "Roll this back?", None)?;
     let program = std::env::current_exe()?;
     for command in &undo.commands {
         let mut step = std::process::Command::new(&program);

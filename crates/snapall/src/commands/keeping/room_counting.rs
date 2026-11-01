@@ -13,13 +13,13 @@ use std::error::Error;
 
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes how the
 /// whole disk works, so it explains what it gives and costs and asks first.
-pub fn quotas(ctx: &Context, wanted: Option<&str>, yes: bool) -> Outcome {
+pub fn quotas(ctx: &Context, wanted: Option<&str>, agreed: Agreed) -> Outcome {
     let system = snapall_system::LinuxSystem::new();
     let facts = gather(ctx.backend, &system)?;
     let mode = how_the_disk_counts(&facts)?;
     match wanted {
         None => say_how_the_disk_counts(ctx, mode),
-        Some(wanted) => switch(ctx, &system, &facts, mode, switch_to(wanted)?, yes),
+        Some(wanted) => switch(ctx, &system, &facts, mode, switch_to(wanted)?, agreed),
     }
 }
 
@@ -29,13 +29,13 @@ fn switch(
     facts: &Facts,
     mode: QuotaMode,
     turn_on: bool,
-    yes: bool,
+    agreed: Agreed,
 ) -> Outcome {
     match mode.switching(turn_on) {
         Switching::CannotBeDoneInPlace => Err("the disk counts room the simple way, and snapall cannot switch it to the full kind in place".into()),
         Switching::AlreadyThatWay => say_it_is_already_so(ctx, mode),
         Switching::Possible => {
-            let approved = ask_before_switching(facts, mode, turn_on, yes)?;
+            let approved = ask_before_switching(facts, mode, turn_on, agreed)?;
             make_the_switch(ctx, system, facts, approved, turn_on)
         }
     }
@@ -79,7 +79,7 @@ fn ask_before_switching(
     facts: &Facts,
     mode: QuotaMode,
     turn_on: bool,
-    yes: bool,
+    agreed: Agreed,
 ) -> Result<ask::Approved, Box<dyn Error>> {
     let areas: Vec<String> = facts
         .areas
@@ -94,7 +94,7 @@ fn ask_before_switching(
     );
     ask::before_showing(
         Act::RoomCounting,
-        yes,
+        agreed,
         || format!("{}\n", room_counting_text(mode)),
         &question,
     )
