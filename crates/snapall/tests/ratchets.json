@@ -20,13 +20,7 @@
   "handlers_with_too_much_plumbing": {
     "check_the_way_back_still_exists": 3
   },
-  "prints_outside_the_presenter": {
-    "crates/snapall/src/commands/going_back/restoring_a_point.rs": 1,
-    "crates/snapall/src/commands/going_back/undoing.rs": 4,
-    "crates/snapall/src/commands/protecting.rs": 1,
-    "crates/snapall/src/doctor.rs": 5,
-    "crates/snapall/src/main.rs": 4
-  },
+  "prints_outside_the_presenter": {},
   "tool_words_in_names": {
     "snapall": 6,
     "snapall-core": 1

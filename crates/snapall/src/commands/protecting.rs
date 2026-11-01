@@ -5,6 +5,7 @@
 //! Protecting parts of the disk, and stopping protecting them.
 
 use super::*;
+use crate::output;
 use crate::output::Outcome;
 use crate::{ask, render, setup};
 use snapall_core::{Act, AreaName};
@@ -20,14 +21,7 @@ pub fn unprotect(ctx: &Context, area: &str, mode: Mode, agreed: Agreed) -> Outco
     let system = snapall_system::LinuxSystem::new();
     let groups = system.groups()?;
     let plan = plan(ctx.backend, &groups, &config)?;
-    eprintln!(
-        "{}
-",
-        plan.words().join(
-            "
-"
-        )
-    );
+    output::note(&format!("{}\n", plan.words().join("\n")));
     if mode.shows_only() {
         return ctx.show.result(
             "Dry run: nothing was changed.

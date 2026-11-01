@@ -7,6 +7,7 @@
 //! All decisions (what is wrong, what to install, with which command) are pure functions in
 //! `snapall_core::protecting::doctor`; this module only gathers facts and performs the I/O.
 
+use crate::output;
 use std::error::Error;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -60,12 +61,12 @@ struct Approved(Vec<Step>);
 
 /// Show the steps and get consent: `--yes`, or an answer on the terminal. `Ok(None)` is a "no".
 fn approve(steps: Vec<Step>, yes: bool) -> Result<Option<Approved>, Box<dyn Error>> {
-    eprintln!("snapall will run, as root:");
+    output::note("snapall will run, as root:");
     for step in &steps {
-        eprintln!("  {}", step.display());
+        output::note(&format!("  {}", step.display()));
     }
     if !yes && !confirm()? {
-        eprintln!("snapall: not installing");
+        output::note("snapall: not installing");
         return Ok(None);
     }
     Ok(Some(Approved(steps)))
@@ -91,7 +92,7 @@ fn execute(approved: Approved, observer: &dyn Observer) -> Result<(), Box<dyn Er
 fn install(probe: &Probe, yes: bool, observer: &dyn Observer) -> Result<bool, Box<dyn Error>> {
     match install_plan(&probe.os) {
         InstallPlan::Manual(text) => {
-            eprintln!("snapall: {text}");
+            output::note(&format!("snapall: {text}"));
             Ok(false)
         }
         InstallPlan::Steps(steps) => {
@@ -122,7 +123,7 @@ pub fn run(
     let mut probe = probe(backend);
     if install_missing {
         if probe.snapper.is_ok() {
-            eprintln!("snapall: snapper is already installed; nothing to install");
+            output::note("snapall: snapper is already installed; nothing to install");
         } else if install(&probe, yes, observer)? {
             // Judge the result by looking again, not by trusting the exit status.
             probe = self::probe(backend);
