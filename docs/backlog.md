@@ -15,18 +15,20 @@ Every known gap lives here, not in a prose TODO.
 
 What is deliberately *not* here (package-manager hooks, more log sinks, Btrfs checks, branch protection) is in [ADR 11](adr/0011-scope-what-snapall-is-not.md).
 
+## Structure
+Where the code still does not say what snapall is for. Each iteration is a branch and a pull request, and none depends on anyone remembering the last; how one goes, and the tools, are in `AGENTS.md`. Progress is measured by `dev/structure-metrics.py` and by the cold-read test (`crates/snapall/tests/findability.rs`), and recorded in `docs/development-log.md`. The debts themselves are data in `crates/snapall/tests/ratchets.json`, which can only be lowered.
+
 | # | Item | Status |
 |---|---|---|
 | 1 | Nine bare booleans remain in the commands, of a different kind from the ones that were named: states a function reports (`stopped`, `changed`, `ended`), a direction (`turn_on`, on or off) and facts about how the program was invoked (`hints`, `json`, `no_dbus` in `Context`). Name `turn_on` if a fourth place needs it | open |
-| 2 | One layer that owns a change (begin, record, end, the way back), used by both the command line (`commands/change.rs`) and the window (`session/executor.rs`), which each do their own today | open |
-| 3 | Outputs as values: a handler returns what is to be said and the surface prints it. Fifteen prints still bypass the presenter | open |
-| 4 | The window by purpose: its state is one 26-field struct, its questions are `model/prompts/` and `view/prompts/` pairs and its file screen `model/file.rs` with `view/file.rs`. Compose the state by screen | open |
-| 5 | The window's `changes.rs` is over 300 lines (419) | open |
-| 6 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
-| 7 | One question the cold read cannot answer: "What does a key do in the window?" leads to the wrong module first (`crates/snapall/tests/ratchets.json`). Name or describe the key modules for what a stranger would ask | open |
-| 8 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
-| 9 | The openSUSE x86_64 container job fails now and then in the runner's own setup, seen twice. `dev/ship.py` re-runs it once; find out why (the image pull, a mirror) or pin it | open |
-| 10 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+| 2 | Outputs as values: a handler returns what is to be said and the surface prints it. Fifteen prints still bypass the presenter | open |
+| 3 | The window by purpose: its state is one 26-field struct, its questions are `model/prompts/` and `view/prompts/` pairs and its file screen `model/file.rs` with `view/file.rs`. Compose the state by screen | open |
+| 4 | The window's `changes.rs` is over 300 lines (419) | open |
+| 5 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
+| 6 | One question the cold read cannot answer: "What does a key do in the window?" leads to the wrong module first (`crates/snapall/tests/ratchets.json`). Name or describe the key modules for what a stranger would ask | open |
+| 7 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
+| 8 | The openSUSE x86_64 container job fails now and then in the runner's own setup, seen twice. `dev/ship.py` re-runs it once; find out why (the image pull, a mirror) or pin it | open |
+| 9 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 

@@ -981,3 +981,30 @@ fn the_model_and_the_executor_know_nothing_of_drawing() {
         offenders.join("\n  ")
     );
 }
+
+/// A document that is edited by a script can lose a section without any path in it going wrong, so the sections the
+/// backlog is read by are checked: the plan is only useful if it can be found.
+#[test]
+fn the_backlog_keeps_the_sections_it_is_read_by() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let backlog = std::fs::read_to_string(root.join("docs/backlog.md")).unwrap();
+    for heading in [
+        "## Product",
+        "## Structure",
+        "## Upstream: argenv",
+        "## Dependencies",
+    ] {
+        assert!(
+            backlog.lines().any(|line| line == heading),
+            "docs/backlog.md has lost its `{heading}` section"
+        );
+    }
+    let structure = backlog.find("## Structure").unwrap();
+    let decided = backlog
+        .find("Decided, so not open:")
+        .expect("the decision about setup is recorded in the backlog");
+    assert!(
+        structure < decided,
+        "the decision about setup belongs under `## Structure`"
+    );
+}
