@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.26.7]
+
+
+### Refactoring
+- The answer and the mode are nouns, and the weight decides what counts ([#103](https://github.com/grenudi/snapall/pull/103)) ([2f4f958])
+
+
+
 ## [0.26.6]
 
 
