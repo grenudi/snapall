@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: a change is written down in one place
+
+**Why.** Item 2 of the plan said the command line and the window each had their own lifecycle for a change. Before building anything I checked that against the code, since the item came from an older design: it was true. The window's executor took the one-change-at-a-time lock, recorded *Started*, ran, recorded *Rollback* and *Finished* with the elapsed time (about 45 lines); the command line's `Change` did the same four events and added *Progress* and a *Failed* record for an early exit (about 170 lines).
+
+**What.** `snapall_core::InProgress` (`crates/snapall-core/src/changing/in_progress.rs`) is the lifecycle, stated once: `begin`, `rollback`, `proceed` (progress, and whether a request to stop has been made), `end`. It does not store the machine, so a change can be held by whoever owns the machine or by someone borrowing it. The command line's `Change` is now a thin wrapper that keeps what is genuinely its own (where the change came from, what it is called, the typestate that a change begins only with leave, and a *Failed* record when a command leaves early); the window's executor calls the same four methods. Four tests state the lifecycle against the in-memory stand-in, including that a refused change leaves no record of having started.
+
+**A defect of mine, found and repaired here.** When the measurement change rewrote the backlog's Structure section by script, it looked up the table header with a search that finds the first match, which is in the Product table above, so the section lost its heading and its introduction and the rows ended up under Product. Every path in the document still existed, so nothing failed. The section is restored, and a test now checks that the backlog keeps the four sections it is read by. The lesson, for `AGENTS.md`: a script that edits a document must assert on what it expects to find, as one that edits code does.
+
+**Evidence.** The workspace tests and the fast gate; CI runs the fixture checks, which exercise both paths: the consequences script and the golden output for the command line, and the terminal journeys for the window (the Activity tab shows what the journal recorded). The cold-read test also moved: the new module is an acceptable answer to "where is a change started and recorded", and `contract/inputs.rs` now says it is the command line's flags, declared once.
+
 ## 2026-10-29: the answer and the mode are nouns, and the weight decides what counts
 
 **Why.** Item 1 of the plan, from the measurement: 34 bare booleans in the commands. Looking at them showed three flags making up almost all of it (`yes` 24, `dry_run` 12, `destroy` 10), travelling together, and a design flaw behind the naming: each handler chose which flag to pass to `ask::before` (`if removes { destroy } else { yes }` in limits, the same choice in undo), which is a rule the act's weight already owns (`--yes` cannot answer a question about what is lost for good).

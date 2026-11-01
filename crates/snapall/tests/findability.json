@@ -192,7 +192,8 @@
     {
       "question": "Where is a change started and recorded when it runs from the command line?",
       "answers": [
-        "snapall/commands/change.rs"
+        "snapall/commands/change.rs",
+        "snapall-core/changing/in_progress.rs"
       ]
     },
     {

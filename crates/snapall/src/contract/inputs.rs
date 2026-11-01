@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The inputs: every flag, positional and environment variable, and the commands each applies to.
+//! Every flag, positional and environment variable of the command line, declared once, and the commands each applies to.
 
 use super::*;
 use argenv_resolve::*;

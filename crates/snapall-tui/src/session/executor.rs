@@ -48,11 +48,19 @@ impl<'a> Executor<'a> {
         };
         let present = describe_now(&effect).unwrap_or_default();
         // one change at a time across every snapall: a second one is told who has the right, and waits
-        let _hold = match self.system.hold_changes(&present) {
-            Ok(hold) => hold,
+        let id = new_id();
+        let change = match snapall_core::InProgress::begin(
+            self.system,
+            &present,
+            &what,
+            snapall_core::Source::Window,
+            id.clone(),
+            std::process::id(),
+        ) {
+            Ok(change) => change,
             Err(busy) => {
                 return Msg::Finished(Box::new(Finished {
-                    id: new_id(),
+                    id,
                     outcome: Err(busy.to_string()),
                     what,
                     present,
@@ -63,14 +71,6 @@ impl<'a> Executor<'a> {
                 }));
             }
         };
-        let id = new_id();
-        self.system.record(&snapall_core::JournalEvent::Started {
-            id: id.clone(),
-            at: self.system.local_time().unwrap_or_default(),
-            what: what.clone(),
-            source: snapall_core::Source::Window,
-            pid: std::process::id(),
-        });
         let started = std::time::Instant::now();
         let asked_for = effect.clone();
         let msg = self.perform(effect);
@@ -82,18 +82,9 @@ impl<'a> Executor<'a> {
             None
         };
         if let Some(rollback) = &how_back {
-            self.system.record(&snapall_core::JournalEvent::Rollback {
-                id: id.clone(),
-                at: self.system.local_time().unwrap_or_default(),
-                rollback: rollback.clone(),
-            });
+            change.rollback(self.system, rollback.clone());
         }
-        self.system.record(&snapall_core::JournalEvent::Finished {
-            id: id.clone(),
-            at: self.system.local_time().unwrap_or_default(),
-            outcome: outcome.clone().into(),
-            took_ms: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-        });
+        change.end(self.system, outcome.clone().into());
         Msg::Finished(Box::new(Finished {
             id,
             outcome,

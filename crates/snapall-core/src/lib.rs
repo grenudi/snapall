@@ -10,6 +10,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod changing;
 pub mod going_back;
 pub mod health;
 pub mod keeping;
@@ -22,6 +23,7 @@ pub mod vocabulary;
 #[cfg(test)]
 mod journeys;
 
+pub use changing::in_progress::InProgress;
 pub use going_back::points::{
     fresh_point, point_of, preview_point, restore_point, restore_point_along, restore_points,
     Member, MemberPreview, MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,

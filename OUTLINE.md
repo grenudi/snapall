@@ -11,6 +11,8 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-core
 
+  - `changing/in_progress.rs`: A change in progress: it holds the right to make a change (one at a time across every snapall, and a second is told who has it and what for), and the journal knows of it from its start to its end, so that the window can show what was done.
+  - `changing/mod.rs`: Making a change: the right to make one, and the record of it from its start to its end.
   - `going_back/boot.rs`: Can a snapshot be booted? The question behind "restore the system".
   - `going_back/mod.rs`: Going back: restoring an area or a restore point, the way back from each change, and whether a snapshot can be booted.
     - `going_back/points/finding.rs`: Finding restore points among snapshots: by their tag, or by matching what one action took together.
@@ -183,7 +185,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `cli/request.rs`: What was asked for: the request, how it logs, and the error in asking.
   - `commands/about.rs`: The program speaking about itself: its help, its version and its contract.
   - `commands/asked_for.rs`: Everything that can be asked for, and the command that does it.
-  - `commands/change.rs`: A change being made: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
+  - `commands/change.rs`: A change being made from the command line: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
   - `commands/deleting.rs`: Deleting a snapshot for good, after saying what that loses.
     - `commands/going_back/mod.rs`: Going back: to a snapshot, to a restore point, or to before a change.
     - `commands/going_back/restoring.rs`: Putting one area, or one file of it, back to how a snapshot had it.
@@ -200,7 +202,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `commands/taking.rs`: Taking snapshots: of one area, of every protected area, or of a group.
   - `commands/window.rs`: The window: opening it, on the whole or on one file.
   - `contract/commands.rs`: The commands: what can be asked for, each with the acts it does and the flags their weight gives it.
-  - `contract/inputs.rs`: The inputs: every flag, positional and environment variable, and the commands each applies to.
+  - `contract/inputs.rs`: Every flag, positional and environment variable of the command line, declared once, and the commands each applies to.
   - `contract/mod.rs`: snapall's invocation surface, declared once with argenv.
 - `doctor.rs`: `snapall doctor` at work: looking at the machine, and running the steps that install what is missing.
 - `generate.rs`: The shell completions and the man page.
