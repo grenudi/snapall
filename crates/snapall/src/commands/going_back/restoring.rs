@@ -23,15 +23,15 @@ pub fn restore(
     area: &AreaName,
     id: SnapshotId,
     path: Option<&str>,
-    dry_run: bool,
-    yes: bool,
+    mode: Mode,
+    agreed: Agreed,
 ) -> Outcome {
     let preview = preview_restore(ctx.backend, area, id, path)?;
     refuse_to_restore_the_whole_system_root(&preview, area, path)?;
-    if dry_run || preview.changes.is_empty() {
+    if mode.shows_only() || preview.changes.is_empty() {
         return show_changes(ctx, area, id, &preview);
     }
-    let approved = ask_before_restoring(yes, area, id, &preview)?;
+    let approved = ask_before_restoring(agreed, area, id, &preview)?;
     let (now, past) = match path {
         Some(path) => (
             format!("Restoring {path} from snapshot #{id} of {area}"),
@@ -88,14 +88,14 @@ fn restore_question(preview: &Preview, area: &AreaName, id: SnapshotId) -> Strin
 }
 
 fn ask_before_restoring(
-    yes: bool,
+    agreed: Agreed,
     area: &AreaName,
     id: SnapshotId,
     preview: &Preview,
 ) -> Result<ask::Approved, Box<dyn std::error::Error>> {
     ask::before_showing(
         Act::Restore,
-        yes,
+        agreed,
         || {
             format!(
                 "{}\n{}\n",

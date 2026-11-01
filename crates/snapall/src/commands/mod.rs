@@ -6,6 +6,7 @@
 //! all share: a change being made. This file is only the map; each command is a short function in the module
 //! that its purpose names.
 
+use crate::ask::Agreed;
 use snapall_core::SnapshotBackend;
 
 use crate::output::Show;
@@ -32,6 +33,27 @@ use window::{absolute, unix_now};
 
 /// What every command works with: the backend (already observed, so every operation is reported), the observer, how
 /// to show results, and how the program was invoked.
+/// Whether to do it, or only to show what would be done (`--dry-run`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Really,
+    ShowOnly,
+}
+
+impl Mode {
+    pub(crate) fn from_dry_run(dry_run: bool) -> Mode {
+        if dry_run {
+            Mode::ShowOnly
+        } else {
+            Mode::Really
+        }
+    }
+
+    pub(crate) fn shows_only(self) -> bool {
+        self == Mode::ShowOnly
+    }
+}
+
 pub struct Context<'a> {
     pub backend: &'a (dyn SnapshotBackend + Sync),
     pub show: &'a Show,

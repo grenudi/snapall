@@ -17,7 +17,7 @@ What is deliberately *not* here (package-manager hooks, more log sinks, Btrfs ch
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Name the bare booleans: 34 `yes`, `destroy` and `dry_run` parameters in the commands are nouns that are not named yet (a run mode, real or dry; how a question was already answered) | open |
+| 1 | Nine bare booleans remain in the commands, of a different kind from the ones that were named: states a function reports (`stopped`, `changed`, `ended`), a direction (`turn_on`, on or off) and facts about how the program was invoked (`hints`, `json`, `no_dbus` in `Context`). Name `turn_on` if a fourth place needs it | open |
 | 2 | One layer that owns a change (begin, record, end, the way back), used by both the command line (`commands/change.rs`) and the window (`session/executor.rs`), which each do their own today | open |
 | 3 | Outputs as values: a handler returns what is to be said and the surface prints it. Fifteen prints still bypass the presenter | open |
 | 4 | The window by purpose: its state is one 26-field struct, its questions are `model/prompts/` and `view/prompts/` pairs and its file screen `model/file.rs` with `view/file.rs`. Compose the state by screen | open |

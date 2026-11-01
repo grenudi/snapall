@@ -23,13 +23,7 @@ pub struct LimitsWanted<'a> {
 /// How many snapshots an area keeps, and when its oldest go. Without options it shows them and what the
 /// next cleanup would remove; with options it changes them, after saying what that would remove (a removed
 /// snapshot cannot be brought back, so a change that removes any asks first, or needs `--destroy`).
-pub fn limits(
-    ctx: &Context,
-    area: &str,
-    wanted: LimitsWanted<'_>,
-    yes: bool,
-    destroy: bool,
-) -> Outcome {
+pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agreed) -> Outcome {
     let config = a_protected_area(ctx, area)?;
     let before = the_limits_now(ctx, &config)?;
     let after = the_limits_wanted(&before, &wanted)?;
@@ -39,7 +33,7 @@ pub fn limits(
         return say_the_limits(ctx, area, &config, &before, &preview, false);
     }
     output::note(&what_changing_would_do(&config, &before, &after, &preview));
-    let approved = ask_before_changing(&preview, yes, destroy)?;
+    let approved = ask_before_changing(&preview, agreed)?;
     let change = Change::begin(
         approved,
         &format!("Changing how many snapshots {config} keeps"),
@@ -120,16 +114,10 @@ fn what_the_next_cleanup_would_remove(
 /// A change that would remove snapshots is destroying, and any other is a change like the rest.
 fn ask_before_changing(
     preview: &LimitsPreview,
-    yes: bool,
-    destroy: bool,
+    agreed: Agreed,
 ) -> Result<ask::Approved, Box<dyn Error>> {
     let removes = preview.would_remove > 0;
-    ask::gate(
-        Act::ChangeLimits { removes },
-        if removes { destroy } else { yes },
-        "Apply this?",
-        None,
-    )
+    ask::gate(Act::ChangeLimits { removes }, agreed, "Apply this?", None)
 }
 
 fn set_the_options(

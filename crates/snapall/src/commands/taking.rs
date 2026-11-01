@@ -22,12 +22,12 @@ pub fn create(
     only: Option<&[AreaName]>,
     group: Option<&str>,
     description: &Description,
-    dry_run: bool,
+    mode: Mode,
     job: Option<&str>,
 ) -> Outcome {
     let chosen = the_areas_asked_for(ctx, only, group)?;
     let plan = plan_snapshots(ctx.backend, chosen.as_deref().or(only))?;
-    if dry_run {
+    if mode.shows_only() {
         return ctx.show.result(
             render::dry_run(&plan, description),
             render::dry_run_json(&plan, description),

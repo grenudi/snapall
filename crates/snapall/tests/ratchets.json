@@ -12,11 +12,10 @@
   "handlers_that_branch_too_much": {
     "restore_all": 8,
     "setup": 7,
-    "undo": 7
+    "undo": 6
   },
   "handlers_too_long": {
-    "restore_all": 79,
-    "undo": 61
+    "restore_all": 79
   },
   "handlers_with_too_much_plumbing": {
     "check_the_way_back_still_exists": 3
