@@ -37,19 +37,19 @@ fn main() -> ExitCode {
         Ok(parsed) => parsed,
         Err(usage) => {
             for line in &usage.0 {
-                eprintln!("snapall: error: {line}");
+                output::note(&format!("snapall: error: {line}"));
             }
-            eprintln!("Try `snapall --help`.");
+            output::note("Try `snapall --help`.");
             return ExitCode::from(2);
         }
     };
     for warning in &parsed.warnings {
-        eprintln!("snapall: warning: {warning}");
+        output::note(&format!("snapall: warning: {warning}"));
     }
     match run(parsed) {
         Ok(code) => code,
         Err(err) => ask::how_it_ended(err.as_ref()).unwrap_or_else(|| {
-            eprintln!("snapall: {err}");
+            output::note(&format!("snapall: {err}"));
             ExitCode::FAILURE
         }),
     }

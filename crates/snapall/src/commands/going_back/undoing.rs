@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::ask;
+use crate::output;
 use crate::output::Outcome;
 use snapall_core::{all_snapshots, restore_points, Act, AreaName};
 use std::error::Error;
@@ -75,7 +76,7 @@ pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
     let undo = match &entry.rollback {
         Some(Rollback::Undo(undo)) => undo,
         Some(Rollback::Advice(text)) => {
-            eprintln!("{} cannot be undone.\n{text}", entry.what);
+            output::note(&format!("{} cannot be undone.\n{text}", entry.what));
             return Ok(ExitCode::FAILURE);
         }
         None => {
@@ -87,11 +88,11 @@ pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
         }
     };
     check_the_way_back_still_exists(ctx, &undo.commands)?;
-    eprintln!("To roll back: {}\n  {}\n", entry.what, undo.what);
+    output::note(&format!("To roll back: {}\n  {}\n", entry.what, undo.what));
     for command in &undo.commands {
-        eprintln!("  snapall {}", command.join(" "));
+        output::note(&format!("  snapall {}", command.join(" ")));
     }
-    eprintln!();
+    output::note("");
     let act = Act::Undo { doing: undo.weight };
     let _asked = ask::gate(act, agreed, "Roll this back?", None)?;
     let program = std::env::current_exe()?;

@@ -19,6 +19,14 @@ cd "$here" || exit 2
 mkdir -p /tmp/gate
 failed=0
 
+# Build output is the one thing that fills the disk, and it is only a cache: when little is free, drop what is ours and
+# keep the dependencies, which are slow to rebuild.
+free_gb=$(df -BG --output=avail "$here" | tail -n 1 | tr -dc '0-9')
+if [ "${free_gb:-99}" -lt 4 ]; then
+  echo "note: ${free_gb} GB free: cleaning this workspace's build output"
+  cargo clean -p snapall -p snapall-tui -p snapall-core -p snapall-snapper -p snapall-observe -p snapall-system >/dev/null 2>&1
+fi
+
 step() {
   local name=$1; shift
   local started=$SECONDS

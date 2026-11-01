@@ -50,6 +50,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_RATCHETS=1` lowers or removes paid debts and never raises one; `FINDABILITY_REPORT=1 cargo test -p snapall --test findability -- --nocapture` prints the ranking for each question. The findability test is the cold read: the outline alone must lead a stranger's question to the right module (`crates/snapall/tests/findability.json`). To add a question, add it there.
 
 ## Traps already fallen into
+- The disk fills with build output: `dev/gate.sh` frees this workspace's own output when under 4 GB is free, so do not do it by hand.
 - A background process (`nohup ... &`) does not outlive the tool call that started it. Anything long must be resumable and run in the foreground within the limit, as `dev/ship.py` is.
 - The tool shell is `sh`: use `bash -c` for `<(...)`, `time` and arrays, or the whole line fails to parse and none of it runs.
 - `cargo fmt` reflows source, so a script that patches source by string must assert that its replacement applied; a mutation that silently did not apply proves nothing. Prove a test bites by planting the violation, seeing it fail, and restoring the file with `cmp`.

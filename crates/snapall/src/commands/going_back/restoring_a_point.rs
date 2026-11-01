@@ -5,6 +5,7 @@
 //! Putting every area back to how a restore point had them.
 
 use super::*;
+use crate::output;
 use crate::output::Outcome;
 use crate::{ask, render};
 use snapall_core::going_back::boot;
@@ -60,7 +61,7 @@ pub fn restore_all(
     }
     if done.stopped {
         let (put_back, total) = (done.members.len(), point.members.len());
-        eprintln!("snapall: stopped on request after {put_back} of {total} areas; the rest were left as they are");
+        output::note(&format!("snapall: stopped on request after {put_back} of {total} areas; the rest were left as they are"));
         change.end_stopped(format!(
             "stopped on request after {put_back} of {total} areas: the others were left as they are. To undo what was done: restore point {}",
             done.safety.as_str()
