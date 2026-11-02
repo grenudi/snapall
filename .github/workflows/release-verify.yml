@@ -34,6 +34,7 @@ jobs:
     name: which release?
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -65,6 +66,7 @@ jobs:
     needs: tag
     if: needs.tag.outputs.tag != ''
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -155,6 +157,7 @@ jobs:
     needs: tag
     if: needs.tag.outputs.tag != ''
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

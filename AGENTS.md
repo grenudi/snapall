@@ -47,6 +47,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 | `split-module.py` | split one module into a folder of modules by purpose, by a JSON spec, moving whole items |
 | `golden-output.sh` | `record` or `check` what 20 commands print, so a refactor is shown to change nothing |
 | `rename-identifier.py` | rename an identifier across the crates, only where it is an identifier, and check no string changed |
+| `ci-timings.py` | what CI costs: wall time, job minutes, the slowest jobs and steps; read before and after changing a workflow |
 | `sample-modules.py` | pick modules at random, by layer, to read as a stranger |
 | `structure-metrics.py` | the proxies for "every layer is the top of the layers beneath it", at any tag |
 
@@ -63,6 +64,7 @@ On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_R
 - A `crate::` path belongs to the crate it is written in; a rewrite across the workspace must not touch another crate's own modules.
 - The release commit is the commit titled `chore: release`, not the merge commit before it, whose release workflows are skipped.
 - The openSUSE container job sometimes failed at the step `A user's tools`. That step is *ours*: a package install (`zypper`) inside the container, over openSUSE's mirrors, so the failure is the network and not the runner (I first called it the runner's, which was wrong). The step now retries three times by itself; `ship.py` still re-runs a job that fails at it once. If it keeps happening after that, try the image from `registry.opensuse.org` rather than Docker Hub.
+- CI rules, each from a measurement: every job has a `timeout-minutes`; `rust-cache` saves only on main; a tool that must be installed is installed prebuilt (compiling `cargo-audit` was 181 s of a 193 s run); a pull request of documents only is narrowed by the `changes` job and nothing else is; a tool swapped into CI gets its policy written down and run locally first (cargo-deny's defaults fail on a transitive unmaintained crate that cargo-audit only warned about). Not nextest: it runs each test in its own process, and the binary tests rely on an in-process lock. Measure with `dev/ci-timings.py` before and after.
 - Never rename by regex without checking the strings: a word in a string is output (a JSON key, the fake tool's own format). Use `dev/rename-identifier.py`, which lexes, and which refuses if a string would change. A compile is not the check for this; two renames compiled and were wrong.
 - Search for a smell by its type shape, not only the names it had where you noticed it: `(bool)` in a tuple variant is the same fact as `turn_on: bool` in a field.
 - Check the property, not the symptom: when a tool drops something, scan history for everything of that kind it dropped (the first fix for comments missed that it also dropped the doc of the first item after the imports, 14 lines over 18 splits).
