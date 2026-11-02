@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.2]
+
+
+### Refactoring
+- The file history screen is one place ([#112](https://github.com/grenudi/snapall/pull/112)) ([1112e4f])
+
+
+
 ## [0.27.1]
 
 
