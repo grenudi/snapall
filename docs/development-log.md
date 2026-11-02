@@ -2,6 +2,18 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-03: the second batch from the read
+
+**Why.** The same seeded read that found the bare on/off found four smaller things, each in a different layer.
+
+**What.**
+- **`restore` could not use the way-back helper** from the day before, because its way back needs a value from the result (the safety snapshot's number), so it still wrote the ritual by hand. The helper's shape was too narrow: its closure now receives what the change returned, and `restore` is one line like the others. The helper is used at six sites; the rule (a way back is written down only when the change went through) lives in one place.
+- **`on_click` was a table whose arms were small programs**, one of which repeated a rule written elsewhere (showing Activity reads the history again, in `on_tab_key` and here). It is a table of named verbs now, in the same order, with `switch_to_tab` shared. It was one of the long functions (82 lines).
+- **The rollback producers still said `config`** in parameter and closure names, which the tool-word guard cannot see because it checks declared names, not parameters. And the snapper backend's trait methods named their `AreaName` parameters `config`; they are `area`, and snapper's own fields and messages keep its word, since the adapter is where it belongs.
+- **The backend parsed the same `list-configs` document in two places**, line for line; it is one method.
+
+**What the guards said.** Two failed before this could ship. The canon's embedded example of `delete` was stale again (regenerated from the source). And the plumbing guard failed on `make_a_group`, which is worth recording because the cause was subtle: it counts closures *with* parameters and does not count a zero-argument `||`, so changing the way-back closure from `||` to `|_|` exposed plumbing that was already there: `made.set(..).map_err(|e| e.to_string()).and_then(|()| system.save_groups(&made))`. That chain is a verb waiting for a name (set it, then save it, and word either refusal the same way), so it is `set_and_save`, rather than the budget being raised or the closure hidden.
+
 ## 2026-11-03: room counting is switched on or off, in every layer
 
 **Why.** A second seeded read (eight more modules) found that `after_room_counting(turned_on: bool)` in the core passed the on/off as a bare bool, the same fact I had named only in the command layer the day before, which made a second, duplicate noun. Measuring it: about 35 sites in four layers carried the direction of room counting as a bool (`turn_on` in messages, effects, modals and handlers; `on` in the machine port and the core's rule), and the window wrote `if turn_on { "on" } else { "off" }` five separate times, the word for a direction written out by hand each time.

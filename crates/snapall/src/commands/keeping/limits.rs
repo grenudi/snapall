@@ -43,7 +43,7 @@ pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agree
         None,
     )?;
     let result = set_the_options(ctx, &area_name, &options);
-    change.end_with_way_back(&result, || {
+    change.end_with_way_back(&result, |_| {
         snapall_core::going_back::rollback::after_limits(&area_name.to_string(), &before)
     });
     result?;

@@ -7,7 +7,7 @@
 use super::*;
 use crate::output::Outcome;
 use crate::{ask, render};
-use snapall_core::{Act, AreaName, GroupName, SystemProbe};
+use snapall_core::{Act, AreaName, GroupName, Groups, SystemProbe};
 use std::error::Error;
 
 /// The areas of a group, out of the ones protected now; a group that names one that is not is refused.
@@ -65,11 +65,8 @@ fn make_a_group(
         &format!("Made the group {name}"),
         None,
     )?;
-    let saved = made
-        .set(name.clone(), list)
-        .map_err(|e| e.to_string())
-        .and_then(|()| system.save_groups(&made));
-    change.end_with_way_back(&saved, || {
+    let saved = set_and_save(system, &mut made, name.clone(), list);
+    change.end_with_way_back(&saved, |_| {
         snapall_core::going_back::rollback::after_groups(&name, before.as_deref())
     });
     saved?;
@@ -105,7 +102,7 @@ fn take_a_group_away(
         None,
     )?;
     let saved = system.save_groups(&made);
-    change.end_with_way_back(&saved, || {
+    change.end_with_way_back(&saved, |_| {
         snapall_core::going_back::rollback::after_groups(&name, before.as_deref())
     });
     saved?;
@@ -138,4 +135,15 @@ fn the_group_asked_for(
 fn in_words(areas: &[AreaName]) -> String {
     let words: Vec<String> = areas.iter().map(ToString::to_string).collect();
     words.join(", ")
+}
+
+/// The group set and then saved: either step can refuse, and a refusal is worded the same way.
+fn set_and_save(
+    system: &dyn SystemProbe,
+    made: &mut Groups,
+    name: GroupName,
+    list: Vec<AreaName>,
+) -> Result<(), String> {
+    made.set(name, list).map_err(|e| e.to_string())?;
+    system.save_groups(made)
 }

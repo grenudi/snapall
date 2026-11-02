@@ -5,7 +5,7 @@
 //! Finding what is wrong, one check at a time, and the verdict they add up to.
 
 use super::*;
-use crate::keeping::jobs::{self};
+use crate::keeping::jobs;
 use crate::ports::machine::{DiskUsage, QuotaMode};
 use crate::vocabulary::calendar::seconds_from_snapshot_date;
 use crate::vocabulary::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
