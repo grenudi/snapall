@@ -33,7 +33,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 
 1. **Read** the plan and the last entries of the log. Read `OUTLINE.md` as a stranger would. The structure trend is the summary of the latest `Structure` workflow run on main (`.github/workflows/structure.yml`), or `dev/structure-metrics.py --trend`.
 2. **Choose by evidence, not by order.** Measure (grep, the metrics, the findability test), read the code as it is, and be willing to reverse the plan: `setup` was decided against its own backlog item.
-3. **Branch**: `git checkout -b refactor/what-it-is`. **Change** with the tools below. Update the plan and the log in the same change; every path a document names must exist (a test checks).
+3. **Branch**: `git checkout -b refactor/what-it-is`. **Change** with the tools below. Update the plan and the log in the same change; every path a document names must exist (a test checks; the ADRs and the development log are dated records and are exempt).
 4. **Gate**: `dev/gate.sh`, about a minute. The heavy checks run in CI on every pull request; reproduce a CI failure with `dev/gate.sh --full`.
 5. **Ship**: `GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md`, in the foreground. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, merges the release pull request, and verifies the release. A process started in one tool call does not outlive it, so it stops itself after about four minutes with exit code 75 ("still waiting"): run the same command again until it exits 0. It keeps no state, so that is safe at any point.
 6. **Log** what was done, why, and the evidence, in `docs/development-log.md`.

@@ -19,6 +19,7 @@
 
 mod changes;
 pub mod model;
+pub mod questions;
 pub mod session;
 pub mod status_bar;
 pub mod tab;

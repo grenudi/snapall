@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Asking before a change, and the end of a command that was not told to go ahead.
+//! Asking before a change: a yes for what can be undone, the word typed for what cannot be, and the end of a command that was not told to go ahead.
 
 use std::error::Error;
 use std::io::{self, BufRead, IsTerminal, Write};

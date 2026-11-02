@@ -1,6 +1,6 @@
 {
   "entry_files_too_long": {
-    "crates/snapall-tui/src/model/mod.rs": 142
+    "crates/snapall-tui/src/model/mod.rs": 141
   },
   "files_too_long": {
     "crates/snapall-tui/src/changes.rs": 419,

@@ -5,7 +5,7 @@
       "question": "What happens when I delete a snapshot?",
       "answers": [
         "snapall/commands/deleting.rs",
-        "snapall-tui/model/prompts/delete.rs"
+        "snapall-tui/questions/delete/asking.rs"
       ]
     },
     {
@@ -204,6 +204,38 @@
         "snapall-core/health/mod.rs",
         "snapall/render/health.rs",
         "snapall-tui/tabs/health/rows.rs"
+      ]
+    },
+    {
+      "question": "Where is the restore question drawn?",
+      "answers": [
+        "snapall-tui/questions/restore/drawing.rs"
+      ]
+    },
+    {
+      "question": "What happens when a key is pressed in the limits editor?",
+      "answers": [
+        "snapall-tui/questions/limits/asking.rs"
+      ]
+    },
+    {
+      "question": "Where is the help screen drawn?",
+      "answers": [
+        "snapall-tui/questions/help/drawing.rs"
+      ]
+    },
+    {
+      "question": "What does the window ask before it stops protecting an area?",
+      "answers": [
+        "snapall-tui/questions/unprotect/asking.rs",
+        "snapall-tui/questions/unprotect/mod.rs"
+      ]
+    },
+    {
+      "question": "How does the window ask which groups of areas to make?",
+      "answers": [
+        "snapall-tui/questions/groups/asking.rs",
+        "snapall-tui/questions/groups/mod.rs"
       ]
     }
   ]

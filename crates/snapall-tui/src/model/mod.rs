@@ -24,16 +24,15 @@ mod keys;
 mod living;
 mod looked;
 mod messages;
-mod prompts;
 mod state;
 
+pub(crate) use crate::questions::asking::*;
 pub(crate) use crate::tabs::snapshots::{on_areas_loaded, on_created, on_snapshots_loaded};
 pub(crate) use file::*;
 pub(crate) use following::*;
 pub use input::*;
 pub(crate) use keys::*;
 pub use messages::*;
-pub(crate) use prompts::*;
 pub use state::*;
 
 pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
