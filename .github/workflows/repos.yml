@@ -38,6 +38,7 @@ jobs:
     name: which release?
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -68,6 +69,7 @@ jobs:
     needs: tag
     if: needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Build it from the release's own PKGBUILD, in an Arch container
         env:
@@ -97,6 +99,7 @@ jobs:
     name: sign the Arch repository
     needs: [tag, arch-build]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -121,6 +124,7 @@ jobs:
     name: sign, check and publish
     needs: [tag, arch-sign]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pages: write
@@ -169,6 +173,7 @@ jobs:
     name: ${{ matrix.name }} (${{ matrix.arch }})
     needs: [tag, publish]
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     container: ${{ matrix.image }}
     strategy:
       fail-fast: false

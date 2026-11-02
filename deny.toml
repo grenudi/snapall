@@ -28,3 +28,12 @@ multiple-versions = "warn"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+[advisories]
+version = 2
+# The RustSec database. A vulnerability fails the check, as it did under cargo-audit, which this replaces (it was compiled
+# from source on every run, 181 seconds of a 193 second CI run). An unmaintained crate fails only when snapall depends on it
+# directly: one that arrives through another crate (`paste`, through ratatui) is nothing this project can act on, and was
+# only a warning under cargo-audit. A yanked version is a warning.
+unmaintained = "workspace"
+yanked = "warn"

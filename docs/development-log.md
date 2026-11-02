@@ -2,6 +2,35 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-06: CI, measured first, then optimised
+
+**Why.** Asked to optimise CI with the best practices. I measured before changing anything (`dev/ci-timings.py`, new): a run took a median **193 s wall and 20.0 job-minutes**, and the cost was concentrated, not spread out. The release pipeline (Release, Verify release, then Install snippets and Package repositories) took 10 to 13 minutes in a strict chain.
+
+**Where the time was.**
+- `dependency advisories`: **181 s of a 193 s run.** `rustsec/audit-check` compiles `cargo-audit` from source on every run.
+- `real snapper on Btrfs`: 164 s, of which the TUI end to end test is 93 s. It already polls; the sleeps in it simulate a slow snapper on purpose, so that cost is real work.
+- Release tail: `Install snippets / Arch` at **365 to 409 s**, the slowest job in the project. The README's Arch instructions run `makepkg -si` twice (the previous release, then the upgrade), each a complete release build of the dependency tree.
+- Smaller: `rustup show` 12 to 14 s in seven jobs; nix 58 s; the reproducible build 42 s (two builds one after the other).
+- Missing: **no job had a timeout** (the default is six hours of a runner for a hung step), and pull requests wrote cache entries that no other pull request can read.
+
+**What I applied.**
+1. Advisories are checked by the prebuilt `cargo-deny` the licences job already runs. I ran the real binary locally first, and it **failed** with cargo-deny's defaults: `paste 1.0.15`, arriving through ratatui, is flagged unmaintained, which `cargo-audit` had only warned about. Swapping the tool without writing the policy would have turned every pull request red. `deny.toml` now says: a vulnerability fails, an unmaintained crate fails only when snapall depends on it directly, a yanked version warns. Proven both ways: it fails on a scratch project depending on `time 0.1.43` (RUSTSEC-2020-0071, exit 1) and passes on this repository (exit 0).
+2. `timeout-minutes` on all 29 jobs in all 7 workflows.
+3. `rust-cache` saves only on main (the documented pattern); a pull request restores from main and writes nothing, which also keeps the 10 GB quota for entries something can read.
+4. A `changes` job: a pull request whose files are all documents (`docs/`, root `*.md`, changelogs) skips the packaging, distributions, static builds, nix, reproducibility, MSRV, contract and repository jobs. The tests, licences and advisories still run (the tests check the documents against the code). A push to main, and any pull request touching anything else (a release PR touches `Cargo.toml`), runs everything. The decision was tested on eleven sets of files.
+5. `CARGO_INCREMENTAL=0`, `CARGO_PROFILE_DEV_DEBUG=line-tables-only` (backtraces keep their lines) and network retries.
+6. The Arch snippet builds at `opt-level=0`, with the reason beside it: the procedure is under test, not the optimiser. **Measured by dispatching the real workflow from the branch: 270 s against 365 and 409 s**, and it still passes.
+
+**What I considered and did not do.**
+- **mold, or another linker:** the pinned toolchain is 1.99.1, and lld has been the default on `x86_64-unknown-linux-gnu` since 1.90.
+- **cargo-nextest:** it runs every test in its own process, which would defeat the in-process lock that the binary tests now take around every spawn and every script write (the `text file busy` fix). It would bring the race back.
+- **sccache for the Arch builds:** about 90 s, but the Arch job would stop being the tail of the release (the repository chain is as long), so the extra moving part buys nothing visible.
+- **Starting Install snippets before Verify release finishes:** the same reason, and Package repositories publishes signed repositories, so it must stay after verification.
+- **Splitting the Btrfs job** so the TUI test runs alone: about 25 s of wall time for 45 more runner-seconds.
+- **Parallelising the reproducible build's two builds:** not on the critical path.
+
+**Not yet measured.** The new cache key (the debug-info setting is part of it) means the first runs are cold. The after numbers for CI belong to the first warm runs, and the next docs-only pull request is also the first test of the narrowing. They are added to this entry when measured.
+
 ## 2026-11-05: main's CI failed on the race I had measured away
 
 **What happened.** After the retired-word change merged with all 24 PR checks green, main's own CI failed in one job at the Test step: `a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_error` panicked with `snapall: could not run snapper: Text file busy (os error 26)`. That is the `ETXTBSY` race: a test writes a fake `snapper` script, and a fork in another test thread holds a copy of the open file for an instant, so running the script fails. I had removed this from the plan a few days earlier because 740 local runs showed nothing. The runner is slower and has fewer cores, and found it at the first chance. The conclusion was wrong, and the plan said the opposite of the truth.

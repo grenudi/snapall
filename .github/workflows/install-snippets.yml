@@ -27,6 +27,7 @@ jobs:
     name: which release?
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -53,6 +54,7 @@ jobs:
     needs: tag
     if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
     container: ${{ matrix.image }}
     strategy:
       fail-fast: false
@@ -99,6 +101,7 @@ jobs:
     needs: tag
     if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     container: archlinux:latest
     steps:
       - name: A user's tools, and a user (makepkg refuses to run as root)
@@ -112,13 +115,17 @@ jobs:
           SNIPPET_REF: ${{ needs.tag.outputs.tag || 'main' }}
         run: |
           curl -fsSL "$SCRIPT" -o /tmp/readme-snippets.sh
-          su builder -c "GITHUB_TOKEN='$GITHUB_TOKEN' SNIPPET_REF='$SNIPPET_REF' bash /tmp/readme-snippets.sh arch"
+          # The snippet builds the package twice (the previous release, then the upgrade), each a complete release build of the
+          # whole dependency tree: about three minutes each, and the longest job of the whole release. What is under test is
+          # the procedure (the PKGBUILD, makepkg, pacman, the upgrade), not the optimiser, so the build is not optimised.
+          su builder -c "CARGO_PROFILE_RELEASE_OPT_LEVEL=0 GITHUB_TOKEN='$GITHUB_TOKEN' SNIPPET_REF='$SNIPPET_REF' bash /tmp/readme-snippets.sh arch"
 
   nix:
     name: Nix
     needs: tag
     if: github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: cachix/install-nix-action@v31
       - name: Run the README snippet
