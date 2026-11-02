@@ -51,6 +51,8 @@ On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_R
 
 ## Traps already fallen into
 - The disk fills with build output: `dev/gate.sh` frees this workspace's own output when under 4 GB is free, so do not do it by hand.
+- A stress experiment must not contend on shared state it is not about: running the binary's tests four copies at once failed 206 of 400 times, not from a race but because the restore tests take the machine's real change lock and refuse each other. Run one copy at a time to measure a flake (250 sequential runs showed none), and never two suites at once.
+- Branch from `origin/main` explicitly (`git fetch && git checkout -b NAME origin/main`), never from whatever is checked out: a line that fails to parse under `sh` runs none of itself, including the `git pull` at its start, and the branch then lacks everything merged since. A pull request that conflicts with main gets no CI at all, which looks like waiting.
 - A background process (`nohup ... &`) does not outlive the tool call that started it. Anything long must be resumable and run in the foreground within the limit, as `dev/ship.py` is.
 - The tool shell is `sh`: use `bash -c` for `<(...)`, `time` and arrays, or the whole line fails to parse and none of it runs.
 - `cargo fmt` reflows source, so a script that patches source by string must assert that its replacement applied; a mutation that silently did not apply proves nothing. Prove a test bites by planting the violation, seeing it fail, and restoring the file with `cmp`.
