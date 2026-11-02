@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.30.0]
+
+
+### Refactoring
+- Room counting is switched on or off, in every layer ([#132](https://github.com/grenudi/snapall/pull/132)) ([9703e17])
+
+
+
 ## [0.29.1]
 
 
