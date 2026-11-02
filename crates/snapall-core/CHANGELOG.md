@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.6]
+
+
+### Refactoring
+- The huddled files that held two languages, and the doc comments my tool had been deleting ([#120](https://github.com/grenudi/snapall/pull/120)) ([3cdbd67])
+
+
+
 ## [0.27.5]
 
 
