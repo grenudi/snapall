@@ -10,9 +10,7 @@
     "setup": 7
   },
   "handlers_too_long": {},
-  "handlers_with_too_much_plumbing": {
-    "check_the_way_back_still_exists": 3
-  },
+  "handlers_with_too_much_plumbing": {},
   "prints_outside_the_presenter": {},
   "tool_words_in_names": {
     "snapall": 6,

@@ -8,61 +8,10 @@ use super::*;
 use crate::ask;
 use crate::output;
 use crate::output::Outcome;
-use snapall_core::{all_snapshots, restore_points, Act, AreaName};
+use snapall_core::Act;
 use std::error::Error;
 use std::process::ExitCode;
 
-/// Whether what a rollback would go back to is still there. It is checked when the rollback is asked for, not
-/// when it was recorded: snapper's cleanup may have removed the snapshot since, and then the honest answer is
-/// that it cannot be done.
-pub(super) fn check_the_way_back_still_exists(
-    ctx: &Context,
-    commands: &[Vec<String>],
-) -> Result<(), Box<dyn Error>> {
-    for command in commands {
-        match command
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-            .as_slice()
-        {
-            ["restore", area, id, ..] => {
-                let area = AreaName::parse(area)?;
-                let number: u64 = id
-                    .parse()
-                    .map_err(|_| format!("`{id}` is not a snapshot number"))?;
-                let there = ctx
-                    .backend
-                    .list_snapshots(&area)?
-                    .iter()
-                    .any(|snapshot| snapshot.id.get() == number);
-                if !there {
-                    return Err(format!(
-                        "snapshot #{number} of {area}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
-                    )
-                    .into());
-                }
-            }
-            ["restore-all", point, ..] => {
-                let there = restore_points(&all_snapshots(ctx.backend)?)
-                    .iter()
-                    .any(|candidate| candidate.point.to_string() == *point);
-                if !there {
-                    return Err(format!(
-                        "restore point {point}, which this would go back to, no longer exists: cleanup has removed it, so this cannot be rolled back"
-                    )
-                    .into());
-                }
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-/// Roll a change back to the state it recorded, if it recorded one. It says what that state is and what it
-/// will run, asks as heavily as what it does weighs (undoing the taking of a snapshot is deleting it), and
-/// runs the recorded commands through this same program, so they are checked and journaled like any other.
 pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
     use snapall_core::SystemProbe;
     let history = snapall_system::LinuxSystem::new().history(500);
@@ -70,7 +19,7 @@ pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
     let Some(undo) = the_way_back(entry)? else {
         return Ok(ExitCode::FAILURE);
     };
-    check_the_way_back_still_exists(ctx, &undo.commands)?;
+    snapall_core::going_back::still_there::still_there(ctx.backend, undo)?;
     say_what_it_would_run(entry, undo);
     let act = Act::Undo { doing: undo.weight };
     let _asked = ask::gate(act, agreed, "Roll this back?", None)?;
