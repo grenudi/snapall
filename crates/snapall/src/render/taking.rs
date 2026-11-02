@@ -67,8 +67,8 @@ pub fn dry_run(plan: &Plan, description: &Description) -> String {
         "dry run: would snapshot {} area(s) with description \"{description}\"\n",
         plan.targets().len()
     );
-    for config in plan.targets() {
-        out.push_str(&format!("  {config}\n"));
+    for area in plan.targets() {
+        out.push_str(&format!("  {area}\n"));
     }
     out
 }

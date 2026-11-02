@@ -21,13 +21,13 @@ pub(crate) fn now_seconds(state: &State) -> Option<i64> {
 }
 
 /// Open the editor on an area, from what snapper has now.
-pub(crate) fn open_limits(state: &mut State, config: AreaName) -> Vec<Effect> {
+pub(crate) fn open_limits(state: &mut State, area: AreaName) -> Vec<Effect> {
     let before = state
         .health
         .data
         .as_ref()
-        .and_then(|data| data.facts.areas.iter().find(|area| area.config == config))
-        .and_then(|area| area.retention.as_ref())
+        .and_then(|data| data.facts.areas.iter().find(|facts| facts.area == area))
+        .and_then(|facts| facts.retention.as_ref())
         .and_then(Limits::from_retention);
     let Some(before) = before else {
         state.notice = Some(Notice::Error(
@@ -36,14 +36,14 @@ pub(crate) fn open_limits(state: &mut State, config: AreaName) -> Vec<Effect> {
         return Vec::new();
     };
     state.modal = Some(Modal::Limits(LimitsEditor {
-        area: config.clone(),
+        area: area.clone(),
         before,
         limits: before,
         field: 0,
         snapshots: None,
         error: None,
     }));
-    vec![Effect::LoadLimitsData { area: config }]
+    vec![Effect::LoadLimitsData { area }]
 }
 
 fn stays(editor: LimitsEditor) -> Reaction {

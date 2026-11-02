@@ -93,7 +93,7 @@ mod tests {
         let counts: Vec<usize> = plan
             .targets()
             .iter()
-            .map(|config| backend.list_snapshots(config).unwrap().len())
+            .map(|area| backend.list_snapshots(area).unwrap().len())
             .collect();
         assert_eq!(
             counts,

@@ -93,8 +93,8 @@ pub fn failure_text(title: &str, error: &SetupError) -> String {
         SetupError::Failed(reason) => format!(
             "Could not protect {title}. The reason the system gave: {reason}. Nothing was changed."
         ),
-        SetupError::LeftBehind { problem, area: config, .. } => format!(
-            "Protecting {title} stopped half way ({problem}) and the part already done could not be taken back: it is left under the name `{config}`. Please report this at https://github.com/grenudi/snapall/issues."
+        SetupError::LeftBehind { problem, area, .. } => format!(
+            "Protecting {title} stopped half way ({problem}) and the part already done could not be taken back: it is left under the name `{area}`. Please report this at https://github.com/grenudi/snapall/issues."
         ),
         other => format!("Could not protect {title}: {other}. Nothing was changed."),
     }

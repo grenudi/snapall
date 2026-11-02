@@ -86,11 +86,11 @@ fn type_text(session: &mut Session<'_>, text: &str) {
     }
 }
 
-/// `U` on the row of `config` in the Health tab.
+/// `U` on the row of the area called `name` in the Health tab.
 fn asking_about<'a>(
     backend: &'a InMemoryBackend,
     system: &'a FakeSystem,
-    config: &str,
+    name: &str,
     context: UiContext,
 ) -> Session<'a> {
     let mut session = Session::with_system(backend, system, context);
@@ -100,7 +100,7 @@ fn asking_about<'a>(
         .health
         .rows()
         .iter()
-        .position(|row| row.area.as_ref() == Some(&area(config)))
+        .position(|row| row.area.as_ref() == Some(&area(name)))
         .expect("the area has a row");
     session.state.health.cursor = at;
     session.press(Key::Char('U'));

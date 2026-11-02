@@ -1096,3 +1096,105 @@ fn a_plural_is_said_by_the_core_and_not_spelled_by_hand_and_the_debt_only_shrink
         0,
     );
 }
+
+// ---- the retired word is not an identifier -------------------------------------------------------------------
+
+/// The identifiers of some Rust code: what is left when comments, strings (ordinary and raw) and character literals are
+/// set aside. A word inside a string is output, which other tests pin; a word in a comment is prose. Only an identifier
+/// is the program speaking.
+fn identifiers_of(code: &str) -> Vec<String> {
+    let chars: Vec<char> = code.chars().collect();
+    let (mut found, mut at) = (Vec::new(), 0);
+    while at < chars.len() {
+        let c = chars[at];
+        let next = chars.get(at + 1).copied();
+        if c == '/' && next == Some('/') {
+            while at < chars.len() && chars[at] != '\n' {
+                at += 1;
+            }
+        } else if c == '/' && next == Some('*') {
+            at += 2;
+            while at + 1 < chars.len() && !(chars[at] == '*' && chars[at + 1] == '/') {
+                at += 1;
+            }
+            at += 2;
+        } else if c == 'r'
+            && matches!(next, Some('"' | '#'))
+            && at
+                .checked_sub(1)
+                .is_none_or(|before| !chars[before].is_alphanumeric())
+        {
+            // a raw string: r"..." or r#"..."#
+            let mut hashes = 0;
+            let mut look = at + 1;
+            while chars.get(look) == Some(&'#') {
+                hashes += 1;
+                look += 1;
+            }
+            if chars.get(look) == Some(&'"') {
+                at = look + 1;
+                while at < chars.len()
+                    && !(chars[at] == '"' && (1..=hashes).all(|n| chars.get(at + n) == Some(&'#')))
+                {
+                    at += 1;
+                }
+                at += 1 + hashes;
+            } else {
+                at += 1;
+            }
+        } else if c == '"' {
+            at += 1;
+            while at < chars.len() && chars[at] != '"' {
+                at += if chars[at] == '\\' { 2 } else { 1 };
+            }
+            at += 1;
+        } else if c == '\''
+            && (chars.get(at + 2) == Some(&'\'')
+                || (next == Some('\\') && chars.get(at + 3) == Some(&'\'')))
+        {
+            // a character literal ('x' or '\n'), not a lifetime
+            at += if next == Some('\\') { 4 } else { 3 };
+        } else if c.is_alphabetic() || c == '_' {
+            let start = at;
+            while at < chars.len() && (chars[at].is_alphanumeric() || chars[at] == '_') {
+                at += 1;
+            }
+            found.push(chars[start..at].iter().collect());
+        } else {
+            at += 1;
+        }
+    }
+    found
+}
+
+/// The word the program retired for what it protects is `area`. It is `snapper`'s word, and snapper is only spoken
+/// of in the adapter that drives it.
+#[test]
+fn the_retired_word_is_not_an_identifier_outside_the_adapter() {
+    let mut observed = BTreeMap::new();
+    for (path, code) in all_sources() {
+        let in_a_crate_that_speaks_for_the_program =
+            ["snapall-core", "snapall-tui", "snapall-observe", "snapall/"]
+                .iter()
+                .any(|name| {
+                    path.starts_with(&format!("crates/{name}"))
+                        || path.starts_with(&name.to_string())
+                });
+        if !in_a_crate_that_speaks_for_the_program {
+            continue;
+        }
+        let uses = identifiers_of(&code)
+            .iter()
+            .filter(|name| matches!(name.as_str(), "config" | "configs"))
+            .count();
+        if uses > 0 {
+            observed.insert(path, uses);
+        }
+    }
+    ratchet(
+        "Files that use the retired word `config` as an identifier:",
+        "retired_word_in_identifiers",
+        &observed,
+        0,
+    );
+}

@@ -24,7 +24,7 @@ const MOUNTINFO: &str = "\
 28 24 0:30 / /mnt/my\\040data rw,relatime shared:3 - ext4 /dev/sda1 rw
 ";
 
-fn configs(pairs: &[(&str, &str)]) -> Vec<(AreaName, String)> {
+fn protected(pairs: &[(&str, &str)]) -> Vec<(AreaName, String)> {
     pairs
         .iter()
         .map(|(n, s)| (name(n), (*s).to_owned()))
@@ -62,19 +62,19 @@ fn only_btrfs_areas_are_listed_root_first_without_snapshot_directories_or_repeat
 #[test]
 fn an_area_is_protected_when_a_area_covers_exactly_it() {
     let mounts = mounts_from_mountinfo(MOUNTINFO);
-    let none = areas(&mounts, &configs(&[("root", "/")]));
+    let none = areas(&mounts, &protected(&[("root", "/")]));
     assert_eq!(
         none.iter().map(Area::is_protected).collect::<Vec<_>>(),
         [true, false, false]
     );
-    let both = areas(&mounts, &configs(&[("root", "/"), ("home", "/home/")]));
+    let both = areas(&mounts, &protected(&[("root", "/"), ("home", "/home/")]));
     assert_eq!(
         both[1].protected_by,
         Some(name("home")),
         "a trailing slash is the same directory"
     );
     // an area for some other directory does not protect /home
-    let wrong = areas(&mounts, &configs(&[("docs", "/home/me/docs")]));
+    let wrong = areas(&mounts, &protected(&[("docs", "/home/me/docs")]));
     assert!(!wrong[1].is_protected());
 }
 

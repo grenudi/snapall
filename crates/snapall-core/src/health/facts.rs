@@ -14,7 +14,7 @@ use crate::vocabulary::explain::Limit;
 /// What is known about one protected area.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AreaFacts {
-    pub config: AreaName,
+    pub area: AreaName,
     /// The directory it protects: `/`, `/home`.
     pub location: String,
     pub snapshots: usize,
@@ -106,7 +106,7 @@ pub fn gather(
     let areas = backend
         .list_areas()?
         .into_iter()
-        .filter_map(|config| area_facts(backend, system, config))
+        .filter_map(|area| area_facts(backend, system, area))
         .collect();
     Ok(Facts {
         now: system.local_time(),
@@ -126,12 +126,12 @@ pub fn gather(
 pub(super) fn area_facts(
     backend: &dyn SnapshotBackend,
     system: &dyn SystemProbe,
-    config: AreaName,
+    area: AreaName,
 ) -> Option<AreaFacts> {
-    let location = backend.area_location(&config).ok()?;
-    let snapshots = backend.list_snapshots(&config).ok()?;
+    let location = backend.area_location(&area).ok()?;
+    let snapshots = backend.list_snapshots(&area).ok()?;
     Some(AreaFacts {
-        retention: backend.retention(&config).ok(),
+        retention: backend.retention(&area).ok(),
         disk: system.disk_usage(&location),
         quotas: system.quota_mode(&location),
         oldest: snapshots.iter().filter_map(|s| s.date.clone()).min(),
@@ -139,7 +139,7 @@ pub(super) fn area_facts(
         measured_bytes: measured_bytes(&snapshots),
         snapshots: snapshots.len(),
         location,
-        config,
+        area,
     })
 }
 

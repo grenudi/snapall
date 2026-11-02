@@ -11,13 +11,13 @@ use snapall_core::{AreaName, Preview, Restored, SnapshotId};
 /// How many changed paths a human sees before the rest is summarised. `--json` is never cut.
 pub(super) const SHOWN: usize = 200;
 
-pub fn changes(config: &AreaName, id: SnapshotId, preview: &Preview) -> String {
+pub fn changes(area: &AreaName, id: SnapshotId, preview: &Preview) -> String {
     if preview.changes.is_empty() {
-        return format!("{config} already matches #{id}: nothing would change\n");
+        return format!("{area} already matches #{id}: nothing would change\n");
     }
     let count = preview.changes.len();
     let mut out = format!(
-        "{config}: restoring #{id} would change {}:\n",
+        "{area}: restoring #{id} would change {}:\n",
         snapall_core::vocabulary::explain::counted(count, "path")
     );
     for change in preview.changes.iter().take(SHOWN) {
@@ -32,14 +32,14 @@ pub fn changes(config: &AreaName, id: SnapshotId, preview: &Preview) -> String {
     out
 }
 
-pub fn changes_json(config: &AreaName, id: SnapshotId, preview: &Preview) -> Value {
+pub fn changes_json(area: &AreaName, id: SnapshotId, preview: &Preview) -> Value {
     let changes: Vec<Value> = preview
         .changes
         .iter()
         .map(|c| json!({"kind": kind_word(c.kind), "path": c.path}))
         .collect();
     json!({
-        "config": config.as_str(),
+        "config": area.as_str(),
         "snapshot": id.get(),
         "subvolume": preview.location,
         "system_root": preview.is_system_root,
@@ -47,18 +47,18 @@ pub fn changes_json(config: &AreaName, id: SnapshotId, preview: &Preview) -> Val
     })
 }
 
-pub fn restored(config: &AreaName, id: SnapshotId, done: &Restored) -> String {
+pub fn restored(area: &AreaName, id: SnapshotId, done: &Restored) -> String {
     let s = done.summary;
     format!(
-        "restored {config} to #{id}: {} reverted, {} removed, {} brought back\n\
-         undo this with: snapall restore {config} {}  (the state before is snapshot #{})\n",
+        "restored {area} to #{id}: {} reverted, {} removed, {} brought back\n\
+         undo this with: snapall restore {area} {}  (the state before is snapshot #{})\n",
         s.modified, s.deleted, s.created, done.safety_snapshot, done.safety_snapshot
     )
 }
 
-pub fn restored_json(config: &AreaName, id: SnapshotId, done: &Restored) -> Value {
+pub fn restored_json(area: &AreaName, id: SnapshotId, done: &Restored) -> Value {
     json!({
-        "config": config.as_str(),
+        "config": area.as_str(),
         "snapshot": id.get(),
         "safety_snapshot": done.safety_snapshot.get(),
         "reverted": done.summary.modified,
@@ -67,10 +67,10 @@ pub fn restored_json(config: &AreaName, id: SnapshotId, done: &Restored) -> Valu
     })
 }
 
-pub fn deleted(config: &AreaName, id: SnapshotId) -> String {
-    format!("deleted #{id} from {config}\n")
+pub fn deleted(area: &AreaName, id: SnapshotId) -> String {
+    format!("deleted #{id} from {area}\n")
 }
 
-pub fn deleted_json(config: &AreaName, id: SnapshotId) -> Value {
-    json!({"config": config.as_str(), "deleted": id.get()})
+pub fn deleted_json(area: &AreaName, id: SnapshotId) -> Value {
+    json!({"config": area.as_str(), "deleted": id.get()})
 }

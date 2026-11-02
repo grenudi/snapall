@@ -80,7 +80,7 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
             input,
             error,
         } => describe_spec(target, input, error.as_deref(), state),
-        Modal::ConfirmDelete { area: config, ids } => delete_spec(config, ids),
+        Modal::ConfirmDelete { area, ids } => delete_spec(area, ids),
         Modal::Restore {
             area,
             id,
