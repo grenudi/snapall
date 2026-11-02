@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.0]
+
+
+### Refactoring
+- The window's state is composed, and the Snapshots tab owns its own ([#109](https://github.com/grenudi/snapall/pull/109)) ([e27328d])
+
+
+
 ## [0.26.8]
 
 
