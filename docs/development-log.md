@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-30: measured instead of worried: the script tests do not race
+
+**Why.** The plan carried an item that three tests, which write a script and run it at once, might hit the `text file busy` race the background runner's test once had. Nothing had shown it. A fast test (0.4 seconds a run) can simply be run many times.
+
+**What.** 250 sequential runs of the binary's tests and 490 of the snapper adapter's (250 sequential, 240 four at a time): no failure and no such error. The first attempt, four copies of the binary's suite at once, failed 206 of 400 times, and reading the message showed why: "Another snapall is making a change right now". The restore tests take the machine's real one-change-at-a-time lock, so two copies refuse each other. An invalid experiment, found by reading the failure instead of counting it; the trap is in `AGENTS.md`. The item is gone from the plan with the measurement recorded.
+
+**Also.** The first release with the retrying package install (0.28.0) ran it in 15 jobs and none needed a retry; the plan says the hypothesis is still untested. I first counted 15 retries by matching the log, which prints the step's script text (with the same `echo` line); matching only lines with the attempt number filled in gave none. Counting evidence needs the same care as writing it.
+
+**A slip in shipping it.** The pull request had a merge conflict and so got no CI, and `ship.py` waited on the silence. The branch had been made from the old state because a line that failed to parse under `sh` skipped its own `git pull`. The script now says when a pull request conflicts with main and force-pushes only its own rebased branch; branching from `origin/main` explicitly is a trap in `AGENTS.md`.
+
 ## 2026-10-30: the last guard debts are paid
 
 **Why.** After the huddled files, the guards' data file still held four kinds of debt besides the contract table: the window model's front at 140 lines, the `setup` handler over the branching budget, and seven names carrying a tool's word (`config`, `snapper`, `systemctl`) above the adapters. Reading each rather than shaving it:

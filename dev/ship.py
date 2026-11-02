@@ -13,7 +13,7 @@ from where the pull request, main or the release already is. A tool call does no
 outlive it, so run it in the foreground. It stops itself after SHIP_BUDGET seconds (255 by default) with exit code 75, "still
 waiting": run the same command again, as often as it takes, until it exits 0 (done) or 1 (something failed, and it says what).
 
-Rules it keeps, so nobody has to remember them: squash merge only, with the title as the commit subject; the pull request is merged only when
+Rules it keeps, so nobody has to remember them: it never runs on main, and only a feature branch is pushed (forced, so a rebased one can be shipped again); squash merge only, with the title as the commit subject; the pull request is merged only when
 every check passed (judged by the newest run of each check name); the release pull request is merged only after main's own CI passed;
 a job that failed at a step that is only a network install (`A user's tools`: openSUSE's mirrors, seen three times, and that step now retries for itself) or in the runner's own container setup is re-run once, and
 anything else that fails is reported with the tail of its log and stops everything.
@@ -94,11 +94,18 @@ def rerun_failed_runner_flakes(sha, names):
             reran = True
     return reran
 
-def wait_for_checks(sha, what):
+def wait_for_checks(sha, what, number=None):
     stable = 0
     reran = False
+    empty = 0
     while True:
         checks = newest_checks(sha)
+        empty = empty + 1 if not checks else 0
+        if number and empty >= 3:
+            # GitHub starts no CI for a pull request that conflicts with main, which looks exactly like waiting
+            pr = api(f"pulls/{number}")
+            if pr.get("mergeable") is False or pr.get("mergeable_state") == "dirty":
+                sys.exit(f"#{number} conflicts with main, so GitHub runs no checks: rebase it onto origin/main and run me again")
         pending = [n for n, c in checks.items() if c["status"] != "completed"]
         failed = [n for n, c in checks.items() if c["status"] == "completed" and c["conclusion"] not in ("success", "skipped", "neutral")]
         say(f"{what}: {len(checks)} checks, {len(pending)} pending, {len(failed)} failed")
@@ -177,7 +184,7 @@ def main(argv):
     found = api(f"pulls?head={owner}:{branch}&state=all")
     pr = found[0] if isinstance(found, list) and found else None
     if pr is None:
-        sh("git", "push", "-q", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
+        sh("git", "push", "-q", "--force", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
         body = open(body_file).read() if body_file else sh("git", "log", "-1", "--format=%b").stdout
         pr = api("pulls", {"title": title, "head": branch, "base": "main", "body": body}, "POST")
         if "number" not in pr:
@@ -186,12 +193,12 @@ def main(argv):
     else:
         say(f"pull request #{pr['number']} is {pr['state']}{' (merged)' if pr.get('merged_at') else ''}")
         if pr["state"] == "open":
-            sh("git", "push", "-q", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
+            sh("git", "push", "-q", "--force", f"https://x-access-token:{token()}@github.com/{REPO}.git", branch)
     number = pr["number"]
     if not pr.get("merged_at"):
         nap(15)
         sha = api(f"pulls/{number}")["head"]["sha"]
-        wait_for_checks(sha, f"#{number}")
+        wait_for_checks(sha, f"#{number}", number)
         say("all checks passed: merging (squash)")
         merged = api(f"pulls/{number}/merge", {"merge_method": "squash", "commit_title": f"{title} (#{number})"}, "PUT")
         if not merged.get("merged"):
