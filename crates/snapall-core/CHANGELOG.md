@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.5]
+
+
+### Refactoring
+- The core understands its own way back ([#118](https://github.com/grenudi/snapall/pull/118)) ([6f20322])
+
+
+
 ## [0.27.4]
 
 
