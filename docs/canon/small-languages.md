@@ -156,7 +156,7 @@ pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, agreed: Agreed) ->
     };
     let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
     let deleted = delete_snapshot(ctx.backend, area, id);
-    change.end_with_way_back(&deleted, after_deleting);
+    change.end_with_way_back(&deleted, |_| after_deleting());
     deleted?;
     ctx.show.result(
         crate::render::deleted(area, id),

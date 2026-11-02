@@ -117,7 +117,7 @@ fn make_the_switch(
         .areas
         .iter()
         .try_for_each(|area| system.set_quotas(&area.location, to));
-    change.end_with_way_back(&result, || {
+    change.end_with_way_back(&result, |_| {
         snapall_core::going_back::rollback::after_room_counting(to)
     });
     result?;

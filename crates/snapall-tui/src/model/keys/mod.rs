@@ -14,4 +14,4 @@ pub(crate) use clicking::on_click;
 pub(crate) use cursor::{
     clamp_step, jump, load_selected_if_needed, on_scroll, select_area, step, toggle_mark,
 };
-pub(crate) use screen::{on_key, open_help, quit};
+pub(crate) use screen::{on_key, open_help, quit, switch_to_tab};

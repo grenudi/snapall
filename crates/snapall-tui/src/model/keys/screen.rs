@@ -12,13 +12,7 @@ use crate::model::*;
 pub(crate) fn on_tab_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
     if let Key::Char(c) = key {
         if let Some(tab) = Tab::from_key(c) {
-            state.tab = tab;
-            // another snapall may have done something since: read the journal again
-            return Some(if tab == Tab::Activity {
-                vec![Effect::LoadHistory]
-            } else {
-                Vec::new()
-            });
+            return Some(switch_to_tab(state, tab));
         }
     }
     let own = match state.tab {
@@ -123,4 +117,14 @@ pub(crate) fn open_help(state: &mut State) -> Vec<Effect> {
 /// reading do not, and stay available.
 fn starts_work(key: Key) -> bool {
     matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R'))
+}
+
+/// Show a tab. Another snapall may have done something since the history was read, so showing Activity reads it again.
+pub(crate) fn switch_to_tab(state: &mut State, tab: Tab) -> Vec<Effect> {
+    state.tab = tab;
+    if tab == Tab::Activity {
+        vec![Effect::LoadHistory]
+    } else {
+        Vec::new()
+    }
 }

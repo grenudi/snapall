@@ -44,19 +44,9 @@ pub fn restore(
     };
     let change = Change::begin(approved, &now, &past, None)?;
     let result = restore_snapshot(ctx.backend, area, id, path);
-    if let Ok(done) = &result {
-        change.rollback(snapall_core::going_back::rollback::after_restoring(
-            area,
-            path,
-            done.safety_snapshot,
-        ));
-    }
-    change.end(
-        result
-            .as_ref()
-            .map(|_| String::new())
-            .map_err(ToString::to_string),
-    );
+    change.end_with_way_back(&result, |done| {
+        snapall_core::going_back::rollback::after_restoring(area, path, done.safety_snapshot)
+    });
     let done = result?;
     ctx.show.result(
         render::restored(area, id, &done),

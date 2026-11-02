@@ -51,7 +51,7 @@ pub fn after_taking_ids(made: &[(AreaName, SnapshotId)]) -> Option<Rollback> {
     }
     let list: Vec<String> = made
         .iter()
-        .map(|(config, id)| format!("#{id} of {config}"))
+        .map(|(area, id)| format!("#{id} of {area}"))
         .collect();
     Some(undo(
         format!(
@@ -61,19 +61,19 @@ pub fn after_taking_ids(made: &[(AreaName, SnapshotId)]) -> Option<Rollback> {
             list.join(", ")
         ),
         made.iter()
-            .map(|(config, id)| command(&["delete", config.as_str(), &id.to_string()]))
+            .map(|(area, id)| command(&["delete", area.as_str(), &id.to_string()]))
             .collect(),
         Weight::Destroys,
     ))
 }
 
 /// After putting one area (or one path of it) back: going back to the snapshot of the state just before.
-pub fn after_restoring(config: &AreaName, path: Option<&str>, safety: SnapshotId) -> Rollback {
-    let mut back = command(&["restore", config.as_str(), &safety.to_string()]);
+pub fn after_restoring(area: &AreaName, path: Option<&str>, safety: SnapshotId) -> Rollback {
+    let mut back = command(&["restore", area.as_str(), &safety.to_string()]);
     back.extend(path.map(str::to_owned));
     undo(
         format!(
-            "Put {config}{} back to how it was just before: snapshot #{safety} (taken by this restore)",
+            "Put {area}{} back to how it was just before: snapshot #{safety} (taken by this restore)",
             path.map_or(String::new(), |path| format!(" ({path})"))
         ),
         vec![back],
@@ -103,12 +103,12 @@ pub fn after_protecting(names: &[String]) -> Rollback {
 }
 
 /// After changing what an area keeps: exactly what it kept before.
-pub fn after_limits(config: &str, before: &Limits) -> Rollback {
+pub fn after_limits(area: &str, before: &Limits) -> Rollback {
     undo(
-        format!("Set {config} back to: {}", before.describe()),
+        format!("Set {area} back to: {}", before.describe()),
         vec![vec![
             "limits".to_owned(),
-            config.to_owned(),
+            area.to_owned(),
             "--keep".to_owned(),
             before.keep.to_string(),
             "--min-age".to_owned(),
