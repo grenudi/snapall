@@ -35,7 +35,8 @@ pub fn explain_with(error: &HistoryError, path: &str, mounts: &[Mount]) -> Strin
     };
     if holder.fstype != "btrfs" {
         return format!(
-            "No snapshot contains {path}.\n\nIt is on {point}, a part of the disk snapall cannot protect: it only works with disks formatted as Btrfs.",
+            "No snapshot contains {path}.\n\nIt is on {point}, a part of the disk snapall cannot protect: it only works with {}.",
+            snapall_core::vocabulary::explain::WORKS_WITH,
             point = holder.point
         );
     }

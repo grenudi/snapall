@@ -105,7 +105,7 @@ pub(super) fn explain_the_basics(talk: &mut dyn Talk) {
 
 pub(super) fn list_the_areas(talk: &mut dyn Talk, areas: &[Area]) {
     if areas.is_empty() {
-        talk.say("snapall did not find a part of this computer's disk that it knows how to protect. It works with disks formatted as Btrfs, and none seems to be in use here.\n");
+        talk.say(&format!("snapall did not find a part of this computer's disk that it knows how to protect. It works with {}, and none seems to be in use here.\n", snapall_core::vocabulary::explain::WORKS_WITH));
         return;
     }
     let mut text =

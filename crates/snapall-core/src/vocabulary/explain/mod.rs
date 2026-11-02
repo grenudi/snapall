@@ -22,7 +22,7 @@ pub use areas::{
 };
 pub use basics::{
     DELETE_ADVICE, NOT_A_BACKUP, RESTORE_CAUTION, RESTORING, UNPROTECT_ADVICE, WHAT_IS_AN_AREA,
-    WHAT_IS_A_SNAPSHOT,
+    WHAT_IS_A_SNAPSHOT, WORKS_WITH,
 };
 pub use cleanup::{
     cleanup_from, cleanup_offer, cleanup_text, room_counting_text, seconds_words, Cleanup, Limit,

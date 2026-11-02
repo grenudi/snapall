@@ -1198,3 +1198,21 @@ fn the_retired_word_is_not_an_identifier_outside_the_adapter() {
         0,
     );
 }
+
+// ---- the disk requirement is told in one place --------------------------------------------------------------
+
+/// What snapall works with is one sentence in the core's vocabulary, which names the format and says what it is. It had
+/// been told in three layers in three slightly different words, none of which explained it.
+#[test]
+fn what_snapall_works_with_is_told_in_one_place() {
+    let telling: Vec<String> = all_sources()
+        .into_iter()
+        .filter(|(_, code)| code.contains("formatted as Btrfs"))
+        .map(|(path, _)| path)
+        .collect();
+    assert_eq!(
+        telling,
+        ["crates/snapall-core/src/vocabulary/explain/basics.rs"],
+        "the disk requirement is said by `explain::WORKS_WITH`, and nowhere else"
+    );
+}

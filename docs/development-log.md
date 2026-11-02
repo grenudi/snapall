@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-07: `on_areas_loaded` as steps, and a sentence told three times
+
+**Why.** `on_areas_loaded` was on the plan since the second seeded read: a 35-line arm that rebuilt the list, kept the cursor on the same area, reset the snapshot cursor, settled which notice shows, and held the "nothing protected yet" sentence inline. I had noted it twice and fixed other things first.
+
+**What.** It is `areas_could_not_be_read`, `show_the_areas`, `settle_the_notice` and `nothing_is_protected_yet`, with the arm reading as the three things it does. Behaviour is unchanged (the window's tests are the check).
+
+**What reading it found.** That inline sentence told a person snapall "works with disks formatted as Btrfs", and the same fact was told in the setup conversation and in the advice for a file snapall cannot protect, in three slightly different sentences, none explaining what Btrfs is. You set the rule at the start that person-readable text never uses words like that unexplained. The word is needed (the person has to know what kind of disk), so it is explained once: `explain::WORKS_WITH` is "disks formatted as Btrfs, a disk format that can take snapshots", used by all three, and a guard says it is told nowhere else (shown to fail when a second telling appears). The boot-menu advice also says "on Btrfs", where it describes the system rather than a requirement, and is left as it is.
+
 ## 2026-11-06: CI, measured first, then optimised
 
 **Why.** Asked to optimise CI with the best practices. I measured before changing anything (`dev/ci-timings.py`, new): a run took a median **193 s wall and 20.0 job-minutes**, and the cost was concentrated, not spread out. The release pipeline (Release, Verify release, then Install snippets and Package repositories) took 10 to 13 minutes in a strict chain.

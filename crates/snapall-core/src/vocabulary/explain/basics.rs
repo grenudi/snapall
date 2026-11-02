@@ -2,7 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The explanations and cautions that stand on their own: what a snapshot is, what an area is, and what cannot be undone.
+//! The explanations and cautions that stand on their own: what a snapshot is, what an area is, which kind of disk snapall works with, and what cannot be undone.
+
+/// What snapall can protect: said wherever a person is told that something is out of its reach, so the format is named and
+/// explained in one place, in one set of words.
+pub const WORKS_WITH: &str = "disks formatted as Btrfs, a disk format that can take snapshots";
 
 /// What a snapshot is, and why it is cheap. Shown first by `snapall setup` and in the TUI's help.
 pub const WHAT_IS_A_SNAPSHOT: &str = "A snapshot is a saved moment of your computer. If an update, a new setting or a mistake breaks something, you can go back to how things were.\n\nA snapshot does not copy your files. The disk only remembers what changes afterwards, so a new snapshot takes almost no space, and it grows only as you change things. That is why it is quick, and why it can be kept for a long time.";
