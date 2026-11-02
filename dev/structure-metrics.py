@@ -54,6 +54,8 @@ def measure(ref):
         if not text or "#![cfg(test)]" in text:
             continue
         sources[name] = text.split("#[cfg(test)]")[0]
+    if not sources:
+        sys.exit(f"no source files at {ref}: is the tag fetched? (git fetch --tags)")
     lines = {n: len(t.split("\n")) for n, t in sources.items()}
     entry = [l for n, l in lines.items() if n.rsplit("/", 1)[-1] in ("lib.rs", "main.rs", "mod.rs")]
     long_functions = total_functions = 0

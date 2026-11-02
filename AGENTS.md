@@ -57,6 +57,7 @@ On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_R
 - A `crate::` path belongs to the crate it is written in; a rewrite across the workspace must not touch another crate's own modules.
 - The release commit is the commit titled `chore: release`, not the merge commit before it, whose release workflows are skipped.
 - The openSUSE x86_64 container job sometimes fails in the runner's own setup (the step `A user's tools`), before any of our code runs: re-run only that job once. `ship.py` does.
+- A tool that rewrites code must never drop a comment silently, and must stop on what it cannot place: `dev/split-module.py` once did the first, and the stop is what saved the code.
 - A script that edits a document must assert on what it expects to find, as one that edits code does: `str.index` finds the first match, which can be in a different section, and a path-existence check will not notice a lost heading.
 - Size limits get gamed: files huddle just under them. Judge by the findability test and by reading, not only by the numbers.
 - A measurement that reads zero before a file became a folder is an artifact of the move, not a result.

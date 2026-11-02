@@ -99,7 +99,10 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-tui
 
-- `changes.rs`: What a change is called in the Activity tab, and how it went: the words, apart from the doing.
+  - `changes/background.rs`: A change handed to the background: the command that carries it out, and the name it is given.
+  - `changes/describing.rs`: What a change is called: in the past tense for the Activity tab's record, in the present tense while it runs.
+  - `changes/mod.rs`: What a change is called in the Activity tab, and how it went: the words, apart from the doing.
+  - `changes/outcome.rs`: How a change went, and the way back from it, read from what came back.
   - `file_history/arriving.rs`: What the file history screen does when the versions of its file arrive.
   - `file_history/drawing.rs`: Drawing the file history screen: one file's versions, newest first.
   - `file_history/keys.rs`: What the keys do on the file history screen: move along the versions, reload them, and put one back.

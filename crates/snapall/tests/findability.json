@@ -250,6 +250,25 @@
       "answers": [
         "snapall-tui/file_history/keys.rs"
       ]
+    },
+    {
+      "question": "What is a change called in the Activity tab?",
+      "answers": [
+        "snapall-tui/changes/describing.rs",
+        "snapall-tui/tabs/activity/entries.rs"
+      ]
+    },
+    {
+      "question": "How does the window work out the way back from a change?",
+      "answers": [
+        "snapall-tui/changes/outcome.rs"
+      ]
+    },
+    {
+      "question": "Which command carries out a change that was handed to the background?",
+      "answers": [
+        "snapall-tui/changes/background.rs"
+      ]
     }
   ]
 }

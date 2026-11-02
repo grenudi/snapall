@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: describing a change is its own language
+
+**Why.** After a re-measurement (the trend was flat since 0.27.0, because the window's structure work is barely visible to those proxies), the biggest remaining file in the window was `changes.rs` (420 lines), holding three of the longest functions. It was three languages: what a change is called, the command that carries a change out in the background, and how it went with the way back from it.
+
+**What.** `changes/{describing,background,outcome}.rs` (15 to 201 lines), split with `dev/split-module.py`. Doing it found a defect in the tool: it silently dropped any plain `//` comment at the top level, and a comment directly above an item made it mistake the comment for the item's head (it stopped with "unplaced", which is why nothing was lost). It now keeps every comment with the item below it; the three "exhaustive on purpose" notes survived. The measuring script also now says what is wrong when asked about a tag that is not fetched, instead of failing with an unhelpful error.
+
+**What the cold read said.** Asked what a change is called in the Activity tab, the outline led to the Activity tab's own files (6th), because the new sentence never said where its words are shown. It now says the Activity tab's record. The three new questions: 41 asked, 40 within the first three, 25 first.
+
+**Not changed.** The long functions in it (`how_it_went` 114 lines, `describe_now` and `describe_change` 81) are exhaustive matches over every kind of change, on purpose (a new kind must be given its words and its result, and the compiler says so), so the file got smaller and the function count did not.
+
 ## 2026-10-29: the file history screen is one place
 
 **Why.** The last window item in the plan: the screen shown when the window is opened on one file had its decisions in `model/file.rs` and its drawing in `view/file.rs`, while every tab and every question was already a folder.

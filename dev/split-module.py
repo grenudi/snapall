@@ -13,7 +13,7 @@ SPEC.json:
      "tests_purpose": "One sentence for the moved tests.",     the `mod tests { .. }` moves to NAME/tests.rs
      "groups": {"facts": ["What this module is for.", ["Item", "impl Item", "a_function"]], ...}}
 
-Every top-level item must be placed in exactly one group, by name; an `impl` block is named by its head
+Every top-level item must be placed in exactly one group, by name (the comments and attributes directly above it go with it); an `impl` block is named by its head
 (`impl Item`, `impl Trait for Item`). A group's public names are re-exported by the new front. Afterwards run
 `cargo fmt`, `cargo fix --lib --tests --allow-dirty` and `cargo check`; what the compiler reports is only visibility
 (`pub(super)` -> `pub(crate)`) and imports. Refresh the outline: UPDATE_OUTLINE=1 cargo test -p snapall --test architecture,
@@ -44,9 +44,9 @@ imports="\n".join(chunks); body_start=i
 def items():
     out=[]; i=body_start
     while i<len(code):
-        if not code[i].strip() or (code[i].startswith("//") and not code[i].startswith("///")): i+=1; continue
+        if not code[i].strip(): i+=1; continue
         start=i; j=i
-        while j<len(code) and (code[j].startswith("///") or code[j].startswith("#[")): j+=1
+        while j<len(code) and (code[j].startswith("//") or code[j].startswith("#[")): j+=1
         head=code[j]; end=j
         single=(head.rstrip().endswith(";") and "{" not in head) or head.rstrip().endswith("{}")
         if not single:

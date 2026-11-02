@@ -3,7 +3,6 @@
     "crates/snapall-tui/src/model/mod.rs": 140
   },
   "files_too_long": {
-    "crates/snapall-tui/src/changes.rs": 419,
     "crates/snapall/src/contract/inputs.rs": 514
   },
   "findability_gaps": {},
