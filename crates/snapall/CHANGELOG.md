@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.31.1]
+
+
+### Refactoring
+- On_areas_loaded as steps, and the disk requirement told once ([#144](https://github.com/grenudi/snapall/pull/144)) ([1b3b77c])
+
+
+
 ## [0.31.0]
 
 
