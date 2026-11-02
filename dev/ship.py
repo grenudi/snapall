@@ -15,11 +15,12 @@ waiting": run the same command again, as often as it takes, until it exits 0 (do
 
 Rules it keeps, so nobody has to remember them: squash merge only, with the title as the commit subject; the pull request is merged only when
 every check passed (judged by the newest run of each check name); the release pull request is merged only after main's own CI passed;
-a job that failed in the runner's own setup, before any of our code ran (the openSUSE container, seen twice), is re-run once, and
+a job that failed at a step that is only a network install (`A user's tools`: openSUSE's mirrors, seen three times, and that step now retries for itself) or in the runner's own container setup is re-run once, and
 anything else that fails is reported with the tail of its log and stops everything.
 """
 import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
+# steps whose failure is the network or the runner, not our code: a package install inside a container, and the runner starting one
 KNOWN_RUNNER_FLAKES = ("A user's tools", "Set up job", "Initialize containers", "Initialize job")
 RELEASE_WORKFLOWS = ("Release", "Verify release", "Package repositories", "Install snippets")
 MIN_CHECKS = 20
@@ -89,7 +90,7 @@ def rerun_failed_runner_flakes(sha, names):
             run_id = job["run_id"]
             if run_id not in runs:
                 runs[run_id] = api(f"actions/runs/{run_id}/rerun-failed-jobs", {}, "POST")
-                say(f"re-running {name}: the runner failed in its own setup ({steps[0]}), before any of our code ran")
+                say(f"re-running {name}: it failed at `{steps[0]}`, a network or runner step and not our code")
             reran = True
     return reran
 
@@ -140,7 +141,7 @@ def verify_release(sha):
             jobs = api(f"actions/runs/{run['id']}/jobs?per_page=50").get("jobs", [])
             flaky = [j for j in jobs if j.get("conclusion") == "failure" and all(any(f in s["name"] for f in KNOWN_RUNNER_FLAKES) for s in j["steps"] if s.get("conclusion") == "failure")]
             if flaky and len(flaky) == len([j for j in jobs if j.get("conclusion") == "failure"]):
-                say(f"re-running {name}: the runner failed in its own setup")
+                say(f"re-running {name}: it failed at a network or runner step and not our code")
                 api(f"actions/runs/{run['id']}/rerun-failed-jobs", {}, "POST")
                 nap(40)
             else:

@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-30: the openSUSE flake was ours, and I had mislabelled it
+
+**Why.** The openSUSE container job had failed three times at the step named `A user's tools`. I had written down, in `ship.py`, in `AGENTS.md` and in the plan, that this was "the runner failing in its own setup, before any of our code ran", and had the script re-run it. Checking what the step actually is: it is in our workflows, and it runs `${{ matrix.setup }}`, a package install (`zypper --non-interactive install sudo gawk curl` on openSUSE) inside the container, over the network. A failure there is a mirror or network hiccup in our own step, not the runner.
+
+**What.** The step now retries the install up to three times with a growing pause, in both workflows that have it (the install snippets and the repositories), for every distribution: a command that works is not repeated and one that never works gives up with a failure (both checked in a plain shell). The three places that described it wrongly are corrected. `ship.py` still re-runs a job that fails at that step once, but now says why correctly. It is a hypothesis that the retry is enough, not a proven fix: if it still flakes after the next releases the next thing to try is the image from `registry.opensuse.org` instead of Docker Hub.
+
+**Evidence.** The YAML parses, and CI runs these jobs on the pull request itself.
+
 ## 2026-10-30: the huddled files, and a defect in my own tool that had been deleting documentation
 
 **Why.** Fourteen files sat between 250 and 299 lines, just under my size limit: the sign that the limit was partly gamed. Rather than guess, I read them. Ten are one language near its natural size. Four showed the sign: two said "and" in their own purpose sentence, one held the events and the folding of events into history, one was three kinds of explanation.

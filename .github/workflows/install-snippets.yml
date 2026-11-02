@@ -68,7 +68,16 @@ jobs:
           - { name: Alpine,   arch: aarch64, runner: ubuntu-24.04-arm,  image: "alpine:latest",         family: tarball,    setup: "apk add --no-cache bash sudo curl gawk" }
     steps:
       - name: A user's tools
-        run: ${{ matrix.setup }}
+        # a package manager over the network fails now and then (openSUSE's mirrors, mostly): it is tried again,
+        # with a pause, before it is called a failure
+        run: |
+          n=0
+          until ${{ matrix.setup }}; do
+            n=$((n + 1))
+            [ "$n" -ge 3 ] && exit 1
+            echo "the install did not work (attempt $n of 3): trying again in $((n * 20)) seconds"
+            sleep $((n * 20))
+          done
       # apt, dnf and pacman take their answers from a pipe; zypper reads them from a terminal, and CI has
       # none. So here it is made to take its default answers. The binary itself is replaced, because
       # sudo resolves `zypper` to /usr/bin whatever the PATH says. A person at a terminal gets the
