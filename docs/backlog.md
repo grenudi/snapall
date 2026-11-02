@@ -21,11 +21,10 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | # | Item | Status |
 |---|---|---|
 | 1 | Nine bare booleans remain in the commands, of a different kind from the ones that were named: states a function reports (`stopped`, `changed`, `ended`), a direction (`turn_on`, on or off) and facts about how the program was invoked (`hints`, `json`, `no_dbus` in `Context`). Name `turn_on` if a fourth place needs it | open |
-| 2 | The window's `changes.rs` is over 300 lines (419) | open |
-| 3 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
-| 4 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
-| 5 | The openSUSE x86_64 container job fails now and then in the runner's own setup, seen twice. `dev/ship.py` re-runs it once; find out why (the image pull, a mirror) or pin it | open |
-| 6 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+| 2 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
+| 3 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
+| 4 | The openSUSE x86_64 container job fails now and then in the runner's own setup, seen twice. `dev/ship.py` re-runs it once; find out why (the image pull, a mirror) or pin it | open |
+| 5 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 
