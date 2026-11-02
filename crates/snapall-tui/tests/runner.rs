@@ -143,8 +143,8 @@ fn a_snapshot_of_several_areas_is_handed_over_as_the_ordinary_command_and_not_do
         system.events().is_empty(),
         "the process that does it writes the journal, not the window"
     );
-    assert_eq!(session.state.watching.len(), 1);
-    assert_eq!(session.state.watching[0].id, id);
+    assert_eq!(session.state.waiting.watching.len(), 1);
+    assert_eq!(session.state.waiting.watching[0].id, id);
     let notice = format!("{:?}", session.state.notice);
     assert!(
         notice.contains("started in the background")
@@ -152,7 +152,7 @@ fn a_snapshot_of_several_areas_is_handed_over_as_the_ordinary_command_and_not_do
         "{notice}"
     );
     assert_eq!(
-        session.state.pending, 0,
+        session.state.waiting.pending, 0,
         "handing it over is not work that blocks the window"
     );
 }
@@ -187,7 +187,7 @@ fn when_it_ends_the_window_says_so_and_looks_at_the_lists_again() {
     worker_starts(&system, &id);
     a_second(&mut session);
     assert_eq!(
-        session.state.watching.len(),
+        session.state.waiting.watching.len(),
         1,
         "still running, still followed"
     );
@@ -199,7 +199,7 @@ fn when_it_ends_the_window_says_so_and_looks_at_the_lists_again() {
     );
     a_second(&mut session);
     assert!(
-        session.state.watching.is_empty(),
+        session.state.waiting.watching.is_empty(),
         "no longer followed once it has ended"
     );
     assert!(format!("{:?}", session.state.notice).contains("Took a snapshot of home, root: done"));
@@ -311,7 +311,7 @@ fn a_change_that_never_reports_is_let_go_of_with_a_word_about_it() {
         a_second(&mut session);
     }
     assert!(
-        session.state.watching.is_empty(),
+        session.state.waiting.watching.is_empty(),
         "it is not followed for ever"
     );
     assert!(format!("{:?}", session.state.notice).contains("never reported"));

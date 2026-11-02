@@ -67,7 +67,7 @@ fn waiting_for_snapshots(backend: &InMemoryBackend) -> State {
 fn while_work_is_in_flight_the_window_says_what_it_is_doing_and_for_how_long() {
     let backend = backend();
     let mut state = waiting_for_snapshots(&backend);
-    assert_eq!(state.doing, ["Taking a snapshot of home, root"]);
+    assert_eq!(state.waiting.doing, ["Taking a snapshot of home, root"]);
     for _ in 0..30 {
         update(&mut state, Msg::Tick);
     }
@@ -123,14 +123,14 @@ fn when_the_work_is_done_the_line_goes_and_the_clock_starts_over() {
     for _ in 0..20 {
         update(&mut state, Msg::Tick);
     }
-    assert!(state.busy_ticks >= 20);
+    assert!(state.waiting.busy_ticks >= 20);
     update(&mut state, Msg::Created(Vec::new()));
-    assert_eq!(state.pending, 0);
+    assert_eq!(state.waiting.pending, 0);
     assert!(
-        state.doing.is_empty() && state.busy_ticks == 0,
+        state.waiting.doing.is_empty() && state.waiting.busy_ticks == 0,
         "{:?} {}",
-        state.doing,
-        state.busy_ticks
+        state.waiting.doing,
+        state.waiting.busy_ticks
     );
     assert!(!rows(&state)[21].contains("Taking a snapshot of"));
 }

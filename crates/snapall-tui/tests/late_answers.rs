@@ -61,7 +61,7 @@ fn restore_points_that_arrive_after_the_screen_was_closed_go_nowhere() {
         "late points must not reopen or fill anything"
     );
     assert_eq!(
-        session.state.pending, 0,
+        session.state.waiting.pending, 0,
         "late points must not start a look at the first one"
     );
 }

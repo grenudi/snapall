@@ -39,7 +39,9 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return on_modal_key(state, key);
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
-    if state.pending > 0 && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R')) {
+    if state.waiting.pending > 0
+        && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R'))
+    {
         state.notice = Some(Notice::Error(
             "busy: wait for the current operation to finish".into(),
         ));
@@ -65,18 +67,18 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
             vec![Effect::LoadAreas, Effect::LoadHealth, Effect::LoadHistory]
         }
         Key::Tab => {
-            state.focus = match state.focus {
+            state.snapshots.focus = match state.snapshots.focus {
                 Pane::Areas => Pane::Snapshots,
                 Pane::Snapshots => Pane::Areas,
             };
             Vec::new()
         }
         Key::Left | Key::Char('h') => {
-            state.focus = Pane::Areas;
+            state.snapshots.focus = Pane::Areas;
             Vec::new()
         }
         Key::Right | Key::Char('l') => {
-            state.focus = Pane::Snapshots;
+            state.snapshots.focus = Pane::Snapshots;
             Vec::new()
         }
         Key::Up | Key::Char('k') => step(state, -1),

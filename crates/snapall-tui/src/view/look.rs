@@ -24,9 +24,13 @@ pub(crate) enum Mood {
 }
 
 pub(crate) fn mood(state: &State, click: Click) -> Mood {
-    if state.pressed.is_some_and(|(pressed, _)| pressed == click) {
+    if state
+        .pointer
+        .pressed
+        .is_some_and(|(pressed, _)| pressed == click)
+    {
         Mood::Pressed
-    } else if state.hover == Some(click) {
+    } else if state.pointer.hover == Some(click) {
         Mood::Hover
     } else {
         Mood::Rest

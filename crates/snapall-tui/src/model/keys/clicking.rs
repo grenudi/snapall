@@ -67,23 +67,23 @@ pub(crate) fn on_click(state: &mut State, click: Click) -> Vec<Effect> {
         }
         Click::Mark { .. } if state.file.is_some() => Vec::new(),
         Click::Row { pane, index } => {
-            state.focus = pane;
+            state.snapshots.focus = pane;
             match pane {
-                Pane::Areas if index < state.entries().len() => select_area(state, index),
-                Pane::Snapshots if index < state.displayed_snapshots().len() => {
-                    state.snapshot_cursor = index;
+                Pane::Areas if index < state.snapshots.entries().len() => select_area(state, index),
+                Pane::Snapshots if index < state.snapshots.displayed_snapshots().len() => {
+                    state.snapshots.snapshot_cursor = index;
                     Vec::new()
                 }
                 _ => Vec::new(),
             }
         }
         Click::Mark { index } => {
-            state.focus = Pane::Snapshots;
-            if index < state.displayed_snapshots().len() {
-                state.snapshot_cursor = index;
+            state.snapshots.focus = Pane::Snapshots;
+            if index < state.snapshots.displayed_snapshots().len() {
+                state.snapshots.snapshot_cursor = index;
                 toggle_mark(state);
                 // Marking by click does not move on to the next row, unlike the space key.
-                state.snapshot_cursor = index;
+                state.snapshots.snapshot_cursor = index;
             }
             Vec::new()
         }

@@ -6,6 +6,8 @@
 
 mod arriving;
 mod drawing;
+mod state;
 
 pub(crate) use arriving::{on_areas_loaded, on_created, on_snapshots_loaded};
 pub(crate) use drawing::{areas_split, pane_block, render_areas, render_snapshots};
+pub use state::SnapshotsTab;

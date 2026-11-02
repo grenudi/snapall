@@ -44,7 +44,7 @@ pub(crate) fn groups_spec(screen: &GroupsScreen, state: &State) -> ModalSpec {
 }
 
 fn list_lines(cursor: usize, state: &State) -> Vec<Line<'static>> {
-    let protected = state.area_names();
+    let protected = state.snapshots.area_names();
     let mut lines = vec![
         Line::from("A group is a name for some of your areas, so that one snapshot can take just those (press a, then Tab to choose the group). It does not change the areas or their snapshots."),
         Line::from(""),

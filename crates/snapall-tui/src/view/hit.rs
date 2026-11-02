@@ -85,10 +85,11 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
     if groups.is_some_and(|groups| contains(groups, col, row)) {
         return Some(Click::Button(Button::Groups));
     }
-    if state.file.is_none() && contains(configs, col, row) && !state.entries().is_empty() {
-        let index =
-            window_start(state.area_cursor, configs.height as usize) + (row - configs.y) as usize;
-        return (index < state.entries().len()).then_some(Click::Row {
+    if state.file.is_none() && contains(configs, col, row) && !state.snapshots.entries().is_empty()
+    {
+        let index = window_start(state.snapshots.area_cursor, configs.height as usize)
+            + (row - configs.y) as usize;
+        return (index < state.snapshots.entries().len()).then_some(Click::Row {
             pane: Pane::Areas,
             index,
         });
@@ -111,8 +112,9 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
     // One header line, then the rows.
     if contains(snapshots, col, row) && row > snapshots.y {
         let visible = (snapshots.height as usize).saturating_sub(1);
-        let index = window_start(state.snapshot_cursor, visible) + (row - snapshots.y - 1) as usize;
-        if index < state.displayed_snapshots().len() {
+        let index = window_start(state.snapshots.snapshot_cursor, visible)
+            + (row - snapshots.y - 1) as usize;
+        if index < state.snapshots.displayed_snapshots().len() {
             // The first two cells are the mark column and its spacing.
             return Some(if col < snapshots.x.saturating_add(2) {
                 Click::Mark { index }

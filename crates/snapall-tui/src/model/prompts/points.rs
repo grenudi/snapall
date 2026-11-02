@@ -143,7 +143,7 @@ pub(crate) fn on_point_restored(
                 .undo
                 .map(|undo| format!(" Undo it: restore point {undo}"))
                 .unwrap_or_default();
-            state.after_reload = Some(Notice::Info(format!(
+            state.waiting.after_reload = Some(Notice::Info(format!(
                 "Put {} area(s) back to {point}.{undo}",
                 outcome.restored
             )));

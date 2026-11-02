@@ -16,7 +16,12 @@ pub(crate) fn describe_spec(
     let title = match target {
         Target::One(area) => format!(" New snapshot of {area} "),
         Target::All => {
-            let names: Vec<String> = state.entries().iter().map(|e| e.name.to_string()).collect();
+            let names: Vec<String> = state
+                .snapshots
+                .entries()
+                .iter()
+                .map(|e| e.name.to_string())
+                .collect();
             format!(
                 " New snapshot of ALL protected areas ({}) ",
                 names.join(", ")

@@ -34,23 +34,24 @@ pub(crate) fn confirming_delete(
 }
 
 pub(crate) fn open_delete(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.selected_area().map(|c| c.name.clone()) else {
+    let Some(area) = state.snapshots.selected_area().map(|c| c.name.clone()) else {
         return Vec::new();
     };
-    if state.focus != Pane::Snapshots {
+    if state.snapshots.focus != Pane::Snapshots {
         state.notice = Some(Notice::Info(
             "move to the snapshots pane (right arrow) to choose what to delete".into(),
         ));
         return Vec::new();
     }
-    let ids: Vec<SnapshotId> = if state.marked.is_empty() {
+    let ids: Vec<SnapshotId> = if state.snapshots.marked.is_empty() {
         state
+            .snapshots
             .selected_snapshot()
             .map(|s| s.id)
             .into_iter()
             .collect()
     } else {
-        state.marked.iter().copied().collect()
+        state.snapshots.marked.iter().copied().collect()
     };
     if ids.is_empty() {
         state.notice = Some(Notice::Error("no snapshot to delete".into()));
@@ -79,6 +80,6 @@ pub(crate) fn on_deleted(
     } else {
         Notice::Error(format!("{area}: {}", failures.join("; ")))
     });
-    state.marked.clear();
+    state.snapshots.marked.clear();
     vec![Effect::LoadSnapshots(area.clone())]
 }

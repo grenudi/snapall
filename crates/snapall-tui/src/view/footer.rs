@@ -143,8 +143,8 @@ pub fn button_help(button: Button, state: &State) -> &'static str {
 /// What is being done and for how long; after a few seconds, that it can take a while and that waiting
 /// is safe. `None` when nothing that changes anything is in flight.
 pub(crate) fn busy_line(state: &State) -> Option<String> {
-    let doing = state.doing.first()?;
-    let seconds = state.busy_ticks / 10;
+    let doing = state.waiting.doing.first()?;
+    let seconds = state.waiting.busy_ticks / 10;
     let lead = if state.quit {
         "Closing as soon as this has finished: "
     } else {
@@ -159,6 +159,7 @@ pub(crate) fn busy_line(state: &State) -> Option<String> {
 
 pub(crate) fn render_footer(state: &State, frame: &mut Frame, areas: &Areas) {
     let explanation = state
+        .pointer
         .hover
         .and_then(|over| match over {
             Click::Button(button) => Some(button_help(button, state)),

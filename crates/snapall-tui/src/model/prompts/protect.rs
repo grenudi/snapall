@@ -51,7 +51,7 @@ pub(crate) fn on_protected(
             state
                 .offers
                 .retain(|offer| offer.mount_point != mount_point);
-            state.after_reload = Some(Notice::Info(
+            state.waiting.after_reload = Some(Notice::Info(
                 snapall_core::vocabulary::explain::protected_text(mount_point),
             ));
             // the new area is in the list from now on, and takes part in "snapshot everything"

@@ -145,13 +145,13 @@ fn a_new_group_is_named_its_areas_chosen_and_it_is_saved() {
         "back at the list, with the new group in it"
     );
     assert_eq!(
-        session.state.pending, 0,
+        session.state.waiting.pending, 0,
         "nothing is left in flight once it is saved"
     );
     assert!(
-        session.state.doing.is_empty(),
+        session.state.waiting.doing.is_empty(),
         "and nothing is announced as being done: {:?}",
-        session.state.doing
+        session.state.waiting.doing
     );
     assert!(
         system

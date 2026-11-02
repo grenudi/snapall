@@ -265,7 +265,7 @@ fn like_every_action_that_starts_work_it_is_refused_while_snapall_is_busy() {
     let mut state = State::with_context(context(true, two_offers()));
     update(&mut state, Msg::Start);
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
-    assert_eq!(state.pending, 1);
+    assert_eq!(state.waiting.pending, 1);
     update(&mut state, Msg::Key(Key::Char('p')));
     assert!(state.modal.is_none(), "busy: no prompt opens");
 }
