@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.4]
+
+
+### Refactoring
+- Restore-all and undo read as the stories they are ([#116](https://github.com/grenudi/snapall/pull/116)) ([9c6654b])
+
+
+
 ## [0.27.3]
 
 
