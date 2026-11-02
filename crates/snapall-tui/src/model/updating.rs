@@ -82,7 +82,7 @@ pub(super) fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
             result,
         } => changed::protected(state, mount_point, result),
         Msg::ProtectionStopped { area, result } => changed::protection_stopped(state, area, result),
-        Msg::QuotasSet { turn_on, result } => changed::quotas_set(state, turn_on, result),
+        Msg::QuotasSet { to, result } => changed::quotas_set(state, to, result),
         Msg::Restored {
             area,
             id,

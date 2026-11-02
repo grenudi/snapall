@@ -134,7 +134,7 @@ impl<'a> Executor<'a> {
             Effect::RestorePoint { point } => self.restore_point(point),
             Effect::SaveGroups { groups, .. } => self.save_groups(groups),
             Effect::SetLimits { area, options, .. } => self.set_limits(area, options),
-            Effect::SetQuotas { turn_on, paths } => self.set_quotas(turn_on, paths),
+            Effect::SetQuotas { to, paths } => self.set_quotas(to, paths),
             Effect::StopChange { id } => self.stop_change(id),
             Effect::StopProtecting { area } => self.stop_protecting(area),
             Effect::SwitchOnCleanup => self.switch_on_cleanup(),

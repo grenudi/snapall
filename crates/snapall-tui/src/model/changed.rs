@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::tabs::activity::Activity;
+use snapall_core::Counting;
 use snapall_core::{AreaName, Restored, SnapshotId};
 
 pub(super) fn job_controlled(
@@ -31,13 +32,13 @@ pub(super) fn job_controlled(
 
 pub(super) fn quotas_set(
     state: &mut State,
-    turn_on: bool,
+    to: Counting,
     result: Result<(), String>,
 ) -> Vec<Effect> {
     settle(state);
-    state.notice = Some(match (turn_on, result) {
-                (true, Ok(())) => Notice::Info("Counting is on: the disk is building its tally in the background, and figures appear as it finishes".into()),
-                (false, Ok(())) => Notice::Info("Counting is off".into()),
+    state.notice = Some(match (to, result) {
+                (Counting::On, Ok(())) => Notice::Info("Counting is on: the disk is building its tally in the background, and figures appear as it finishes".into()),
+                (Counting::Off, Ok(())) => Notice::Info("Counting is off".into()),
                 (_, Err(why)) => Notice::Error(format!("Could not change how room is counted: {why}")),
             });
     Vec::new()

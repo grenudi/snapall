@@ -7,6 +7,7 @@
 #![cfg(test)]
 
 use crate::model::{Effect, Msg};
+use snapall_core::Counting;
 
 use super::*;
 use snapall_core::{AreaName, Description};
@@ -129,15 +130,15 @@ fn every_change_the_window_makes_records_its_way_back_and_one_that_failed_record
         (
             "room counting",
             Effect::SetQuotas {
-                turn_on: true,
+                to: Counting::On,
                 paths: vec![],
             },
             Msg::QuotasSet {
-                turn_on: true,
+                to: Counting::On,
                 result: Ok(()),
             },
             Msg::QuotasSet {
-                turn_on: true,
+                to: Counting::On,
                 result: failed(),
             },
         ),

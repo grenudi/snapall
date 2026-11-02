@@ -5,6 +5,7 @@
 //! How a change went, and the way back from it, read from what came back.
 
 use crate::model::{Effect, Msg, PointOutcome};
+use snapall_core::Counting;
 
 /// What a person is told about putting a restore point back, from what happened to each area.
 pub(crate) fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
@@ -109,7 +110,7 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
             result.clone().map(|n| format!("{n} snapshots deleted"))
         }
         Msg::QuotasSet {
-            turn_on: true,
+            to: Counting::On,
             result,
         } => result
             .clone()
@@ -170,8 +171,8 @@ pub(crate) fn way_back(effect: &Effect, msg: &Msg) -> Option<snapall_core::Rollb
         (Effect::Protect { .. }, Msg::Protected { result: Ok(name), .. }) => {
             Some(back::after_protecting(&[name.to_string()]))
         }
-        (Effect::SetQuotas { turn_on, .. }, Msg::QuotasSet { result: Ok(()), .. }) => {
-            Some(back::after_room_counting(*turn_on))
+        (Effect::SetQuotas { to, .. }, Msg::QuotasSet { result: Ok(()), .. }) => {
+            Some(back::after_room_counting(*to))
         }
         (Effect::SetLimits { area, before, .. }, Msg::LimitsSet { result: Ok(()), .. }) => {
             Some(back::after_limits(area.as_str(), before))

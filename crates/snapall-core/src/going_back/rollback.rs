@@ -9,6 +9,7 @@
 use crate::keeping::groups::GroupName;
 use crate::keeping::limits::Limits;
 use crate::looking::journal::{Rollback, Undo};
+use crate::ports::machine::Counting;
 use crate::taking::run::Report;
 use crate::vocabulary::consequence::Weight;
 use crate::vocabulary::domain::{AreaName, SnapshotId};
@@ -120,8 +121,8 @@ pub fn after_limits(config: &str, before: &Limits) -> Rollback {
 }
 
 /// After switching room counting: switching it back.
-pub fn after_room_counting(turned_on: bool) -> Rollback {
-    let before = if turned_on { "off" } else { "on" };
+pub fn after_room_counting(turned: Counting) -> Rollback {
+    let before = turned.opposite().word();
     undo(
         format!("Switch counting the room snapshots take back {before}, as it was"),
         vec![command(&["quotas", before])],
@@ -260,11 +261,11 @@ mod tests {
             "keeps the newest 50, never removes one younger than 30 minutes, cleanup on"
         ));
         assert_eq!(
-            the_undo(after_room_counting(true)).commands,
+            the_undo(after_room_counting(Counting::On)).commands,
             [["quotas", "off"]]
         );
         assert_eq!(
-            the_undo(after_room_counting(false)).commands,
+            the_undo(after_room_counting(Counting::Off)).commands,
             [["quotas", "on"]]
         );
     }

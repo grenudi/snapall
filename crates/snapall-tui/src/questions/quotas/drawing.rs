@@ -10,9 +10,10 @@ use crate::view::*;
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use snapall_core::vocabulary::explain::room_counting_text;
+use snapall_core::Counting;
 use snapall_core::QuotaMode;
 
-pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {
+pub(crate) fn quotas_spec(to: Counting, state: &State) -> ModalSpec {
     let areas: Vec<String> = state
         .health
         .data
@@ -25,7 +26,7 @@ pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {
         .as_ref()
         .and_then(|data| data.facts.areas.first().map(|a| a.quotas))
         .unwrap_or(QuotaMode::Unknown);
-    let will = if turn_on {
+    let will = if to.is_on() {
         format!(
             "snapall will switch counting on for the disk{} holding {}. The disk then builds its tally in the background; figures appear as it finishes. You can switch it off again here.",
             if areas.len() == 1 { "" } else { "s" },
@@ -45,7 +46,7 @@ pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {
     ];
     let height = (rows_needed(&lines, 80) + 4).clamp(10, MAX_PROMPT_HEIGHT);
     ModalSpec {
-        title: if turn_on {
+        title: if to.is_on() {
             " Count the room snapshots take? ".into()
         } else {
             " Stop counting the room snapshots take? ".into()
@@ -55,7 +56,11 @@ pub(crate) fn quotas_spec(turn_on: bool, state: &State) -> ModalSpec {
         width: 80,
         height,
         buttons: vec![
-            confirm_button(if turn_on { "Switch on" } else { "Switch off" }),
+            confirm_button(if to.is_on() {
+                "Switch on"
+            } else {
+                "Switch off"
+            }),
             cancel_button(),
         ],
     }

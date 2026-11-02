@@ -59,7 +59,7 @@ pub(crate) fn on_modal_key(state: &mut State, key: Key) -> Vec<Effect> {
             preview,
         } => browsing_points(key, index, points, preview),
         Modal::Job { unit } => controlling_job(state, key, unit),
-        Modal::Quotas { turn_on } => confirming_quotas(state, key, turn_on),
+        Modal::Quotas { to } => confirming_quotas(state, key, to),
         Modal::StopChange { id, what } => confirming_stop(state, key, id, what),
         Modal::Groups(screen) => managing_groups(state, key, screen),
         Modal::Limits(editor) => editing_limits(state, key, editor),

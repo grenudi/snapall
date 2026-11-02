@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-03: room counting is switched on or off, in every layer
+
+**Why.** A second seeded read (eight more modules) found that `after_room_counting(turned_on: bool)` in the core passed the on/off as a bare bool, the same fact I had named only in the command layer the day before, which made a second, duplicate noun. Measuring it: about 35 sites in four layers carried the direction of room counting as a bool (`turn_on` in messages, effects, modals and handlers; `on` in the machine port and the core's rule), and the window wrote `if turn_on { "on" } else { "off" }` five separate times, the word for a direction written out by hand each time.
+
+**What.** One noun in the core, next to `QuotaMode`: `Counting::On` and `Counting::Off`, with `word()` (what is said and typed), `is_on()` (for the one boundary that takes a plain yes or no, the `btrfs` call) and `opposite()` (what switching it back is). It replaced the bool in the core's rule, the machine port, the rollback, the command (its own local copy of the noun is gone), and all of the window (messages, effects, the modal, the handlers, the drawing, the tests). The five hand-written words are `to.word()`.
+
+**What the guards did.** The length guard failed twice, honestly: the machine port file crossed 300 lines with the new noun, and the in-memory machine used by tests (at 297) crossed it with three more lines. Both were read for their seams instead of trimmed. The machine port is now four languages (what the machine reports, the probe trait, room counting, and making a change one at a time); the stand-in is its arrangement and inspection against how it answers. The splitter placed every item and its comment check passed.
+
 ## 2026-11-02: reading eight modules at random, as a stranger
 
 **Why.** With every guard at zero and the plan nearly empty, the proxies were exhausted: they are all things I thought to measure. The cold read the automation cannot replace is reading code with no memory of having written it. I sampled two modules per layer at random with a fixed seed (so the choice could not drift to the ones I like) and read each in full.

@@ -11,7 +11,7 @@ use std::process::Command;
 use crate::asking::{ask_succeeding, parse_df, plain_systemctl, systemctl_says};
 use crate::{groups, journal, lock, quotas, runner, units};
 use snapall_core::{
-    Busy, DiskUsage, Hold, JobAction, QuotaMode, ServiceState, SystemProbe, UnitDetails,
+    Busy, Counting, DiskUsage, Hold, JobAction, QuotaMode, ServiceState, SystemProbe, UnitDetails,
 };
 
 /// The machine snapall is running on.
@@ -145,8 +145,8 @@ impl SystemProbe for LinuxSystem {
         quotas::mode(path)
     }
 
-    fn set_quotas(&self, path: &str, on: bool) -> Result<(), String> {
-        quotas::set(path, on)
+    fn set_quotas(&self, path: &str, to: Counting) -> Result<(), String> {
+        quotas::set(path, to.is_on())
     }
 
     fn hold_changes(&self, doing: &str) -> Result<Hold, Busy> {

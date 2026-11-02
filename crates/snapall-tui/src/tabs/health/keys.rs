@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::model::{Effect, Key, Modal, Notice, State};
+use snapall_core::Counting;
 use snapall_core::Remedy;
 
 /// The keys of this tab. `None` means the key is not one of its own, and the window handles it.
@@ -72,11 +73,11 @@ pub(super) fn act_on_chosen(state: &mut State) -> Vec<Effect> {
             Vec::new()
         }
         RowAction::Fix(Remedy::CountRoom) | RowAction::CountRoom(true) => {
-            state.modal = Some(Modal::Quotas { turn_on: true });
+            state.modal = Some(Modal::Quotas { to: Counting::On });
             Vec::new()
         }
         RowAction::CountRoom(false) => {
-            state.modal = Some(Modal::Quotas { turn_on: false });
+            state.modal = Some(Modal::Quotas { to: Counting::Off });
             Vec::new()
         }
         RowAction::EditLimits(config) => crate::model::open_limits(state, config),

@@ -68,11 +68,8 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
             };
             format!("{did} {}", snapall_core::keeping::jobs::title_of(unit))
         }
-        Effect::SetQuotas { turn_on, .. } => {
-            format!(
-                "Switched room counting {}",
-                if *turn_on { "on" } else { "off" }
-            )
+        Effect::SetQuotas { to, .. } => {
+            format!("Switched room counting {}", to.word())
         }
         // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
         // the change it is about carries the record, and ends as stopped
@@ -155,11 +152,8 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
             };
             format!("{doing} {}", snapall_core::keeping::jobs::title_of(unit))
         }
-        Effect::SetQuotas { turn_on, .. } => {
-            format!(
-                "Switching room counting {}",
-                if *turn_on { "on" } else { "off" }
-            )
+        Effect::SetQuotas { to, .. } => {
+            format!("Switching room counting {}", to.word())
         }
         // reading changes nothing; and asking a running change to stop is a request, not a change of its own:
         // the change it is about carries the record, and ends as stopped
