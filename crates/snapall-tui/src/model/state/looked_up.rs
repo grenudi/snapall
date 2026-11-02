@@ -6,6 +6,8 @@
 
 use crate::model::*;
 
+/// Something that is fetched on demand, so "not asked yet", "here" and "failed" are
+/// distinct states instead of an empty list standing in for all three.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Load<T> {
     NotLoaded,

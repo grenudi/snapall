@@ -7,6 +7,8 @@
 use super::*;
 use crate::model::*;
 
+/// Switching tabs (1, 2, 3) and the keys of the tab that is showing. `None` is a key the window itself
+/// handles, whatever is showing: quit, help, take a snapshot of everything, protect, restore points.
 pub(crate) fn on_tab_key(state: &mut State, key: Key) -> Option<Vec<Effect>> {
     if let Key::Char(c) = key {
         if let Some(tab) = Tab::from_key(c) {

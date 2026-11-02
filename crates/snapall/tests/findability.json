@@ -101,7 +101,9 @@
       "question": "How is a person told what protecting means?",
       "answers": [
         "snapall/setup/flow.rs",
-        "snapall-core/vocabulary/explain.rs"
+        "snapall-core/vocabulary/explain/mod.rs",
+        "snapall-core/vocabulary/explain/basics.rs",
+        "snapall-core/vocabulary/explain/areas.rs"
       ]
     },
     {
@@ -128,8 +130,9 @@
     {
       "question": "How is what snapall did remembered?",
       "answers": [
-        "snapall-core/looking/journal.rs",
-        "snapall-system/journal.rs"
+        "snapall-system/journal.rs",
+        "snapall-core/looking/journal/mod.rs",
+        "snapall-core/looking/journal/events.rs"
       ]
     },
     {
@@ -280,6 +283,30 @@
       "question": "How does undo know that the snapshot it would go back to still exists?",
       "answers": [
         "snapall-core/going_back/still_there.rs"
+      ]
+    },
+    {
+      "question": "How is the mount table read?",
+      "answers": [
+        "snapall-core/protecting/coverage/mounts.rs"
+      ]
+    },
+    {
+      "question": "Where are the steps to install snapper for each kind of system?",
+      "answers": [
+        "snapall-core/protecting/doctor/installing/plan.rs"
+      ]
+    },
+    {
+      "question": "How is the cleanup of old snapshots explained to a person?",
+      "answers": [
+        "snapall-core/vocabulary/explain/cleanup.rs"
+      ]
+    },
+    {
+      "question": "How is each change's history built from what was written?",
+      "answers": [
+        "snapall-core/looking/journal/history.rs"
       ]
     }
   ]

@@ -10,6 +10,7 @@ use crate::ports::snapshots::{BackendError, SnapshotBackend};
 use crate::taking::plan::{plan, Plan};
 use crate::vocabulary::domain::{AreaName, Description, Point, SnapshotId};
 
+/// What happened for one area.
 #[derive(Debug)]
 pub struct Outcome {
     pub area: AreaName,

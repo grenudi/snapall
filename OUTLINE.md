@@ -35,7 +35,9 @@ What each part of snapall says it is for, read from the first line of each modul
 - `lib.rs`: What snapall does, with no terminal, no file and no tool in sight: protecting parts of the disk, taking snapshots, looking at them, going back to them and keeping them.
   - `looking/find.rs`: Finding what a person points at: one snapshot of an area, by its number.
   - `looking/history.rs`: The history of one file: which area holds it, and what it was in each snapshot.
-  - `looking/journal.rs`: What snapall did, remembered: every change writes an event when it starts and another when it ends, whichever snapall made it (the window or a command), and folding them gives the record a person reads.
+    - `looking/journal/events.rs`: What was written when a change began, went on and ended: the events, and how a change can be undone.
+    - `looking/journal/history.rs`: What the events say, read back: each change as one entry, and whether it is still running.
+    - `looking/journal/mod.rs`: What snapall did, remembered: every change writes an event when it starts and another when it ends, whichever snapall made it (the window or a command), and folding them gives the record a person reads.
   - `looking/mod.rs`: Looking at what there is: an area's snapshots, what a path points at, a file's history, and what snapall did.
   - `looking/snapshots.rs`: The snapshots of an area: listing them, and deleting one.
   - `ports/course.rs`: A change that takes several steps (a snapshot of every area, a restore point put back area by area) follows a [`Course`]: before each step it asks whether to begin it.
@@ -49,9 +51,14 @@ What each part of snapall says it is for, read from the first line of each modul
     - `ports/testing/mod.rs`: Test support: an in-memory adapter and the contract every backend must satisfy.
     - `ports/testing/state.rs`: What the in-memory stand-in remembers: each area, its snapshots and files.
     - `ports/testing/system.rs`: A machine whose answers a test sets: its disk, its jobs, its clock, who else is making a change.
-  - `protecting/coverage.rs`: The parts of a disk that snapshots can protect, and which of them are.
+    - `protecting/coverage/areas.rs`: Which parts of a disk are protected and which are not.
+    - `protecting/coverage/mod.rs`: The parts of a disk that snapshots can protect, and which of them are.
+    - `protecting/coverage/mounts.rs`: Reading the mount table: each place a disk is attached.
+    - `protecting/coverage/worth.rs`: What a place on the disk is worth protecting, and what to call it.
     - `protecting/doctor/diagnosing.rs`: Diagnosing the setup: what each check finds and what to do about it.
-    - `protecting/doctor/installing.rs`: Understanding the operating system, and how to install the snapshot tool on it.
+      - `protecting/doctor/installing/mod.rs`: Understanding the operating system, and how to install the snapshot tool on it.
+      - `protecting/doctor/installing/operating_system.rs`: Understanding the operating system: what it is called, which family it belongs to, and whether it can be changed.
+      - `protecting/doctor/installing/plan.rs`: How to install the snapshot tool: the steps for each kind of system, and how they are described.
     - `protecting/doctor/mod.rs`: `snapall doctor`, as pure functions: from facts about the machine to findings and an install plan.
   - `protecting/mod.rs`: Protecting parts of the disk and stopping: which parts can be protected, what the doctor finds, how an area is made and unmade.
   - `protecting/protect.rs`: Protecting a part of the disk: making it an area.
@@ -66,7 +73,10 @@ What each part of snapall says it is for, read from the first line of each modul
     - `vocabulary/domain/mod.rs`: Validated domain types.
     - `vocabulary/domain/names.rs`: Names and numbers that are parsed once, at the boundary: an area, a description, a snapshot number, a restore point.
     - `vocabulary/domain/snapshots.rs`: What is known about a snapshot.
-  - `vocabulary/explain.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
+    - `vocabulary/explain/areas.rs`: What a person is told about an area: what could be protected, what protecting does, and why it failed.
+    - `vocabulary/explain/basics.rs`: The explanations and cautions that stand on their own: what a snapshot is, what an area is, and what cannot be undone.
+    - `vocabulary/explain/cleanup.rs`: What a person is told about cleanup and about how room is counted.
+    - `vocabulary/explain/mod.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
   - `vocabulary/mod.rs`: The words snapall thinks and speaks in: its names and numbers, what an act weighs, dates, and what it tells a person.
 
 ## snapall-observe

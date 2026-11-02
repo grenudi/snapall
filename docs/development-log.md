@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-30: the huddled files, and a defect in my own tool that had been deleting documentation
+
+**Why.** Fourteen files sat between 250 and 299 lines, just under my size limit: the sign that the limit was partly gamed. Rather than guess, I read them. Ten are one language near its natural size. Four showed the sign: two said "and" in their own purpose sentence, one held the events and the folding of events into history, one was three kinds of explanation.
+
+**The defect.** Splitting them with `dev/split-module.py` exposed that the tool's loop after the imports skipped every line starting with `//`, and a doc comment starts with `//`. So **the doc of the first item after the imports was silently deleted in every split**. Scanning git history for every file split into a folder found 18 splits and 14 doc lines lost (`Facts`, `Load`, `Request`, `ParseError`, `AreaFacts`, `PACKAGE`, `on_tab_key`, `outcome_of`, `KEPT`, `MATCH_WINDOW_SECONDS` and others), the oldest of them from the first splits of this arc. The doc of the other items was safe.
+
+**What.** The tool now starts the first item at its doc comment and attributes, and refuses to write anything unless every comment of the original is in what it is about to write; it also handles a module with no imports. The lost docs were restored from their original text in git, each above the item that had lost it (one sentence still said "config" and was corrected). The four splits were then made with the fixed tool and checked: no comment lost, 139 lines accounted for. `journal`, `installing`, `coverage` and `explain` are folders; their public paths are unchanged.
+
+**What I would do differently.** I checked that comments survived after the first report of a dropped comment, but only for plain comments. A fix for the symptom I could see was not a check for the property I cared about. The property (nothing is lost) is now enforced by the tool before it writes, and the history scan is how I found the rest.
+
 ## 2026-10-29: the core understands its own way back
 
 **Why.** The finding from the previous change: `check_the_way_back_still_exists` parsed the recorded command words back (`["restore", area, id, ..]`) to find out what a rollback would go back to, while each producer in the core assembled those words by hand. Two sides of one language with nothing tying them together: a change to either would silently break undo, and nobody would find out until someone needed it.

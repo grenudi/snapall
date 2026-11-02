@@ -6,6 +6,7 @@
 
 use crate::model::{Effect, Msg, PointOutcome};
 
+/// What a person is told about putting a restore point back, from what happened to each area.
 pub(crate) fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
     use snapall_core::MemberResult;
     let count = |wanted: fn(&MemberResult) -> bool| {

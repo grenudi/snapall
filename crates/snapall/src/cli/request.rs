@@ -10,6 +10,7 @@ use snapall_core::{AreaName, Description, Point, SnapshotId};
 use std::fmt;
 use std::path::PathBuf;
 
+/// What the user asked for, fully parsed.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     Help,
