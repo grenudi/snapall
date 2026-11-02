@@ -13,46 +13,68 @@ pub(crate) fn on_areas_loaded(
     result: Result<Vec<AreaName>, String>,
 ) -> Vec<Effect> {
     match result {
-        Err(error) => {
-            state.snapshots.areas = Load::Failed(error.clone());
-            state.snapshots.area_cursor = 0;
-            state.waiting.after_reload = None;
-            state.notice = Some(Notice::Error(error));
-            Vec::new()
-        }
-        Ok(mut names) => {
-            let previous = state.snapshots.selected_area().map(|c| c.name.clone());
-            names.sort();
-            names.dedup();
-            state.snapshots.area_cursor = previous
-                .and_then(|p| names.iter().position(|n| *n == p))
-                .unwrap_or(0);
-            state.snapshots.areas = Load::Loaded(
-                names
-                    .into_iter()
-                    .map(|name| AreaEntry {
-                        name,
-                        snapshots: Load::NotLoaded,
-                    })
-                    .collect(),
-            );
-            state.snapshots.snapshot_cursor = 0;
-            state.snapshots.marked.clear();
-            if matches!(state.notice, Some(Notice::Info(_))) {
-                state.notice = None;
-            }
-            if let Some(confirmation) = state.waiting.after_reload.take() {
-                state.notice = Some(confirmation);
-            }
-            if state.snapshots.entries().is_empty() {
-                state.notice = Some(Notice::Error(if state.offers.is_empty() {
-                    "There are no protected areas yet, and snapall found nothing it can protect here: it works with disks formatted as Btrfs.".into()
-                } else {
-                    "There are no protected areas yet, so there is nothing to show. Press p to protect one.".into()
-                }));
-            }
+        Err(error) => areas_could_not_be_read(state, error),
+        Ok(names) => {
+            show_the_areas(state, names);
+            settle_the_notice(state);
             load_selected_if_needed(state)
         }
+    }
+}
+
+fn areas_could_not_be_read(state: &mut State, error: String) -> Vec<Effect> {
+    state.snapshots.areas = Load::Failed(error.clone());
+    state.snapshots.area_cursor = 0;
+    state.waiting.after_reload = None;
+    state.notice = Some(Notice::Error(error));
+    Vec::new()
+}
+
+/// The areas, in order, with the cursor still on the one it was on if that one is still there. Nothing of theirs is
+/// loaded yet, and nothing is marked: the old marks belonged to the old lists.
+fn show_the_areas(state: &mut State, mut names: Vec<AreaName>) {
+    let previous = state.snapshots.selected_area().map(|c| c.name.clone());
+    names.sort();
+    names.dedup();
+    state.snapshots.area_cursor = previous
+        .and_then(|p| names.iter().position(|n| *n == p))
+        .unwrap_or(0);
+    state.snapshots.areas = Load::Loaded(
+        names
+            .into_iter()
+            .map(|name| AreaEntry {
+                name,
+                snapshots: Load::NotLoaded,
+            })
+            .collect(),
+    );
+    state.snapshots.snapshot_cursor = 0;
+    state.snapshots.marked.clear();
+}
+
+/// Which notice shows now that the areas have arrived: an old piece of information goes, what a change asked to say
+/// once the lists were read again shows, and with nothing protected at all the way forward is said.
+fn settle_the_notice(state: &mut State) {
+    if matches!(state.notice, Some(Notice::Info(_))) {
+        state.notice = None;
+    }
+    if let Some(confirmation) = state.waiting.after_reload.take() {
+        state.notice = Some(confirmation);
+    }
+    if state.snapshots.entries().is_empty() {
+        state.notice = Some(Notice::Error(nothing_is_protected_yet(state)));
+    }
+}
+
+fn nothing_is_protected_yet(state: &State) -> String {
+    if state.offers.is_empty() {
+        format!(
+            "There are no protected areas yet, and snapall found nothing it can protect here: it works with {}.",
+            snapall_core::vocabulary::explain::WORKS_WITH
+        )
+    } else {
+        "There are no protected areas yet, so there is nothing to show. Press p to protect one."
+            .to_owned()
     }
 }
 

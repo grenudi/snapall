@@ -334,6 +334,12 @@
       "answers": [
         "snapall-core/vocabulary/explain/numbers.rs"
       ]
+    },
+    {
+      "question": "Where is it said which kind of disk snapall works with?",
+      "answers": [
+        "snapall-core/vocabulary/explain/basics.rs"
+      ]
     }
   ]
 }

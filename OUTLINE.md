@@ -80,7 +80,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `vocabulary/domain/names.rs`: Names and numbers that are parsed once, at the boundary: an area, a description, a snapshot number, a restore point.
     - `vocabulary/domain/snapshots.rs`: What is known about a snapshot.
     - `vocabulary/explain/areas.rs`: What a person is told about an area: what could be protected, what protecting does, and why it failed.
-    - `vocabulary/explain/basics.rs`: The explanations and cautions that stand on their own: what a snapshot is, what an area is, and what cannot be undone.
+    - `vocabulary/explain/basics.rs`: The explanations and cautions that stand on their own: what a snapshot is, what an area is, which kind of disk snapall works with, and what cannot be undone.
     - `vocabulary/explain/cleanup.rs`: What a person is told about cleanup and about how room is counted.
     - `vocabulary/explain/mod.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
     - `vocabulary/explain/numbers.rs`: Saying how many: a number with its noun, in the right plural.
