@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.31.0]
+
+
+### Bug Fixes
+- The text file busy race was real, and the tests no longer overlap ([#140](https://github.com/grenudi/snapall/pull/140)) ([1c2763d])
+
+
+### Refactoring
+- The retired word, seventy-nine times, and a rename that went wrong twice ([#138](https://github.com/grenudi/snapall/pull/138)) ([6854ee1])
+
+
+
 ## [0.30.2]
 
 
