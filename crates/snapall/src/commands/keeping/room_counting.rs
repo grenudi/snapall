@@ -138,12 +138,9 @@ fn make_the_switch(
         .areas
         .iter()
         .try_for_each(|area| system.set_quotas(&area.location, to.is_on()));
-    if result.is_ok() {
-        change.rollback(snapall_core::going_back::rollback::after_room_counting(
-            to.is_on(),
-        ));
-    }
-    change.end_with(&result);
+    change.end_with_way_back(&result, || {
+        snapall_core::going_back::rollback::after_room_counting(to.is_on())
+    });
     result?;
     ctx.show.result(
         format!(

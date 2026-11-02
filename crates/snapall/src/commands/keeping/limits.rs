@@ -43,13 +43,9 @@ pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agree
         None,
     )?;
     let result = set_the_options(ctx, &area_name, &options);
-    if result.is_ok() {
-        change.rollback(snapall_core::going_back::rollback::after_limits(
-            &area_name.to_string(),
-            &before,
-        ));
-    }
-    change.end_with(&result);
+    change.end_with_way_back(&result, || {
+        snapall_core::going_back::rollback::after_limits(&area_name.to_string(), &before)
+    });
     result?;
     say_the_limits(ctx, area, &area_name, &after, &preview, Wording::Changed)
 }

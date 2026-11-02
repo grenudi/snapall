@@ -150,7 +150,7 @@ fn enter_puts_every_area_back_leaves_the_system_and_names_the_way_back() {
     );
     let note = format!("{:?}", session.state.notice);
     assert!(
-        note.contains("Put 2 area(s) back to 20261025T110000Z")
+        note.contains("Put 2 areas back to 20261025T110000Z")
             && note.contains("Undo it: restore point"),
         "{note}"
     );

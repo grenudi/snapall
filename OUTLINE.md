@@ -169,6 +169,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `questions/protect/asking.rs`: Protecting a part of the disk that has no snapshots yet: one offer at a time.
     - `questions/protect/drawing.rs`: Drawing the offer to protect a part of the disk.
     - `questions/protect/mod.rs`: The offer to protect a part of the disk that has no snapshots yet: the question, and how it is drawn.
+  - `questions/putting_back.rs`: The words the two ways of putting something back share: how many areas, and that each is saved first.
     - `questions/quotas/asking.rs`: Asking before the disk starts, or stops, counting the room snapshots take.
     - `questions/quotas/drawing.rs`: Drawing the question before the disk starts, or stops, counting the room snapshots take: what it gives, what it costs, what will happen, and that it can be undone.
     - `questions/quotas/mod.rs`: The question about counting the room snapshots take: its answer, and how it is drawn.

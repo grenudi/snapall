@@ -79,6 +79,19 @@ impl Change {
         );
     }
 
+    /// How it went, and the way back if it went through. A change that failed has nothing to go back from, so none is
+    /// written down; the way back is worked out only then, while the earlier state is still known.
+    pub(super) fn end_with_way_back<T, E: ToString>(
+        self,
+        result: &Result<T, E>,
+        way_back: impl FnOnce() -> snapall_core::Rollback,
+    ) {
+        if result.is_ok() {
+            self.rollback(way_back());
+        }
+        self.end_with(result);
+    }
+
     pub(super) fn end(mut self, outcome: Result<String, String>) {
         self.finish(outcome.into());
     }

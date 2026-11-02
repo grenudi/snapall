@@ -132,7 +132,7 @@ fn a_puts_every_area_that_differs_back_leaves_the_system_alone_and_names_the_way
     );
     let note = format!("{:?}", session.state.notice);
     assert!(
-        note.contains("Put 2 area(s) back to 20261025T100000Z")
+        note.contains("Put 2 areas back to 20261025T100000Z")
             && note.contains("Undo it: restore point"),
         "{note}"
     );

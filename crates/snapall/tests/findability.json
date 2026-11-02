@@ -315,6 +315,12 @@
         "snapall-tui/model/updating.rs",
         "snapall-tui/model/mod.rs"
       ]
+    },
+    {
+      "question": "Where is it said that a restore saves the current state first?",
+      "answers": [
+        "snapall-tui/questions/putting_back.rs"
+      ]
     }
   ]
 }

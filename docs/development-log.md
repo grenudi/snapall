@@ -2,6 +2,18 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-02: reading eight modules at random, as a stranger
+
+**Why.** With every guard at zero and the plan nearly empty, the proxies were exhausted: they are all things I thought to measure. The cold read the automation cannot replace is reading code with no memory of having written it. I sampled two modules per layer at random with a fixed seed (so the choice could not drift to the ones I like) and read each in full.
+
+**What I found, and what was fine.** Five of the eight had something real; three were fine as they were (`doctor/installing/plan.rs`, `snapper/files.rs`, `system/machine.rs`: the comments carry *why*, and the tools' words are where they belong).
+- `ports/testing/contract.rs`: the assertion messages named functions that no longer exist (`list_configs`, `config_subvolume`, "a missing config"), because the tool-word guard checks identifiers and not strings; and it was one 100-line function whose five phases were announced by comments. It is six named phases with current words, every assertion kept, and it passes against real snapper.
+- `commands/keeping/groups.rs`: the ritual *do it; if it worked, write down the way back; end the change with the result* was copied by hand in five commands, so a command that forgot the `if` would record a rollback for something that failed. It is one method, `Change::end_with_way_back`, with the way back worked out only when the change went through.
+- `model/keys/screen.rs`: quit and help were written inline here and again on the file screen (now two shared verbs), and "the keys that start work" was an anonymous `matches!` inside a condition (now `starts_work`).
+- `questions/restore/asking.rs`: two sentences were copied word for word into the restore-points screen, and five places wrote "area(s)" where the core says "1 area" or "2 areas". The shared words are one small module, and two tests that asserted the old plural were updated.
+
+**What the lesson is.** Each of these is a thing a guard could have been written for, after the fact. The cold read is how you find the next guard, not a substitute for the ones you have. `dev/sample-modules.py` makes it a routine.
+
 ## 2026-10-31: the booleans that were nouns, and two that I had added
 
 **Why.** Re-running the trend after the outline audit showed bare boolean parameters in the commands had gone from 8 to 10: two of my own refactors had added them (`json: bool` passed into two of the `setup` helpers when the context already knows). Looking at all ten sorted them into: two mine, one real duplication (`Context.json` kept a second copy of a fact `Show` already holds), three legitimate (the flag-to-noun conversion in `Mode::from_dry_run`, and the invocation facts `hints` and `no_dbus`), and five unnamed nouns.
