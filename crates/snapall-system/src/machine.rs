@@ -130,7 +130,7 @@ impl SystemProbe for LinuxSystem {
 
     fn control_job(&self, unit: &str, action: JobAction) -> Result<(), String> {
         let output = Command::new("systemctl")
-            .args(action.systemctl())
+            .args(action.control_words())
             .arg(unit)
             .output()
             .map_err(|e| format!("systemctl could not be run: {e}"))?;

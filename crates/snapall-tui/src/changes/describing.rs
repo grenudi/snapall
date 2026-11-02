@@ -66,7 +66,7 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
                 Stop => "Stopped",
                 Restart => "Restarted",
             };
-            format!("{did} {}", crate::model::job_title(unit))
+            format!("{did} {}", snapall_core::keeping::jobs::title_of(unit))
         }
         Effect::SetQuotas { turn_on, .. } => {
             format!(
@@ -153,7 +153,7 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
                 Stop => "Stopping",
                 Restart => "Restarting",
             };
-            format!("{doing} {}", crate::model::job_title(unit))
+            format!("{doing} {}", snapall_core::keeping::jobs::title_of(unit))
         }
         Effect::SetQuotas { turn_on, .. } => {
             format!(

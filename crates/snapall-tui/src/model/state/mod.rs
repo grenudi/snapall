@@ -12,7 +12,7 @@ mod waiting;
 mod window;
 
 pub use looked_up::{AreaEntry, FileTarget, FileView, Load, PointOffer, PointOutcome};
-pub use pointer::Pointer;
+pub use pointer::{Pointer, PRESSED_TICKS};
 pub use questions::{
     Confirm, GroupsScreen, LimitsEditor, Modal, RestoreStage, StopProtecting, Target,
 };

@@ -121,9 +121,9 @@ pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
 }
 
 pub fn snapshots_json(all: &[(AreaName, Vec<SnapshotInfo>)]) -> Value {
-    let configs: serde_json::Map<String, Value> = all
+    let by_area: serde_json::Map<String, Value> = all
         .iter()
-        .map(|(config, list)| {
+        .map(|(area_name, list)| {
             let list: Vec<Value> = list
                 .iter()
                 .map(|s| {
@@ -145,8 +145,8 @@ pub fn snapshots_json(all: &[(AreaName, Vec<SnapshotInfo>)]) -> Value {
                     value
                 })
                 .collect();
-            (config.to_string(), Value::Array(list))
+            (area_name.to_string(), Value::Array(list))
         })
         .collect();
-    json!({ "configs": configs })
+    json!({ "configs": by_area })
 }

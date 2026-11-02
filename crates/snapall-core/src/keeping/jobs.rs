@@ -84,9 +84,9 @@ impl JobAction {
         JobAction::Restart,
     ];
 
-    /// The `systemctl` words that do it. The commands shown to a person and the ones run are both made
-    /// from these, so they cannot differ.
-    pub fn systemctl(self) -> &'static [&'static str] {
+    /// The words that do it, for the service manager. The commands shown to a person and the ones run are both
+    /// made from these, so they cannot differ.
+    pub fn control_words(self) -> &'static [&'static str] {
         match self {
             JobAction::EnableNow => &["enable", "--now"],
             JobAction::DisableNow => &["disable", "--now"],
@@ -148,7 +148,7 @@ impl Job {
     pub fn command_for(&self, action: JobAction) -> String {
         format!(
             "sudo systemctl {} {}",
-            action.systemctl().join(" "),
+            action.control_words().join(" "),
             self.unit
         )
     }
@@ -257,6 +257,13 @@ pub fn schedule_words(settings: &[(String, String)]) -> Vec<String> {
         .collect()
 }
 
+/// What a unit is called to a person: its job's title, or the unit's own name if it is not one.
+pub fn title_of(unit: &str) -> String {
+    ALL.iter()
+        .find(|job| job.unit == unit || job.worker_unit() == unit)
+        .map_or_else(|| unit.to_owned(), |job| job.title.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,7 +332,7 @@ mod tests {
             for action in JobAction::ALL {
                 let wanted = format!(
                     "sudo systemctl {} {}",
-                    action.systemctl().join(" "),
+                    action.control_words().join(" "),
                     job.unit
                 );
                 assert!(job.commands().iter().any(|c| c.line == wanted), "{wanted}");
@@ -361,5 +368,16 @@ mod tests {
         assert!(ALL
             .iter()
             .all(|job| !job.title.is_empty() && !job.purpose.is_empty()));
+    }
+
+    #[test]
+    fn a_unit_is_called_by_its_jobs_title_and_one_that_is_no_job_by_its_own_name() {
+        assert_eq!(title_of(CLEANUP.unit), CLEANUP.title);
+        assert_eq!(
+            title_of(&CLEANUP.worker_unit()),
+            CLEANUP.title,
+            "the service a timer starts is the same job"
+        );
+        assert_eq!(title_of("cron.service"), "cron.service");
     }
 }

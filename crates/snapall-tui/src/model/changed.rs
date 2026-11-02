@@ -18,10 +18,13 @@ pub(super) fn job_controlled(
     state.notice = Some(match result {
         Ok(()) => Notice::Info(format!(
             "{}: {} done",
-            job_title(&unit),
+            snapall_core::keeping::jobs::title_of(&unit),
             action.label().to_lowercase()
         )),
-        Err(why) => Notice::Error(format!("Could not do that to {}: {why}", job_title(&unit))),
+        Err(why) => Notice::Error(format!(
+            "Could not do that to {}: {why}",
+            snapall_core::keeping::jobs::title_of(&unit)
+        )),
     });
     Vec::new()
 }

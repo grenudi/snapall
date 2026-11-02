@@ -24,13 +24,14 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | 2 | Three tests write a script and run it at once (`binary.rs` and the snapper adapter's tests): the same `text file busy` race the background runner's test had. Give them the same retry when one fails | open |
 | 3 | The openSUSE container job's package install (`zypper`, in the step called `A user's tools`, which is ours and not the runner's) flaked three times. It now retries three times; judge by the next releases, and if it still flakes try the image from `registry.opensuse.org` instead of Docker Hub | open |
 | 4 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
-| 5 | The `setup` command handler is over the branching budget (`crates/snapall/tests/ratchets.json`); its conversation is the module, the handler only wires it | open |
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 
 Decided as well: the files between 250 and 299 lines were read one by one instead of split to satisfy a number. Four held two languages and were split (the journal's events and its history; the operating system and the install plan; the mount table, what is covered and what a place is worth; the explanations, the cleanup words and what a person is told about an area). The ten that remain are one language each near its natural size (the two backends, the Health rows, the window's messages, the Snapshots tab's drawing, the setup conversation, the job catalogue, the machine port, the boot question, the contract's commands) and stay.
 
 Decided too: handlers speak as they go, and do not return one value at the end. Several say something and then read an answer (a question, a list of what a rollback will run), so speaking and listening interleave, and a story that returned its words would have to give that up. What is kept instead is that there is one place that prints (`output.rs`, and the asker for what it asks): a test allows no print anywhere else, and the debt of fifteen was paid.
+
+The guards' own debt list holds one entry: `contract/inputs.rs` (514 lines), the table of every flag and argument of the command line. It is one language and reads as a table, so it stays unless a seam by purpose shows (the shared flags against each command's own).
 
 ## Upstream: argenv
 | # | Item | Status |

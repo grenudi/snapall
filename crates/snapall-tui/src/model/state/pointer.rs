@@ -14,3 +14,6 @@ pub struct Pointer {
     /// What was clicked a moment ago, and for how many more ticks it is shown pressed.
     pub pressed: Option<(Click, u8)>,
 }
+
+/// How long a click leaves its button looking pressed: a few tenths of a second.
+pub const PRESSED_TICKS: u8 = 3;

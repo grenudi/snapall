@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-30: the last guard debts are paid
+
+**Why.** After the huddled files, the guards' data file still held four kinds of debt besides the contract table: the window model's front at 140 lines, the `setup` handler over the branching budget, and seven names carrying a tool's word (`config`, `snapper`, `systemctl`) above the adapters. Reading each rather than shaving it:
+
+**What.** `model/mod.rs` held three things that were not a front: the update loop and its table of messages (now `model/updating.rs`), a constant about how long a click looks pressed (now with the pointer it describes), and a pure naming rule about jobs (`title_of`, now in the core's job catalogue with a test, used by two window files). The `setup` handler is its steps with four named helpers (the options from the flags, beginning only when it is not a rehearsal, holding the conversation to a terminal or silently, and ending with the way back), like `restore_all` and `undo`. The seven names say what the value is: `area_name`, `snapshot_tool`, `listed_areas`, `by_area` and `locations`; the core's `JobAction::systemctl()` is `control_words()`.
+
+**A milestone.** The guards' debt file now holds one entry, the contract's table of flags, which is one language and stays. Entry files, handler length, branching and plumbing, prints outside the presenter, tool words in names and the cold read's gaps are all empty. That does not mean the code is as it should be: the guards measure what I thought to measure.
+
 ## 2026-10-30: the openSUSE flake was ours, and I had mislabelled it
 
 **Why.** The openSUSE container job had failed three times at the step named `A user's tools`. I had written down, in `ship.py`, in `AGENTS.md` and in the plan, that this was "the runner failing in its own setup, before any of our code ran", and had the script re-run it. Checking what the step actually is: it is in our workflows, and it runs `${{ matrix.setup }}`, a package install (`zypper --non-interactive install sudo gawk curl` on openSUSE) inside the container, over the network. A failure there is a mirror or network hiccup in our own step, not the runner.
