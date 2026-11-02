@@ -41,9 +41,7 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return on_modal_key(state, key);
     }
     // Moving around and reading stay available while snapper works; starting more work does not.
-    if state.waiting.pending > 0
-        && matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R'))
-    {
+    if state.waiting.pending > 0 && starts_work(key) {
         state.notice = Some(Notice::Error(
             "busy: wait for the current operation to finish".into(),
         ));
@@ -56,14 +54,8 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         return effects;
     }
     match key {
-        Key::CtrlC | Key::Char('q') => {
-            state.quit = true;
-            Vec::new()
-        }
-        Key::Char('?') => {
-            state.modal = Some(Modal::Help { page: 0 });
-            Vec::new()
-        }
+        Key::CtrlC | Key::Char('q') => quit(state),
+        Key::Char('?') => open_help(state),
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
             vec![Effect::LoadAreas, Effect::LoadHealth, Effect::LoadHistory]
@@ -113,4 +105,22 @@ pub(crate) fn on_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         _ => Vec::new(),
     }
+}
+
+/// Leave the window.
+pub(crate) fn quit(state: &mut State) -> Vec<Effect> {
+    state.quit = true;
+    Vec::new()
+}
+
+/// Show the help, from its first page.
+pub(crate) fn open_help(state: &mut State) -> Vec<Effect> {
+    state.modal = Some(Modal::Help { page: 0 });
+    Vec::new()
+}
+
+/// Whether a key asks for something to be done, which waits while something is already being done: moving around and
+/// reading do not, and stay available.
+fn starts_work(key: Key) -> bool {
+    matches!(key, Key::Char('r' | 'c' | 'a' | 'd' | 'u' | 'p' | 'R'))
 }

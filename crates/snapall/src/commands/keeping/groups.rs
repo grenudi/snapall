@@ -12,7 +12,7 @@ use std::error::Error;
 
 /// The areas of a group, out of the ones protected now; a group that names one that is not is refused.
 pub(crate) fn areas_of_group(ctx: &Context, wanted: &str) -> Result<Vec<AreaName>, Box<dyn Error>> {
-    use snapall_core::{SystemProbe, Wanted};
+    use snapall_core::Wanted;
     let wanted = Wanted::parse(wanted)?;
     let groups = snapall_system::LinuxSystem::new().groups()?;
     let protected = ctx.backend.list_areas()?;
@@ -69,13 +69,9 @@ fn make_a_group(
         .set(name.clone(), list)
         .map_err(|e| e.to_string())
         .and_then(|()| system.save_groups(&made));
-    if saved.is_ok() {
-        change.rollback(snapall_core::going_back::rollback::after_groups(
-            &name,
-            before.as_deref(),
-        ));
-    }
-    change.end_with(&saved);
+    change.end_with_way_back(&saved, || {
+        snapall_core::going_back::rollback::after_groups(&name, before.as_deref())
+    });
     saved?;
     ctx.show.result(
         format!(
@@ -109,13 +105,9 @@ fn take_a_group_away(
         None,
     )?;
     let saved = system.save_groups(&made);
-    if saved.is_ok() {
-        change.rollback(snapall_core::going_back::rollback::after_groups(
-            &name,
-            before.as_deref(),
-        ));
-    }
-    change.end_with(&saved);
+    change.end_with_way_back(&saved, || {
+        snapall_core::going_back::rollback::after_groups(&name, before.as_deref())
+    });
     saved?;
     ctx.show.result(
         format!("The group {name} is gone. The areas and their snapshots are untouched.\n"),

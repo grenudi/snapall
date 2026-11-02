@@ -156,10 +156,7 @@ pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, agreed: Agreed) ->
     };
     let change = Change::begin(approved, &deleting_one(area), &deleted_one(area), None)?;
     let deleted = delete_snapshot(ctx.backend, area, id);
-    if deleted.is_ok() {
-        change.rollback(after_deleting());
-    }
-    change.end_with(&deleted);
+    change.end_with_way_back(&deleted, after_deleting);
     deleted?;
     ctx.show.result(
         crate::render::deleted(area, id),
@@ -168,7 +165,8 @@ pub fn delete(ctx: &Context, area: &AreaName, id: SnapshotId, agreed: Agreed) ->
 }
 ```
 
-The wording moved beneath the story, the lookup became a verb in the core, the plumbing became `end_with`, and the
+The wording moved beneath the story, the lookup became a verb in the core, the plumbing became `end_with`, and then `end_with_way_back`, which also owns the rule that the way back is written
+down only when the change went through, and the
 comment became two tests with those names. What was left was a three-line `if let Some(stop) = ...` repeated in eight
 handlers, which was a missing noun: a story *stopped* by an answer that is not a yes. It is now `Stopped`, which
 lives where it is produced, so each story says `ask::before(..)?;` and `main` ends it with its own exit code. The

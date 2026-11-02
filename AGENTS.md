@@ -36,6 +36,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 3. **Branch**: `git checkout -b refactor/what-it-is`. **Change** with the tools below. Update the plan and the log in the same change; every path a document names must exist (a test checks; the ADRs and the development log are dated records and are exempt).
 4. **Gate**: `dev/gate.sh`, about a minute. The heavy checks run in CI on every pull request; reproduce a CI failure with `dev/gate.sh --full`.
 5. **Ship**: `GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md`, in the foreground. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, merges the release pull request, and verifies the release. A process started in one tool call does not outlive it, so it stops itself after about four minutes with exit code 75 ("still waiting"): run the same command again until it exits 0. It keeps no state, so that is safe at any point.
+   Every few iterations, also read some code as a stranger: `dev/sample-modules.py` picks modules at random (a seed makes a read reproducible). It finds what no guard measures; the first read found stale words in messages, a rule copied by hand in five places, and a sentence written twice.
 6. **Log** what was done, why, and the evidence, in `docs/development-log.md`.
 
 ## The tools, all in `dev/`
@@ -45,6 +46,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 | `ship.py` | push, pull request, CI, merge, release, verify; resumable; re-runs a job the runner itself failed to start |
 | `split-module.py` | split one module into a folder of modules by purpose, by a JSON spec, moving whole items |
 | `golden-output.sh` | `record` or `check` what 20 commands print, so a refactor is shown to change nothing |
+| `sample-modules.py` | pick modules at random, by layer, to read as a stranger |
 | `structure-metrics.py` | the proxies for "every layer is the top of the layers beneath it", at any tag |
 
 On the architecture test: `UPDATE_OUTLINE=1` regenerates `OUTLINE.md`; `UPDATE_RATCHETS=1` lowers or removes paid debts and never raises one; `FINDABILITY_REPORT=1 cargo test -p snapall --test findability -- --nocapture` prints the ranking for each question. The findability test is the cold read: the outline alone must lead a stranger's question to the right module (`crates/snapall/tests/findability.json`). To add a question, add it there.

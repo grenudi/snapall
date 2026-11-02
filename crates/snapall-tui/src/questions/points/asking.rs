@@ -4,6 +4,7 @@
 
 //! Restore points: the list of them, the preview of the chosen one, and putting one back.
 
+use super::super::putting_back::{areas_in_words, EACH_AREA_IS_SAVED_FIRST};
 use crate::model::*;
 use snapall_core::Act;
 
@@ -90,11 +91,11 @@ pub(crate) fn browsing_points(
                 {
                     let lines = vec![
                         format!(
-                            "Put {} area(s) back to restore point {}.",
-                            shown.areas_to_change(),
+                            "Put {} back to restore point {}.",
+                            areas_in_words(shown.areas_to_change()),
                             point.point
                         ),
-                        "Each area's current state is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
+                        EACH_AREA_IS_SAVED_FIRST.to_owned(),
                     ];
                     ask_first(
                         Act::RestorePoint,
@@ -131,8 +132,8 @@ pub(crate) fn on_point_restored(
         }
         Ok(outcome) if !outcome.failed.is_empty() => {
             state.notice = Some(Notice::Error(format!(
-                "Put {} area(s) back to {point}, but {} failed: {}",
-                outcome.restored,
+                "Put {} back to {point}, but {} failed: {}",
+                areas_in_words(outcome.restored),
                 outcome.failed.len(),
                 outcome.failed.join("; ")
             )));
@@ -144,8 +145,8 @@ pub(crate) fn on_point_restored(
                 .map(|undo| format!(" Undo it: restore point {undo}"))
                 .unwrap_or_default();
             state.waiting.after_reload = Some(Notice::Info(format!(
-                "Put {} area(s) back to {point}.{undo}",
-                outcome.restored
+                "Put {} back to {point}.{undo}",
+                areas_in_words(outcome.restored)
             )));
             vec![Effect::LoadAreas]
         }

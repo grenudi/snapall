@@ -4,6 +4,9 @@
 
 //! Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
 
+use super::super::putting_back::{
+    areas_in_words, EACH_AREA_IS_SAVED_FIRST, THE_AREA_IS_SAVED_FIRST,
+};
 use crate::model::*;
 use snapall_core::Act;
 use snapall_core::{AreaName, Preview, Restored, SnapshotId};
@@ -29,8 +32,12 @@ pub(crate) fn confirming_restore(
             if offer.areas_to_change() > 0 {
                 let (areas, point) = (offer.areas_to_change(), offer.point.clone());
                 let lines = vec![
-                    format!("Put {areas} area(s) back to restore point {}.", point.point),
-                    "Each area's current state is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
+                    format!(
+                        "Put {} back to restore point {}.",
+                        areas_in_words(areas),
+                        point.point
+                    ),
+                    EACH_AREA_IS_SAVED_FIRST.to_owned(),
                 ];
                 return ask_first(
                     Act::RestorePoint,
@@ -47,10 +54,7 @@ pub(crate) fn confirming_restore(
                 Some(path) => format!("Put {path} back to how snapshot #{id} had it."),
                 None => format!("Put {area} back to how snapshot #{id} had it."),
             };
-            let lines = vec![
-                what,
-                "How it is now is saved first, so this can be rolled back: the Activity tab shows how.".to_owned(),
-            ];
+            let lines = vec![what, THE_AREA_IS_SAVED_FIRST.to_owned()];
             ask_first(
                 Act::Restore,
                 None,

@@ -15,6 +15,7 @@ pub(crate) mod job;
 pub(crate) mod limits;
 pub(crate) mod points;
 pub(crate) mod protect;
+pub(crate) mod putting_back;
 pub(crate) mod quotas;
 pub(crate) mod restore;
 pub(crate) mod stop;

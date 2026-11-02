@@ -13,14 +13,8 @@ pub(crate) fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
         return Vec::new();
     };
     match key {
-        Key::CtrlC | Key::Char('q') => {
-            state.quit = true;
-            Vec::new()
-        }
-        Key::Char('?') => {
-            state.modal = Some(Modal::Help { page: 0 });
-            Vec::new()
-        }
+        Key::CtrlC | Key::Char('q') => quit(state),
+        Key::Char('?') => open_help(state),
         Key::Up | Key::Char('k') => {
             view.cursor = clamp_step(view.cursor, -1, count);
             Vec::new()

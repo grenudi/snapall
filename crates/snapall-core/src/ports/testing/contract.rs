@@ -10,13 +10,29 @@ use crate::vocabulary::domain::{AreaName, Description, FileState, SnapshotId, Sn
 /// The behaviour every `SnapshotBackend` must have, whatever sits behind it.
 /// `existing` must name an area the backend can snapshot.
 pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
-    let areas = backend.list_areas().expect("list_configs succeeds");
+    let missing = AreaName::parse("snapall-no-such-area").expect("valid name");
+    the_area_is_listed(backend, existing);
+    let (first, second) = creating(backend, existing, &missing);
+    listing_snapshots(backend, existing, &missing, second);
+    let location = reading_what_changed(backend, existing, &missing, second);
+    reading_a_files_history(backend, existing, &missing, &location);
+    deleting(backend, existing, first, second);
+}
+
+fn the_area_is_listed(backend: &dyn SnapshotBackend, existing: &AreaName) {
+    let areas = backend.list_areas().expect("list_areas succeeds");
     assert!(
         areas.contains(existing),
-        "list_configs should include `{existing}`, got {areas:?}"
+        "list_areas should include `{existing}`, got {areas:?}"
     );
+}
 
-    // Creating
+/// Two snapshots with increasing numbers; a missing area is an error. Returns the two numbers.
+fn creating(
+    backend: &dyn SnapshotBackend,
+    existing: &AreaName,
+    missing: &AreaName,
+) -> (SnapshotId, SnapshotId) {
     let description = Description::parse("snapall contract").expect("valid description");
     let first = backend
         .create_snapshot(existing, &description)
@@ -25,14 +41,20 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
         .create_snapshot(existing, &description)
         .expect("second snapshot succeeds");
     assert!(second > first, "ids must increase: {first} then {second}");
-
-    let missing = AreaName::parse("snapall-no-such-config").expect("valid name");
     assert!(
-        backend.create_snapshot(&missing, &description).is_err(),
-        "a snapshot of a missing config must be an error"
+        backend.create_snapshot(missing, &description).is_err(),
+        "a snapshot of a missing area must be an error"
     );
+    (first, second)
+}
 
-    // Listing: oldest first, and what we created is there, as we described it.
+/// Oldest first, and what was created is there, as it was described.
+fn listing_snapshots(
+    backend: &dyn SnapshotBackend,
+    existing: &AreaName,
+    missing: &AreaName,
+    second: SnapshotId,
+) {
     let listed = backend
         .list_snapshots(existing)
         .expect("list_snapshots succeeds");
@@ -47,15 +69,22 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
     assert_eq!(created.description, "snapall contract");
     assert_eq!(created.kind, SnapshotKind::Single);
     assert!(
-        backend.list_snapshots(&missing).is_err(),
-        "listing a missing config must be an error"
+        backend.list_snapshots(missing).is_err(),
+        "listing a missing area must be an error"
     );
+}
 
-    // Restoring is checked read-only here (mutation is backend-specific): where the area lives,
-    // what changed since a snapshot, and that a snapshot that does not exist is an error.
+/// Restoring is checked read-only here (mutation is backend-specific): where the area lives, what changed since a
+/// snapshot, and that a snapshot that does not exist is an error. Returns where the area lives.
+fn reading_what_changed(
+    backend: &dyn SnapshotBackend,
+    existing: &AreaName,
+    missing: &AreaName,
+    second: SnapshotId,
+) -> String {
     let location = backend
         .area_location(existing)
-        .expect("config_subvolume succeeds");
+        .expect("area_location succeeds");
     assert!(
         location.starts_with('/'),
         "a mount point is absolute: {location}"
@@ -72,14 +101,23 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
         backend.undo_changes(existing, nowhere, None).is_err(),
         "undoing to a snapshot that does not exist must be an error"
     );
-    assert!(backend.area_location(&missing).is_err());
+    assert!(backend.area_location(missing).is_err());
     assert!(
         backend
             .covers(existing, &location)
             .expect("covers succeeds"),
-        "a config covers its own subvolume"
+        "an area covers its own location"
     );
-    // A file's history is read-only too: for a path that was never there, every snapshot says so.
+    location
+}
+
+/// A file's history is read-only too: for a path that was never there, every snapshot says so.
+fn reading_a_files_history(
+    backend: &dyn SnapshotBackend,
+    existing: &AreaName,
+    missing: &AreaName,
+    location: &str,
+) {
     let never = format!(
         "{}/snapall-contract-never-existed",
         location.trim_end_matches('/')
@@ -91,9 +129,16 @@ pub fn backend_contract(backend: &dyn SnapshotBackend, existing: &AreaName) {
         history.iter().all(|v| v.state == FileState::AbsentThen),
         "a file that never existed is absent in every snapshot"
     );
-    assert!(backend.file_versions(&missing, &never).is_err());
+    assert!(backend.file_versions(missing, &never).is_err());
+}
 
-    // Deleting: gone afterwards, and deleting again is an error, not a silent success.
+/// Gone afterwards, the others survive, and deleting again is an error, not a silent success.
+fn deleting(
+    backend: &dyn SnapshotBackend,
+    existing: &AreaName,
+    first: SnapshotId,
+    second: SnapshotId,
+) {
     backend
         .delete_snapshot(existing, first)
         .expect("deleting an existing snapshot succeeds");
