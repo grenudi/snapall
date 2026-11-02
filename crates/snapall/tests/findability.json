@@ -81,7 +81,8 @@
     {
       "question": "What does a key do in the window?",
       "answers": [
-        "snapall-tui/model/keys/screen.rs"
+        "snapall-tui/model/keys/screen.rs",
+        "snapall-tui/model/keys/mod.rs"
       ]
     },
     {
@@ -236,6 +237,18 @@
       "answers": [
         "snapall-tui/questions/groups/asking.rs",
         "snapall-tui/questions/groups/mod.rs"
+      ]
+    },
+    {
+      "question": "Where is the history of one file drawn?",
+      "answers": [
+        "snapall-tui/file_history/drawing.rs"
+      ]
+    },
+    {
+      "question": "What do the keys do on the file history screen?",
+      "answers": [
+        "snapall-tui/file_history/keys.rs"
       ]
     }
   ]

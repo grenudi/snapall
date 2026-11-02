@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The file history screen: one file's versions, newest first, and putting one back.
+//! What the keys do on the file history screen: move along the versions, reload them, and put one back.
 
 use crate::model::*;
-
-// ---- the file history screen --------------------------------------------------------------
+use snapall_core::FileState;
 
 pub(crate) fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
     let count = state.displayed_versions().len();
@@ -84,26 +83,4 @@ pub(crate) fn open_file_restore(state: &mut State) -> Vec<Effect> {
         id,
         path: Some(path),
     }]
-}
-
-pub(crate) fn on_file_versions_loaded(
-    state: &mut State,
-    area: &AreaName,
-    path: &str,
-    result: Result<Vec<FileVersion>, String>,
-) -> Vec<Effect> {
-    if let Some(view) = state.file.as_mut() {
-        if &view.target.area == area && view.target.path == path {
-            view.versions = match result {
-                Ok(list) => Load::Loaded(list),
-                Err(error) => Load::Failed(error),
-            };
-            let len = match &view.versions {
-                Load::Loaded(list) => list.len(),
-                _ => 0,
-            };
-            view.cursor = view.cursor.min(len.saturating_sub(1));
-        }
-    }
-    Vec::new()
 }

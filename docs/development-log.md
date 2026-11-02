@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: the file history screen is one place
+
+**Why.** The last window item in the plan: the screen shown when the window is opened on one file had its decisions in `model/file.rs` and its drawing in `view/file.rs`, while every tab and every question was already a folder.
+
+**What.** `file_history/` with `keys.rs` (what the keys do), `arriving.rs` (what happens when the versions arrive) and `drawing.rs`, and a front that says it is read in one place. The split followed the three real boundaries in the old file. It compiled first time and all 185 window tests pass unchanged. With it, every part of the window is a folder named for what it is: the tabs, the questions, and this screen; and the role-based purity rule covers all of it.
+
+**What the cold read said.** The new screen answers its two questions (first and second). It also moved the long-standing key gap from fifth to sixth, because its own sentence competes for "what does a key do in the window". Looking at the ranking showed the better answer was the front of the key handling, which I had not listed and whose sentence did not say *window*; it now does and is accepted, and the findability debt list is empty for the first time: 38 questions, all within the first three, 24 first.
+
+**Evidence.** The window's tests and the fast gate; CI runs the terminal journeys, which open the file screen.
+
 ## 2026-10-29: each question is one place
 
 **Why.** The window's thirteen questions each had the same two halves in two parallel trees: `model/prompts/<q>.rs` (what opens it, what its keys do, what comes of the answer) and `view/prompts/<q>.rs` (how it is drawn). The tabs had already solved this with a folder each.

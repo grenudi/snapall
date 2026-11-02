@@ -13,11 +13,10 @@ use crate::tab::Tab;
 use crate::tabs::activity::ActivityTab;
 use crate::tabs::health::{HealthData, HealthTab};
 use snapall_core::{
-    AreaName, Description, FileState, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
+    AreaName, Description, FileVersion, Preview, Restored, SnapshotId, SnapshotInfo,
 };
 
 mod changed;
-mod file;
 mod following;
 mod input;
 mod keys;
@@ -26,9 +25,9 @@ mod looked;
 mod messages;
 mod state;
 
+pub(crate) use crate::file_history::{on_file_key, on_file_versions_loaded};
 pub(crate) use crate::questions::asking::*;
 pub(crate) use crate::tabs::snapshots::{on_areas_loaded, on_created, on_snapshots_loaded};
-pub(crate) use file::*;
 pub(crate) use following::*;
 pub use input::*;
 pub(crate) use keys::*;
