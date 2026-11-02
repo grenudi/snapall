@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::model::*;
+use snapall_core::Counting;
 
 /// Where a restore prompt is: looking at what would change, ready, or unable to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,7 +124,7 @@ pub enum Modal {
     /// One background job: what it is, how to check on it, and the keys that control it.
     Job { unit: String },
     /// Asking before switching the counting of room on or off for the disk.
-    Quotas { turn_on: bool },
+    Quotas { to: Counting },
     /// The groups of areas: see them, make one, change one, take one away.
     Groups(GroupsScreen),
     /// How many snapshots an area keeps, and when its oldest are removed.

@@ -51,7 +51,8 @@ pub use looking::journal::{
 pub use looking::snapshots::{all_snapshots, delete_snapshot, snapshots_of, SnapshotError};
 pub use ports::course::{Course, Unattended};
 pub use ports::machine::{
-    Busy, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, Switching, SystemProbe, UnitDetails,
+    Busy, Counting, DiskUsage, Hold, NoSystem, QuotaMode, ServiceState, Switching, SystemProbe,
+    UnitDetails,
 };
 pub use ports::observing::{Event, Observer, Silent};
 pub use ports::snapshots::{BackendError, SnapshotBackend};

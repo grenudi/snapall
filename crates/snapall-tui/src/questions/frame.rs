@@ -96,7 +96,7 @@ pub(crate) fn modal_spec(modal: &Modal, state: &State) -> ModalSpec {
             preview,
         } => points_spec(*index, points.as_deref(), preview.as_ref()),
         Modal::Job { unit } => job_spec(unit, state),
-        Modal::Quotas { turn_on } => quotas_spec(*turn_on, state),
+        Modal::Quotas { to } => quotas_spec(*to, state),
         Modal::StopChange { what, .. } => stop_spec(what),
         Modal::Groups(screen) => groups_spec(screen, state),
         Modal::Limits(editor) => limits_spec(editor, state),

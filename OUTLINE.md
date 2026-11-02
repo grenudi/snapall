@@ -41,7 +41,11 @@ What each part of snapall says it is for, read from the first line of each modul
   - `looking/mod.rs`: Looking at what there is: an area's snapshots, what a path points at, a file's history, and what snapall did.
   - `looking/snapshots.rs`: The snapshots of an area: listing them, and deleting one.
   - `ports/course.rs`: A change that takes several steps (a snapshot of every area, a restore point put back area by area) follows a [`Course`]: before each step it asks whether to begin it.
-  - `ports/machine.rs`: What the machine can tell snapall besides what snapper says: how full a disk is, whether a background job is switched on and running, what time it is there.
+    - `ports/machine/changing.rs`: Making a change one at a time: what is held while it is made, and what it is told when another is already being made.
+    - `ports/machine/facts.rs`: What the machine can report: how full a disk is, how a service stands, and what a unit says about itself.
+    - `ports/machine/mod.rs`: What the machine can tell snapall besides what snapper says: how full a disk is, whether a background job is switched on and running, what time it is there.
+    - `ports/machine/probe.rs`: What snapall asks of the machine, as one trait, and the stand-in that answers nothing.
+    - `ports/machine/room_counting.rs`: How the disk counts the room snapshots take, which way it can be switched, and whether that can be done.
   - `ports/mod.rs`: What the core needs from outside, in its own words: a backend for snapshots, the machine, an observer, a way to be asked to stop, and stand-ins for them.
   - `ports/observing.rs`: What snapall reports about what it did: the events, and whoever receives them.
   - `ports/snapshots.rs`: What snapall needs from whatever takes snapshots, said in snapall's own words.
@@ -50,7 +54,9 @@ What each part of snapall says it is for, read from the first line of each modul
     - `ports/testing/contract.rs`: The contract every backend must satisfy, as one function to run against it.
     - `ports/testing/mod.rs`: Test support: an in-memory adapter and the contract every backend must satisfy.
     - `ports/testing/state.rs`: What the in-memory stand-in remembers: each area, its snapshots and files.
-    - `ports/testing/system.rs`: A machine whose answers a test sets: its disk, its jobs, its clock, who else is making a change.
+      - `ports/testing/system/answering.rs`: How the stand-in answers what snapall asks of the machine.
+      - `ports/testing/system/mod.rs`: A machine whose answers a test sets: its disk, its jobs, its clock, who else is making a change.
+      - `ports/testing/system/standing_in.rs`: A stand-in for the machine: how a test arranges what it says, and how it looks at what it was told.
     - `protecting/coverage/areas.rs`: Which parts of a disk are protected and which are not.
     - `protecting/coverage/mod.rs`: The parts of a disk that snapshots can protect, and which of them are.
     - `protecting/coverage/mounts.rs`: Reading the mount table: each place a disk is attached.

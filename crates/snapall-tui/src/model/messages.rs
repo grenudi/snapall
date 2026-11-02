@@ -5,6 +5,7 @@
 //! What the window asks for (effects) and what comes back (messages).
 
 use crate::model::*;
+use snapall_core::Counting;
 
 /// What the shell should do. Each effect is answered by exactly one [`Msg`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,7 +81,7 @@ pub enum Effect {
     },
     /// Switch counting the room snapshots take on or off, for the disks holding these paths.
     SetQuotas {
-        turn_on: bool,
+        to: Counting,
         paths: Vec<String>,
     },
     /// Switch automatic cleanup on.
@@ -151,7 +152,7 @@ pub enum Msg {
     },
     /// Counting room was switched, or why it could not be.
     QuotasSet {
-        turn_on: bool,
+        to: Counting,
         result: Result<(), String>,
     },
     /// A change was not made because another snapall is making one; the reason says who.

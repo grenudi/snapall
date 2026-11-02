@@ -8,29 +8,8 @@ use super::*;
 use crate::ask;
 use crate::output::Outcome;
 use snapall_core::vocabulary::explain::room_counting_text;
-use snapall_core::{gather, Act, Facts, QuotaMode, Switching, SystemProbe};
+use snapall_core::{gather, Act, Counting, Facts, QuotaMode, Switching, SystemProbe};
 use std::error::Error;
-
-/// Which way the disk's room counting is being switched.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Counting {
-    On,
-    Off,
-}
-
-impl Counting {
-    /// For the places that take a plain yes or no: the core's rule and the machine's call.
-    fn is_on(self) -> bool {
-        self == Counting::On
-    }
-
-    fn word(self) -> &'static str {
-        match self {
-            Counting::On => "on",
-            Counting::Off => "off",
-        }
-    }
-}
 
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes how the
 /// whole disk works, so it explains what it gives and costs and asks first.
@@ -52,7 +31,7 @@ fn switch(
     to: Counting,
     agreed: Agreed,
 ) -> Outcome {
-    match mode.switching(to.is_on()) {
+    match mode.switching(to) {
         Switching::CannotBeDoneInPlace => Err("the disk counts room the simple way, and snapall cannot switch it to the full kind in place".into()),
         Switching::AlreadyThatWay => say_it_is_already_so(ctx, mode),
         Switching::Possible => {
@@ -137,9 +116,9 @@ fn make_the_switch(
     let result: Result<(), String> = facts
         .areas
         .iter()
-        .try_for_each(|area| system.set_quotas(&area.location, to.is_on()));
+        .try_for_each(|area| system.set_quotas(&area.location, to));
     change.end_with_way_back(&result, || {
-        snapall_core::going_back::rollback::after_room_counting(to.is_on())
+        snapall_core::going_back::rollback::after_room_counting(to)
     });
     result?;
     ctx.show.result(

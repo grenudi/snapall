@@ -11,6 +11,7 @@ use snapall_core::keeping::jobs;
 use snapall_core::protecting::{coverage, unprotect};
 use snapall_core::vocabulary::explain;
 use snapall_core::AreaName;
+use snapall_core::Counting;
 use snapall_core::Description;
 use snapall_core::SnapshotId;
 use snapall_core::{
@@ -61,12 +62,12 @@ impl Executor<'_> {
         }
     }
 
-    pub(super) fn set_quotas(&self, turn_on: bool, paths: Vec<String>) -> Msg {
+    pub(super) fn set_quotas(&self, to: Counting, paths: Vec<String>) -> Msg {
         // the disks may be one or several; asking again of one that is already so is harmless
         let result = paths
             .iter()
-            .try_for_each(|path| self.system.set_quotas(path, turn_on));
-        Msg::QuotasSet { turn_on, result }
+            .try_for_each(|path| self.system.set_quotas(path, to));
+        Msg::QuotasSet { to, result }
     }
 
     pub(super) fn switch_on_cleanup(&self) -> Msg {

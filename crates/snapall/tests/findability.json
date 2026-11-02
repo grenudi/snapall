@@ -321,6 +321,13 @@
       "answers": [
         "snapall-tui/questions/putting_back.rs"
       ]
+    },
+    {
+      "question": "Can the disk's room counting be switched from the simple kind to the full kind?",
+      "answers": [
+        "snapall-core/ports/machine/room_counting.rs",
+        "snapall/commands/keeping/room_counting.rs"
+      ]
     }
   ]
 }

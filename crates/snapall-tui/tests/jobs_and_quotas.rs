@@ -10,6 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use snapall_core::keeping::jobs::{self, JobAction};
 use snapall_core::ports::testing::{FakeSystem, InMemoryBackend};
+use snapall_core::Counting;
 use snapall_core::{plan_snapshots, run_plan, Description, QuotaMode, SystemProbe};
 use snapall_tui::model::{Key, Modal, Msg};
 use snapall_tui::tabs::health::RowAction;
@@ -227,7 +228,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
     session.press(Key::Enter);
     assert!(matches!(
         session.state.modal,
-        Some(Modal::Quotas { turn_on: true })
+        Some(Modal::Quotas { to: Counting::On })
     ));
     let text = flat(&screen(&session));
     for must in [

@@ -6,9 +6,10 @@
 
 use crate::model::*;
 use snapall_core::Act;
+use snapall_core::Counting;
 
 /// Enter or y does it, Esc leaves. Switching it needs administrator rights, and says so rather than failing.
-pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> Reaction {
+pub(crate) fn confirming_quotas(state: &mut State, key: Key, to: Counting) -> Reaction {
     match key {
         Key::Esc | Key::CtrlC | Key::Char('q' | 'n' | 'N') => Reaction::closes(),
         Key::Enter | Key::Char('y' | 'Y') if !state.context.administrator => {
@@ -34,7 +35,7 @@ pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> R
             let lines = vec![
                 format!(
                     "Switch counting the room snapshots take {} for the whole disk.",
-                    if turn_on { "on" } else { "off" }
+                    to.word()
                 ),
                 "It can be switched back the same way.".to_owned(),
             ];
@@ -42,9 +43,9 @@ pub(crate) fn confirming_quotas(state: &mut State, key: Key, turn_on: bool) -> R
                 Act::RoomCounting,
                 None,
                 lines,
-                vec![Effect::SetQuotas { turn_on, paths }],
+                vec![Effect::SetQuotas { to, paths }],
             )
         }
-        _ => Reaction::stays(Modal::Quotas { turn_on }),
+        _ => Reaction::stays(Modal::Quotas { to }),
     }
 }
