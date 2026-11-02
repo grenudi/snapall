@@ -13,13 +13,28 @@ use std::process::{Command, Output, Stdio};
 
 use serde_json::Value;
 
+/// A process is started, or a script is written, by one test at a time. A test that has just written a script and one
+/// that is forking at that moment can leave the script open in the child for an instant, and running it then fails
+/// with "text file busy". Tests run in parallel threads, so this is a rare race, and a slow machine finds it.
+static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn exclusively<R>(work: impl FnOnce() -> R) -> R {
+    let _only = ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    work()
+}
+
+/// Run a prepared command to its end, with no other test starting a process or writing a script meanwhile.
+fn run(command: &mut Command) -> Output {
+    exclusively(|| command.output().expect("run snapall"))
+}
+
 fn snapall(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_snapall"))
+    run(Command::new(env!("CARGO_BIN_EXE_snapall"))
         .args(args)
         // A clean environment: nothing from the developer's shell may change the result.
-        .env_clear()
-        .output()
-        .expect("run snapall")
+        .env_clear())
 }
 
 fn stdout(output: &Output) -> String {
@@ -72,12 +87,10 @@ fn a_wrong_invocation_exits_2_with_the_reason_on_stderr_and_nothing_on_stdout() 
 fn a_missing_snapper_is_a_runtime_failure_not_a_usage_error() {
     // An explicitly empty PATH, so the result does not depend on whether this machine has
     // snapper installed (an unset PATH would fall back to the system defaults).
-    let output = Command::new(env!("CARGO_BIN_EXE_snapall"))
+    let output = run(Command::new(env!("CARGO_BIN_EXE_snapall"))
         .arg("list")
         .env_clear()
-        .env("PATH", "/nonexistent")
-        .output()
-        .expect("run snapall");
+        .env("PATH", "/nonexistent"));
     assert_eq!(output.status.code(), Some(1));
     assert!(
         stderr(&output).contains("could not run `snapper`"),
@@ -142,15 +155,17 @@ fn the_committed_contract_is_the_one_the_code_produces() {
 fn a_reader_that_goes_away_is_not_an_error() {
     // `snapall contract | head -0`: the reader closes before the output is written. That must
     // end quietly, not with Rust's "failed printing to stdout: Broken pipe" panic.
-    let mut child = Command::new(env!("CARGO_BIN_EXE_snapall"))
-        .arg("contract")
-        .env_clear()
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn snapall");
-    drop(child.stdout.take());
-    let output = child.wait_with_output().expect("wait");
+    let output = exclusively(|| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_snapall"))
+            .arg("contract")
+            .env_clear()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn snapall");
+        drop(child.stdout.take());
+        child.wait_with_output().expect("wait")
+    });
     assert!(
         !stderr(&output).contains("panicked"),
         "snapall panicked on a closed pipe:\n{}",
@@ -162,12 +177,10 @@ fn a_reader_that_goes_away_is_not_an_error() {
 /// A snapall run whose `snapper` cannot be found (an empty PATH): deterministic, and it still
 /// reaches the backend, so there is an operation to observe.
 fn snapall_without_snapper(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_snapall"))
+    run(Command::new(env!("CARGO_BIN_EXE_snapall"))
         .args(args)
         .env_clear()
-        .env("PATH", "/nonexistent")
-        .output()
-        .expect("run snapall")
+        .env("PATH", "/nonexistent"))
 }
 
 #[test]
@@ -287,12 +300,10 @@ fn a_flag_that_belongs_to_one_command_is_not_offered_for_another_in_the_real_scr
 #[test]
 fn the_man_page_is_reproducible_and_dated_by_source_date_epoch() {
     let render = || {
-        Command::new(env!("CARGO_BIN_EXE_snapall"))
+        run(Command::new(env!("CARGO_BIN_EXE_snapall"))
             .arg("man")
             .env_clear()
-            .env("SOURCE_DATE_EPOCH", "1761187392")
-            .output()
-            .expect("run snapall man")
+            .env("SOURCE_DATE_EPOCH", "1761187392"))
     };
     let (first, second) = (render(), render());
     assert!(first.status.success(), "{}", stderr(&first));
@@ -346,19 +357,19 @@ case "$*" in
 esac
 "#;
     let path = dir.join("snapper");
-    std::fs::write(&path, script).expect("write script");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    exclusively(|| {
+        std::fs::write(&path, script).expect("write script");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    });
     dir
 }
 
 fn with_fake(dir: &std::path::Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_snapall"))
+    run(Command::new(env!("CARGO_BIN_EXE_snapall"))
         .args(args)
         .env_clear()
         .env("PATH", format!("{}:/usr/bin:/bin", dir.display()))
-        .stdin(std::process::Stdio::null())
-        .output()
-        .expect("run snapall")
+        .stdin(std::process::Stdio::null()))
 }
 
 #[test]
@@ -552,20 +563,20 @@ esac
             root = root.display()
         );
         let path = bin.join("snapper");
-        std::fs::write(&path, script).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        exclusively(|| {
+            std::fs::write(&path, script).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        });
         Volume { root, bin }
     }
 
     fn run(&self, cwd: &std::path::Path, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_snapall"))
+        run(Command::new(env!("CARGO_BIN_EXE_snapall"))
             .args(args)
             .current_dir(cwd)
             .env_clear()
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin.display()))
-            .stdin(std::process::Stdio::null())
-            .output()
-            .expect("run snapall")
+            .stdin(std::process::Stdio::null()))
     }
 }
 

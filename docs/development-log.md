@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-05: main's CI failed on the race I had measured away
+
+**What happened.** After the retired-word change merged with all 24 PR checks green, main's own CI failed in one job at the Test step: `a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_error` panicked with `snapall: could not run snapper: Text file busy (os error 26)`. That is the `ETXTBSY` race: a test writes a fake `snapper` script, and a fork in another test thread holds a copy of the open file for an instant, so running the script fails. I had removed this from the plan a few days earlier because 740 local runs showed nothing. The runner is slower and has fewer cores, and found it at the first chance. The conclusion was wrong, and the plan said the opposite of the truth.
+
+**What.** Every process the binary's tests start, and every script they write, now goes through one lock (`exclusively` and `run`), so a fork can never overlap a script being written. Stress with sixteen test threads and four CPU burners: the original failed 120 of 120 runs, not from `text file busy` but because the restore tests take the machine's real one-change-at-a-time lock and refuse each other; the fixed version failed none. So the same change removes both. I could not reproduce `text file busy` itself locally, and I do not claim to have; the overlap that causes it is excluded by construction.
+
+**What I would do differently.** An absence in many runs on one machine is not evidence about a race on another. The rule is in `AGENTS.md`: remove the overlap by construction instead of arguing from a count.
+
 ## 2026-11-05: the retired word, seventy-nine times, and a rename that went wrong twice
 
 **Why.** A fourth seeded read found that `AreaFacts` still had a public field called `config`, which my tool-word guard cannot see because it checks names declared with `let`, `fn` and `struct`, not fields or parameters. Counting the word as an identifier token, outside strings and comments, in the four crates that speak for the program: **79 uses** (a public field in two structs, about twenty parameters, closure variables, a screen rectangle).
