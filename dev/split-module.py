@@ -31,14 +31,20 @@ if tm:
 else:
     code=whole.split("\n"); tests=""
 doc=[l for l in code if l.startswith("//!")]
-first=next(i for i,l in enumerate(code) if l.startswith("use "))
+first=next((i for i,l in enumerate(code) if l.startswith("use ")), None)
+if first is None:
+    # a module with no imports: its body starts after the licence header, the blank lines and the `//!` purpose
+    first=0
+    while first<len(code) and (not code[first].strip() or code[first].startswith("//!") or (code[first].startswith("//") and not code[first].startswith("///") and first<4)):
+        first+=1
+    if first>=len(code): raise SystemExit("nothing to split: no items after the header")
 chunks=[]; i=first
 while i<len(code):
     if code[i].startswith("use "):
         j=i
         while not code[j].rstrip().endswith(";"): j+=1
         chunks.append("\n".join(code[i:j+1])); i=j+1
-    elif not code[i].strip() or code[i].startswith("//"): i+=1
+    elif not code[i].strip() or code[i].startswith("//!"): i+=1
     else: break
 imports="\n".join(chunks); body_start=i
 def items():
@@ -63,6 +69,11 @@ for s,e,h in items():
     n=name_of(h)
     if n not in where: raise SystemExit("unplaced: "+n+" :: "+h[:70])
     buckets[where[n]].append(("\n".join(code[s:e+1]),n,h.startswith("pub "),h.startswith("pub(crate) ")))
+# nothing is written until every comment of the original is known to be in what will be written: a tool that rewrites code
+# must never drop prose, and it once did (the doc of the first item after the imports)
+produced="\n".join(chunk for bl in buckets.values() for chunk,_,_,_ in bl)
+lost=[l.strip() for l in code[body_start:] if l.strip().startswith("//") and l.strip() not in produced]
+if lost: raise SystemExit("would lose comments, so nothing was written:\n  "+"\n  ".join(lost))
 os.makedirs(f"{D}{NAME}",exist_ok=True)
 def widen(b): return re.sub(r"^(fn|struct|enum|const|static|type|trait) ",lambda m:"pub(super) "+m.group(1)+" ",b,flags=re.M)
 pub_by={}; crate_by={}; priv_by={}

@@ -8,6 +8,7 @@ use snapall_core::{JournalEntry, JournalStatus, Source};
 use std::collections::HashSet;
 use std::time::Duration;
 
+/// How many entries are kept: enough to scroll back through a long history, not enough to grow.
 pub(super) const KEPT: usize = 200;
 
 /// One thing snapall did.

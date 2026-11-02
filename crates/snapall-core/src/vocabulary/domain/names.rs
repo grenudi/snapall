@@ -8,6 +8,7 @@ use std::fmt;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
+/// Why a piece of input could not become a domain value.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error("the area's name is empty")]

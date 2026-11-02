@@ -28,6 +28,8 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 
+Decided as well: the files between 250 and 299 lines were read one by one instead of split to satisfy a number. Four held two languages and were split (the journal's events and its history; the operating system and the install plan; the mount table, what is covered and what a place is worth; the explanations, the cleanup words and what a person is told about an area). The ten that remain are one language each near its natural size (the two backends, the Health rows, the window's messages, the Snapshots tab's drawing, the setup conversation, the job catalogue, the machine port, the boot question, the contract's commands) and stay.
+
 Decided too: handlers speak as they go, and do not return one value at the end. Several say something and then read an answer (a question, a list of what a rollback will run), so speaking and listening interleave, and a story that returned its words would have to give that up. What is kept instead is that there is one place that prints (`output.rs`, and the asker for what it asks): a test allows no print anywhere else, and the debt of fifteen was paid.
 
 ## Upstream: argenv

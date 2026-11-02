@@ -9,6 +9,7 @@ use crate::vocabulary::calendar::{compact_utc, seconds_from_snapshot_date};
 use crate::vocabulary::domain::{AreaName, Point, SnapshotId, SnapshotInfo, SnapshotKind};
 use std::collections::BTreeMap;
 
+/// How far apart, in seconds, snapshots of different areas can be and still count as one action's.
 pub(super) const MATCH_WINDOW_SECONDS: i64 = 120;
 
 /// A name for the restore point of an action that starts at `seconds`: the time, and if a point of

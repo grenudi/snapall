@@ -11,6 +11,7 @@ use crate::protecting::coverage::describe;
 use crate::vocabulary::domain::{AreaName, Retention, SnapshotInfo};
 use crate::vocabulary::explain::Limit;
 
+/// What is known about one protected area.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AreaFacts {
     pub config: AreaName,

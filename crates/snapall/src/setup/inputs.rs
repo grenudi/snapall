@@ -7,6 +7,7 @@
 use snapall_core::vocabulary::explain::Cleanup;
 use std::error::Error;
 
+/// What the flow needs to know about this machine.
 pub struct Facts {
     /// The text of `/proc/self/mountinfo`.
     pub mountinfo: String,
