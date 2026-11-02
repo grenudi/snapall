@@ -139,6 +139,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/state/told.rs`: What the window is told about the machine, once, at the start: its tips, what could be protected, whether it may change things.
     - `model/state/waiting.rs`: What the window is waiting for: work in flight, the changes it handed to the background, and for how long.
     - `model/state/window.rs`: The window at one moment: its lists, cursor, open question, message, and what it is waiting for.
+  - `model/updating.rs`: What the window does with each message that arrives: it decides, changes its state, and says what it wants done in return; one table says which step answers which message.
     - `questions/confirm/asking.rs`: The question before a change: what it will do, and the answer that goes with its weight.
     - `questions/confirm/drawing.rs`: The question before a change, in the colour of its weight: yellow for what can be put back, red for what cannot.
     - `questions/confirm/mod.rs`: The question before a change: what it will do, and the answer that goes with its weight.

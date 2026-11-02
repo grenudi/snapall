@@ -1,19 +1,12 @@
 {
-  "entry_files_too_long": {
-    "crates/snapall-tui/src/model/mod.rs": 140
-  },
+  "entry_files_too_long": {},
   "files_too_long": {
     "crates/snapall/src/contract/inputs.rs": 514
   },
   "findability_gaps": {},
-  "handlers_that_branch_too_much": {
-    "setup": 7
-  },
+  "handlers_that_branch_too_much": {},
   "handlers_too_long": {},
   "handlers_with_too_much_plumbing": {},
   "prints_outside_the_presenter": {},
-  "tool_words_in_names": {
-    "snapall": 6,
-    "snapall-core": 1
-  }
+  "tool_words_in_names": {}
 }

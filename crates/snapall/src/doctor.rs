@@ -25,13 +25,13 @@ use snapall_system::{boot_menu, environment, installing};
 
 /// Gather the facts about this machine.
 pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
-    let snapper = snapall_snapper::installed_version();
-    let configs = snapper
+    let snapshot_tool = snapall_snapper::installed_version();
+    let listed_areas = snapshot_tool
         .is_ok()
         .then(|| backend.list_areas().map_err(|e| e.to_string()));
     // Where each area lives, to see what none of them covers. Unreadable ones are left out: this
     // only adds a finding, and the areas check already says if listing fails.
-    let locations = match &configs {
+    let locations = match &listed_areas {
         Some(Ok(names)) => names
             .iter()
             .filter_map(|name| Some((name.clone(), backend.area_location(name).ok()?)))
@@ -40,9 +40,9 @@ pub fn probe(backend: &dyn SnapshotBackend) -> Probe {
     };
     Probe {
         os: environment::operating_system(),
-        snapper,
+        snapper: snapshot_tool,
         is_root: environment::is_administrator(),
-        areas: configs,
+        areas: listed_areas,
         locations,
     }
 }

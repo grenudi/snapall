@@ -308,6 +308,13 @@
       "answers": [
         "snapall-core/looking/journal/history.rs"
       ]
+    },
+    {
+      "question": "How does the window decide what to do when something happens?",
+      "answers": [
+        "snapall-tui/model/updating.rs",
+        "snapall-tui/model/mod.rs"
+      ]
     }
   ]
 }

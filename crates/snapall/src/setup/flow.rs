@@ -56,13 +56,13 @@ pub(super) fn find_the_areas(
     backend: &dyn SnapshotBackend,
     facts: &Facts,
 ) -> Result<Vec<Area>, Box<dyn Error>> {
-    let mut configs = Vec::new();
+    let mut locations = Vec::new();
     for name in backend.list_areas()? {
         let location = backend.area_location(&name)?;
-        configs.push((name, location));
+        locations.push((name, location));
     }
     let mounts = coverage::mounts_from_mountinfo(&facts.mountinfo);
-    Ok(coverage::areas(&mounts, &configs))
+    Ok(coverage::areas(&mounts, &locations))
 }
 
 pub(super) fn area_report(area: &Area) -> AreaReport {

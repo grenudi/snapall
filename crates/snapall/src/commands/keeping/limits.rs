@@ -24,32 +24,34 @@ pub struct LimitsWanted<'a> {
 /// next cleanup would remove; with options it changes them, after saying what that would remove (a removed
 /// snapshot cannot be brought back, so a change that removes any asks first, or needs `--destroy`).
 pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agreed) -> Outcome {
-    let config = a_protected_area(ctx, area)?;
-    let before = the_limits_now(ctx, &config)?;
+    let area_name = a_protected_area(ctx, area)?;
+    let before = the_limits_now(ctx, &area_name)?;
     let after = the_limits_wanted(&before, &wanted)?;
-    let preview = what_the_next_cleanup_would_remove(ctx, &config, &after)?;
+    let preview = what_the_next_cleanup_would_remove(ctx, &area_name, &after)?;
     let options = after.changes_from(&before);
     if options.is_empty() {
-        return say_the_limits(ctx, area, &config, &before, &preview, false);
+        return say_the_limits(ctx, area, &area_name, &before, &preview, false);
     }
-    output::note(&what_changing_would_do(&config, &before, &after, &preview));
+    output::note(&what_changing_would_do(
+        &area_name, &before, &after, &preview,
+    ));
     let approved = ask_before_changing(&preview, agreed)?;
     let change = Change::begin(
         approved,
-        &format!("Changing how many snapshots {config} keeps"),
-        &format!("Changed how many snapshots {config} keeps"),
+        &format!("Changing how many snapshots {area_name} keeps"),
+        &format!("Changed how many snapshots {area_name} keeps"),
         None,
     )?;
-    let result = set_the_options(ctx, &config, &options);
+    let result = set_the_options(ctx, &area_name, &options);
     if result.is_ok() {
         change.rollback(snapall_core::going_back::rollback::after_limits(
-            &config.to_string(),
+            &area_name.to_string(),
             &before,
         ));
     }
     change.end_with(&result);
     result?;
-    say_the_limits(ctx, area, &config, &after, &preview, true)
+    say_the_limits(ctx, area, &area_name, &after, &preview, true)
 }
 
 fn a_protected_area(ctx: &Context, area: &str) -> Result<AreaName, Box<dyn Error>> {
