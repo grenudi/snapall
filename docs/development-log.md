@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: restore-all and undo read as the stories they are
+
+**Why.** The stories are the layer I had judged weakest: the last measurement showed the handlers' length and branching budgets as the only debts left in the command line. `restore_all` was 79 lines and `undo` 61, each with its steps (find, preview, ask, begin, do, record, end, show) written inline, and `restore_all` with the *words* of two outcomes inside it.
+
+**What.** The words went to the core, where they can be tested: `PointRestore::how_it_went` (how many areas were put back, in the singular or the plural, and where the way back is; or why it failed) and `PointRestore::stopped_words` (how far it got, for the person and for the record), with five tests against real restores on the in-memory backend. `restore_all` is now its steps plus three named helpers (`anything_to_change`, `put_every_area_back`, `end_the_change`); `undo` is its steps plus four (`the_change_called`, `the_way_back`, `say_what_it_would_run`, `run_the_way_back`). The exit code, the order of what is said and what is recorded are unchanged (the golden output and the consequences script in CI check it). `handlers_too_long` in the data file is now empty, and `restore_all` and `undo` have left the branching list.
+
+**A finding, written into the plan, not tidied away.** The remaining plumbing debt, `check_the_way_back_still_exists`, parses the recorded command words back to find out what a rollback would go back to. The rollback is stringly typed, and the real fix is a typed step.
+
 ## 2026-10-29: describing a change is its own language
 
 **Why.** After a re-measurement (the trend was flat since 0.27.0, because the window's structure work is barely visible to those proxies), the biggest remaining file in the window was `changes.rs` (420 lines), holding three of the longest functions. It was three languages: what a change is called, the command that carries a change out in the background, and how it went with the way back from it.

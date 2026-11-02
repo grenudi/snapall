@@ -64,37 +64,64 @@ pub(super) fn check_the_way_back_still_exists(
 /// will run, asks as heavily as what it does weighs (undoing the taking of a snapshot is deleting it), and
 /// runs the recorded commands through this same program, so they are checked and journaled like any other.
 pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
-    use snapall_core::{Rollback, SystemProbe};
-    let system = snapall_system::LinuxSystem::new();
-    let history = system.history(500);
-    let Some(entry) = history.iter().find(|entry| entry.id == change_id) else {
-        return Err(format!(
-            "there is no change called `{change_id}`: `snapall activity` lists them"
-        )
-        .into());
-    };
-    let undo = match &entry.rollback {
-        Some(Rollback::Undo(undo)) => undo,
-        Some(Rollback::Advice(text)) => {
-            output::note(&format!("{} cannot be undone.\n{text}", entry.what));
-            return Ok(ExitCode::FAILURE);
-        }
-        None => {
-            return Err(format!(
-                "no way back was recorded for `{}`: changes made before snapall recorded one have none",
-                entry.what
-            )
-            .into());
-        }
+    use snapall_core::SystemProbe;
+    let history = snapall_system::LinuxSystem::new().history(500);
+    let entry = the_change_called(&history, change_id)?;
+    let Some(undo) = the_way_back(entry)? else {
+        return Ok(ExitCode::FAILURE);
     };
     check_the_way_back_still_exists(ctx, &undo.commands)?;
+    say_what_it_would_run(entry, undo);
+    let act = Act::Undo { doing: undo.weight };
+    let _asked = ask::gate(act, agreed, "Roll this back?", None)?;
+    run_the_way_back(ctx, undo)?;
+    ctx.show.result(
+        format!("Rolled back: {}\n", undo.what),
+        serde_json::json!({ "change": change_id, "rolled_back": true }),
+    )
+}
+
+fn the_change_called<'a>(
+    history: &'a [snapall_core::JournalEntry],
+    change_id: &str,
+) -> Result<&'a snapall_core::JournalEntry, Box<dyn Error>> {
+    history
+        .iter()
+        .find(|entry| entry.id == change_id)
+        .ok_or_else(|| {
+            format!("there is no change called `{change_id}`: `snapall activity` lists them").into()
+        })
+}
+
+/// What undoes it. `None` is a change that cannot be undone, which has been said.
+fn the_way_back(
+    entry: &snapall_core::JournalEntry,
+) -> Result<Option<&snapall_core::Undo>, Box<dyn Error>> {
+    use snapall_core::Rollback;
+    match &entry.rollback {
+        Some(Rollback::Undo(undo)) => Ok(Some(undo)),
+        Some(Rollback::Advice(text)) => {
+            output::note(&format!("{} cannot be undone.\n{text}", entry.what));
+            Ok(None)
+        }
+        None => Err(format!(
+            "no way back was recorded for `{}`: changes made before snapall recorded one have none",
+            entry.what
+        )
+        .into()),
+    }
+}
+
+fn say_what_it_would_run(entry: &snapall_core::JournalEntry, undo: &snapall_core::Undo) {
     output::note(&format!("To roll back: {}\n  {}\n", entry.what, undo.what));
     for command in &undo.commands {
         output::note(&format!("  snapall {}", command.join(" ")));
     }
     output::note("");
-    let act = Act::Undo { doing: undo.weight };
-    let _asked = ask::gate(act, agreed, "Roll this back?", None)?;
+}
+
+/// Each command, one after another, by this same program; one failing stops the rest.
+fn run_the_way_back(ctx: &Context, undo: &snapall_core::Undo) -> Result<(), Box<dyn Error>> {
     let program = std::env::current_exe()?;
     for command in &undo.commands {
         let mut step = std::process::Command::new(&program);
@@ -114,8 +141,5 @@ pub fn undo(ctx: &Context, change_id: &str, agreed: Agreed) -> Outcome {
             .into());
         }
     }
-    ctx.show.result(
-        format!("Rolled back: {}\n", undo.what),
-        serde_json::json!({ "change": change_id, "rolled_back": true }),
-    )
+    Ok(())
 }

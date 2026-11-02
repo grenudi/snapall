@@ -269,6 +269,12 @@
       "answers": [
         "snapall-tui/changes/background.rs"
       ]
+    },
+    {
+      "question": "How does a restore say how many areas were put back?",
+      "answers": [
+        "snapall-core/going_back/points/saying.rs"
+      ]
     }
   ]
 }
