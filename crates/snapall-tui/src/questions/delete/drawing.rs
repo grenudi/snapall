@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The prompt that asks before deleting snapshots.
+//! Drawing the prompt that asks before deleting snapshots.
 
 use crate::view::*;
 use ratatui::style::{Color, Style, Stylize};

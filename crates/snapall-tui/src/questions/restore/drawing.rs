@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The restore prompt: what would change, and the offer to put the whole restore point back.
+//! Drawing the restore prompt: what would change, and the offer to put the whole restore point back.
 
 use crate::model::{Button, RestoreStage, State};
 use crate::theme::{ACCENT, DIM};

@@ -1030,3 +1030,42 @@ fn the_backlog_keeps_the_sections_it_is_read_by() {
         "the decision about setup belongs under `## Structure`"
     );
 }
+
+// ---- no two modules say the same thing ------------------------------------------------------------------------
+
+/// What a module says it is for is what a stranger reads in the outline. Two modules with the same sentence say
+/// nothing about how they differ: a folder's front is not its file, and a file is not its neighbour.
+#[test]
+fn no_two_modules_describe_themselves_in_the_same_words() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let outline = std::fs::read_to_string(root.join("OUTLINE.md")).unwrap();
+    let mut by_sentence: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut current = String::new();
+    for line in outline.lines() {
+        if let Some(name) = line.strip_prefix("## ") {
+            current = name.trim().to_owned();
+        } else if let Some(entry) = line.trim_start().strip_prefix("- `") {
+            if let Some((path, sentence)) = entry.split_once("`: ") {
+                by_sentence
+                    .entry(sentence.trim().to_owned())
+                    .or_default()
+                    .push(format!("{current}/{path}"));
+            }
+        }
+    }
+    assert!(
+        by_sentence.len() > 100,
+        "the outline has {} sentences: it has stopped being read",
+        by_sentence.len()
+    );
+    let repeated: Vec<String> = by_sentence
+        .iter()
+        .filter(|(_, modules)| modules.len() > 1)
+        .map(|(sentence, modules)| format!("\"{sentence}\"\n      {}", modules.join("\n      ")))
+        .collect();
+    assert!(
+        repeated.is_empty(),
+        "modules that say the same thing about themselves:\n  {}",
+        repeated.join("\n  ")
+    );
+}

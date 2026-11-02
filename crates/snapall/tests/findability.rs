@@ -40,6 +40,8 @@ const IRREGULAR: &[(&str, &str)] = &[
     ("ran", "run"),
     ("written", "write"),
     ("shown", "show"),
+    ("drawn", "draw"),
+    ("chosen", "choose"),
     ("held", "hold"),
     ("done", "do"),
 ];

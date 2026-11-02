@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The prompt for a snapshot's note.
+//! Drawing the prompt for a snapshot's note.
 
 use crate::model::{State, Target};
 use crate::theme::{ACCENT, DIM};

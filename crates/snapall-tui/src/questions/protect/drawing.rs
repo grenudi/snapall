@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The offer to protect a part of the disk.
+//! Drawing the offer to protect a part of the disk.
 
 use crate::model::{Button, State};
 use crate::theme::ACCENT;

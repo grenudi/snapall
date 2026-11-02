@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The groups prompt: the list, naming a new group, and choosing its areas, each with the keys that work
+//! Drawing the groups prompt: the list, naming a new group, and choosing its areas, each with the keys that work
 //! on it said on the screen.
 
 use crate::model::State;

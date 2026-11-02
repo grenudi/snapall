@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The restore points screen.
+//! Drawing the restore points screen: the points, and what putting the chosen one back would change.
 
 use crate::theme::{ACCENT, DIM};
 use crate::view::*;
