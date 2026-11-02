@@ -30,7 +30,7 @@ pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agree
     let preview = what_the_next_cleanup_would_remove(ctx, &area_name, &after)?;
     let options = after.changes_from(&before);
     if options.is_empty() {
-        return say_the_limits(ctx, area, &area_name, &before, &preview, false);
+        return say_the_limits(ctx, area, &area_name, &before, &preview, Wording::AsTheyAre);
     }
     output::note(&what_changing_would_do(
         &area_name, &before, &after, &preview,
@@ -51,7 +51,7 @@ pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agree
     }
     change.end_with(&result);
     result?;
-    say_the_limits(ctx, area, &area_name, &after, &preview, true)
+    say_the_limits(ctx, area, &area_name, &after, &preview, Wording::Changed)
 }
 
 fn a_protected_area(ctx: &Context, area: &str) -> Result<AreaName, Box<dyn Error>> {
@@ -157,31 +157,38 @@ fn what_changing_would_do(
     )
 }
 
+/// Whether the limits are shown as they are, or as they have just been changed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Wording {
+    AsTheyAre,
+    Changed,
+}
+
 fn say_the_limits(
     ctx: &Context,
     area: &str,
-    config: &AreaName,
+    area_name: &AreaName,
     shown: &Limits,
     preview: &LimitsPreview,
-    changed: bool,
+    wording: Wording,
 ) -> Outcome {
+    let changed = wording == Wording::Changed;
     let json = serde_json::json!({ "area": area, "keep": shown.keep, "min_age_minutes": shown.min_age_seconds / 60, "cleanup": shown.cleanup, "would_remove": preview.would_remove, "changed": changed });
-    if changed {
-        ctx.show.result(
+    match wording {
+        Wording::Changed => ctx.show.result(
             format!(
-                "{config} now {}. It takes effect at the next cleanup.\n",
+                "{area_name} now {}. It takes effect at the next cleanup.\n",
                 describe(shown)
             ),
             json,
-        )
-    } else {
-        ctx.show.result(
+        ),
+        Wording::AsTheyAre => ctx.show.result(
             format!(
-                "{config} {}.\n{}\n",
+                "{area_name} {}.\n{}\n",
                 describe(shown),
                 limits_words(preview, shown)
             ),
             json,
-        )
+        ),
     }
 }

@@ -93,7 +93,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             Agreed::to(false, destroy),
         ),
         Request::Doctor { install, yes } => {
-            doctor::run(ctx.backend, ctx.observer, install, yes, ctx.json)
+            doctor::run(ctx.backend, ctx.observer, install, yes, ctx.show.is_json())
         }
 
         Request::Limits {

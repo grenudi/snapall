@@ -21,6 +21,9 @@ pub struct Outcome {
 #[derive(Debug)]
 pub struct Report {
     pub outcomes: Vec<Outcome>,
+    /// It was stopped, on request, before every area had its snapshot: the outcomes are those of the areas
+    /// that were taken, and the rest were not started.
+    pub stopped: bool,
 }
 
 impl Report {
@@ -50,11 +53,11 @@ pub fn run_plan(
     description: &Description,
     point: Option<&Point>,
 ) -> Report {
-    run_plan_along(backend, plan, description, point, &Unattended).0
+    run_plan_along(backend, plan, description, point, &Unattended)
 }
 
 /// [`run_plan`], one step per area, following a [`Course`]: told before each, and stoppable between
-/// them. The second answer is whether it was stopped before the end; the report then has the outcomes of
+/// them. The report says whether it was stopped before the end, and then has the outcomes of
 /// the steps that were taken.
 pub fn run_plan_along(
     backend: &dyn SnapshotBackend,
@@ -62,12 +65,15 @@ pub fn run_plan_along(
     description: &Description,
     point: Option<&Point>,
     course: &dyn Course,
-) -> (Report, bool) {
+) -> Report {
     let total = plan.targets().len();
     let mut outcomes = Vec::with_capacity(total);
     for (done, area) in plan.targets().iter().enumerate() {
         if !course.proceed(done, total, area.as_str()) {
-            return (Report { outcomes }, true);
+            return Report {
+                outcomes,
+                stopped: true,
+            };
         }
         outcomes.push(Outcome {
             area: area.clone(),
@@ -79,7 +85,10 @@ pub fn run_plan_along(
             },
         });
     }
-    (Report { outcomes }, false)
+    Report {
+        outcomes,
+        stopped: false,
+    }
 }
 
 pub fn snapshot_all(

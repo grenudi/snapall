@@ -11,6 +11,27 @@ use snapall_core::vocabulary::explain::room_counting_text;
 use snapall_core::{gather, Act, Facts, QuotaMode, Switching, SystemProbe};
 use std::error::Error;
 
+/// Which way the disk's room counting is being switched.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Counting {
+    On,
+    Off,
+}
+
+impl Counting {
+    /// For the places that take a plain yes or no: the core's rule and the machine's call.
+    fn is_on(self) -> bool {
+        self == Counting::On
+    }
+
+    fn word(self) -> &'static str {
+        match self {
+            Counting::On => "on",
+            Counting::Off => "off",
+        }
+    }
+}
+
 /// How the disk counts the room snapshots take, and, given `on` or `off`, switching it. Switching changes how the
 /// whole disk works, so it explains what it gives and costs and asks first.
 pub fn quotas(ctx: &Context, wanted: Option<&str>, agreed: Agreed) -> Outcome {
@@ -28,15 +49,15 @@ fn switch(
     system: &dyn SystemProbe,
     facts: &Facts,
     mode: QuotaMode,
-    turn_on: bool,
+    to: Counting,
     agreed: Agreed,
 ) -> Outcome {
-    match mode.switching(turn_on) {
+    match mode.switching(to.is_on()) {
         Switching::CannotBeDoneInPlace => Err("the disk counts room the simple way, and snapall cannot switch it to the full kind in place".into()),
         Switching::AlreadyThatWay => say_it_is_already_so(ctx, mode),
         Switching::Possible => {
-            let approved = ask_before_switching(facts, mode, turn_on, agreed)?;
-            make_the_switch(ctx, system, facts, approved, turn_on)
+            let approved = ask_before_switching(facts, mode, to, agreed)?;
+            make_the_switch(ctx, system, facts, approved, to)
         }
     }
 }
@@ -48,10 +69,10 @@ fn how_the_disk_counts(facts: &Facts) -> Result<QuotaMode, Box<dyn Error>> {
     })
 }
 
-fn switch_to(wanted: &str) -> Result<bool, Box<dyn Error>> {
+fn switch_to(wanted: &str) -> Result<Counting, Box<dyn Error>> {
     match wanted {
-        "on" => Ok(true),
-        "off" => Ok(false),
+        "on" => Ok(Counting::On),
+        "off" => Ok(Counting::Off),
         other => Err(format!("`{other}` is not `on` or `off`").into()),
     }
 }
@@ -78,7 +99,7 @@ fn say_it_is_already_so(ctx: &Context, mode: QuotaMode) -> Outcome {
 fn ask_before_switching(
     facts: &Facts,
     mode: QuotaMode,
-    turn_on: bool,
+    to: Counting,
     agreed: Agreed,
 ) -> Result<ask::Approved, Box<dyn Error>> {
     let areas: Vec<String> = facts
@@ -88,7 +109,7 @@ fn ask_before_switching(
         .collect();
     let question = format!(
         "Switch counting {} for the disk{} holding {}?",
-        side(turn_on),
+        to.word(),
         if areas.len() == 1 { "" } else { "s" },
         areas.join(", ")
     );
@@ -105,21 +126,21 @@ fn make_the_switch(
     system: &dyn SystemProbe,
     facts: &Facts,
     approved: ask::Approved,
-    turn_on: bool,
+    to: Counting,
 ) -> Outcome {
     let change = Change::begin(
         approved,
-        &format!("Switching room counting {}", side(turn_on)),
-        &format!("Switched room counting {}", side(turn_on)),
+        &format!("Switching room counting {}", to.word()),
+        &format!("Switched room counting {}", to.word()),
         None,
     )?;
     let result: Result<(), String> = facts
         .areas
         .iter()
-        .try_for_each(|area| system.set_quotas(&area.location, turn_on));
+        .try_for_each(|area| system.set_quotas(&area.location, to.is_on()));
     if result.is_ok() {
         change.rollback(snapall_core::going_back::rollback::after_room_counting(
-            turn_on,
+            to.is_on(),
         ));
     }
     change.end_with(&result);
@@ -127,21 +148,13 @@ fn make_the_switch(
     ctx.show.result(
         format!(
             "Counting the room snapshots take is now {}.{}\n",
-            side(turn_on),
-            if turn_on {
+            to.word(),
+            if to.is_on() {
                 " The disk builds its tally in the background; figures appear as it finishes."
             } else {
                 ""
             }
         ),
-        serde_json::json!({ "counting": side(turn_on), "changed": true }),
+        serde_json::json!({ "counting": to.word(), "changed": true }),
     )
-}
-
-fn side(turn_on: bool) -> &'static str {
-    if turn_on {
-        "on"
-    } else {
-        "off"
-    }
 }
