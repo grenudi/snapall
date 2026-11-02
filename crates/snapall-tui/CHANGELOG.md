@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.3]
+
+
+### Refactoring
+- Describing a change is its own language ([#114](https://github.com/grenudi/snapall/pull/114)) ([cf196f1])
+
+
+
 ## [0.27.2]
 
 
