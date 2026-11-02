@@ -29,7 +29,7 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 - **Splitting the Btrfs job** so the TUI test runs alone: about 25 s of wall time for 45 more runner-seconds.
 - **Parallelising the reproducible build's two builds:** not on the critical path.
 
-**Not yet measured.** The new cache key (the debug-info setting is part of it) means the first runs are cold. The after numbers for CI belong to the first warm runs, and the next docs-only pull request is also the first test of the narrowing. They are added to this entry when measured.
+**The first runs were cold, as expected.** The debug-info setting is part of the cache key, so the pull request's own run (368 s wall, 30.4 job-minutes) and main's first run (336 s, 23.9 job-minutes) rebuilt every cache. Both were green, with the new advisories check passing in real CI. That price is paid once; it is not the number to judge the change by. The warm numbers follow from the next runs, and this very pull request (documents only) is the first test of the narrowing.
 
 ## 2026-11-05: main's CI failed on the race I had measured away
 
