@@ -861,7 +861,8 @@ fn the_worked_example_in_the_canon_is_the_code_it_shows() {
 // ---- the documents name only what is there -------------------------------------------------------------------
 
 /// A document that is written in the present tense must point at what exists: a path that moved is a sentence that
-/// became false. ADRs are exempt: they are dated records of a decision and are never rewritten to match the present.
+/// became false. ADRs and the development log are exempt: they are dated records of what was decided and done, and name
+/// what was there then, so they are never rewritten to match the present.
 #[test]
 fn the_documents_name_only_files_and_folders_that_exist() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -879,6 +880,7 @@ fn the_documents_name_only_files_and_folders_that_exist() {
             .path()
             .extension()
             .is_some_and(|extension| extension == "md")
+            && !entry.path().ends_with("development-log.md")
         {
             documents.push(entry.path());
         }
@@ -953,16 +955,32 @@ fn the_documents_name_only_files_and_folders_that_exist() {
 
 // ---- the window decides, and drawing only draws ----------------------------------------------------------------
 
-/// The window is a pure state machine: the model and the executor decide what happens, and the view only draws what
-/// the state says. So nothing in `model/` or `session/` may use the drawing library, the view or the theme: if it
-/// did, what the window does would start to depend on how it looks.
+/// The window is a pure state machine: what it decides is separate from how it looks. The drawing library, the view and
+/// the theme may be used only by the files that draw: those named `drawing.rs` (a tab's, a question's), the shared
+/// frame of the questions, the status bar, the terminal and the theme, and everything under `view/`. Every other file,
+/// wherever it lives, decides and knows nothing of drawing. The rule is about what a file is for and not where it sits, so
+/// that moving files into a folder per tab or per question cannot dodge it.
 #[test]
-fn the_model_and_the_executor_know_nothing_of_drawing() {
+fn only_the_files_that_draw_use_the_drawing_library() {
+    let draws = |path: &str| {
+        path.contains("snapall-tui/src/view/")
+            || [
+                "drawing.rs",
+                "frame.rs",
+                "status_bar.rs",
+                "term.rs",
+                "theme.rs",
+            ]
+            .iter()
+            .any(|name| path.ends_with(&format!("/{name}")))
+    };
     let mut offenders = Vec::new();
+    let mut seen = 0;
     for (path, code) in all_sources() {
-        if !(path.contains("snapall-tui/src/model/") || path.contains("snapall-tui/src/session/")) {
+        if !path.contains("snapall-tui/src/") || draws(&path) {
             continue;
         }
+        seen += 1;
         for line in code
             .lines()
             .filter(|line| !line.trim_start().starts_with("//"))
@@ -976,8 +994,12 @@ fn the_model_and_the_executor_know_nothing_of_drawing() {
         }
     }
     assert!(
+        seen > 50,
+        "the rule looked at {seen} files: it has stopped finding them"
+    );
+    assert!(
         offenders.is_empty(),
-        "the model and the executor reach for drawing:\n  {}",
+        "files that do not draw reach for drawing:\n  {}",
         offenders.join("\n  ")
     );
 }

@@ -21,7 +21,7 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | # | Item | Status |
 |---|---|---|
 | 1 | Nine bare booleans remain in the commands, of a different kind from the ones that were named: states a function reports (`stopped`, `changed`, `ended`), a direction (`turn_on`, on or off) and facts about how the program was invoked (`hints`, `json`, `no_dbus` in `Context`). Name `turn_on` if a fourth place needs it | open |
-| 2 | The window's questions and file screen are still by mechanism: `model/prompts/` and `view/prompts/` hold one pair of files per question, and `model/file.rs` with `view/file.rs` the file history screen. The window's state is composed now (14 fields: the Snapshots tab, what it is waiting for and the pointer each own theirs, as Health and Activity do) | open |
+| 2 | The window's file history screen is still by mechanism: `model/file.rs` with `view/file.rs`. The questions are a folder each now (`questions/`), and the state is composed (14 fields: the Snapshots tab, what it is waiting for and the pointer each own theirs, as Health and Activity do) | open |
 | 3 | The window's `changes.rs` is over 300 lines (419) | open |
 | 4 | `restore_all` and `undo` are over the branching budget, and `check_the_way_back_still_exists` over the plumbing budget | open |
 | 5 | One question the cold read cannot answer: "What does a key do in the window?" leads to the wrong module first (`crates/snapall/tests/ratchets.json`). Name or describe the key modules for what a stranger would ask | open |

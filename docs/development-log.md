@@ -2,6 +2,18 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: each question is one place
+
+**Why.** The window's thirteen questions each had the same two halves in two parallel trees: `model/prompts/<q>.rs` (what opens it, what its keys do, what comes of the answer) and `view/prompts/<q>.rs` (how it is drawn). The tabs had already solved this with a folder each.
+
+**What.** `questions/<q>/{asking,drawing}.rs` for each question, `questions/frame.rs` for the frame they share, and two small facades in `questions/mod.rs` (`asking` for the model, `drawing` for the view) that replace the two old fronts. The files moved with `git mv`; because they were descendants of `model/` and `view/` they had relied on those modules' private imports, so each was given its own (the same lesson as the tabs).
+
+**A stronger rule, found on the way.** The test that keeps the model pure was path-based (nothing in `model/` or `session/` may use the drawing library). Counting where the library was used showed it appeared outside `view/` only in files named `drawing.rs` (plus the status bar, the terminal and the theme), so the rule became role-based: only files that draw may use it, wherever they live. It now also covers every question's asking half and every tab's keys, state and arrival code, and it was shown to fail in both.
+
+**What the cold read said.** The new structure answers questions about it well (the limits editor and the groups question rank first). It also found two real problems, one of them caused by this change: the unprotect question did not say "stop protecting", the phrase the vocabulary itself uses (13th), and thirteen new folder fronts pushed `ask.rs` from the top three for "what is asked before a change that cannot be undone" (9th) because its sentence never said what it asks. Both sentences were rewritten. A third was a claim that had gone false: the unprotect question called itself the one prompt where Enter alone is never enough, which stopped being true when deleting a snapshot began to need a typed word. It now says what it does and claims nothing.
+
+**Evidence.** The window's 185 tests; CI runs the terminal journeys, which open every question.
+
 ## 2026-10-29: the window's state is composed, and the Snapshots tab owns its own
 
 **Why.** The window's `State` was one 26-field struct. Rather than group by a guess, I counted which parts of the window use each field. Three clusters were clear: the fields for *what the window is waiting for* (`pending`, `spinner`, `doing`, `busy_ticks`, `watching`, `poll_ticks`, `after_reload`) are used only by the update loop and the spinner and by no screen; the mouse (`hover`, `pressed`); and the Snapshots tab's own five (`areas`, the two cursors, `marked`, `focus`), which was the one tab still keeping its state in the global struct while Health and Activity own theirs. `health_asked` was the Health tab's all along.

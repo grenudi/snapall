@@ -4,17 +4,14 @@
 
 //! Rendering: `render(state, frame)` draws, and does nothing else.
 
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{
-    Block, BorderType, Borders, Clear, Paragraph, Row, Table, TableState, Wrap,
-};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState, Wrap};
 use ratatui::Frame;
-use snapall_core::vocabulary::explain;
-use snapall_core::{AreaName, ChangeKind, FileState, SnapshotId};
+use snapall_core::FileState;
 
-use crate::model::{Button, Click, Load, Modal, Notice, Pane, RestoreStage, State, Target};
+use crate::model::{Button, Click, Load, Modal, Notice, Pane, State};
 
 use crate::tab::Tab;
 use crate::theme::{ACCENT, DIM};
@@ -24,15 +21,14 @@ mod file;
 mod footer;
 mod header;
 mod hit;
-mod look;
-mod prompts;
+pub(crate) mod look;
 
+pub(crate) use crate::questions::drawing::*;
 pub(crate) use crate::tabs::snapshots::{areas_split, pane_block, render_areas, render_snapshots};
 pub(crate) use file::*;
 pub use footer::*;
 pub use header::*;
 pub use hit::*;
-pub(crate) use prompts::*;
 
 /// Where everything is, for a terminal of this size. Drawing and clicking both start here, so a
 /// click can only ever land on what was drawn.
