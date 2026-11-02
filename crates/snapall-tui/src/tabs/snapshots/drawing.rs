@@ -81,7 +81,7 @@ fn group_lines(state: &State, width: usize) -> Vec<Line<'static>> {
 pub(crate) fn areas_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) {
     let wanted =
         u16::try_from(group_lines(state, usize::from(inner.width)).len()).unwrap_or(u16::MAX);
-    let areas = u16::try_from(state.entries().len().max(1)).unwrap_or(u16::MAX);
+    let areas = u16::try_from(state.snapshots.entries().len().max(1)).unwrap_or(u16::MAX);
     if state.file.is_some() || inner.height < areas.saturating_add(wanted).saturating_add(1) {
         return (inner, None);
     }
@@ -99,9 +99,9 @@ pub(crate) fn areas_split(state: &State, inner: Rect) -> (Rect, Option<Rect>) {
 }
 
 pub(crate) fn render_areas(state: &State, frame: &mut Frame, area: Rect) {
-    let focused = state.focus == Pane::Areas && state.modal.is_none();
+    let focused = state.snapshots.focus == Pane::Areas && state.modal.is_none();
     let block = pane_block(" Protected areas ".into(), focused);
-    match &state.areas {
+    match &state.snapshots.areas {
         Load::NotLoaded => {
             frame.render_widget(Paragraph::new("loading...").block(block), area);
         }
@@ -148,10 +148,11 @@ pub(crate) fn render_areas(state: &State, frame: &mut Frame, area: Rect) {
             let list = List::new(items)
                 .highlight_style(highlight)
                 .highlight_symbol("> ");
-            let mut list_state = ListState::default().with_selected(Some(state.area_cursor));
+            let mut list_state =
+                ListState::default().with_selected(Some(state.snapshots.area_cursor));
             frame.render_stateful_widget(list, list_area, &mut list_state);
             if let Some(groups) = groups_area {
-                let hovered = state.hover == Some(Click::Button(Button::Groups));
+                let hovered = state.pointer.hover == Some(Click::Button(Button::Groups));
                 let style = if hovered {
                     Style::new().add_modifier(Modifier::REVERSED)
                 } else {
@@ -175,8 +176,8 @@ pub(crate) fn kind_label(info: &SnapshotInfo) -> String {
 }
 
 pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
-    let focused = state.focus == Pane::Snapshots && state.modal.is_none();
-    let Some(entry) = state.selected_area() else {
+    let focused = state.snapshots.focus == Pane::Snapshots && state.modal.is_none();
+    let Some(entry) = state.snapshots.selected_area() else {
         frame.render_widget(pane_block(" Snapshots ".into(), focused), area);
         return;
     };
@@ -209,15 +210,16 @@ pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
         }
         Load::Loaded(_) => {
             let rows: Vec<Row> = state
+                .snapshots
                 .displayed_snapshots()
                 .into_iter()
                 .map(|info| {
-                    let mark = if state.marked.contains(&info.id) {
+                    let mark = if state.snapshots.marked.contains(&info.id) {
                         "*"
                     } else {
                         " "
                     };
-                    let style = if state.marked.contains(&info.id) {
+                    let style = if state.snapshots.marked.contains(&info.id) {
                         Style::new().fg(Color::Yellow)
                     } else {
                         Style::new()
@@ -255,7 +257,8 @@ pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
             .block(block)
             .row_highlight_style(highlight)
             .column_spacing(1);
-            let mut table_state = TableState::default().with_selected(Some(state.snapshot_cursor));
+            let mut table_state =
+                TableState::default().with_selected(Some(state.snapshots.snapshot_cursor));
             frame.render_stateful_widget(table, area, &mut table_state);
         }
     }

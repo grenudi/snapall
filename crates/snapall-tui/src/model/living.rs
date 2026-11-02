@@ -23,14 +23,14 @@ pub(super) fn refused(state: &mut State, why: String) -> Vec<Effect> {
 }
 
 pub(super) fn tick(state: &mut State) -> Vec<Effect> {
-    state.spinner = state.spinner.wrapping_add(1);
-    state.pressed = state.pressed.and_then(|(click, left)| {
+    state.waiting.spinner = state.waiting.spinner.wrapping_add(1);
+    state.pointer.pressed = state.pointer.pressed.and_then(|(click, left)| {
         left.checked_sub(1)
             .filter(|left| *left > 0)
             .map(|left| (click, left))
     });
-    state.busy_ticks = if state.pending > 0 {
-        state.busy_ticks.saturating_add(1)
+    state.waiting.busy_ticks = if state.waiting.pending > 0 {
+        state.waiting.busy_ticks.saturating_add(1)
     } else {
         0
     };
@@ -38,12 +38,12 @@ pub(super) fn tick(state: &mut State) -> Vec<Effect> {
 }
 
 pub(super) fn hover(state: &mut State, over: Option<Click>) -> Vec<Effect> {
-    state.hover = over;
+    state.pointer.hover = over;
     Vec::new()
 }
 
 pub(super) fn click(state: &mut State, click: Click) -> Vec<Effect> {
     // shown pressed for a moment, whatever the click then does
-    state.pressed = Some((click, PRESSED_TICKS));
+    state.pointer.pressed = Some((click, PRESSED_TICKS));
     on_click(state, click)
 }

@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: the window's state is composed, and the Snapshots tab owns its own
+
+**Why.** The window's `State` was one 26-field struct. Rather than group by a guess, I counted which parts of the window use each field. Three clusters were clear: the fields for *what the window is waiting for* (`pending`, `spinner`, `doing`, `busy_ticks`, `watching`, `poll_ticks`, `after_reload`) are used only by the update loop and the spinner and by no screen; the mouse (`hover`, `pressed`); and the Snapshots tab's own five (`areas`, the two cursors, `marked`, `focus`), which was the one tab still keeping its state in the global struct while Health and Activity own theirs. `health_asked` was the Health tab's all along.
+
+**What.** `Waiting` and `Pointer` (in `model/state/`), and `SnapshotsTab` (in `tabs/snapshots/state.rs`, with the six methods that used only its fields), so `State` has 14 fields and `window.rs` went from 179 to 104 lines. About 160 uses across the source and the tests were rewritten by a script on the receivers; the compiler found the seven it missed (multi-line method chains and an import), and all 185 window tests pass unchanged apart from those renames.
+
+**Evidence.** The window's tests and the fast gate; CI runs the terminal journeys, which drive the real window through every screen.
+
 ## 2026-10-29: everything is said through the presenter
 
 **Why.** The plan's item was "outputs as values: handlers return what is to be said and the surface prints it", because fifteen prints bypassed the presenter. Looking at the fifteen showed the premise was wrong: all of them were lines spoken to the person on stderr (an error, a warning, "snapall will run, as root:", "To roll back:"), and several are said right before an answer is read, so speaking and listening interleave and a story cannot return its words as one value at the end.

@@ -190,7 +190,7 @@ fn typing_the_name_stops_the_protection_deletes_its_snapshots_and_leaves_the_res
     );
     assert!(format!("{:?}", session.state.notice)
         .contains("is no longer protected: 2 snapshots deleted, its files are untouched"));
-    assert_eq!(session.state.pending, 0);
+    assert_eq!(session.state.waiting.pending, 0);
     // the lists and the Health tab no longer have it
     assert!(!session
         .state

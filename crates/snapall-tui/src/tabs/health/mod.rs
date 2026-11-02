@@ -26,6 +26,8 @@ pub struct HealthData {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HealthTab {
+    /// The report of how protection stands has been asked for once the first screen had its data.
+    pub asked: bool,
     pub data: Option<HealthData>,
     /// Why the report could not be made, if it could not.
     pub error: Option<String>,

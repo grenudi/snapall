@@ -53,7 +53,7 @@ pub(super) fn protection_stopped(
                         if deleted == 1 { "" } else { "s" }
                     ));
             // looking at the lists again would clear it: it is shown again when they have arrived
-            state.after_reload = Some(told.clone());
+            state.waiting.after_reload = Some(told.clone());
             state.notice = Some(told);
             // the areas listed have changed
             vec![Effect::LoadAreas]
@@ -101,8 +101,8 @@ pub(super) fn groups_saved(
 
 pub(super) fn started_in_background(state: &mut State, id: String, present: String) -> Vec<Effect> {
     settle(state);
-    state.watching.push(Watched { id, unseen: 0 });
-    state.poll_ticks = 0;
+    state.waiting.watching.push(Watched { id, unseen: 0 });
+    state.waiting.poll_ticks = 0;
     state.notice = Some(Notice::Info(format!(
         "{present}: started in the background. It goes on if you close the window."
     )));
@@ -149,8 +149,13 @@ pub(super) fn finished(state: &mut State, done: Box<Finished>) -> Vec<Effect> {
         msg,
     } = *done;
     // it is no longer being done
-    if let Some(at) = state.doing.iter().position(|doing| *doing == present) {
-        state.doing.remove(at);
+    if let Some(at) = state
+        .waiting
+        .doing
+        .iter()
+        .position(|doing| *doing == present)
+    {
+        state.waiting.doing.remove(at);
     }
     let (status, detail) = match outcome {
         Ok(done) => (snapall_core::JournalStatus::Done, done),

@@ -130,8 +130,10 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/prompts/unprotect.rs`: Stopping the protection of an area: what it would do, in plain words, and the area's name typed out before it does it.
     - `model/state/looked_up.rs`: What looking brought back, as the window holds it: areas, a file's versions, a restore point's offer, what a restore did.
     - `model/state/mod.rs`: What the window knows: the lists, the cursor, the open prompt, the message, and what it was told about the machine.
+    - `model/state/pointer.rs`: The mouse: what it is over, and what was just clicked.
     - `model/state/questions.rs`: The questions the window asks, and what each one holds while it is open.
     - `model/state/told.rs`: What the window is told about the machine, once, at the start: its tips, what could be protected, whether it may change things.
+    - `model/state/waiting.rs`: What the window is waiting for: work in flight, the changes it handed to the background, and for how long.
     - `model/state/window.rs`: The window at one moment: its lists, cursor, open question, message, and what it is waiting for.
   - `session/changing.rs`: What the window asks to be changed, done through the backend and the machine.
   - `session/executor.rs`: The window's executor: it performs each effect against the backend and the machine, and answers with the message that describes the outcome.
@@ -151,6 +153,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `tabs/snapshots/arriving.rs`: What the Snapshots tab does when the areas and their snapshots arrive, and after a snapshot is taken.
     - `tabs/snapshots/drawing.rs`: Drawing the Snapshots tab: the protected areas and their groups on the left, the chosen area's snapshots on the right.
     - `tabs/snapshots/mod.rs`: The Snapshots tab: the protected areas on the left and the chosen area's snapshots on the right.
+    - `tabs/snapshots/state.rs`: What the Snapshots tab holds: the protected areas and the snapshots of the chosen one, the cursors, what is marked, and which pane has the focus.
 - `term.rs`: The terminal: setup and restore, key translation, and the event loop.
 - `theme.rs`: The colours, in one place, so every screen speaks in the same ones: good is green, something to know is cyan, something to do is yellow, something to do now is red.
   - `view/file.rs`: The file history screen: one file's versions, newest first.

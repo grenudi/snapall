@@ -39,6 +39,7 @@ fn press(session: &mut Session<'_>, keys: &[Key]) {
 fn descriptions_of(session: &Session<'_>) -> Vec<String> {
     session
         .state
+        .snapshots
         .displayed_snapshots()
         .iter()
         .map(|s| s.description.clone())
@@ -53,17 +54,21 @@ fn startup_loads_the_areas_and_only_the_selected_ones_snapshots() {
 
     let names: Vec<_> = session
         .state
+        .snapshots
         .entries()
         .iter()
         .map(|e| e.name.to_string())
         .collect();
     assert_eq!(names, ["home", "root"], "sorted by name");
-    assert_eq!(session.state.area_cursor, 0);
+    assert_eq!(session.state.snapshots.area_cursor, 0);
     assert!(matches!(
-        session.state.entries()[0].snapshots,
+        session.state.snapshots.entries()[0].snapshots,
         Load::Loaded(_)
     ));
-    assert_eq!(session.state.entries()[1].snapshots, Load::NotLoaded);
+    assert_eq!(
+        session.state.snapshots.entries()[1].snapshots,
+        Load::NotLoaded
+    );
     assert_eq!(descriptions_of(&session), ["b", "a"], "newest first");
 }
 
@@ -74,12 +79,21 @@ fn moving_to_another_area_loads_its_snapshots_lazily() {
     let mut session = Session::new(&backend);
 
     session.press(Key::Down);
-    assert_eq!(session.state.selected_area().unwrap().name.as_str(), "root");
+    assert_eq!(
+        session
+            .state
+            .snapshots
+            .selected_area()
+            .unwrap()
+            .name
+            .as_str(),
+        "root"
+    );
     assert_eq!(descriptions_of(&session), ["r1"]);
 
     // The cursor does not run off the end.
     session.press(Key::Down);
-    assert_eq!(session.state.area_cursor, 1);
+    assert_eq!(session.state.snapshots.area_cursor, 1);
 }
 
 #[test]
@@ -95,7 +109,7 @@ fn create_asks_for_a_description_then_creates_and_shows_the_new_snapshot_first()
 
     assert!(session.state.modal.is_none());
     assert_eq!(descriptions_of(&session), ["before theming", "old"]);
-    assert_eq!(session.state.snapshot_cursor, 0);
+    assert_eq!(session.state.snapshots.snapshot_cursor, 0);
     assert!(matches!(&session.state.notice, Some(Notice::Info(t)) if t.contains("home #2")));
 }
 
@@ -157,7 +171,7 @@ fn marking_moves_on_and_delete_removes_exactly_the_marked_snapshots() {
         &mut session,
         &[Key::Right, Key::Char(' '), Key::Down, Key::Char(' ')],
     );
-    assert_eq!(session.state.marked.len(), 2);
+    assert_eq!(session.state.snapshots.marked.len(), 2);
 
     session.press(Key::Char('d'));
     assert!(
@@ -167,7 +181,7 @@ fn marking_moves_on_and_delete_removes_exactly_the_marked_snapshots() {
     session.confirm();
 
     assert_eq!(descriptions_of(&session), ["three", "one"]);
-    assert!(session.state.marked.is_empty());
+    assert!(session.state.snapshots.marked.is_empty());
     assert!(matches!(&session.state.notice, Some(Notice::Info(t)) if t.contains("deleted")));
 }
 
@@ -194,7 +208,7 @@ fn delete_is_not_offered_from_the_areas_pane() {
     let backend = InMemoryBackend::with_areas(&["home"]);
     seed(&backend, "home", &["one"]);
     let mut session = Session::new(&backend);
-    assert_eq!(session.state.focus, Pane::Areas);
+    assert_eq!(session.state.snapshots.focus, Pane::Areas);
 
     session.press(Key::Char('d'));
     assert!(session.state.modal.is_none());
@@ -222,7 +236,7 @@ fn no_areas_is_explained_not_empty() {
     let backend = InMemoryBackend::with_areas(&[]);
     let mut session = Session::new(&backend);
 
-    assert!(session.state.entries().is_empty());
+    assert!(session.state.snapshots.entries().is_empty());
     assert!(
         matches!(&session.state.notice, Some(Notice::Error(t)) if t.contains("no protected areas") && !t.contains("create-config"))
     );
@@ -239,7 +253,16 @@ fn reload_keeps_the_selection_by_name() {
     let mut session = Session::new(&backend);
     session.press(Key::Down);
     session.press(Key::Char('r'));
-    assert_eq!(session.state.selected_area().unwrap().name.as_str(), "root");
+    assert_eq!(
+        session
+            .state
+            .snapshots
+            .selected_area()
+            .unwrap()
+            .name
+            .as_str(),
+        "root"
+    );
 }
 
 #[test]

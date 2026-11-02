@@ -95,7 +95,7 @@ fn clicking_a_snapshot_row_selects_exactly_the_row_that_was_drawn_even_when_the_
         else {
             panic!("row {y} ({described}) is not clickable");
         };
-        let hit = session.state.displayed_snapshots()[index]
+        let hit = session.state.snapshots.displayed_snapshots()[index]
             .description
             .clone();
         assert_eq!(
@@ -120,8 +120,11 @@ fn clicking_a_area_row_selects_the_area_drawn_there_and_loads_its_snapshots() {
         .position(|l| l.contains("iso"))
         .expect("iso is listed") as u16;
     click(&mut session, SIZE, 5, y);
-    assert_eq!(session.state.selected_area().unwrap().name, name("iso"));
-    assert_eq!(session.state.focus, Pane::Areas);
+    assert_eq!(
+        session.state.snapshots.selected_area().unwrap().name,
+        name("iso")
+    );
+    assert_eq!(session.state.snapshots.focus, Pane::Areas);
     // it loaded: the pane's title names the area
     let screen = rows(&session.state, 100, 24).join("\n");
     assert!(screen.contains("Snapshots of iso"), "{screen}");
@@ -226,12 +229,12 @@ fn clicks_behind_a_prompt_do_nothing_and_are_never_typed_into_it() {
         other => panic!("the prompt should still be open: {other:?}"),
     }
     // and a row click behind it changes nothing either
-    let before = session.state.area_cursor;
+    let before = session.state.snapshots.area_cursor;
     session.dispatch(Msg::Click(Click::Row {
         pane: Pane::Areas,
         index: 2,
     }));
-    assert_eq!(session.state.area_cursor, before);
+    assert_eq!(session.state.snapshots.area_cursor, before);
 }
 
 #[test]
@@ -248,7 +251,7 @@ fn a_button_that_starts_work_is_refused_while_snapper_is_busy_exactly_like_its_k
     let mut state = State::default();
     update(&mut state, Msg::Start);
     update(&mut state, Msg::HealthLoaded(Err(String::new())));
-    assert_eq!(state.pending, 1);
+    assert_eq!(state.waiting.pending, 1);
     update(&mut state, Msg::Click(Click::Button(Button::Create)));
     assert!(state.modal.is_none(), "busy: no prompt opens");
     assert!(
@@ -267,12 +270,15 @@ fn the_mark_column_toggles_a_mark_without_moving_the_cursor_unlike_the_space_key
     session.press(Key::Right);
     session.dispatch(Msg::Click(Click::Mark { index: 2 }));
     assert_eq!(
-        session.state.snapshot_cursor, 2,
+        session.state.snapshots.snapshot_cursor, 2,
         "the cursor stays on the clicked row"
     );
-    assert_eq!(session.state.marked.len(), 1);
+    assert_eq!(session.state.snapshots.marked.len(), 1);
     session.dispatch(Msg::Click(Click::Mark { index: 2 }));
-    assert!(session.state.marked.is_empty(), "a second click unmarks");
+    assert!(
+        session.state.snapshots.marked.is_empty(),
+        "a second click unmarks"
+    );
     // the first cells of a snapshot row really are the mark column in the drawn screen
     let drawn = rows(&session.state, 100, 24);
     let y = drawn.iter().position(|l| l.contains("snap 4")).unwrap() as u16;
@@ -287,14 +293,14 @@ fn the_mark_column_toggles_a_mark_without_moving_the_cursor_unlike_the_space_key
 fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() {
     let backend = backend(10);
     let mut session = Session::new(&backend);
-    assert_eq!(session.state.focus, Pane::Areas);
+    assert_eq!(session.state.snapshots.focus, Pane::Areas);
     session.dispatch(Msg::Scroll {
         pane: Pane::Snapshots,
         delta: 3,
     });
-    assert_eq!(session.state.snapshot_cursor, 3);
+    assert_eq!(session.state.snapshots.snapshot_cursor, 3);
     assert_eq!(
-        session.state.focus,
+        session.state.snapshots.focus,
         Pane::Areas,
         "the keyboard focus did not move"
     );
@@ -302,12 +308,18 @@ fn the_wheel_moves_the_pane_under_the_pointer_and_leaves_keyboard_focus_alone() 
         pane: Pane::Snapshots,
         delta: -100,
     });
-    assert_eq!(session.state.snapshot_cursor, 0, "clamped at the top");
+    assert_eq!(
+        session.state.snapshots.snapshot_cursor, 0,
+        "clamped at the top"
+    );
     session.dispatch(Msg::Scroll {
         pane: Pane::Areas,
         delta: 1,
     });
-    assert_eq!(session.state.selected_area().unwrap().name, name("iso"));
+    assert_eq!(
+        session.state.snapshots.selected_area().unwrap().name,
+        name("iso")
+    );
     assert_eq!(view::pane_at(&session.state, SIZE, 5, 5), Some(Pane::Areas));
     assert_eq!(
         view::pane_at(&session.state, SIZE, 60, 5),

@@ -7,7 +7,6 @@
 //! Nothing here touches a terminal or a backend. `update` mutates the state and returns
 //! the *effects* the shell should perform; the shell reports what happened as new messages.
 
-use std::collections::BTreeSet;
 use std::time::Duration;
 
 use crate::tab::Tab;
@@ -45,24 +44,25 @@ pub fn update(state: &mut State, msg: Msg) -> Vec<Effect> {
         Msg::SnapshotsLoaded { .. } | Msg::FileVersionsLoaded { .. } | Msg::AreasLoaded(Err(_))
     ) || matches!(&msg, Msg::AreasLoaded(Ok(areas)) if areas.is_empty());
     let mut effects = handle(state, msg);
-    if first_screen_arrived && !state.health_asked {
-        state.health_asked = true;
+    if first_screen_arrived && !state.health.asked {
+        state.health.asked = true;
         effects.push(Effect::LoadHealth);
         effects.push(Effect::LoadHistory);
         effects.push(Effect::LoadGroups);
     }
     // looking at how protection stands is a refresh on the side: it is neither work that blocks the keys
     // that start work, nor something the screen announces
-    state.pending += effects
+    state.waiting.pending += effects
         .iter()
         .filter(|effect| !effect.is_background())
         .count();
     state
+        .waiting
         .doing
         .extend(effects.iter().filter_map(crate::changes::describe_now));
-    if state.pending == 0 {
-        state.doing.clear();
-        state.busy_ticks = 0;
+    if state.waiting.pending == 0 {
+        state.waiting.doing.clear();
+        state.waiting.busy_ticks = 0;
     }
     effects
 }
@@ -138,5 +138,5 @@ fn handle(state: &mut State, msg: Msg) -> Vec<Effect> {
 
 /// One result came back. A result nobody asked for does not push the count below zero.
 pub(super) fn settle(state: &mut State) {
-    state.pending = state.pending.saturating_sub(1);
+    state.waiting.pending = state.waiting.pending.saturating_sub(1);
 }

@@ -63,11 +63,11 @@ pub(crate) fn render_header(state: &State, frame: &mut Frame, area: Rect) {
         )),
         None => spans.extend(tab_spans(state)),
     }
-    if state.pending > 0 {
+    if state.waiting.pending > 0 {
         // Work is in flight on the worker thread: say so, and keep the screen moving.
         const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
         let word = if state.quit { "finishing" } else { "working" };
-        let seconds = state.busy_ticks / 10;
+        let seconds = state.waiting.busy_ticks / 10;
         let elapsed = if seconds > 0 {
             format!(" {seconds} s")
         } else {
@@ -76,7 +76,7 @@ pub(crate) fn render_header(state: &State, frame: &mut Frame, area: Rect) {
         spans.push(Span::styled(
             format!(
                 "   {} {word}{elapsed}",
-                FRAMES[state.spinner % FRAMES.len()]
+                FRAMES[state.waiting.spinner % FRAMES.len()]
             ),
             Style::new().fg(Color::Yellow).bold(),
         ));

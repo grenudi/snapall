@@ -168,7 +168,7 @@ fn a_click_flashes_the_button_for_a_moment_and_then_it_is_as_before() {
         Color::DarkGray,
         "and back to rest after three"
     );
-    assert!(session.state.pressed.is_none());
+    assert!(session.state.pointer.pressed.is_none());
 }
 
 #[test]

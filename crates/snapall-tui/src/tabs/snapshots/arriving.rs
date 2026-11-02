@@ -14,20 +14,20 @@ pub(crate) fn on_areas_loaded(
 ) -> Vec<Effect> {
     match result {
         Err(error) => {
-            state.areas = Load::Failed(error.clone());
-            state.area_cursor = 0;
-            state.after_reload = None;
+            state.snapshots.areas = Load::Failed(error.clone());
+            state.snapshots.area_cursor = 0;
+            state.waiting.after_reload = None;
             state.notice = Some(Notice::Error(error));
             Vec::new()
         }
         Ok(mut names) => {
-            let previous = state.selected_area().map(|c| c.name.clone());
+            let previous = state.snapshots.selected_area().map(|c| c.name.clone());
             names.sort();
             names.dedup();
-            state.area_cursor = previous
+            state.snapshots.area_cursor = previous
                 .and_then(|p| names.iter().position(|n| *n == p))
                 .unwrap_or(0);
-            state.areas = Load::Loaded(
+            state.snapshots.areas = Load::Loaded(
                 names
                     .into_iter()
                     .map(|name| AreaEntry {
@@ -36,15 +36,15 @@ pub(crate) fn on_areas_loaded(
                     })
                     .collect(),
             );
-            state.snapshot_cursor = 0;
-            state.marked.clear();
+            state.snapshots.snapshot_cursor = 0;
+            state.snapshots.marked.clear();
             if matches!(state.notice, Some(Notice::Info(_))) {
                 state.notice = None;
             }
-            if let Some(confirmation) = state.after_reload.take() {
+            if let Some(confirmation) = state.waiting.after_reload.take() {
                 state.notice = Some(confirmation);
             }
-            if state.entries().is_empty() {
+            if state.snapshots.entries().is_empty() {
                 state.notice = Some(Notice::Error(if state.offers.is_empty() {
                     "There are no protected areas yet, and snapall found nothing it can protect here: it works with disks formatted as Btrfs.".into()
                 } else {
@@ -61,8 +61,8 @@ pub(crate) fn on_snapshots_loaded(
     area: &AreaName,
     result: Result<Vec<SnapshotInfo>, String>,
 ) -> Vec<Effect> {
-    let selected = state.selected_area().map(|c| c.name.clone());
-    let Some(entry) = state.entry_mut(area) else {
+    let selected = state.snapshots.selected_area().map(|c| c.name.clone());
+    let Some(entry) = state.snapshots.entry_mut(area) else {
         return Vec::new();
     };
     match result {
@@ -76,11 +76,16 @@ pub(crate) fn on_snapshots_loaded(
         }
     }
     if selected.as_ref() == Some(area) {
-        let existing: BTreeSet<SnapshotId> =
-            state.displayed_snapshots().iter().map(|s| s.id).collect();
-        state.marked.retain(|id| existing.contains(id));
+        let existing: BTreeSet<SnapshotId> = state
+            .snapshots
+            .displayed_snapshots()
+            .iter()
+            .map(|s| s.id)
+            .collect();
+        state.snapshots.marked.retain(|id| existing.contains(id));
         let len = existing.len();
-        state.snapshot_cursor = state.snapshot_cursor.min(len.saturating_sub(1));
+        state.snapshots.snapshot_cursor =
+            state.snapshots.snapshot_cursor.min(len.saturating_sub(1));
     }
     Vec::new()
 }
@@ -109,7 +114,7 @@ pub(crate) fn on_created(
         ))
     });
     // New snapshots are newest: show them.
-    state.snapshot_cursor = 0;
+    state.snapshots.snapshot_cursor = 0;
     results
         .into_iter()
         .filter_map(|(area, r)| r.ok().map(|_| Effect::LoadSnapshots(area)))

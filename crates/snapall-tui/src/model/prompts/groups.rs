@@ -102,6 +102,7 @@ fn on_list(state: &mut State, key: Key, cursor: usize) -> Reaction {
 fn pick(state: &State, name: GroupName) -> Modal {
     let already = state.groups.get(&name).unwrap_or(&[]).to_vec();
     let picks = state
+        .snapshots
         .area_names()
         .into_iter()
         .map(|area| {

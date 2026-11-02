@@ -71,16 +71,16 @@ pub(crate) fn confirming_restore(
 }
 
 pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.selected_area().map(|c| c.name.clone()) else {
+    let Some(area) = state.snapshots.selected_area().map(|c| c.name.clone()) else {
         return Vec::new();
     };
-    if state.focus != Pane::Snapshots {
+    if state.snapshots.focus != Pane::Snapshots {
         state.notice = Some(Notice::Info(
             "move to the snapshots pane (right arrow) to choose the snapshot to restore".into(),
         ));
         return Vec::new();
     }
-    let Some(id) = state.selected_snapshot().map(|s| s.id) else {
+    let Some(id) = state.snapshots.selected_snapshot().map(|s| s.id) else {
         state.notice = Some(Notice::Error("no snapshot to restore".into()));
         return Vec::new();
     };
@@ -144,7 +144,7 @@ pub(crate) fn on_restored(
         )),
         (Err(error), _) => Notice::Error(error.clone()),
     });
-    state.marked.clear();
+    state.snapshots.marked.clear();
     // Reload either way: a safety snapshot may exist even when the restore itself failed.
     match &state.file {
         Some(view) => vec![Effect::LoadFileVersions {

@@ -182,12 +182,12 @@ fn the_header_says_so_while_work_is_in_flight_and_stays_quiet_otherwise() {
         "idle: no indicator"
     );
 
-    session.state.pending = 1;
+    session.state.waiting.pending = 1;
     let first = screen(&session, 100, 12);
     assert!(first.contains("working"), "{first}");
 
     // The indicator moves, so a frozen-looking screen is distinguishable from a working one.
-    session.state.spinner += 1;
+    session.state.waiting.spinner += 1;
     let second = screen(&session, 100, 12);
     assert_ne!(
         first.lines().next(),

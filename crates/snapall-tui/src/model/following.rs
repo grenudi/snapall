@@ -15,15 +15,15 @@ pub(crate) fn follow_what_runs(state: &mut State) -> Vec<Effect> {
         .entries
         .iter()
         .any(|entry| entry.status == snapall_core::JournalStatus::Running);
-    if !running && state.watching.is_empty() {
-        state.poll_ticks = 0;
+    if !running && state.waiting.watching.is_empty() {
+        state.waiting.poll_ticks = 0;
         return Vec::new();
     }
-    state.poll_ticks += 1;
-    if state.poll_ticks < 10 {
+    state.waiting.poll_ticks += 1;
+    if state.waiting.poll_ticks < 10 {
         return Vec::new();
     }
-    state.poll_ticks = 0;
+    state.waiting.poll_ticks = 0;
     vec![Effect::LoadHistory]
 }
 
@@ -38,7 +38,7 @@ pub(crate) fn what_this_window_started_has_ended(
     const LET_GO_AFTER: u32 = 30;
     let mut effects = Vec::new();
     let mut notice = None;
-    state.watching.retain_mut(|watched| {
+    state.waiting.watching.retain_mut(|watched| {
         match entries.iter().find(|entry| entry.id == watched.id) {
             None => {
                 watched.unseen += 1;
@@ -73,7 +73,7 @@ pub(crate) fn what_this_window_started_has_ended(
     if let Some(notice) = notice {
         // looking at the lists again would clear it: it is shown again when they have arrived
         if !effects.is_empty() {
-            state.after_reload = Some(notice.clone());
+            state.waiting.after_reload = Some(notice.clone());
         }
         state.notice = Some(notice);
     }

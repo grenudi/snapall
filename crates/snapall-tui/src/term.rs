@@ -95,7 +95,7 @@ fn step(state: &mut State, msg: Msg, effects: &mpsc::Sender<Effect>) {
     for effect in update(state, msg) {
         if effects.send(effect).is_err() {
             // The worker is gone: nothing will ever answer, so do not wait for it.
-            state.pending = state.pending.saturating_sub(1);
+            state.waiting.pending = state.waiting.pending.saturating_sub(1);
             state.notice = Some(Notice::Error("the background worker stopped".into()));
         }
     }
@@ -127,8 +127,8 @@ fn event_loop(
                 }
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => {
-                    if state.pending > 0 {
-                        state.pending = 0;
+                    if state.waiting.pending > 0 {
+                        state.waiting.pending = 0;
                         state.notice = Some(Notice::Error("the background worker stopped".into()));
                         changed = true;
                     }
@@ -138,7 +138,7 @@ fn event_loop(
         }
         // Quitting waits for the operation in flight: a half-finished delete is worse than a
         // short wait. The header says "finishing" meanwhile.
-        if state.quit && state.pending == 0 {
+        if state.quit && state.waiting.pending == 0 {
             return Ok(Exit::Quit);
         }
         if let Some(signal) = pending_signal(received) {
@@ -162,7 +162,7 @@ fn event_loop(
                         // Moving over a button explains it; only a change is worth a redraw.
                         MouseEventKind::Moved => {
                             let over = view::hit_test(&state, screen, mouse.column, mouse.row);
-                            (over != state.hover).then_some(Msg::Hover(over))
+                            (over != state.pointer.hover).then_some(Msg::Hover(over))
                         }
                         MouseEventKind::ScrollUp => {
                             view::pane_at(&state, screen, mouse.column, mouse.row)
