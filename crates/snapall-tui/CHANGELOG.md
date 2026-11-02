@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.27.1]
+
+
+### Refactoring
+- Each question is one place ([#110](https://github.com/grenudi/snapall/pull/110)) ([b507458])
+
+
+
 ## [0.27.0]
 
 
