@@ -71,9 +71,9 @@ pub fn unprotect(ctx: &Context, area: &str, mode: Mode, agreed: Agreed) -> Outco
 /// `--json` nothing is said or asked, and nothing is changed unless `--yes` is given as well.
 pub fn setup(ctx: &Context, area: Option<&str>, agreed: Agreed, mode: Mode) -> Outcome {
     let json = ctx.show.is_json();
-    let options = options_for(area, agreed, mode, json);
+    let options = options_for(ctx, area, agreed, mode);
     let change = begin_unless_rehearsing(&options)?;
-    let report = hold_the_conversation(ctx, &options, json)?;
+    let report = hold_the_conversation(ctx, &options)?;
     if let Some(change) = change {
         end_with_the_way_back(change, &report);
     }
@@ -89,12 +89,12 @@ pub fn setup(ctx: &Context, area: Option<&str>, agreed: Agreed, mode: Mode) -> O
 
 /// What was asked on the command line. A program reading the output (`--json`) cannot be asked anything, so
 /// without `--yes` it is shown what would be done and nothing is.
-fn options_for(area: Option<&str>, agreed: Agreed, mode: Mode, json: bool) -> setup::Options {
+fn options_for(ctx: &Context, area: Option<&str>, agreed: Agreed, mode: Mode) -> setup::Options {
     let yes = agreed.covers(snapall_core::Weight::Changes);
     setup::Options {
         area: area.map(str::to_owned),
         yes,
-        dry_run: mode.shows_only() || (json && !yes),
+        dry_run: mode.shows_only() || (ctx.show.is_json() && !yes),
     }
 }
 
@@ -115,10 +115,9 @@ fn begin_unless_rehearsing(options: &setup::Options) -> Result<Option<Change>, B
 fn hold_the_conversation(
     ctx: &Context,
     options: &setup::Options,
-    json: bool,
 ) -> Result<setup::Report, Box<dyn Error>> {
     let facts = setup::gather();
-    if json {
+    if ctx.show.is_json() {
         setup::run(ctx.backend, &facts, &mut setup::Quiet, options)
     } else {
         setup::run(ctx.backend, &facts, &mut setup::Terminal, options)

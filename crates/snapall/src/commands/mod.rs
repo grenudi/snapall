@@ -59,6 +59,5 @@ pub struct Context<'a> {
     pub show: &'a Show,
     pub observer: &'a (dyn snapall_core::Observer + Send + Sync),
     pub hints: bool,
-    pub json: bool,
     pub no_dbus: bool,
 }

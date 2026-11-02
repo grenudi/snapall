@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-31: the booleans that were nouns, and two that I had added
+
+**Why.** Re-running the trend after the outline audit showed bare boolean parameters in the commands had gone from 8 to 10: two of my own refactors had added them (`json: bool` passed into two of the `setup` helpers when the context already knows). Looking at all ten sorted them into: two mine, one real duplication (`Context.json` kept a second copy of a fact `Show` already holds), three legitimate (the flag-to-noun conversion in `Mode::from_dry_run`, and the invocation facts `hints` and `no_dbus`), and five unnamed nouns.
+
+**What.** The `setup` helpers ask the context, and `Context.json` is gone. `stopped` moved into the core's `Report` (the restore side already keeps it inside `PointRestore`), which removed a `(Report, bool)` tuple, two parameters in the command and five test destructurings. `say_the_limits(…, true)` and `(…, false)` became `Wording::Changed` and `Wording::AsTheyAre`, the classic literal whose meaning a reader cannot see at the call site. `turn_on: bool`, four times, became `Counting::On` and `Counting::Off`, with a plain yes or no only at the three boundaries that need one (the core's rule, the machine's call, the rollback). Bare booleans in the commands: 10 to 1, and the one left is the boundary.
+
+**What the lesson is.** A metric that goes the wrong way after a refactor is information, not noise. The two I added would have stayed unless I had measured after the change, not only before it.
+
 ## 2026-10-30: the outline's sentences, audited as a set
 
 **Why.** With every guard at zero I needed a new way to find weak spots. The outline's sentences are what a stranger reads first, and I had checked them one question at a time but never as a set. Looking for the shortest, any used twice, and any that open with a generic noun.

@@ -202,7 +202,10 @@ mod tests {
             undo.what
         );
         assert!(undo.what.contains("lost for good"));
-        let nothing = crate::taking::run::Report { outcomes: vec![] };
+        let nothing = crate::taking::run::Report {
+            outcomes: vec![],
+            stopped: false,
+        };
         assert!(
             after_taking(&nothing).is_none(),
             "nothing taken, nothing to undo"

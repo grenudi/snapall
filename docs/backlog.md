@@ -20,9 +20,8 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Nine bare booleans remain in the commands, of a different kind from the ones that were named: states a function reports (`stopped`, `changed`, `ended`), a direction (`turn_on`, on or off) and facts about how the program was invoked (`hints`, `json`, `no_dbus` in `Context`). Name `turn_on` if a fourth place needs it | open |
-| 2 | The openSUSE container job's package install (`zypper`, in the step called `A user's tools`, which is ours and not the runner's) flaked three times. It now retries three times; judge by the next releases, and if it still flakes try the image from `registry.opensuse.org` instead of Docker Hub. First release with the retry (0.28.0): 15 jobs ran the step and none needed a retry, so the hypothesis is still untested | open |
-| 3 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
+| 1 | The openSUSE container job's package install (`zypper`, in the step called `A user's tools`, which is ours and not the runner's) flaked three times. It now retries three times; judge by the next releases, and if it still flakes try the image from `registry.opensuse.org` instead of Docker Hub. First release with the retry (0.28.0): 15 jobs ran the step and none needed a retry, so the hypothesis is still untested | open |
+| 2 | Record each change's weight in the journal (asked at: changed, or lost for good), so the Activity tab can say it | open |
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 

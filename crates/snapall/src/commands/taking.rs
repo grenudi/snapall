@@ -43,7 +43,7 @@ pub fn create(
     )?;
     // every snapshot of this one action is the same restore point
     let point = fresh_point(ctx.backend, unix_now());
-    let (report, stopped) = run_plan_along(
+    let report = run_plan_along(
         ctx.backend,
         &plan,
         description,
@@ -53,8 +53,8 @@ pub fn create(
     if let Some(way_back) = snapall_core::going_back::rollback::after_taking(&report) {
         change.rollback(way_back);
     }
-    record_how_taking_went(change, &plan, &report, stopped);
-    say_what_was_taken(ctx, &plan, &report, stopped)
+    record_how_taking_went(change, &plan, &report);
+    say_what_was_taken(ctx, &plan, &report)
 }
 
 /// A group is a name for a set of areas: it is what `--only` would have been.
@@ -75,9 +75,9 @@ fn areas_in_words(plan: &Plan) -> String {
     areas.join(", ")
 }
 
-fn record_how_taking_went(change: Change, plan: &Plan, report: &Report, stopped: bool) {
+fn record_how_taking_went(change: Change, plan: &Plan, report: &Report) {
     let (taken, total) = (report.outcomes.len(), plan.targets().len());
-    if stopped {
+    if report.stopped {
         change.end_stopped(format!(
             "stopped on request after {taken} of {total} areas: the others were not started"
         ));
@@ -105,8 +105,8 @@ fn what_failed(report: &Report) -> String {
     failures.join("; ")
 }
 
-fn say_what_was_taken(ctx: &Context, plan: &Plan, report: &Report, stopped: bool) -> Outcome {
-    if stopped {
+fn say_what_was_taken(ctx: &Context, plan: &Plan, report: &Report) -> Outcome {
+    if report.stopped {
         let (taken, total) = (report.outcomes.len(), plan.targets().len());
         output::note(&format!(
             "snapall: stopped on request after {taken} of {total} areas; the rest were not started"
@@ -114,7 +114,7 @@ fn say_what_was_taken(ctx: &Context, plan: &Plan, report: &Report, stopped: bool
     }
     ctx.show
         .result(render::report(report), render::report_json(report))?;
-    if stopped || !report.is_success() {
+    if report.stopped || !report.is_success() {
         return Ok(ExitCode::FAILURE);
     }
     suggest_the_boot_menu(ctx);

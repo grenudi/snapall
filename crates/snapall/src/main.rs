@@ -72,7 +72,6 @@ fn run(parsed: Parsed) -> Outcome {
         show: &show,
         observer: observer.as_ref(),
         hints,
-        json,
         no_dbus,
     };
     commands::carry_out(&ctx, request)

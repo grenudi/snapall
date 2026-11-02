@@ -66,8 +66,8 @@ mod tests {
         let backend = InMemoryBackend::with_areas(&["home", "docs", "root"]);
         let plan = plan_snapshots(&backend, None).unwrap();
         let course = Stopper::after(usize::MAX);
-        let (report, stopped) = run_plan_along(&backend, &plan, &description(), None, &course);
-        assert!(!stopped && report.outcomes.len() == 3);
+        let report = run_plan_along(&backend, &plan, &description(), None, &course);
+        assert!(!report.stopped && report.outcomes.len() == 3);
         let expected: Vec<(usize, usize, String)> = [(0, "docs"), (1, "home"), (2, "root")]
             .into_iter()
             .map(|(done, area)| (done, 3, area.to_owned()))
@@ -83,9 +83,8 @@ mod tests {
     fn a_stopped_snapshot_of_everything_leaves_the_taken_ones_and_never_starts_the_rest() {
         let backend = InMemoryBackend::with_areas(&["home", "docs"]);
         let plan = plan_snapshots(&backend, None).unwrap();
-        let (report, stopped) =
-            run_plan_along(&backend, &plan, &description(), None, &Stopper::after(1));
-        assert!(stopped, "it says it was stopped");
+        let report = run_plan_along(&backend, &plan, &description(), None, &Stopper::after(1));
+        assert!(report.stopped, "it says it was stopped");
         assert_eq!(
             report.outcomes.len(),
             1,
@@ -138,7 +137,7 @@ mod tests {
     fn nobody_watching_means_every_step_goes_ahead() {
         let backend = InMemoryBackend::with_areas(&["home"]);
         let plan = plan_snapshots(&backend, None).unwrap();
-        let (report, stopped) = run_plan_along(&backend, &plan, &description(), None, &Unattended);
-        assert!(!stopped && report.is_success());
+        let report = run_plan_along(&backend, &plan, &description(), None, &Unattended);
+        assert!(!report.stopped && report.is_success());
     }
 }
