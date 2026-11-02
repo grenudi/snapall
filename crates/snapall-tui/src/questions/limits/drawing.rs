@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The editor of how many snapshots an area keeps, with what the settings would do shown beneath them.
+//! Drawing the editor of how many snapshots an area keeps, with what the settings would do shown beneath them.
 
 use crate::model::State;
 use crate::model::{now_seconds, LimitsEditor};

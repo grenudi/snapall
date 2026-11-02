@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The help: two pages, turned with Enter, Tab or the arrows.
+//! The window's help: its pages, how they are turned, and how they are drawn.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;

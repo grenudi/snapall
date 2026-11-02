@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Asking before the disk starts, or stops, counting the room snapshots take.
+//! The question about counting the room snapshots take: its answer, and how it is drawn.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The controls of one background job: what it is, what the machine says about it, and the keys that
+//! Drawing the controls of one background job: what it is, what the machine says about it, and the keys that
 //! control it, each beside the command a person could type instead.
 
 use crate::model::State;

@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-30: the outline's sentences, audited as a set
+
+**Why.** With every guard at zero I needed a new way to find weak spots. The outline's sentences are what a stranger reads first, and I had checked them one question at a time but never as a set. Looking for the shortest, any used twice, and any that open with a generic noun.
+
+**What it found.** Mostly decent sentences, and one thing I had caused: **ten modules repeated their sibling's sentence word for word.** When each question became a folder I copied the asking file's first sentence into the folder's front, so the outline showed the same line twice and said nothing about how a folder differs from the file inside it. Three more were too thin to help ("Validated domain types.", "Groups of areas.", "The restore points screen."). And the question drawing files did not begin "Drawing the …" as the tabs' do.
+
+**What.** Distinct sentences for the ten fronts, fuller ones for the thin three, a consistent "Drawing the …" for the twelve question drawing files, and a guard that would have caught my mistake: no two modules may describe themselves in the same words. Rewording the fronts moved one ranking, and the cause was in the ranker, not the sentences: it did not know that "drawn" is a form of "draw", the same blind spot as "taken" and "delete" before; it now knows that and "chosen". 48 questions, all within the first three, 35 first (31 before).
+
 ## 2026-10-30: measured instead of worried: the script tests do not race
 
 **Why.** The plan carried an item that three tests, which write a script and run it at once, might hit the `text file busy` race the background runner's test once had. Nothing had shown it. A fast test (0.4 seconds a run) can simply be run many times.

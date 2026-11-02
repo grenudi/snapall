@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
+//! The restore question: what would change, the offer to put the whole point back, and how it is drawn.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;

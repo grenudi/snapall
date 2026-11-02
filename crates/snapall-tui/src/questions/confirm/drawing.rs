@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The question before a change, in the colour of its weight: yellow for what can be put back, red for what
+//! Drawing the question before a change, in the colour of its weight: yellow for what can be put back, red for what
 //! cannot.
 
 use crate::model::Confirm;

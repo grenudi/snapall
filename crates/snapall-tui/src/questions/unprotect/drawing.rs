@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The question before an area stops being protected: the plan in plain words, in red where it is
+//! Drawing the question before an area stops being protected: the plan in plain words, in red where it is
 //! destructive, and the name to type.
 
 use crate::model::StopProtecting;

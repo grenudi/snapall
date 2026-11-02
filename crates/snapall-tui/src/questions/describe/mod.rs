@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The prompt for a snapshot's note: what is typed, and what Enter does with it.
+//! The note a person gives a snapshot: typing it, and how the box looks.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;

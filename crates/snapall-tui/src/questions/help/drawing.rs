@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The help: what snapshots are, then the keys.
+//! Drawing the help: what snapshots are, then the keys.
 
 use crate::theme::ACCENT;
 use crate::view::*;

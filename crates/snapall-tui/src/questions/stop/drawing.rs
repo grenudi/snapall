@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The question before a running change is asked to stop.
+//! Drawing the question before a running change is asked to stop.
 
 use crate::theme::DIM;
 use crate::view::*;

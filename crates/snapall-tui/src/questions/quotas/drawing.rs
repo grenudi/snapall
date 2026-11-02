@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Asking before the disk starts, or stops, counting the room snapshots take: what it gives, what it
+//! Drawing the question before the disk starts, or stops, counting the room snapshots take: what it gives, what it
 //! costs, what will happen, and that it can be undone.
 
 use crate::model::State;

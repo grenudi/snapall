@@ -70,7 +70,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `vocabulary/consequence.rs`: How heavy an action is (what it weighs), and so what has to be typed before it happens.
     - `vocabulary/domain/files.rs`: What changed in a file between a snapshot and now, and what a restore did.
     - `vocabulary/domain/keeping.rs`: How many snapshots an area keeps, and the options that say so.
-    - `vocabulary/domain/mod.rs`: Validated domain types.
+    - `vocabulary/domain/mod.rs`: The nouns snapall works with, each checked when it is made: area names, snapshot numbers, descriptions and points.
     - `vocabulary/domain/names.rs`: Names and numbers that are parsed once, at the boundary: an area, a description, a snapshot number, a restore point.
     - `vocabulary/domain/snapshots.rs`: What is known about a snapshot.
     - `vocabulary/explain/areas.rs`: What a person is told about an area: what could be protected, what protecting does, and why it failed.
@@ -141,45 +141,45 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/state/window.rs`: The window at one moment: its lists, cursor, open question, message, and what it is waiting for.
   - `model/updating.rs`: What the window does with each message that arrives: it decides, changes its state, and says what it wants done in return; one table says which step answers which message.
     - `questions/confirm/asking.rs`: The question before a change: what it will do, and the answer that goes with its weight.
-    - `questions/confirm/drawing.rs`: The question before a change, in the colour of its weight: yellow for what can be put back, red for what cannot.
-    - `questions/confirm/mod.rs`: The question before a change: what it will do, and the answer that goes with its weight.
+    - `questions/confirm/drawing.rs`: Drawing the question before a change, in the colour of its weight: yellow for what can be put back, red for what cannot.
+    - `questions/confirm/mod.rs`: The confirmation before a change: what it says, the answer its weight asks for, and how it looks.
     - `questions/delete/asking.rs`: Deleting snapshots: asking first, and what comes of it.
-    - `questions/delete/drawing.rs`: The prompt that asks before deleting snapshots.
-    - `questions/delete/mod.rs`: Deleting snapshots: asking first, and what comes of it.
+    - `questions/delete/drawing.rs`: Drawing the prompt that asks before deleting snapshots.
+    - `questions/delete/mod.rs`: The question before deleting snapshots: what is lost, what has to be typed, and how it looks.
     - `questions/describe/asking.rs`: The prompt for a snapshot's note: what is typed, and what Enter does with it.
-    - `questions/describe/drawing.rs`: The prompt for a snapshot's note.
-    - `questions/describe/mod.rs`: The prompt for a snapshot's note: what is typed, and what Enter does with it.
+    - `questions/describe/drawing.rs`: Drawing the prompt for a snapshot's note.
+    - `questions/describe/mod.rs`: The note a person gives a snapshot: typing it, and how the box looks.
   - `questions/frame.rs`: The frame every prompt shares: its size and place (clear of the three lines beneath), its buttons, and the drawing of any of them.
     - `questions/groups/asking.rs`: The groups of areas: see them, make one, change which areas one has, take one away.
-    - `questions/groups/drawing.rs`: The groups prompt: the list, naming a new group, and choosing its areas, each with the keys that work on it said on the screen.
-    - `questions/groups/mod.rs`: The groups of areas: see them, make one, change which areas one has, take one away.
+    - `questions/groups/drawing.rs`: Drawing the groups prompt: the list, naming a new group, and choosing its areas, each with the keys that work on it said on the screen.
+    - `questions/groups/mod.rs`: The groups of areas as the window shows and edits them: the keys, and the screens.
     - `questions/help/asking.rs`: The help: two pages, turned with Enter, Tab or the arrows.
-    - `questions/help/drawing.rs`: The help: what snapshots are, then the keys.
-    - `questions/help/mod.rs`: The help: two pages, turned with Enter, Tab or the arrows.
+    - `questions/help/drawing.rs`: Drawing the help: what snapshots are, then the keys.
+    - `questions/help/mod.rs`: The window's help: its pages, how they are turned, and how they are drawn.
     - `questions/job/asking.rs`: The controls of one background job: a key for each thing that can be done to it.
-    - `questions/job/drawing.rs`: The controls of one background job: what it is, what the machine says about it, and the keys that control it, each beside the command a person could type instead.
-    - `questions/job/mod.rs`: The controls of one background job: a key for each thing that can be done to it.
+    - `questions/job/drawing.rs`: Drawing the controls of one background job: what it is, what the machine says about it, and the keys that control it, each beside the command a person could type instead.
+    - `questions/job/mod.rs`: The controls of one background job in the window: its keys, and how they are shown.
     - `questions/limits/asking.rs`: The editor of how many snapshots an area keeps: three settings, each adjusted with the arrows, and the consequence of them shown as they are set.
-    - `questions/limits/drawing.rs`: The editor of how many snapshots an area keeps, with what the settings would do shown beneath them.
+    - `questions/limits/drawing.rs`: Drawing the editor of how many snapshots an area keeps, with what the settings would do shown beneath them.
     - `questions/limits/mod.rs`: The editor of how many snapshots an area keeps: three settings, each adjusted with the arrows, and the
   - `questions/mod.rs`: The questions the window asks.
     - `questions/points/asking.rs`: Restore points: the list of them, the preview of the chosen one, and putting one back.
-    - `questions/points/drawing.rs`: The restore points screen.
-    - `questions/points/mod.rs`: Restore points: the list of them, the preview of the chosen one, and putting one back.
+    - `questions/points/drawing.rs`: Drawing the restore points screen: the points, and what putting the chosen one back would change.
+    - `questions/points/mod.rs`: The restore points screen: choosing a point and what putting it back would do, decided and drawn in one place.
     - `questions/protect/asking.rs`: Protecting a part of the disk that has no snapshots yet: one offer at a time.
-    - `questions/protect/drawing.rs`: The offer to protect a part of the disk.
-    - `questions/protect/mod.rs`: Protecting a part of the disk that has no snapshots yet: one offer at a time.
+    - `questions/protect/drawing.rs`: Drawing the offer to protect a part of the disk.
+    - `questions/protect/mod.rs`: The offer to protect a part of the disk that has no snapshots yet: the question, and how it is drawn.
     - `questions/quotas/asking.rs`: Asking before the disk starts, or stops, counting the room snapshots take.
-    - `questions/quotas/drawing.rs`: Asking before the disk starts, or stops, counting the room snapshots take: what it gives, what it costs, what will happen, and that it can be undone.
-    - `questions/quotas/mod.rs`: Asking before the disk starts, or stops, counting the room snapshots take.
+    - `questions/quotas/drawing.rs`: Drawing the question before the disk starts, or stops, counting the room snapshots take: what it gives, what it costs, what will happen, and that it can be undone.
+    - `questions/quotas/mod.rs`: The question about counting the room snapshots take: its answer, and how it is drawn.
     - `questions/restore/asking.rs`: Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
-    - `questions/restore/drawing.rs`: The restore prompt: what would change, and the offer to put the whole restore point back.
-    - `questions/restore/mod.rs`: Restoring an area from a snapshot: showing what would change, asking, and what comes of it.
+    - `questions/restore/drawing.rs`: Drawing the restore prompt: what would change, and the offer to put the whole restore point back.
+    - `questions/restore/mod.rs`: The restore question: what would change, the offer to put the whole point back, and how it is drawn.
     - `questions/stop/asking.rs`: Asking before a change that is running is asked to stop: what stopping means, so that nobody is afraid to do it, and that it is only a request.
-    - `questions/stop/drawing.rs`: The question before a running change is asked to stop.
+    - `questions/stop/drawing.rs`: Drawing the question before a running change is asked to stop.
     - `questions/stop/mod.rs`: Asking before a change that is running is asked to stop: what stopping means, so that nobody is
     - `questions/unprotect/asking.rs`: Stop protecting an area: what it would do, in plain words, and the area's name typed out before it does it.
-    - `questions/unprotect/drawing.rs`: The question before an area stops being protected: the plan in plain words, in red where it is destructive, and the name to type.
+    - `questions/unprotect/drawing.rs`: Drawing the question before an area stops being protected: the plan in plain words, in red where it is destructive, and the name to type.
     - `questions/unprotect/mod.rs`: Stop protecting an area: what it would do, in plain words, and the area's name typed out
   - `session/changing.rs`: What the window asks to be changed, done through the backend and the machine.
   - `session/executor.rs`: The window's executor: it performs each effect against the backend and the machine, and answers with the message that describes the outcome.
@@ -245,7 +245,7 @@ What each part of snapall says it is for, read from the first line of each modul
 - `output.rs`: Printing, and the choice between text for a person and JSON for a program.
   - `render/activity.rs`: What snapall has done, as the journal remembers it.
   - `render/changing.rs`: What a restore would change, what a restore or a deletion did.
-  - `render/groups.rs`: Groups of areas.
+  - `render/groups.rs`: What the command line says about groups of areas: the list, and what making or changing one did.
   - `render/health.rs`: How protection stands, and the checks that find out.
   - `render/listing.rs`: Listing snapshots and the history of a file.
   - `render/mod.rs`: What the command line says: each result as text for a person or as JSON for a program.

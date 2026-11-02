@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Groups of areas.
+//! What the command line says about groups of areas: the list, and what making or changing one did.
 
 use serde_json::{json, Value};
 

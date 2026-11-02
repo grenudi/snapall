@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Validated domain types. Untrusted text is parsed into these once, at the boundary;
+//! The nouns snapall works with, each checked when it is made: area names, snapshot numbers, descriptions and points. Untrusted text is parsed into these once, at the boundary;
 //! everything downstream receives a value that cannot be invalid.
 
 mod files;

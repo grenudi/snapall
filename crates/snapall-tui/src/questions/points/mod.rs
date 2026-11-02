@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Restore points: the list of them, the preview of the chosen one, and putting one back.
+//! The restore points screen: choosing a point and what putting it back would do, decided and drawn in one place.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The question before a change: what it will do, and the answer that goes with its weight. Every change
+//! The confirmation before a change: what it says, the answer its weight asks for, and how it looks.
 
 pub(crate) mod asking;
 pub(crate) mod drawing;
