@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.29.0]
+
+
+### Refactoring
+- The booleans that were nouns, and two that I had added ([#128](https://github.com/grenudi/snapall/pull/128)) ([7617693])
+
+
+
 ## [0.28.1]
 
 
