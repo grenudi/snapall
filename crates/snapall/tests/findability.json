@@ -275,6 +275,12 @@
       "answers": [
         "snapall-core/going_back/points/saying.rs"
       ]
+    },
+    {
+      "question": "How does undo know that the snapshot it would go back to still exists?",
+      "answers": [
+        "snapall-core/going_back/still_there.rs"
+      ]
     }
   ]
 }

@@ -21,6 +21,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `going_back/points/saying.rs`: What a restore of every area says about itself: how many areas were put back and where the way back is, why it failed, or how far it got before it was stopped.
   - `going_back/restoring.rs`: Putting an area, or one path of it, back to how a snapshot had it, with a safety snapshot first.
   - `going_back/rollback.rs`: The way back from each kind of change, in one place: what it names as the earlier state, the commands that return to it, and what doing that weighs.
+  - `going_back/still_there.rs`: Whether what a rollback would go back to is still there.
   - `health/chips.rs`: The chips that say how things stand at a glance.
   - `health/facts.rs`: Collecting what is true of the machine: each area's snapshots and limits, the jobs, the room taken.
   - `health/findings.rs`: Finding what is wrong, one check at a time, and the verdict they add up to.

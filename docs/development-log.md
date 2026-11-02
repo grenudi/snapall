@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-10-29: the core understands its own way back
+
+**Why.** The finding from the previous change: `check_the_way_back_still_exists` parsed the recorded command words back (`["restore", area, id, ..]`) to find out what a rollback would go back to, while each producer in the core assembled those words by hand. Two sides of one language with nothing tying them together: a change to either would silently break undo, and nobody would find out until someone needed it.
+
+**What.** The stored words stay as they are (a readable, stable form that old journals depend on), and the core now reads them: `Undo::goes_back_to()` says, typed, which snapshots and restore points a rollback names, and `going_back::still_there::still_there(backend, undo)` is the check, with the exact messages a person saw before. The binary's function and its parsing are gone, and with it the last plumbing debt in the handlers. Five tests, one of which is a guard over the producers: what each producer writes must be something this can read. Shown to bite by renaming the command word one producer records (that test, and only that one, failed; the file was restored exactly).
+
+**Evidence.** The core's tests and the fast gate; CI runs the consequences script, which undoes real changes on real snapper.
+
 ## 2026-10-29: restore-all and undo read as the stories they are
 
 **Why.** The stories are the layer I had judged weakest: the last measurement showed the handlers' length and branching budgets as the only debts left in the command line. `restore_all` was 79 lines and `undo` 61, each with its steps (find, preview, ask, begin, do, record, end, show) written inline, and `restore_all` with the *words* of two outcomes inside it.

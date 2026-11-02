@@ -8,3 +8,4 @@ pub mod boot;
 pub mod points;
 pub mod restoring;
 pub mod rollback;
+pub mod still_there;
