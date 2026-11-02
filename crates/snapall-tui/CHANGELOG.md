@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.28.0]
+
+
+### Refactoring
+- The last guard debts are paid ([#123](https://github.com/grenudi/snapall/pull/123)) ([b1ffcc4])
+
+
+
 ## [0.27.6]
 
 
