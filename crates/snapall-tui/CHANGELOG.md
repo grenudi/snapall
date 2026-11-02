@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.28.1]
+
+
+### Refactoring
+- The outline's sentences, audited as a set ([#126](https://github.com/grenudi/snapall/pull/126)) ([7baf10b])
+
+
+
 ## [0.28.0]
 
 
