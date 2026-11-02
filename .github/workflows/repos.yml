@@ -183,7 +183,16 @@ jobs:
           - { name: Arch,     arch: x86_64,  runner: ubuntu-latest,    image: "archlinux:latest",    family: pacman, setup: "pacman -Syu --noconfirm --needed sudo curl gawk && pacman-key --init && pacman-key --populate archlinux" }
     steps:
       - name: A user's tools
-        run: ${{ matrix.setup }}
+        # a package manager over the network fails now and then (openSUSE's mirrors, mostly): it is tried again,
+        # with a pause, before it is called a failure
+        run: |
+          n=0
+          until ${{ matrix.setup }}; do
+            n=$((n + 1))
+            [ "$n" -ge 3 ] && exit 1
+            echo "the install did not work (attempt $n of 3): trying again in $((n * 20)) seconds"
+            sleep $((n * 20))
+          done
       # zypper reads its answers from a terminal, not a pipe, and CI has none: take the defaults, and
       # import the repository's key without asking (the test checks the fingerprint it shows).
       - name: Let zypper answer without a terminal
