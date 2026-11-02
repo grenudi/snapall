@@ -5,27 +5,25 @@
 //! Rendering: `render(state, frame)` draws, and does nothing else.
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState, Wrap};
+use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
-use snapall_core::FileState;
 
-use crate::model::{Button, Click, Load, Modal, Notice, Pane, State};
+use crate::model::{Button, Click, Modal, Notice, Pane, State};
 
 use crate::tab::Tab;
 use crate::theme::{ACCENT, DIM};
 use crate::{status_bar, tabs};
 
-mod file;
 mod footer;
 mod header;
 mod hit;
 pub(crate) mod look;
 
+pub(crate) use crate::file_history::drawing::render_file;
 pub(crate) use crate::questions::drawing::*;
 pub(crate) use crate::tabs::snapshots::{areas_split, pane_block, render_areas, render_snapshots};
-pub(crate) use file::*;
 pub use footer::*;
 pub use header::*;
 pub use hit::*;

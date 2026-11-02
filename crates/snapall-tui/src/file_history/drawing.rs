@@ -2,9 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The file history screen: one file's versions, newest first.
+//! Drawing the file history screen: one file's versions, newest first.
 
+use crate::model::{Load, State};
+use crate::theme::{ACCENT, DIM};
 use crate::view::*;
+use ratatui::layout::{Constraint, Rect};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::widgets::{Paragraph, Row, Table, TableState, Wrap};
+use ratatui::Frame;
+use snapall_core::FileState;
 
 pub(crate) fn state_style(state: FileState) -> Style {
     match state {

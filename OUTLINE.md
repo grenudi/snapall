@@ -100,15 +100,18 @@ What each part of snapall says it is for, read from the first line of each modul
 ## snapall-tui
 
 - `changes.rs`: What a change is called in the Activity tab, and how it went: the words, apart from the doing.
+  - `file_history/arriving.rs`: What the file history screen does when the versions of its file arrive.
+  - `file_history/drawing.rs`: Drawing the file history screen: one file's versions, newest first.
+  - `file_history/keys.rs`: What the keys do on the file history screen: move along the versions, reload them, and put one back.
+  - `file_history/mod.rs`: The file history screen: one file's versions, newest first, and putting one back.
 - `lib.rs`: The window: everything snapall does, in a terminal, with the keys and the mouse, over the same core as the command line.
   - `model/changed.rs`: What a finished change leaves behind in the window: its result, what to show of it, and what to look at again.
-  - `model/file.rs`: The file history screen: one file's versions, newest first, and putting one back.
   - `model/following.rs`: Following the changes that run on their own: looking at the journal once a second while anything runs, and noticing when one that this window started has ended.
   - `model/input.rs`: What a person does: a key, a click, a button.
     - `model/keys/answering.rs`: How a prompt answers a key: what it returns, and which prompt a key goes to.
     - `model/keys/clicking.rs`: What a click does: a button, a row, or the prompt over them.
     - `model/keys/cursor.rs`: Moving through the lists: the cursor, jumping, scrolling, and marking snapshots.
-    - `model/keys/mod.rs`: What each key and click does, and how a prompt answers one.
+    - `model/keys/mod.rs`: What each key and click does in the window, and how a prompt answers one.
     - `model/keys/screen.rs`: What a key does on the screen the person is looking at: the tab's own keys first, then the keys every screen shares.
   - `model/living.rs`: The window's own life: starting, the clock, the pointer and a refusal.
   - `model/looked.rs`: What looking brought back arriving in the window: the areas, snapshots, history, health, groups and points.
@@ -183,7 +186,6 @@ What each part of snapall says it is for, read from the first line of each modul
     - `tabs/snapshots/state.rs`: What the Snapshots tab holds: the protected areas and the snapshots of the chosen one, the cursors, what is marked, and which pane has the focus.
 - `term.rs`: The terminal: setup and restore, key translation, and the event loop.
 - `theme.rs`: The colours, in one place, so every screen speaks in the same ones: good is green, something to know is cyan, something to do is yellow, something to do now is red.
-  - `view/file.rs`: The file history screen: one file's versions, newest first.
   - `view/footer.rs`: The two lines under the status bar: the explanation of whatever the mouse is over, and the keys as buttons.
   - `view/header.rs`: The tab bar: the brand badge, the three tabs, and where a click on each lands.
   - `view/hit.rs`: Where a click lands, worked out from the same layout the drawing used.

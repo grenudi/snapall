@@ -18,6 +18,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 mod changes;
+pub mod file_history;
 pub mod model;
 pub mod questions;
 pub mod session;

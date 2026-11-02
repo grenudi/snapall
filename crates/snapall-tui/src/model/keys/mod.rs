@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What each key and click does, and how a prompt answers one. A key means what the screen in front of it means.
+//! What each key and click does in the window, and how a prompt answers one. A key means what the screen in front of it means.
 
 mod answering;
 mod clicking;
