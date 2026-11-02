@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.30.2]
+
+
+### Refactoring
+- A third read, and the plural that was written twenty-four times ([#136](https://github.com/grenudi/snapall/pull/136)) ([3c0d123])
+
+
+
 ## [0.30.1]
 
 
