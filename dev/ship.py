@@ -23,7 +23,10 @@ import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 # steps whose failure is the network or the runner, not our code: a package install inside a container, and the runner starting one
 KNOWN_RUNNER_FLAKES = ("A user's tools", "Set up job", "Initialize containers", "Initialize job")
 RELEASE_WORKFLOWS = ("Release", "Verify release", "Package repositories", "Install snippets")
-MIN_CHECKS = 20
+# Fewer than this is a pull request whose CI has not started (or conflicts). A pull request of documents only is narrowed by the
+# `changes` job to 13 checks, and a full one has 24, so the floor is below the narrowed count: the wait for no pending check
+# that stays so for two looks is what says the rest have arrived.
+MIN_CHECKS = 10
 # A tool call does not last, and a process started in one does not outlive it. So this runs in the foreground, stops
 # itself before the call is cut off, and is run again: every step reads GitHub, so it carries on where it was.
 BUDGET_SECONDS = int(os.environ.get("SHIP_BUDGET", "255"))

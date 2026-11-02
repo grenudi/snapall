@@ -29,7 +29,18 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 - **Splitting the Btrfs job** so the TUI test runs alone: about 25 s of wall time for 45 more runner-seconds.
 - **Parallelising the reproducible build's two builds:** not on the critical path.
 
-**The first runs were cold, as expected.** The debug-info setting is part of the cache key, so the pull request's own run (368 s wall, 30.4 job-minutes) and main's first run (336 s, 23.9 job-minutes) rebuilt every cache. Both were green, with the new advisories check passing in real CI. That price is paid once; it is not the number to judge the change by. The warm numbers follow from the next runs, and this very pull request (documents only) is the first test of the narrowing.
+**The first runs were cold, as expected.** The debug-info setting is part of the cache key, so the pull request's own run (368 s wall, 30.4 job-minutes) and main's first run (336 s, 23.9 job-minutes) rebuilt every cache. Both were green, with the new advisories check passing in real CI. That price is paid once; it is not the number to judge the change by.
+
+**Measured, warm.** (Baseline: median 193 s wall and 20.0 job-minutes over eight runs.)
+
+| | wall | job-minutes | jobs |
+|---|---|---|---|
+| Full run on main, warm | **177 s** | **15.6** | 23 ran |
+| Pull request of documents only | **61 s** | **1.9** | 3 ran, 9 skipped |
+
+A full run is 8% faster and costs **22% less runner time**; a documents-only pull request costs about **90% less**. Wall time improved least because the Btrfs job (158 s) is now the floor: the advisories job that was 181 s is gone, and what is left is real work. The remaining ideas buy 15 to 30 seconds each for another moving part, so this is where the work stops.
+
+**A bug in my own tooling, found by the narrowing.** `dev/ship.py` required at least 20 checks before it would merge, which was right while every pull request ran 24, and is wrong for a narrowed one (13). It waited forever on the first documents-only pull request, and I finished that one by running a patched copy in memory. (My first attempt at that patch did nothing, because `runpy.run_path` returns a copy of the module's globals, so the functions never saw it.) The floor is 10 now, below the narrowed count, with the reason in the file.
 
 ## 2026-11-05: main's CI failed on the race I had measured away
 
