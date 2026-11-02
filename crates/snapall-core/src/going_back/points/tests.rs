@@ -355,3 +355,76 @@ fn the_preview_says_what_would_change_per_area_and_changes_nothing() {
         Some("home, ruined")
     );
 }
+
+#[test]
+fn what_a_restore_says_is_how_many_areas_were_put_back_and_where_the_way_back_is() {
+    let (backend, point) = three_areas();
+    backend.write_file("docs", "/mnt/docs/a.txt", "docs, ruined");
+    backend.write_file("home", "/mnt/home/b.txt", "home, ruined");
+    let done = restore_point(&backend, &point, Point::parse("20261025T110000Z").unwrap());
+    assert_eq!(
+        done.how_it_went(),
+        Ok("2 areas put back. To undo it: restore point 20261025T110000Z".to_owned())
+    );
+}
+
+#[test]
+fn one_area_put_back_is_said_in_the_singular() {
+    let (backend, point) = three_areas();
+    backend.write_file("home", "/mnt/home/b.txt", "home, ruined");
+    let done = restore_point(&backend, &point, Point::parse("20261025T110000Z").unwrap());
+    assert_eq!(
+        done.how_it_went(),
+        Ok("1 area put back. To undo it: restore point 20261025T110000Z".to_owned())
+    );
+}
+
+#[test]
+fn a_restore_that_changed_nothing_says_nothing_and_one_that_failed_says_so() {
+    let (backend, point) = three_areas();
+    let untouched = restore_point(&backend, &point, Point::parse("20261025T110000Z").unwrap());
+    assert_eq!(
+        untouched.how_it_went(),
+        Ok(String::new()),
+        "nothing to put back, nothing to undo"
+    );
+    backend.write_file("docs", "/mnt/docs/a.txt", "docs, ruined");
+    backend.refuse_snapshots_of("docs");
+    let failed = restore_point(&backend, &point, Point::parse("20261025T120000Z").unwrap());
+    assert_eq!(
+        failed.how_it_went(),
+        Err("some areas could not be put back: the output says which".to_owned())
+    );
+}
+
+#[test]
+fn a_restore_stopped_between_areas_says_how_far_it_got_and_how_to_undo_that() {
+    struct StopAfter(usize);
+    impl crate::ports::course::Course for StopAfter {
+        fn proceed(&self, done: usize, _of: usize, _area: &str) -> bool {
+            done < self.0
+        }
+    }
+    let (backend, point) = three_areas();
+    backend.write_file("docs", "/mnt/docs/a.txt", "docs, ruined");
+    backend.write_file("home", "/mnt/home/b.txt", "home, ruined");
+    let done = restore_point_along(
+        &backend,
+        &point,
+        Point::parse("20261025T110000Z").unwrap(),
+        &StopAfter(1),
+    );
+    assert!(done.stopped && done.members.len() == 1);
+    let words = done.stopped_words(point.members.len());
+    assert_eq!(
+        words.now,
+        "snapall: stopped on request after 1 of 3 areas; the rest were left as they are"
+    );
+    assert!(
+        words
+            .record
+            .ends_with("To undo what was done: restore point 20261025T110000Z"),
+        "{}",
+        words.record
+    );
+}

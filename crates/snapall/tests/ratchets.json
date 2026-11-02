@@ -7,13 +7,9 @@
   },
   "findability_gaps": {},
   "handlers_that_branch_too_much": {
-    "restore_all": 8,
-    "setup": 7,
-    "undo": 6
+    "setup": 7
   },
-  "handlers_too_long": {
-    "restore_all": 79
-  },
+  "handlers_too_long": {},
   "handlers_with_too_much_plumbing": {
     "check_the_way_back_still_exists": 3
   },

@@ -32,10 +32,7 @@ pub fn restore_all(
     let point = the_point_named(&found, wanted)?;
     let previews = preview_point(ctx.backend, point);
     let route = boot::restore_route(&boot::assess(&boot_menu::on_this_machine()));
-    let anything_to_change = previews
-        .iter()
-        .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()));
-    if mode.shows_only() || !anything_to_change {
+    if mode.shows_only() || !anything_to_change(&previews) {
         return ctx.show.result(
             render::point_preview(point, &previews, &route),
             render::point_preview_json(point, &previews),
@@ -48,6 +45,31 @@ pub fn restore_all(
         &format!("Put every area back to restore point {}", point.point),
         job,
     )?;
+    let done = put_every_area_back(ctx, point, &change);
+    end_the_change(change, point, &done);
+    ctx.show.result(
+        render::point_restored(point, &done),
+        render::point_restored_json(point, &done),
+    )?;
+    Ok(if done.succeeded() && !done.stopped {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    })
+}
+
+fn anything_to_change(previews: &[snapall_core::MemberPreview]) -> bool {
+    previews
+        .iter()
+        .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
+}
+
+/// Area by area, each after its own safety snapshot; the way back is written down as soon as there is one.
+fn put_every_area_back(
+    ctx: &Context,
+    point: &RestorePoint,
+    change: &Change,
+) -> snapall_core::PointRestore {
     let done = restore_point_along(
         ctx.backend,
         point,
@@ -59,46 +81,18 @@ pub fn restore_all(
             done.safety.as_str(),
         ));
     }
+    done
+}
+
+/// Stopped on request or not, the record says how it went.
+fn end_the_change(change: Change, point: &RestorePoint, done: &snapall_core::PointRestore) {
     if done.stopped {
-        let (put_back, total) = (done.members.len(), point.members.len());
-        output::note(&format!("snapall: stopped on request after {put_back} of {total} areas; the rest were left as they are"));
-        change.end_stopped(format!(
-            "stopped on request after {put_back} of {total} areas: the others were left as they are. To undo what was done: restore point {}",
-            done.safety.as_str()
-        ));
-        ctx.show.result(
-            render::point_restored(point, &done),
-            render::point_restored_json(point, &done),
-        )?;
-        return Ok(ExitCode::FAILURE);
+        let words = done.stopped_words(point.members.len());
+        output::note(&words.now);
+        change.end_stopped(words.record);
+    } else {
+        change.end(done.how_it_went());
     }
-    change.end(if done.succeeded() {
-        let put_back = done
-            .members
-            .iter()
-            .filter(|m| matches!(m.result, snapall_core::MemberResult::Restored(_)))
-            .count();
-        Ok(if done.changed_anything() {
-            format!(
-                "{put_back} area{} put back. To undo it: restore point {}",
-                if put_back == 1 { "" } else { "s" },
-                done.safety.as_str()
-            )
-        } else {
-            String::new()
-        })
-    } else {
-        Err("some areas could not be put back: the output says which".to_owned())
-    });
-    ctx.show.result(
-        render::point_restored(point, &done),
-        render::point_restored_json(point, &done),
-    )?;
-    Ok(if done.succeeded() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    })
 }
 
 pub(super) fn the_point_named<'a>(

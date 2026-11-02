@@ -18,6 +18,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `going_back/points/finding.rs`: Finding restore points among snapshots: by their tag, or by matching what one action took together.
     - `going_back/points/mod.rs`: Restore points: the snapshots that one action took together, one in every area, found again and put back with a single action.
     - `going_back/points/putting_back.rs`: Putting a restore point back: what it would change in each area, and doing it.
+    - `going_back/points/saying.rs`: What a restore of every area says about itself: how many areas were put back and where the way back is, why it failed, or how far it got before it was stopped.
   - `going_back/restoring.rs`: Putting an area, or one path of it, back to how a snapshot had it, with a safety snapshot first.
   - `going_back/rollback.rs`: The way back from each kind of change, in one place: what it names as the earlier state, the commands that return to it, and what doing that weighs.
   - `health/chips.rs`: The chips that say how things stand at a glance.
