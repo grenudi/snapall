@@ -13,6 +13,7 @@
 mod areas;
 mod basics;
 mod cleanup;
+mod numbers;
 #[cfg(test)]
 mod tests;
 
@@ -26,3 +27,4 @@ pub use basics::{
 pub use cleanup::{
     cleanup_from, cleanup_offer, cleanup_text, room_counting_text, seconds_words, Cleanup, Limit,
 };
+pub use numbers::counted;

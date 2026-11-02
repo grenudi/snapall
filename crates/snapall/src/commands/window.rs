@@ -80,34 +80,3 @@ pub(super) fn ui_context(
         administrator: facts.is_root,
     }
 }
-
-/// The absolute path of what the user named. A relative path is taken from the working directory,
-/// and symlinks in the *directory* part are resolved, so that a path reached through `/home` being
-/// a link to `/var/home` is found in the subvolume that really holds it. The file's own name is
-/// kept as given: a symlink is itself what is asked about, and a deleted file has nothing to resolve.
-pub(super) fn absolute(path: &str) -> Result<String, Box<dyn Error>> {
-    let given = std::path::Path::new(path);
-    let joined = if given.is_absolute() {
-        given.to_owned()
-    } else {
-        std::env::current_dir()?.join(given)
-    };
-    let (Some(parent), Some(name)) = (joined.parent(), joined.file_name()) else {
-        return Err(format!("`{path}` does not name a file").into());
-    };
-    let parent = parent
-        .canonicalize()
-        .map_err(|e| format!("{}: {e}", parent.display()))?;
-    parent
-        .join(name)
-        .to_str()
-        .map(str::to_owned)
-        .ok_or_else(|| "a path must be valid UTF-8".into())
-}
-
-/// Seconds since 1970, which is what names a restore point after the moment an action started.
-pub(super) fn unix_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs())
-}

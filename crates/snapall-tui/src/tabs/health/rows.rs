@@ -9,6 +9,7 @@ use super::*;
 use snapall_core::health::format_bytes;
 use snapall_core::keeping::jobs::{self, Job};
 use snapall_core::vocabulary::explain::{cleanup_from, cleanup_text, room_counting_text, Cleanup};
+use snapall_core::Counting;
 use snapall_core::QuotaMode;
 use snapall_core::{AreaFacts, Facts, Health, Level, Remedy, Topic};
 
@@ -58,7 +59,7 @@ pub enum RowAction {
     /// Open the controls of a background job.
     ControlJob(Job),
     /// Switch counting the room snapshots take on (`true`) or off (`false`).
-    CountRoom(bool),
+    CountRoom(Counting),
     /// Change how many snapshots this area keeps, and when its oldest are removed.
     EditLimits(snapall_core::AreaName),
 }
@@ -97,11 +98,7 @@ pub(crate) fn space_row(area: &AreaFacts) -> Row {
         Some(bytes) => format!("{} held", format_bytes(bytes)),
         None => "room not measured".to_owned(),
     };
-    let snapshots = format!(
-        "{} snapshot{}",
-        area.snapshots,
-        if area.snapshots == 1 { "" } else { "s" }
-    );
+    let snapshots = snapall_core::vocabulary::explain::counted(area.snapshots, "snapshot");
     let disk = area
         .disk
         .map_or(String::new(), |d| format!("  disk {}%", d.percent_used()));
@@ -180,8 +177,8 @@ pub(crate) fn cleanup_state(facts: &Facts) -> Cleanup {
 pub(crate) fn room_row(facts: &Facts) -> Option<Row> {
     let mode = facts.areas.first()?.quotas;
     let (level, word, action) = match mode {
-        QuotaMode::Off => (Level::Note, "off", RowAction::CountRoom(true)),
-        QuotaMode::Full => (Level::Good, "on", RowAction::CountRoom(false)),
+        QuotaMode::Off => (Level::Note, "off", RowAction::CountRoom(Counting::On)),
+        QuotaMode::Full => (Level::Good, "on", RowAction::CountRoom(Counting::Off)),
         QuotaMode::Simple => (Level::Note, "on, the simple kind", RowAction::Nothing),
         QuotaMode::Unknown => (Level::Note, "could not be found out", RowAction::Nothing),
     };

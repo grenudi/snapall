@@ -33,36 +33,18 @@ pub(crate) fn outcome_of(done: &snapall_core::PointRestore) -> PointOutcome {
 // refuses until it is. A catch-all would let it through as "not a change" or as a success, unseen.
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
-    let failures = |pairs: Vec<(String, &Result<String, String>)>| -> Vec<String> {
-        pairs
-            .into_iter()
-            .filter_map(|(what, result)| result.as_ref().err().map(|why| format!("{what}: {why}")))
-            .collect()
-    };
     match msg {
         Msg::Created(results) => {
-            let each: Vec<(String, Result<String, String>)> = results
+            let failed: Vec<String> = results
                 .iter()
-                .map(|(area, result)| {
-                    (
-                        area.to_string(),
-                        result
-                            .as_ref()
-                            .map(|id| format!("#{id}"))
-                            .map_err(Clone::clone),
-                    )
+                .filter_map(|(area, result)| {
+                    result.as_ref().err().map(|why| format!("{area}: {why}"))
                 })
                 .collect();
-            let failed = failures(
-                each.iter()
-                    .map(|(name, result)| (name.clone(), result))
-                    .collect(),
-            );
             if failed.is_empty() {
                 Ok(format!(
-                    "{} snapshot{} taken",
-                    results.len(),
-                    if results.len() == 1 { "" } else { "s" }
+                    "{} taken",
+                    snapall_core::vocabulary::explain::counted(results.len(), "snapshot")
                 ))
             } else {
                 Err(failed.join("; "))
@@ -87,9 +69,8 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
             result: Ok(outcome),
             ..
         } if outcome.failed.is_empty() => Ok(format!(
-            "{} area{} put back.{}",
-            outcome.restored,
-            if outcome.restored == 1 { "" } else { "s" },
+            "{} put back.{}",
+            snapall_core::vocabulary::explain::counted(outcome.restored, "area"),
             outcome.undo.as_ref().map_or(String::new(), |undo| format!(
                 " To undo it: restore point {undo}"
             ))

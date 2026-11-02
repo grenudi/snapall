@@ -4,6 +4,13 @@
     "crates/snapall/src/contract/inputs.rs": 514
   },
   "findability_gaps": {},
+  "hand_spelled_plurals": {
+    "crates/snapall-core/src/protecting/unprotect.rs": 4,
+    "crates/snapall-core/src/vocabulary/explain/cleanup.rs": 1,
+    "crates/snapall-tui/src/questions/quotas/drawing.rs": 2,
+    "crates/snapall/src/commands/keeping/room_counting.rs": 1,
+    "crates/snapall/src/render/points.rs": 1
+  },
   "handlers_that_branch_too_much": {},
   "handlers_too_long": {},
   "handlers_with_too_much_plumbing": {},

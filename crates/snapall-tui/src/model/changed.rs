@@ -53,9 +53,9 @@ pub(super) fn protection_stopped(
     match result {
         Ok(deleted) => {
             let told = Notice::Info(format!(
-                        "{area} is no longer protected: {deleted} snapshot{} deleted, its files are untouched",
-                        if deleted == 1 { "" } else { "s" }
-                    ));
+                "{area} is no longer protected: {} deleted, its files are untouched",
+                snapall_core::vocabulary::explain::counted(deleted, "snapshot")
+            ));
             // looking at the lists again would clear it: it is shown again when they have arrived
             state.waiting.after_reload = Some(told.clone());
             state.notice = Some(told);

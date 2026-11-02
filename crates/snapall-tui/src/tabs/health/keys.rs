@@ -36,7 +36,7 @@ pub(super) fn stop_protecting_the_chosen(state: &mut State) -> Vec<Effect> {
         .nth(state.health.cursor)
         .and_then(|row| row.area);
     match area {
-        Some(config) => crate::model::open_unprotect(state, config),
+        Some(area) => crate::model::open_unprotect(state, area),
         None => {
             state.notice = Some(Notice::Info(
                 "U stops protecting an area: choose one of the areas under Space first".into(),
@@ -72,15 +72,15 @@ pub(super) fn act_on_chosen(state: &mut State) -> Vec<Effect> {
             ));
             Vec::new()
         }
-        RowAction::Fix(Remedy::CountRoom) | RowAction::CountRoom(true) => {
+        RowAction::Fix(Remedy::CountRoom) => {
             state.modal = Some(Modal::Quotas { to: Counting::On });
             Vec::new()
         }
-        RowAction::CountRoom(false) => {
-            state.modal = Some(Modal::Quotas { to: Counting::Off });
+        RowAction::CountRoom(to) => {
+            state.modal = Some(Modal::Quotas { to });
             Vec::new()
         }
-        RowAction::EditLimits(config) => crate::model::open_limits(state, config),
+        RowAction::EditLimits(area) => crate::model::open_limits(state, area),
         RowAction::ControlJob(job) => {
             state.modal = Some(Modal::Job {
                 unit: job.unit.to_owned(),

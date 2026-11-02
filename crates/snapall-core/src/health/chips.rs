@@ -19,7 +19,7 @@ pub(super) fn chips(facts: &Facts, findings: &[Finding]) -> Vec<Chip> {
 pub(super) fn snapshot_count(facts: &Facts) -> Chip {
     let total: usize = facts.areas.iter().map(|a| a.snapshots).sum();
     Chip {
-        label: format!("{total} snapshot{}", if total == 1 { "" } else { "s" }),
+        label: crate::vocabulary::explain::counted(total, "snapshot"),
         level: Level::Good,
         topic: Topic::Snapshots,
     }

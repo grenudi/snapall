@@ -157,9 +157,8 @@ pub fn preview_words(preview: &Preview, limits: &Limits) -> String {
             String::new()
         };
         return format!(
-            "Nothing would be removed: cleanup looks after {} snapshot{} and the limit is {}{spared}.",
-            preview.looked_after,
-            if preview.looked_after == 1 { "" } else { "s" },
+            "Nothing would be removed: cleanup looks after {} and the limit is {}{spared}.",
+            crate::vocabulary::explain::counted(preview.looked_after, "snapshot"),
             limits.keep
         );
     }

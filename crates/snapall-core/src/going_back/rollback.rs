@@ -13,7 +13,7 @@ use crate::ports::machine::Counting;
 use crate::taking::run::Report;
 use crate::vocabulary::consequence::Weight;
 use crate::vocabulary::domain::{AreaName, SnapshotId};
-use crate::vocabulary::explain::{DELETE_ADVICE, UNPROTECT_ADVICE};
+use crate::vocabulary::explain::{counted, DELETE_ADVICE, UNPROTECT_ADVICE};
 
 fn undo(what: String, commands: Vec<Vec<String>>, weight: Weight) -> Rollback {
     Rollback::Undo(Undo {
@@ -55,9 +55,8 @@ pub fn after_taking_ids(made: &[(AreaName, SnapshotId)]) -> Option<Rollback> {
         .collect();
     Some(undo(
         format!(
-            "Delete the {} snapshot{} this took ({}). They are lost for good, but nothing else changes",
-            made.len(),
-            if made.len() == 1 { "" } else { "s" },
+            "Delete the {} this took ({}). They are lost for good, but nothing else changes",
+            counted(made.len(), "snapshot"),
             list.join(", ")
         ),
         made.iter()

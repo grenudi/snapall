@@ -222,7 +222,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
     let (backend, machine) = (machine(), system());
     let mut session = Session::with_system(&backend, &machine, admin());
     choose(&mut session, |action| {
-        matches!(action, RowAction::CountRoom(true))
+        matches!(action, RowAction::CountRoom(Counting::On))
     });
     assert!(flat(&screen(&session)).contains("Enter: switch room counting on (it explains first)"));
     session.press(Key::Enter);
@@ -254,7 +254,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
     );
 
     choose(&mut session, |action| {
-        matches!(action, RowAction::CountRoom(true))
+        matches!(action, RowAction::CountRoom(Counting::On))
     });
     session.press(Key::Enter);
     session.press(Key::Enter);
@@ -264,7 +264,7 @@ fn counting_room_is_explained_with_its_price_asked_about_and_can_be_switched_bot
 
     // and back: the row now offers to switch it off, and says the cost of keeping it
     choose(&mut session, |action| {
-        matches!(action, RowAction::CountRoom(false))
+        matches!(action, RowAction::CountRoom(Counting::Off))
     });
     session.press(Key::Enter);
     assert!(flat(&screen(&session)).contains("Switching it off removes the tally"));
@@ -302,7 +302,7 @@ fn without_administrator_rights_changing_room_counting_says_so_and_changes_nothi
     let (backend, machine) = (machine(), system());
     let mut session = Session::with_system(&backend, &machine, UiContext::default());
     choose(&mut session, |action| {
-        matches!(action, RowAction::CountRoom(true))
+        matches!(action, RowAction::CountRoom(Counting::On))
     });
     session.press(Key::Enter);
     session.press(Key::Enter);
@@ -315,7 +315,7 @@ fn these_prompts_leave_the_status_bar_and_the_two_lines_beneath_it_and_use_no_un
     let (backend, machine) = (machine(), system());
     let mut session = Session::with_system(&backend, &machine, admin());
     for open in [the_cleanup_job as fn(&RowAction) -> bool, |a| {
-        matches!(a, RowAction::CountRoom(true))
+        matches!(a, RowAction::CountRoom(Counting::On))
     }] {
         choose(&mut session, open);
         session.press(Key::Enter);

@@ -12,12 +12,14 @@ use snapall_core::SnapshotBackend;
 use crate::output::Show;
 
 mod about;
+mod absolute_path;
 mod asked_for;
 mod change;
 mod deleting;
 mod going_back;
 mod keeping;
 mod looking;
+mod moment;
 mod protecting;
 mod running;
 mod taking;
@@ -26,10 +28,11 @@ mod window;
 pub use asked_for::carry_out;
 
 // what the commands share, in one place: the change being made, and the few helpers more than one needs
+use absolute_path::absolute;
 use change::Change;
 use keeping::areas_of_group;
 use looking::show_changes;
-use window::{absolute, unix_now};
+use moment::a_restore_point_for_now;
 
 /// What every command works with: the backend (already observed, so every operation is reported), the observer, how
 /// to show results, and how the program was invoked.

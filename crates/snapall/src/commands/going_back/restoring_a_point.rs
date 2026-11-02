@@ -11,8 +11,8 @@ use crate::{ask, render};
 use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
-    all_snapshots, fresh_point, preview_point, restore_point_along, restore_points, MemberView,
-    Point, RestorePoint,
+    all_snapshots, preview_point, restore_point_along, restore_points, MemberView, Point,
+    RestorePoint,
 };
 use snapall_system::boot_menu;
 use std::error::Error;
@@ -73,7 +73,7 @@ fn put_every_area_back(
     let done = restore_point_along(
         ctx.backend,
         point,
-        fresh_point(ctx.backend, unix_now()),
+        a_restore_point_for_now(ctx.backend),
         &change.course(),
     );
     if !done.members.is_empty() {
@@ -117,8 +117,8 @@ fn restore_point_question(
         .filter(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
         .count();
     format!(
-        "Put {areas} area{} back to restore point {}? Each one's current state is snapshotted first, so this can be undone.",
-        if areas == 1 { "" } else { "s" },
+        "Put {} back to restore point {}? Each one's current state is snapshotted first, so this can be undone.",
+        snapall_core::vocabulary::explain::counted(areas, "area"),
         point.point
     )
 }
