@@ -83,6 +83,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `vocabulary/explain/basics.rs`: The explanations and cautions that stand on their own: what a snapshot is, what an area is, and what cannot be undone.
     - `vocabulary/explain/cleanup.rs`: What a person is told about cleanup and about how room is counted.
     - `vocabulary/explain/mod.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
+    - `vocabulary/explain/numbers.rs`: Saying how many: a number with its noun, in the right plural.
   - `vocabulary/mod.rs`: The words snapall thinks and speaks in: its names and numbers, what an act weighs, dates, and what it tells a person.
 
 ## snapall-observe
@@ -224,6 +225,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `cli/parsing.rs`: Parsing what was typed: the command, its words, and what to suggest when it is mistyped.
   - `cli/request.rs`: What was asked for: the request, how it logs, and the error in asking.
   - `commands/about.rs`: The program speaking about itself: its help, its version and its contract.
+  - `commands/absolute_path.rs`: The absolute path of a file a person named.
   - `commands/asked_for.rs`: Everything that can be asked for, and the command that does it.
   - `commands/change.rs`: A change being made from the command line: it is started and written down, followed while it runs (can it be asked to stop?), and ended with how it went.
   - `commands/deleting.rs`: Deleting a snapshot for good, after saying what that loses.
@@ -237,6 +239,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `commands/keeping/room_counting.rs`: Counting the room that snapshots take.
   - `commands/looking.rs`: Looking, which changes nothing: the areas, their snapshots, the history of a file, the health, the record, the restore points.
   - `commands/mod.rs`: Everything the command line does, by what it is for.
+  - `commands/moment.rs`: What moment it is, as the number that names a restore point.
   - `commands/protecting.rs`: Protecting parts of the disk, and stopping protecting them.
   - `commands/running.rs`: Changes that are running: asking one to stop.
   - `commands/taking.rs`: Taking snapshots: of one area, of every protected area, or of a group.

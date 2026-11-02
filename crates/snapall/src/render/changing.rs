@@ -17,8 +17,8 @@ pub fn changes(config: &AreaName, id: SnapshotId, preview: &Preview) -> String {
     }
     let count = preview.changes.len();
     let mut out = format!(
-        "{config}: restoring #{id} would change {count} path{}:\n",
-        if count == 1 { "" } else { "s" }
+        "{config}: restoring #{id} would change {}:\n",
+        snapall_core::vocabulary::explain::counted(count, "path")
     );
     for change in preview.changes.iter().take(SHOWN) {
         out.push_str(&format!("  {:<10} {}\n", verb(change.kind), change.path));

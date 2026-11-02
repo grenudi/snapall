@@ -328,6 +328,12 @@
         "snapall-core/ports/machine/room_counting.rs",
         "snapall/commands/keeping/room_counting.rs"
       ]
+    },
+    {
+      "question": "How is a number said with its noun, like 3 snapshots?",
+      "answers": [
+        "snapall-core/vocabulary/explain/numbers.rs"
+      ]
     }
   ]
 }

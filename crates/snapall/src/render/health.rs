@@ -87,11 +87,10 @@ pub fn health(facts: &snapall_core::Facts, report: &snapall_core::Health) -> Str
             .and_then(|r| r.keep)
             .map_or(String::new(), |k| format!("   keeps the newest {k}"));
         out.push_str(&format!(
-            "  {} ({})\n      {} snapshot{}, {room}{disk}{keeps}\n      newest: {}   kept in {}\n",
+            "  {} ({})\n      {}, {room}{disk}{keeps}\n      newest: {}   kept in {}\n",
             area.title(),
             area.location,
-            area.snapshots,
-            if area.snapshots == 1 { "" } else { "s" },
+            snapall_core::vocabulary::explain::counted(area.snapshots, "snapshot"),
             area.newest.as_deref().unwrap_or("none yet"),
             area.lives_in()
         ));

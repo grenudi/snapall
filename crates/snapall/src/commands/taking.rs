@@ -10,9 +10,7 @@ use crate::output::{self, Outcome};
 use crate::render;
 use snapall_core::going_back::boot;
 use snapall_core::Act;
-use snapall_core::{
-    fresh_point, plan_snapshots, run_plan_along, AreaName, Description, Plan, Report,
-};
+use snapall_core::{plan_snapshots, run_plan_along, AreaName, Description, Plan, Report};
 use snapall_system::boot_menu;
 use std::io::IsTerminal;
 use std::process::ExitCode;
@@ -33,7 +31,7 @@ pub fn create(
             render::dry_run_json(&plan, description),
         );
     }
-    let areas = areas_in_words(&plan);
+    let areas = names_of_the_areas(&plan);
     let approved = ask::nothing_to_ask(Act::TakeSnapshot)?;
     let change = Change::begin(
         approved,
@@ -42,7 +40,7 @@ pub fn create(
         job,
     )?;
     // every snapshot of this one action is the same restore point
-    let point = fresh_point(ctx.backend, unix_now());
+    let point = a_restore_point_for_now(ctx.backend);
     let report = run_plan_along(
         ctx.backend,
         &plan,
@@ -70,7 +68,7 @@ fn the_areas_asked_for(
     }
 }
 
-fn areas_in_words(plan: &Plan) -> String {
+fn names_of_the_areas(plan: &Plan) -> String {
     let areas: Vec<String> = plan.targets().iter().map(ToString::to_string).collect();
     areas.join(", ")
 }
@@ -83,8 +81,8 @@ fn record_how_taking_went(change: Change, plan: &Plan, report: &Report) {
         ));
     } else if report.is_success() {
         change.end(Ok(format!(
-            "{taken} snapshot{} taken",
-            if taken == 1 { "" } else { "s" }
+            "{} taken",
+            snapall_core::vocabulary::explain::counted(taken, "snapshot")
         )));
     } else {
         change.end(Err(what_failed(report)));

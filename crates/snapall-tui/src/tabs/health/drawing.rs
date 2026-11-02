@@ -12,6 +12,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::Frame;
+use snapall_core::Counting;
 use snapall_core::{Health, Remedy};
 
 /// One line of the list: the verdict, a gap, a section's name, or a row.
@@ -117,10 +118,12 @@ pub(super) fn render_detail(state: &State, frame: &mut Frame, area: Rect, rows: 
     let hint = chosen.and_then(|row| match row.action {
         RowAction::Nothing => None,
         RowAction::Fix(Remedy::SwitchOnCleanup) => Some("Enter: switch automatic cleanup on"),
-        RowAction::Fix(Remedy::CountRoom) | RowAction::CountRoom(true) => {
+        RowAction::Fix(Remedy::CountRoom) | RowAction::CountRoom(Counting::On) => {
             Some("Enter: switch room counting on (it explains first)")
         }
-        RowAction::CountRoom(false) => Some("Enter: switch room counting off (it explains first)"),
+        RowAction::CountRoom(Counting::Off) => {
+            Some("Enter: switch room counting off (it explains first)")
+        }
         RowAction::ControlJob(_) => Some("Enter: the commands that check on it and control it"),
         RowAction::EditLimits(_) => {
             Some("Enter: change what it keeps   U: stop protecting it (deletes its snapshots)")

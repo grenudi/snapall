@@ -11,7 +11,6 @@ use crate::model::Effect;
 // refuses until it is. A catch-all would let it through as "not a change" or as a success, unseen.
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
-    let plural = |n: usize| if n == 1 { "" } else { "s" };
     Some(match effect {
         Effect::Create { targets, .. } => format!(
             "Took a snapshot of {}",
@@ -23,9 +22,8 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
         ),
         Effect::Delete { area, ids } => {
             format!(
-                "Deleted {} snapshot{} of {area}",
-                ids.len(),
-                plural(ids.len())
+                "Deleted {} of {area}",
+                snapall_core::vocabulary::explain::counted(ids.len(), "snapshot")
             )
         }
         Effect::Restore {
@@ -96,7 +94,6 @@ pub(crate) fn describe_change(effect: &Effect) -> Option<String> {
 #[deny(clippy::wildcard_enum_match_arm)]
 pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
     use snapall_core::JobAction::{DisableNow, EnableNow, Restart, Start, Stop};
-    let plural = |n: usize| if n == 1 { "" } else { "s" };
     Some(match effect {
         Effect::Create { targets, .. } => format!(
             "Taking a snapshot of {}",
@@ -108,9 +105,8 @@ pub(crate) fn describe_now(effect: &Effect) -> Option<String> {
         ),
         Effect::Delete { area, ids } => {
             format!(
-                "Deleting {} snapshot{} of {area}",
-                ids.len(),
-                plural(ids.len())
+                "Deleting {} of {area}",
+                snapall_core::vocabulary::explain::counted(ids.len(), "snapshot")
             )
         }
         Effect::Restore {

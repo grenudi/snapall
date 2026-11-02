@@ -19,7 +19,7 @@ pub enum HistoryError {
     BadPath { path: String },
     #[error("no protected area contains `{path}`")]
     NoArea { path: String },
-    /// The path is under an area's directory but on another subvolume, which that area's
+    /// The path is under an area's directory but in another part of the disk, which that area's
     /// snapshots do not include. Saying "did not exist" here would be wrong: it never could have.
     #[error("`{path}` is in a different part of the disk than {area} (`{location}`), so no snapshot of {area} contains it")]
     OtherLocation {
@@ -40,52 +40,83 @@ pub struct FileHistory {
     pub versions: Vec<FileVersion>,
 }
 
-/// The area whose subvolume holds `path`: the one with the longest matching mount point, so a
-/// file in `/home` belongs to `home` and not to `root`, which also contains it.
+/// How an area stands to a path.
+enum Holding {
+    /// The path is in the area's own part of the disk: its snapshots hold the file.
+    Really {
+        length: usize,
+    },
+    /// The path is under the area's directory but in another part of the disk, which that area's snapshots do not
+    /// include.
+    OnlyUnderItsDirectory {
+        length: usize,
+        location: String,
+    },
+    NotUnder,
+}
+
+/// One rule, for finding the area of a path and for reading its history: where the area lives, whether the path is
+/// under that, and whether the area's snapshots really hold it.
+fn holding(
+    backend: &dyn SnapshotBackend,
+    area: &AreaName,
+    path: &str,
+) -> Result<Holding, HistoryError> {
+    let location = backend.area_location(area)?;
+    if !under(&location, path) {
+        return Ok(Holding::NotUnder);
+    }
+    let length = location.trim_end_matches('/').len();
+    Ok(if backend.covers(area, path)? {
+        Holding::Really { length }
+    } else {
+        Holding::OnlyUnderItsDirectory { length, location }
+    })
+}
+
+/// The area whose part of the disk holds `path`: the one with the longest matching mount point, so a file in `/home`
+/// belongs to `home` and not to `root`, which also contains it.
 pub fn area_covering(backend: &dyn SnapshotBackend, path: &str) -> Result<AreaName, HistoryError> {
     if !clean(path) {
         return Err(HistoryError::BadPath {
             path: path.to_owned(),
         });
     }
-    // The most specific area whose subvolume really holds the file (by length of mount point),
-    // and, failing that, the most specific one that merely has it under its directory.
-    let mut covering: Option<(usize, AreaName)> = None;
-    let mut only_by_name: Option<(usize, AreaName, String)> = None;
+    let mut really = Vec::new();
+    let mut only_by_directory = Vec::new();
     for area in backend.list_areas().map_err(SnapshotError::from)? {
-        let location = backend.area_location(&area)?;
-        if !under(&location, path) {
-            continue;
-        }
-        let length = location.trim_end_matches('/').len();
-        if backend.covers(&area, path)? {
-            if covering
-                .as_ref()
-                .is_none_or(|(longest, _)| length > *longest)
-            {
-                covering = Some((length, area));
+        match holding(backend, &area, path)? {
+            Holding::Really { length } => really.push((length, area)),
+            Holding::OnlyUnderItsDirectory { length, location } => {
+                only_by_directory.push((length, area, location));
             }
-        } else if only_by_name
-            .as_ref()
-            .is_none_or(|(longest, ..)| length > *longest)
-        {
-            only_by_name = Some((length, area, location));
+            Holding::NotUnder => {}
         }
     }
-    match (covering, only_by_name) {
-        (Some((_, area)), _) => Ok(area),
-        (None, Some((_, area, location))) => Err(HistoryError::OtherLocation {
+    // the longest mount point wins, and the first of two equally long ones
+    if let Some((_, area)) = really
+        .into_iter()
+        .min_by_key(|(length, _)| std::cmp::Reverse(*length))
+    {
+        return Ok(area);
+    }
+    // failing that, the most specific one that merely has it under its directory: saying "does not exist" would be wrong
+    match only_by_directory
+        .into_iter()
+        .min_by_key(|(length, ..)| std::cmp::Reverse(*length))
+    {
+        Some((_, area, location)) => Err(HistoryError::OtherLocation {
             path: path.to_owned(),
             area,
             location,
         }),
-        (None, None) => Err(HistoryError::NoArea {
+        None => Err(HistoryError::NoArea {
             path: path.to_owned(),
         }),
     }
 }
 
-/// How `path` stood in every snapshot of `config`.
+/// How `path` stood in every snapshot of `area`.
 pub fn file_versions_of(
     backend: &dyn SnapshotBackend,
     area: &AreaName,
@@ -97,20 +128,17 @@ pub fn file_versions_of(
         });
     }
     ensure_area(backend, area)?;
-    let location = backend.area_location(area)?;
-    if !under(&location, path) {
-        return Err(HistoryError::NoArea {
+    match holding(backend, area, path)? {
+        Holding::NotUnder => Err(HistoryError::NoArea {
             path: path.to_owned(),
-        });
-    }
-    if !backend.covers(area, path)? {
-        return Err(HistoryError::OtherLocation {
+        }),
+        Holding::OnlyUnderItsDirectory { location, .. } => Err(HistoryError::OtherLocation {
             path: path.to_owned(),
             area: area.clone(),
             location,
-        });
+        }),
+        Holding::Really { .. } => Ok(backend.file_versions(area, path)?),
     }
-    Ok(backend.file_versions(area, path)?)
 }
 
 /// The history of one file: which area covers it, and how it stood in each snapshot.

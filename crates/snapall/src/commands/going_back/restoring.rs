@@ -71,9 +71,9 @@ pub(super) fn refuse_to_restore_the_whole_system_root(
 
 fn restore_question(preview: &Preview, area: &AreaName, id: SnapshotId) -> String {
     let count = preview.changes.len();
-    let paths = if count == 1 { "path" } else { "paths" };
     format!(
-        "Restore {count} {paths} of {area} to #{id}? The current state is snapshotted first, so this can be undone."
+        "Restore {} of {area} to #{id}? The current state is snapshotted first, so this can be undone.",
+        snapall_core::vocabulary::explain::counted(count, "path")
     )
 }
 

@@ -6,11 +6,7 @@
 
 /// "1 area" or "3 areas".
 pub(crate) fn areas_in_words(count: usize) -> String {
-    if count == 1 {
-        "1 area".to_owned()
-    } else {
-        format!("{count} areas")
-    }
+    snapall_core::vocabulary::explain::counted(count, "area")
 }
 
 /// Said before one area, or a path of it, is put back from a snapshot.

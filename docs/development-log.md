@@ -2,6 +2,20 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-04: a third read, and the plural that was written twenty-four times
+
+**Why.** A third seeded read (seven modules; one was a repeat). Real findings again, in a different mix.
+
+**What.**
+- `looking/history.rs` wrote the rule "the path is under the area's location, yet not covered by it means it is elsewhere" twice, as two accumulators in `area_covering` and again in `file_versions_of`. It is one answer, `Holding`, that both use. This is behaviour-bearing logic, so I proved the riskiest line: making the shortest mount point win instead of the longest fails `the_area_with_the_longest_mount_point_covers_a_file`, and only that. (The tie rule, the first of two equally long ones wins, is kept with `min_by_key` on `Reverse`, because `max_by_key` would silently pick the last.)
+- `commands/window.rs` held a path resolver and a clock that have nothing to do with the window. They are `absolute_path.rs` and `moment.rs`, and the phrase two commands each wrote (`fresh_point(backend, unix_now())`) is one verb, `a_restore_point_for_now`. A helper in `taking.rs` called `areas_in_words` actually joined area names and shared its name with a different helper in the window; it is `names_of_the_areas`.
+- `RowAction::CountRoom(bool)` was the on/off of room counting yet again. My search two days ago looked for named fields (`turn_on`, `on: bool`) and missed the tuple variant. It is `CountRoom(Counting)`, which also made two match arms one.
+- `how_it_went`'s `Created` arm built a list, converted it to a list of references and passed it to a closure no other arm used any more: twenty lines whose output was "`area: why` for each failure".
+
+**The plural.** Counting the idiom `if n == 1 { "" } else { "s" }` found **twenty-four hand-written spellings** across the core, the command line and the window, and two helpers called `areas_in_words`. One core function now says it (`counted(3, "snapshot")`, with a test), and a guard counts the hand-spelled idiom per file with the usual ratchet: it may only shrink, and a new file using it fails (shown to bite by adding one to a clean file). Fifteen were converted by reading each sentence, none rewritten; nine remain in five files, for shapes `counted` does not fit. The outcomes use the same words as before, so the golden output is unchanged.
+
+**What I would do differently.** Search for a smell by its *type shape*, not only the names it had in the place I noticed it: `(bool)` in a tuple variant is the same fact as `turn_on: bool` in a field.
+
 ## 2026-11-03: the second batch from the read
 
 **Why.** The same seeded read that found the bare on/off found four smaller things, each in a different layer.

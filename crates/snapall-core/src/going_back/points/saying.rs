@@ -28,8 +28,8 @@ impl PointRestore {
             .filter(|member| matches!(member.result, MemberResult::Restored(_)))
             .count();
         Ok(format!(
-            "{put_back} area{} put back. To undo it: restore point {}",
-            if put_back == 1 { "" } else { "s" },
+            "{} put back. To undo it: restore point {}",
+            crate::vocabulary::explain::counted(put_back, "area"),
             self.safety.as_str()
         ))
     }
