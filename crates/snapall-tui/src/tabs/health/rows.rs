@@ -123,9 +123,9 @@ pub(crate) fn space_row(area: &AreaFacts) -> Row {
             .as_ref()
             .and_then(snapall_core::Limits::from_retention)
             .map_or(RowAction::Nothing, |_| {
-                RowAction::EditLimits(area.config.clone())
+                RowAction::EditLimits(area.area.clone())
             }),
-        area: Some(area.config.clone()),
+        area: Some(area.area.clone()),
     }
 }
 

@@ -18,7 +18,7 @@ pub(crate) fn limits_spec(editor: &LimitsEditor, state: &State) -> ModalSpec {
             .health
             .data
             .as_ref()
-            .and_then(|data| data.facts.areas.iter().find(|a| a.config == editor.area))
+            .and_then(|data| data.facts.areas.iter().find(|a| a.area == editor.area))
             .map_or_else(String::new, |area| area.location.clone()),
     )
     .title;

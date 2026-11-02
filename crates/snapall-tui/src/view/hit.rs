@@ -29,7 +29,7 @@ pub(crate) fn contains(rect: Rect, col: u16, row: u16) -> bool {
 /// The pane a terminal cell belongs to, for the wheel.
 pub fn pane_at(state: &State, size: Rect, col: u16, row: u16) -> Option<Pane> {
     let areas = layout(state, size);
-    if contains(areas.configs, col, row) {
+    if contains(areas.area_list, col, row) {
         Some(Pane::Areas)
     } else if contains(areas.snapshots, col, row) {
         Some(Pane::Snapshots)
@@ -80,15 +80,17 @@ pub fn hit_test(state: &State, size: Rect, col: u16, row: u16) -> Option<Click> 
         return index.map(|index| Click::TabRow { index });
     }
     let block = Block::default().borders(Borders::ALL);
-    let (configs, groups) = areas_split(state, block.inner(areas.configs));
+    let (area_list, groups) = areas_split(state, block.inner(areas.area_list));
     // the groups under the areas open the groups, like the button
     if groups.is_some_and(|groups| contains(groups, col, row)) {
         return Some(Click::Button(Button::Groups));
     }
-    if state.file.is_none() && contains(configs, col, row) && !state.snapshots.entries().is_empty()
+    if state.file.is_none()
+        && contains(area_list, col, row)
+        && !state.snapshots.entries().is_empty()
     {
-        let index = window_start(state.snapshots.area_cursor, configs.height as usize)
-            + (row - configs.y) as usize;
+        let index = window_start(state.snapshots.area_cursor, area_list.height as usize)
+            + (row - area_list.y) as usize;
         return (index < state.snapshots.entries().len()).then_some(Click::Row {
             pane: Pane::Areas,
             index,

@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-05: the retired word, seventy-nine times, and a rename that went wrong twice
+
+**Why.** A fourth seeded read found that `AreaFacts` still had a public field called `config`, which my tool-word guard cannot see because it checks names declared with `let`, `fn` and `struct`, not fields or parameters. Counting the word as an identifier token, outside strings and comments, in the four crates that speak for the program: **79 uses** (a public field in two structs, about twenty parameters, closure variables, a screen rectangle).
+
+**The rename went wrong twice, and I want that on record.** The first attempt used a regex to skip strings and comments, and a `.` that does not match a newline meant a string continued with a trailing backslash flipped the string/code pairing for the rest of the line: `restored_json` and `deleted_json` came out as `"area": config.as_str()`, which would have silently renamed a **JSON key in the program's output** and left a stale variable. The compiler caught only the one change that happened to break compilation. An audit I wrote afterwards caught the rest. The second attempt fixed that and then changed the text of the **fake snapper's output** inside a raw string (`r#"..."#`), which is snapper's own format. Each was found because I checked *the property* (no string literal changed) rather than trusting that the compile was the check. The third attempt, with a lexer that knows escapes spanning lines and raw strings, changed no string literal across 65 hunks.
+
+**What.** The identifier is `area` (and `areas`) in the core, the command line and the window, and `area_list` for the screen rectangle that holds the areas pane, where `area` already meant a rectangle. Four collisions were named by hand: a closure that compared a thing to itself, a test parameter that shadowed its own helper function (`name`), a test helper that shadowed the function under test (`protected`), and the rectangle. The guard is a real lexer in the architecture test, shown to bite and to ignore the word inside an ordinary string, a raw string with embedded quotes, and both comment kinds: it counted exactly the two real uses in a probe.
+
+**The tool.** I did this rename three times in a day, so it is `dev/rename-identifier.py`: it renames identifier tokens only, follows inline `{name}` interpolations, and verifies no string literal changed, putting everything back if one did.
+
 ## 2026-11-04: a third read, and the plural that was written twenty-four times
 
 **Why.** A third seeded read (seven modules; one was a repeat). Real findings again, in a different mix.

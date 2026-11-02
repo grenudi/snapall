@@ -58,8 +58,8 @@ fn a_protected_area(ctx: &Context, area: &str) -> Result<AreaName, Box<dyn Error
     Ok(named)
 }
 
-fn the_limits_now(ctx: &Context, config: &AreaName) -> Result<Limits, Box<dyn Error>> {
-    let kept = Limits::from_retention(&ctx.backend.retention(config)?);
+fn the_limits_now(ctx: &Context, area: &AreaName) -> Result<Limits, Box<dyn Error>> {
+    let kept = Limits::from_retention(&ctx.backend.retention(area)?);
     kept.ok_or_else(|| {
         "snapper did not say how many this area keeps, so there is nothing to show or change".into()
     })
@@ -95,7 +95,7 @@ fn a_whole_number(text: &str, what: &str) -> Result<u64, Box<dyn Error>> {
 
 fn what_the_next_cleanup_would_remove(
     ctx: &Context,
-    config: &AreaName,
+    area: &AreaName,
     after: &Limits,
 ) -> Result<LimitsPreview, Box<dyn Error>> {
     let now = snapall_system::LinuxSystem::new()
@@ -103,7 +103,7 @@ fn what_the_next_cleanup_would_remove(
         .as_deref()
         .and_then(snapall_core::vocabulary::calendar::seconds_from_snapshot_date);
     Ok(preview_limits(
-        &ctx.backend.list_snapshots(config)?,
+        &ctx.backend.list_snapshots(area)?,
         after,
         now,
     ))
@@ -120,12 +120,12 @@ fn ask_before_changing(
 
 fn set_the_options(
     ctx: &Context,
-    config: &AreaName,
+    area: &AreaName,
     options: &[snapall_core::AreaOption],
 ) -> Result<(), String> {
     options.iter().try_for_each(|option| {
         ctx.backend
-            .set_area_option(config, *option)
+            .set_area_option(area, *option)
             .map_err(|e| e.to_string())
     })
 }
@@ -140,13 +140,13 @@ fn describe(limits: &Limits) -> String {
 }
 
 fn what_changing_would_do(
-    config: &AreaName,
+    area: &AreaName,
     before: &Limits,
     after: &Limits,
     preview: &LimitsPreview,
 ) -> String {
     format!(
-        "{config} currently {}.\nAfter: {}.\n{}\n",
+        "{area} currently {}.\nAfter: {}.\n{}\n",
         describe(before),
         describe(after),
         limits_words(preview, after)

@@ -24,7 +24,7 @@ use crate::vocabulary::domain::AreaName;
 /// What stopping the protection of one area would do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
-    pub config: AreaName,
+    pub area: AreaName,
     /// Where the area is.
     pub location: String,
     /// How many snapshots would be deleted.
@@ -55,28 +55,28 @@ pub enum UnprotectError {
 pub fn plan(
     backend: &dyn SnapshotBackend,
     groups: &Groups,
-    config: &AreaName,
+    area: &AreaName,
 ) -> Result<Plan, UnprotectError> {
-    if !backend.list_areas()?.contains(config) {
-        return Err(UnprotectError::Unknown(config.to_string()));
+    if !backend.list_areas()?.contains(area) {
+        return Err(UnprotectError::Unknown(area.to_string()));
     }
-    let location = backend.area_location(config)?;
+    let location = backend.area_location(area)?;
     if is_root(&location) {
         return Err(UnprotectError::SystemArea);
     }
-    let snapshots = backend.list_snapshots(config)?;
+    let snapshots = backend.list_snapshots(area)?;
     let measured: Option<u64> = snapshots.iter().map(|s| s.used_bytes).sum();
     let points = restore_points(&all_snapshots(backend)?)
         .iter()
-        .filter(|point| point.members.iter().any(|member| member.area == *config))
+        .filter(|point| point.members.iter().any(|member| member.area == *area))
         .count();
     let naming = groups
         .names()
-        .filter(|name| groups.get(name).is_some_and(|areas| areas.contains(config)))
+        .filter(|name| groups.get(name).is_some_and(|areas| areas.contains(area)))
         .cloned()
         .collect();
     Ok(Plan {
-        config: config.clone(),
+        area: area.clone(),
         location,
         snapshots: snapshots.len(),
         freed_bytes: if snapshots.is_empty() { None } else { measured },
@@ -91,12 +91,12 @@ pub fn stop_protecting(
     backend: &dyn SnapshotBackend,
     plan: &Plan,
 ) -> Result<usize, UnprotectError> {
-    if is_root(&backend.area_location(&plan.config)?) {
+    if is_root(&backend.area_location(&plan.area)?) {
         return Err(UnprotectError::SystemArea);
     }
-    backend.delete_area(&plan.config)?;
-    if backend.list_areas()?.contains(&plan.config) {
-        return Err(UnprotectError::StillProtected(plan.config.to_string()));
+    backend.delete_area(&plan.area)?;
+    if backend.list_areas()?.contains(&plan.area) {
+        return Err(UnprotectError::StillProtected(plan.area.to_string()));
     }
     Ok(plan.snapshots)
 }
@@ -210,7 +210,7 @@ mod tests {
         ));
         // a plan made some other way cannot get past the second check
         let forged = Plan {
-            config: area("root"),
+            area: area("root"),
             location: "/".into(),
             snapshots: 2,
             freed_bytes: None,
@@ -283,7 +283,7 @@ mod tests {
             assert!(said.contains(must), "`{must}` missing:\n{said}");
         }
         let bytes = Plan {
-            config: area("home"),
+            area: area("home"),
             location: "/mnt/home".into(),
             snapshots: 1,
             freed_bytes: Some(3_145_728),

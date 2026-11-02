@@ -30,14 +30,14 @@ fn retention() -> Retention {
 }
 
 fn area(
-    config: &str,
+    area: &str,
     location: &str,
     snapshots: usize,
     newest: &str,
     used_percent: u64,
 ) -> AreaFacts {
     AreaFacts {
-        config: name(config),
+        area: name(area),
         location: location.to_owned(),
         snapshots,
         oldest: Some("2026-09-01 10:00:00".to_owned()),
@@ -397,7 +397,7 @@ fn gathering_reads_each_area_through_the_ports_and_skips_nothing_that_can_be_rea
     let home = facts
         .areas
         .iter()
-        .find(|a| a.config.as_str() == "home")
+        .find(|a| a.area.as_str() == "home")
         .unwrap();
     assert_eq!(
         (home.snapshots, home.oldest.is_some(), home.newest.is_some()),

@@ -53,14 +53,14 @@ pub fn history_json(history: &FileHistory) -> Value {
     json!({"path": history.path, "config": history.area.as_str(), "versions": versions})
 }
 
-pub fn protected_areas(configs: &[AreaName]) -> String {
-    let mut sorted: Vec<&AreaName> = configs.iter().collect();
+pub fn protected_areas(areas: &[AreaName]) -> String {
+    let mut sorted: Vec<&AreaName> = areas.iter().collect();
     sorted.sort();
     sorted.iter().map(|c| format!("{c}\n")).collect()
 }
 
-pub fn areas_json(configs: &[AreaName]) -> Value {
-    let mut sorted: Vec<&str> = configs.iter().map(AreaName::as_str).collect();
+pub fn areas_json(areas: &[AreaName]) -> Value {
+    let mut sorted: Vec<&str> = areas.iter().map(AreaName::as_str).collect();
     sorted.sort_unstable();
     json!({ "configs": sorted })
 }
@@ -76,8 +76,8 @@ pub(super) fn kind_label(info: &SnapshotInfo) -> String {
 /// One block per area: a header, then an aligned table, newest snapshot last.
 pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
     let mut blocks = Vec::new();
-    for (config, list) in all {
-        let mut block = format!("{config}\n");
+    for (area, list) in all {
+        let mut block = format!("{area}\n");
         if list.is_empty() {
             block.push_str("  (no snapshots)\n");
         } else {

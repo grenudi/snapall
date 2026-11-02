@@ -77,14 +77,14 @@ pub(super) fn area_report(area: &Area) -> AreaReport {
 
 /// What each area keeps and protects from cleanup: its real settings, read from snapper.
 pub(super) fn limits_of(backend: &dyn SnapshotBackend) -> Vec<explain::Limit> {
-    let Ok(configs) = backend.list_areas() else {
+    let Ok(areas) = backend.list_areas() else {
         return Vec::new();
     };
-    configs
+    areas
         .iter()
-        .filter_map(|config| {
-            let location = backend.area_location(config).ok()?;
-            let retention = backend.retention(config).ok()?;
+        .filter_map(|area| {
+            let location = backend.area_location(area).ok()?;
+            let retention = backend.retention(area).ok()?;
             Some(explain::Limit {
                 area: coverage::describe(&location).title,
                 keep: retention.keep,

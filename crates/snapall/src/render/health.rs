@@ -151,7 +151,7 @@ pub fn health_json(facts: &snapall_core::Facts, report: &snapall_core::Health) -
         })).collect::<Vec<_>>(),
         "status": report.chips.iter().map(|c| json!({"label": c.label, "level": level_word(c.level), "topic": topic_word(c.topic)})).collect::<Vec<_>>(),
         "areas": facts.areas.iter().map(|a| json!({
-            "area": a.config.as_str(),
+            "area": a.area.as_str(),
             "path": a.location,
             "snapshots": a.snapshots,
             "oldest": a.oldest,
