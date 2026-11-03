@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.32.0]
+
+
+
 ## [0.31.1]
 
 
