@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.3]
+
+
+### Refactoring
+- The adapters, read from the top ([#164](https://github.com/grenudi/snapall/pull/164)) ([0eb4914])
+
+
+
 ## [0.34.2]
 
 
