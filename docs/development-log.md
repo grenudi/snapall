@@ -2,6 +2,12 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-15: telling the reader the idea
+
+Reading the project from the very top, as a newcomer, showed a gap that no amount of tidying inside the code would close: nowhere did the repository say, in plain words, what the code is trying to be. The idea (every layer is the top of the layers beneath it, with an upward face that says what it is for and a downward face written only in the words below) was in an architecture reading list as one line and in a canon page as a worked example, but not on a page a person would open first.
+
+`docs/the-idea.md` is that page: the idea, one request followed from the front door to the machine, the checks the repository runs on itself and what each one protects, and an honest account of how close each part is to the ideal and which parts are not close. The paths on it are checked by the same guard that keeps every document honest, and it is linked from the README and from the architecture page, the two places a newcomer lands.
+
 ## 2026-11-14: a sixth read, and an item dropped
 
 **The item dropped.** "Record each change's weight in the journal (changed, or lost for good)" has been on the plan since early on, and I had never checked what it would add. The journal records the weight of the *undo*, and an entry's rollback is either a real undo or advice saying it cannot be undone, so the Activity tab already tells a person whether a change can be put back. A second field would say that through another route. Not built, with the reason in the plan.
