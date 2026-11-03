@@ -95,7 +95,7 @@ pub(super) fn the_point_named<'a>(
 ) -> Result<&'a RestorePoint, Box<dyn Error>> {
     found.iter().find(|p| p.point == *wanted).ok_or_else(|| {
         if found.is_empty() {
-            "There are no restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is one.".into()
+            snapall_core::vocabulary::explain::NO_RESTORE_POINTS_YET.into()
         } else {
             format!("`{wanted}` is not a restore point. `snapall points` lists them.").into()
         }

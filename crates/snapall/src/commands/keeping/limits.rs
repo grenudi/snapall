@@ -60,9 +60,7 @@ fn a_protected_area(ctx: &Context, area: &str) -> Result<AreaName, Box<dyn Error
 
 fn the_limits_now(ctx: &Context, area: &AreaName) -> Result<Limits, Box<dyn Error>> {
     let kept = Limits::from_retention(&ctx.backend.retention(area)?);
-    kept.ok_or_else(|| {
-        "snapper did not say how many this area keeps, so there is nothing to show or change".into()
-    })
+    kept.ok_or_else(|| snapall_core::vocabulary::explain::LIMITS_UNKNOWN.into())
 }
 
 /// What was typed, laid over what is: each part that was given must be a sensible value.
