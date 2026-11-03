@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.33.1]
+
+
+### Refactoring
+- The group editor's picks have a name ([#155](https://github.com/grenudi/snapall/pull/155)) ([18ada22])
+
+
+
 ## [0.33.0]
 
 
