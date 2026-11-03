@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-20: the window's header
+
+A read of two window screens. The Health tab's drawing already reads as its steps and needed nothing. The header drew three things in one function (the brand badge, the tabs, a spinner with its elapsed time), and found the list of tabs by laying them out on an imaginary screen 65,535 cells wide; the badge and the spinner are named now, and the tabs come from the list of tabs.
+
 ## 2026-11-19: nothing is said as "no", not as a zero
 
 The singular fix had a cousin. `counted` now says "no snapshots" for zero, the way a person does, instead of "0 snapshots". The one place it must not is a length of time, where "0 seconds" is right and "no seconds" is not (a failing test said so), so the duration words keep their zero by saying it themselves.

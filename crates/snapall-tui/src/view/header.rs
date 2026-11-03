@@ -38,12 +38,7 @@ pub fn tab_rects(header: Rect) -> Vec<(Rect, Tab)> {
 
 pub(crate) fn tab_spans(state: &State) -> Vec<Span<'static>> {
     let mut spans = vec![Span::raw(" ")];
-    for (_, tab) in tab_rects(Rect {
-        x: 0,
-        y: 0,
-        width: u16::MAX,
-        height: 1,
-    }) {
+    for tab in Tab::ALL {
         let style = look::tab(look::mood(state, Click::Tab(tab)), tab == state.tab);
         spans.push(Span::styled(tab_label(tab), style));
         spans.push(Span::raw(" "));
@@ -51,11 +46,36 @@ pub(crate) fn tab_spans(state: &State) -> Vec<Span<'static>> {
     spans
 }
 
+/// The brand badge that opens the header.
+fn brand_badge() -> Span<'static> {
+    Span::styled(" snapall ", Style::new().fg(Color::Black).bg(ACCENT).bold())
+}
+
+/// While work is in flight on the worker thread: a spinner, what it is doing, and for how long once it is more than a
+/// moment. It keeps the screen moving, so a long change is not mistaken for a stuck window.
+fn working_indicator(state: &State) -> Option<Span<'static>> {
+    if state.waiting.pending == 0 {
+        return None;
+    }
+    const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
+    let word = if state.quit { "finishing" } else { "working" };
+    let seconds = state.waiting.busy_ticks / 10;
+    let elapsed = if seconds > 0 {
+        format!(" {seconds} s")
+    } else {
+        String::new()
+    };
+    Some(Span::styled(
+        format!(
+            "   {} {word}{elapsed}",
+            FRAMES[state.waiting.spinner % FRAMES.len()]
+        ),
+        Style::new().fg(Color::Yellow).bold(),
+    ))
+}
+
 pub(crate) fn render_header(state: &State, frame: &mut Frame, area: Rect) {
-    let mut spans = vec![Span::styled(
-        " snapall ",
-        Style::new().fg(Color::Black).bg(ACCENT).bold(),
-    )];
+    let mut spans = vec![brand_badge()];
     match &state.file {
         Some(view) => spans.push(Span::styled(
             format!("  history of {}", view.target.path),
@@ -63,23 +83,6 @@ pub(crate) fn render_header(state: &State, frame: &mut Frame, area: Rect) {
         )),
         None => spans.extend(tab_spans(state)),
     }
-    if state.waiting.pending > 0 {
-        // Work is in flight on the worker thread: say so, and keep the screen moving.
-        const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
-        let word = if state.quit { "finishing" } else { "working" };
-        let seconds = state.waiting.busy_ticks / 10;
-        let elapsed = if seconds > 0 {
-            format!(" {seconds} s")
-        } else {
-            String::new()
-        };
-        spans.push(Span::styled(
-            format!(
-                "   {} {word}{elapsed}",
-                FRAMES[state.waiting.spinner % FRAMES.len()]
-            ),
-            Style::new().fg(Color::Yellow).bold(),
-        ));
-    }
+    spans.extend(working_indicator(state));
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
