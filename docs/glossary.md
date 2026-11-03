@@ -10,7 +10,7 @@ The words snapall uses, and what each one means here. The code, the CLI, the doc
 | **snapshot** | One saved state of a config, with a number, a kind, a date and a description. |
 | **snapshot id** | The number snapper gives a snapshot. Never 0: 0 is the *current system*, which is not a snapshot and cannot be deleted. |
 | **current system** | Snapper's pseudo-snapshot 0: the live state. Never listed, never deletable. |
-| **kind** | `single`, `pre` or `post`. A `post` always knows its `pre`. |
+| **kind** | `single`, `pre` or `post` (snapper's words, kept in the JSON output). A person reads `single`, `before` and `after #3`, where 3 is the `pre` that a `post` always knows. |
 | **description** | The text stored with a snapshot: non-empty, one line, at most 200 characters. |
 | **cleanup algorithm** | Snapper's rule for pruning old snapshots. snapall's snapshots use `number`, so snapper's own timer prunes them. |
 | **plan** | The set of configs a `create` will snapshot: non-empty, sorted, unique, all of them real. Built only by `plan()`. |

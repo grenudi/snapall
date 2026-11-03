@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-10: `pre` and `post<-3`, in plain words
+
+**Decision.** The Snapshots list showed snapper's words for a pair of snapshots taken around one command, unexplained, against the rule that person-readable text does not carry the tool's vocabulary. A person now reads `single`, **`before`** and **`after #3`** (the one taken after snapshot 3), and the pairing is explained once, in the help, in the existing entry for the list: "Newest first. `before` and `after #3` are a pair taken around one command." The machine-readable output keeps `"kind": "pre"`, because a script reads it; the words are in `SnapshotKind::label`, one place, which both the window and the command line use since the scan of repeated code.
+
+**What the guards said.** The help page fits a small terminal exactly (17 rows of 17), and an extra entry for the pair made it 19: two tests, which exist for this, failed. I did not raise the limit, which protects a small terminal. The explanation did not need an entry of its own: it is a fact about the list that the existing entry already describes, so it went into that entry as one line of 74 characters against a width of 78, measured before writing it.
+
+**Two slips in the making of it.** Twice my script matched an export list by its exact text, and rustfmt had rewrapped the list since: the first time the edit stopped half way, so the later edits did not apply and the build passed with a warning about an unused constant; the second time I re-ran it and it stopped the same way. Replacing the identifier alone is robust to the formatting. The partial first run is a reminder that a script which edits several files must either apply everything or nothing, and that "it compiled" was not evidence that it had done what I meant: the unused-constant warning was.
+
 ## 2026-11-09: a scan for repeated code, instead of reading eight modules at a time
 
 **Why.** The fifth read's lesson was that the finds had become one smell, a distinction the code makes and does not name, and that finding it by sampling meant reading eight modules to fix four things. Repeated code is the part of that smell a program can find. `dev/find-duplicates.py` lists every run of N meaningful production lines (comments, braces, attributes and imports dropped; whitespace normalised) that appears in two places.

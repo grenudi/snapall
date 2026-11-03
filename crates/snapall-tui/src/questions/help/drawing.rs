@@ -45,7 +45,7 @@ pub(crate) fn concepts_page() -> Vec<Line<'static>> {
     ));
     lines.extend(term(
         "Snapshot (the list on the right)",
-        "One saved moment of that area. Newest first.",
+        explain::SNAPSHOT_LIST,
     ));
     lines.extend(term("Restore", explain::RESTORING));
     lines
