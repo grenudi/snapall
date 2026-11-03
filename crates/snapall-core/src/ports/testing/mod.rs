@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Test support: an in-memory adapter and the contract every backend must satisfy.
+//! Test support: a stand-in for the snapshot tool that keeps everything in memory, and the checks every real one must pass.
 //! Compiled for this crate's own tests and for adapter crates via the `testing` feature.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

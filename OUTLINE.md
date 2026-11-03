@@ -52,7 +52,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `ports/testing/backend.rs`: The in-memory stand-in doing what a real backend does.
     - `ports/testing/building.rs`: Setting up the in-memory stand-in the way a test needs it.
     - `ports/testing/contract.rs`: The contract every backend must satisfy, as one function to run against it.
-    - `ports/testing/mod.rs`: Test support: an in-memory adapter and the contract every backend must satisfy.
+    - `ports/testing/mod.rs`: Test support: a stand-in for the snapshot tool that keeps everything in memory, and the checks every real one must pass.
     - `ports/testing/state.rs`: What the in-memory stand-in remembers: each area, its snapshots and files.
       - `ports/testing/system/answering.rs`: How the stand-in answers what snapall asks of the machine.
       - `ports/testing/system/mod.rs`: A machine whose answers a test sets: its disk, its jobs, its clock, who else is making a change.
@@ -251,7 +251,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `contract/log_format.rs`: How the log is written: not at all, as text, or as JSON.
   - `contract/mod.rs`: snapall's invocation surface, declared once with argenv.
 - `doctor.rs`: `snapall doctor` at work: looking at the machine, and running the steps that install what is missing.
-- `generate.rs`: The shell completions and the man page.
+- `generate.rs`: Tab completion for bash, zsh and fish, and the man page.
 - `help.rs`: `--help`, generated from the contract.
 - `logging.rs`: Where the audit trail goes: nowhere, to stderr, or to a private file.
 - `main.rs`: The program: read what was asked, set up what it works with, carry it out, and end with the right exit code.
