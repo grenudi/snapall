@@ -187,10 +187,7 @@ fn the_preview_says_per_area_what_changes_and_why_the_system_is_left_out() {
         text.contains("docs") && text.contains("nothing to change: it already matches"),
         "{text}"
     );
-    assert!(
-        text.contains("change 1 path: 1 reverted, 0 removed, 0 brought back"),
-        "{text}"
-    );
+    assert!(text.contains("change 1 path: 1 reverted"), "{text}");
     assert!(
         text.contains("not touched: the running system is not put back while it runs"),
         "{text}"

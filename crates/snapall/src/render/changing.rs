@@ -50,9 +50,11 @@ pub fn changes_json(area: &AreaName, id: SnapshotId, preview: &Preview) -> Value
 pub fn restored(area: &AreaName, id: SnapshotId, done: &Restored) -> String {
     let s = done.summary;
     format!(
-        "restored {area} to #{id}: {} reverted, {} removed, {} brought back\n\
+        "restored {area} to #{id}: {}\n\
          undo this with: snapall restore {area} {}  (the state before is snapshot #{})\n",
-        s.modified, s.deleted, s.created, done.safety_snapshot, done.safety_snapshot
+        snapall_core::vocabulary::explain::what_changes(s.modified, s.deleted, s.created),
+        done.safety_snapshot,
+        done.safety_snapshot
     )
 }
 

@@ -84,6 +84,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `vocabulary/explain/cleanup.rs`: What a person is told about cleanup and about how room is counted.
     - `vocabulary/explain/mod.rs`: What snapall tells a person about what it does, in words that assume nothing: no snapshots, no filesystems, no snapper.
     - `vocabulary/explain/numbers.rs`: Saying how many: a number with its noun, in the right plural.
+    - `vocabulary/explain/paths.rs`: What putting files back does to paths, in words: only what happens, never a row of zeros.
   - `vocabulary/mod.rs`: The words snapall thinks and speaks in: its names and numbers, what an act weighs, dates, and what it tells a person.
 
 ## snapall-observe

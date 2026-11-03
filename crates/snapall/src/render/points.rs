@@ -99,8 +99,9 @@ pub fn point_preview(
             MemberView::Changes(c) => {
                 let (changed, added, removed) = path_counts(&c.changes);
                 format!(
-                    "change {}: {changed} reverted, {added} removed, {removed} brought back",
-                    snapall_core::vocabulary::explain::counted(c.changes.len(), "path")
+                    "change {}: {}",
+                    snapall_core::vocabulary::explain::counted(c.changes.len(), "path"),
+                    snapall_core::vocabulary::explain::what_changes(changed, added, removed)
                 )
             }
             MemberView::SystemRoot => {

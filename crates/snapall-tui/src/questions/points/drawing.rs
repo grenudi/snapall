@@ -90,7 +90,13 @@ pub(crate) fn points_spec(
                     }
                     snapall_core::MemberView::Changes(p) => {
                         let (changed, added, removed) = restore_counts(&p.changes);
-                        format!("change {} path(s): {changed} reverted, {added} removed, {removed} brought back", p.changes.len())
+                        format!(
+                            "change {}: {}",
+                            snapall_core::vocabulary::explain::counted(p.changes.len(), "path"),
+                            snapall_core::vocabulary::explain::what_changes(
+                                changed, added, removed
+                            )
+                        )
                     }
                     snapall_core::MemberView::SystemRoot => {
                         format!(
