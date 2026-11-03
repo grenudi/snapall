@@ -64,6 +64,7 @@ pub enum Request {
         keep: Option<String>,
         min_age: Option<String>,
         cleanup: Option<String>,
+        dry_run: bool,
         yes: bool,
         destroy: bool,
     },

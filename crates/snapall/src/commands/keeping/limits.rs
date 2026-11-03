@@ -23,7 +23,13 @@ pub struct LimitsWanted<'a> {
 /// How many snapshots an area keeps, and when its oldest go. Without options it shows them and what the
 /// next cleanup would remove; with options it changes them, after saying what that would remove (a removed
 /// snapshot cannot be brought back, so a change that removes any asks first, or needs `--destroy`).
-pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agreed) -> Outcome {
+pub fn limits(
+    ctx: &Context,
+    area: &str,
+    wanted: LimitsWanted<'_>,
+    mode: Mode,
+    agreed: Agreed,
+) -> Outcome {
     let area_name = a_protected_area(ctx, area)?;
     let before = the_limits_now(ctx, &area_name)?;
     let after = the_limits_wanted(&before, &wanted)?;
@@ -35,6 +41,12 @@ pub fn limits(ctx: &Context, area: &str, wanted: LimitsWanted<'_>, agreed: Agree
     output::note(&what_changing_would_do(
         &area_name, &before, &after, &preview,
     ));
+    if mode.shows_only() {
+        return ctx.show.result(
+            "Dry run: nothing was changed.\n".to_owned(),
+            serde_json::json!({ "area": area, "would_remove": preview.would_remove, "changed": false }),
+        );
+    }
     let approved = ask_before_changing(&preview, agreed)?;
     let change = Change::begin(
         approved,

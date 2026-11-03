@@ -243,6 +243,7 @@
         "create",
         "restore",
         "restore-all",
+        "limits",
         "unprotect",
         "setup"
       ],

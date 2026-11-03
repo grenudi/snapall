@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-10-27T09:43:04Z",
+  "generated": "2026-11-03T20:00:28Z",
   "inputs": [
     {
       "allowed": [],
@@ -243,6 +243,7 @@
         "create",
         "restore",
         "restore-all",
+        "limits",
         "unprotect",
         "setup"
       ],
@@ -801,5 +802,5 @@
     "env",
     "default"
   ],
-  "source": "snapall@0.21.0"
+  "source": "snapall@0.34.13"
 }
