@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.9]
+
+
+### Refactoring
+- Failures in one voice ([#177](https://github.com/grenudi/snapall/pull/177)) ([9a19b44])
+
+
+
 ## [0.34.8]
 
 
