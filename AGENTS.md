@@ -37,7 +37,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 4. **Gate**: `dev/gate.sh`, about a minute. The heavy checks run in CI on every pull request; reproduce a CI failure with `dev/gate.sh --full`.
 5. **Ship**: `GITHUB_TOKEN=... dev/ship.py "refactor: lowercase subject" --body-file /tmp/body.md`, in the foreground. It pushes, opens the pull request, waits for CI, squash-merges, waits for main, and then releases only when the policy says so: 10 changes are waiting, or the oldest has waited 7 days, or the change touches `packaging/` or the release workflows (the one thing CI cannot prove), or `--release` was given. Otherwise it says "release deferred" and stops, and the release pull request keeps collecting changes. When it does release it merges that pull request and verifies the release. A process started in one tool call does not outlive it, so it stops itself after about four minutes with exit code 75 ("still waiting"): run the same command again until it exits 0. It keeps no state, so that is safe at any point.
    Every few iterations, also read some code as a stranger: `dev/sample-modules.py` picks modules at random (a seed makes a read reproducible). It finds what no guard measures; the first read found stale words in messages, a rule copied by hand in five places, and a sentence written twice.
-6. **Log** what was done, why, and the evidence, in `docs/development-log.md`.
+6. **Log** what was done, why, and the evidence, in `docs/development-log.md`. The date of an entry is today's date from `date`, never counted forward: an invented date makes the whole record untrustworthy.
 
 ## The tools, all in `dev/`
 | | |
