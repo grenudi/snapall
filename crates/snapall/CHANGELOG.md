@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.14]
+
+
+### Bug Fixes
+- The file history says in area, not config ([#191](https://github.com/grenudi/snapall/pull/191)) ([abeda10])
+- The restore point tip obeys --no-hints ([#193](https://github.com/grenudi/snapall/pull/193)) ([5df0658])
+
+
+### Features
+- Limits accepts --dry-run like the other commands that change things ([#189](https://github.com/grenudi/snapall/pull/189)) ([6494ea4])
+
+
+### Refactoring
+- The plural left to the reader ([#192](https://github.com/grenudi/snapall/pull/192)) ([c6aacbe])
+
+
+
 ## [0.34.13]
 
 
