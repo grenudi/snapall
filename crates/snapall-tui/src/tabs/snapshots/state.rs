@@ -43,6 +43,11 @@ impl SnapshotsTab {
         self.entries().get(self.area_cursor)
     }
 
+    /// The chosen area's name, for the questions and the reloads that need it after the borrow has ended.
+    pub fn selected_area_name(&self) -> Option<AreaName> {
+        self.selected_area().map(|entry| entry.name.clone())
+    }
+
     /// The selected area's snapshots, newest first.
     pub fn displayed_snapshots(&self) -> Vec<&SnapshotInfo> {
         match self.selected_area().map(|c| &c.snapshots) {

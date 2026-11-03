@@ -33,10 +33,7 @@ pub(crate) fn on_file_key(state: &mut State, key: Key) -> Vec<Effect> {
         }
         Key::Char('r') => {
             state.notice = Some(Notice::Info("reloading".into()));
-            vec![Effect::LoadFileVersions {
-                area: view.target.area.clone(),
-                path: view.target.path.clone(),
-            }]
+            vec![view.reload()]
         }
         Key::Enter | Key::Char('u') => open_file_restore(state),
         _ => Vec::new(),

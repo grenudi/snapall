@@ -38,6 +38,16 @@ pub struct FileView {
     pub cursor: usize,
 }
 
+impl FileView {
+    /// Ask for this file's versions again: what a change to the area, or opening the screen, calls for.
+    pub fn reload(&self) -> crate::model::Effect {
+        crate::model::Effect::LoadFileVersions {
+            area: self.target.area.clone(),
+            path: self.target.path.clone(),
+        }
+    }
+}
+
 /// The restore point a snapshot belongs to, and what putting all of it back would do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PointOffer {

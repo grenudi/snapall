@@ -46,6 +46,7 @@ Each iteration is one coherent step with its own branch and pull request, and no
 | `ship.py` | push, pull request, CI, merge, release, verify; resumable; re-runs a job the runner itself failed to start |
 | `split-module.py` | split one module into a folder of modules by purpose, by a JSON spec, moving whole items |
 | `golden-output.sh` | `record` or `check` what 20 commands print, so a refactor is shown to change nothing |
+| `find-duplicates.py` | the same production code written in more than one place: a list to judge, and the blunt case is a guard |
 | `rename-identifier.py` | rename an identifier across the crates, only where it is an identifier, and check no string changed |
 | `ci-timings.py` | what CI costs: wall time, job minutes, the slowest jobs and steps; read before and after changing a workflow |
 | `sample-modules.py` | pick modules at random, by layer, to read as a stranger |

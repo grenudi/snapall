@@ -5,10 +5,10 @@
 //! Drawing the file history screen: one file's versions, newest first.
 
 use crate::model::{Load, State};
-use crate::theme::{ACCENT, DIM};
+use crate::theme::DIM;
 use crate::view::*;
 use ratatui::layout::{Constraint, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Paragraph, Row, Table, TableState, Wrap};
 use ratatui::Frame;
 use snapall_core::FileState;
@@ -65,11 +65,7 @@ pub(crate) fn render_file(state: &State, frame: &mut Frame, area: Rect) {
                 .collect();
             let header = Row::new(["#", "Date", "This file", "Snapshot"])
                 .style(Style::new().fg(DIM).add_modifier(Modifier::BOLD));
-            let highlight = if state.modal.is_none() {
-                Style::new().fg(Color::Black).bg(ACCENT).bold()
-            } else {
-                Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
-            };
+            let highlight = crate::theme::chosen_row(state.modal.is_none());
             let table = Table::new(
                 rows,
                 [

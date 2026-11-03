@@ -35,6 +35,18 @@ fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (if month <= 2 { year + 1 } else { year }, month, day)
 }
 
+/// `2026-10-23T05:43:12Z` for the seconds since 1970, the form a line of the log carries.
+pub fn rfc3339_utc(seconds: u64) -> String {
+    let (days, rest) = (seconds / 86_400, seconds % 86_400);
+    let (year, month, day) = civil_from_days(i64::try_from(days).unwrap_or(0));
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3600,
+        rest % 3600 / 60,
+        rest % 60
+    )
+}
+
 /// `20261025T181500Z` for 2026-10-25 18:15:00 UTC.
 pub fn compact_utc(seconds: u64) -> String {
     let seconds = i64::try_from(seconds).unwrap_or(i64::MAX / 2);
@@ -153,5 +165,22 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn seconds_become_a_log_timestamp_across_the_edges_of_the_calendar() {
+        assert_eq!(rfc3339_utc(0), "1970-01-01T00:00:00Z");
+        assert_eq!(rfc3339_utc(86_399), "1970-01-01T23:59:59Z");
+        assert_eq!(
+            rfc3339_utc(951_782_400),
+            "2000-02-29T00:00:00Z",
+            "a century year that is a leap year"
+        );
+        assert_eq!(
+            rfc3339_utc(4_107_542_400),
+            "2100-03-01T00:00:00Z",
+            "a century year that is not"
+        );
+        assert_eq!(rfc3339_utc(1_761_187_392), "2025-10-23T02:43:12Z");
     }
 }

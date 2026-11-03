@@ -35,7 +35,7 @@ pub(crate) fn confirming_delete(
 }
 
 pub(crate) fn open_delete(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.snapshots.selected_area().map(|c| c.name.clone()) else {
+    let Some(area) = state.snapshots.selected_area_name() else {
         return Vec::new();
     };
     if state.snapshots.focus != Pane::Snapshots {

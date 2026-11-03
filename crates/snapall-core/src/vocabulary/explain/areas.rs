@@ -55,11 +55,7 @@ pub fn protect_offer(mount_point: &str) -> String {
         title = info.title,
         holds = info.holds,
         reason = info.reason,
-        verdict = match info.worth {
-            Worth::Recommended => "Recommended",
-            Worth::Optional => "Up to you",
-            Worth::NotUseful => "Not recommended",
-        },
+        verdict = info.worth.verdict(),
     )
 }
 
@@ -78,11 +74,7 @@ pub fn protect_summary(mount_point: &str) -> String {
         title = info.title,
         holds = info.holds,
         reason = info.reason,
-        verdict = match info.worth {
-            Worth::Recommended => "Recommended",
-            Worth::Optional => "Up to you",
-            Worth::NotUseful => "Not recommended",
-        },
+        verdict = info.worth.verdict(),
     )
 }
 

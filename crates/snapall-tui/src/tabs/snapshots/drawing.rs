@@ -13,7 +13,6 @@ use ratatui::widgets::{
     Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Row, Table, TableState, Wrap,
 };
 use ratatui::Frame;
-use snapall_core::{SnapshotInfo, SnapshotKind};
 
 pub(crate) fn pane_block(title: String, focused: bool) -> Block<'static> {
     let color = if focused { ACCENT } else { DIM };
@@ -140,11 +139,7 @@ pub(crate) fn render_areas(state: &State, frame: &mut Frame, area: Rect) {
                     ]))
                 })
                 .collect();
-            let highlight = if focused {
-                Style::new().fg(Color::Black).bg(ACCENT).bold()
-            } else {
-                Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
-            };
+            let highlight = crate::theme::chosen_row(focused);
             let list = List::new(items)
                 .highlight_style(highlight)
                 .highlight_symbol("> ");
@@ -164,14 +159,6 @@ pub(crate) fn render_areas(state: &State, frame: &mut Frame, area: Rect) {
                 );
             }
         }
-    }
-}
-
-pub(crate) fn kind_label(info: &SnapshotInfo) -> String {
-    match info.kind {
-        SnapshotKind::Single => "single".to_owned(),
-        SnapshotKind::Pre => "pre".to_owned(),
-        SnapshotKind::Post { pre } => format!("post<-{pre}"),
     }
 }
 
@@ -227,7 +214,7 @@ pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
                     Row::new(vec![
                         mark.to_owned(),
                         info.id.to_string(),
-                        kind_label(info),
+                        info.kind.label(),
                         info.date.clone().unwrap_or_default(),
                         info.cleanup.clone().unwrap_or_default(),
                         info.description.clone(),
@@ -237,11 +224,7 @@ pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
                 .collect();
             let header = Row::new(["", "#", "Type", "Date", "Cleanup", "Description"])
                 .style(Style::new().fg(DIM).add_modifier(Modifier::BOLD));
-            let highlight = if focused {
-                Style::new().fg(Color::Black).bg(ACCENT).bold()
-            } else {
-                Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
-            };
+            let highlight = crate::theme::chosen_row(focused);
             let table = Table::new(
                 rows,
                 [
