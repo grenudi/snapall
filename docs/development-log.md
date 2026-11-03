@@ -6,6 +6,10 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 
 The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
 
+## 2026-11-27: the setup conversation, and the idea page
+
+The setup conversation could not be run here (this machine has no unprotected disk for it to find), so I read it the other honest way: every sentence it says, in order, as one conversation. It is coherent and plain, uses the same voice for a failure as the window now does, and ends every branch with what to run next, so nothing changed. The idea page was missing the practice that has found the most this week, using the program as a newcomer rather than reading its code, so it says so.
+
 ## 2026-11-26: reading the window as a newcomer
 
 Driving the real window in a pseudo-terminal and reading the first screen, the Health tab and the Activity tab: they explain themselves, and the earlier headline fix shows. One thing was ambiguous: an Activity entry from the command line ended with "(command)", the journal's stored word doing double duty as the displayed one, and the command line's own listing re-spelled the same mapping. The core owns both words now, the stored one (`command`, which older journals depend on and which a test pins) and the one for a person (`command line`), and the command line's listing uses the stored word instead of its own copy. The Type column still shows "single" for an ordinary snapshot, which is snapper's word, and I left it: it is plain English, and what stands out are the pairs, which now say `before` and `after #3`.
