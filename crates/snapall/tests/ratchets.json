@@ -1,7 +1,7 @@
 {
   "entry_files_too_long": {},
   "files_too_long": {
-    "crates/snapall/src/contract/inputs.rs": 514
+    "crates/snapall/src/contract/inputs.rs": 498
   },
   "findability_gaps": {},
   "hand_spelled_plurals": {},

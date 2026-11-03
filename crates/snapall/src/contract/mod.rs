@@ -13,10 +13,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod commands;
 mod inputs;
+mod log_format;
 #[cfg(test)]
 mod tests;
 
 pub use commands::*;
 pub use inputs::*;
+pub use log_format::LogFormat;
 
 use commands::{DESTROY_COMMANDS, DRY_RUN_COMMANDS, JSON_COMMANDS, LOGGED_COMMANDS, YES_COMMANDS};

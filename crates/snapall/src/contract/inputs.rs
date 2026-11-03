@@ -3,43 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Every flag, positional and environment variable of the command line, declared once, and the commands each applies to.
+//!
+//! Read it as a table. Each entry is one thing a person can give; it says which commands it applies to, and how it is spelled as a flag,
+//! as a position, or as an environment variable. The sections say what the entries are for, so the commands each one belongs to are
+//! named in the section, not implied by where it sits.
 
 use super::*;
 use argenv_resolve::*;
-
-/// How events are written. `Off` is the default: a command-line tool is quiet unless asked.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LogFormat {
-    Off,
-    Text,
-    Json,
-}
-
-impl LogFormat {
-    pub const TOKENS: &'static [&'static str] = &["off", "text", "json"];
-}
-
-impl std::fmt::Display for LogFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            LogFormat::Off => "off",
-            LogFormat::Text => "text",
-            LogFormat::Json => "json",
-        })
-    }
-}
-
-impl FromRaw for LogFormat {
-    fn from_raw(raw: &str) -> Option<LogFormat> {
-        Some(match raw.trim() {
-            "off" | "none" => LogFormat::Off,
-            "text" => LogFormat::Text,
-            "json" => LogFormat::Json,
-            _ => return None,
-        })
-    }
-}
 
 contract! {
     // ---- general ---------------------------------------------------------------------
@@ -151,6 +121,8 @@ contract! {
         ..Input::EMPTY
     };
 
+    // ---- destroying (--destroy) and rehearsing (--dry-run), shared by several commands ----
+
     /// Show the plan without acting.
     DESTROY: bool, Command = Input {
         key:         "destroy",
@@ -202,7 +174,7 @@ contract! {
         ..Input::EMPTY
     };
 
-    // ---- delete ----------------------------------------------------------------------
+    // ---- which snapshot a command acts on (delete, changes, restore) -------------------
 
     /// The area a snapshot belongs to.
     TARGET_AREA: String, Command = Input {
@@ -229,6 +201,8 @@ contract! {
         ..Input::EMPTY
     };
 
+    // ---- one path inside a snapshot (changes, restore) ---------------------------------
+
     /// Limit changes and restore to one path.
     PATH: std::path::PathBuf, Command = Input {
         key:         "path",
@@ -240,6 +214,8 @@ contract! {
         summary:     "Only this file or directory (an absolute path inside the area). Default: everything that differs.",
         ..Input::EMPTY
     };
+
+    // ---- one file (history, tui) -------------------------------------------------------
 
     /// The file whose history to show.
     HISTORY_FILE: std::path::PathBuf, Command = Input {
@@ -266,6 +242,8 @@ contract! {
         ..Input::EMPTY
     };
 
+    // ---- one restore point (restore-all) -----------------------------------------------
+
     /// Which restore point to put every area back to.
     RESTORE_POINT: String, Command = Input {
         key:         "point",
@@ -277,6 +255,8 @@ contract! {
         summary:     "The restore point to go back to, as `snapall points` shows it (required).",
         ..Input::EMPTY
     };
+
+    // ---- a new part of the disk to protect (setup) -------------------------------------
 
     /// Protect this part of the disk.
     SETUP_AREA: std::path::PathBuf, Command = Input {
@@ -406,6 +386,8 @@ contract! {
         ..Input::EMPTY
     };
 
+    // ---- a group to take snapshots of (create) -----------------------------------------
+
     /// Which group to take a snapshot of.
     GROUP: String, Command = Input {
         key:         "group",
@@ -472,6 +454,8 @@ contract! {
         summary:     "Install snapper with this system's package manager if it is missing. Shows the commands and asks first; needs root.",
         ..Input::EMPTY
     };
+
+    // ---- agreeing without being asked (--yes), shared by many commands -----------------
 
     /// Do not ask.
     YES: bool, Command = Input {

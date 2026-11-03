@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-16: the flag table says what its sections are for
+
+The table of every flag is one `contract!` macro, so it cannot be split across files, and its order shows in help and completions, so it cannot be reshuffled. What could be made true is its sections. Several said the wrong thing: `--destroy` and `--dry-run` sat under "create" and `--yes` under "doctor" though many commands share them, one banner ("delete") held five commands' arguments, and a group flag that belongs to `create` sat under "groups". Each is labelled for what it is and which commands it serves, and the header says how to read the table.
+
+The file also opened with a type that is not a flag, `LogFormat`, the value of the `--log` flag. It is its own small module now, which makes the table shorter and truer to its header (its recorded length debt went from 514 to 498).
+
+**Checked, not assumed.** I compared the real `snapall contract` and `--help` output before and after. A false alarm in the middle: the contract differed on one line, which was its own `generated` timestamp, so the right comparison leaves that field out, and over the other 804 lines it is identical.
+
+**Left alone on purpose.** The contract's key for the area argument is still `config`. It is the argument's identity in the published contract, which other tools read, so renaming it would break them for the sake of a word.
+
 ## 2026-11-15: telling the reader the idea
 
 Reading the project from the very top, as a newcomer, showed a gap that no amount of tidying inside the code would close: nowhere did the repository say, in plain words, what the code is trying to be. The idea (every layer is the top of the layers beneath it, with an upward face that says what it is for and a downward face written only in the words below) was in an architecture reading list as one line and in a canon page as a worked example, but not on a page a person would open first.

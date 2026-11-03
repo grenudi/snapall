@@ -246,6 +246,7 @@ What each part of snapall says it is for, read from the first line of each modul
   - `commands/window.rs`: The window: opening it, on the whole or on one file.
   - `contract/commands.rs`: The commands: what can be asked for, each with the acts it does and the flags their weight gives it.
   - `contract/inputs.rs`: Every flag, positional and environment variable of the command line, declared once, and the commands each applies to.
+  - `contract/log_format.rs`: How the log is written: not at all, as text, or as JSON.
   - `contract/mod.rs`: snapall's invocation surface, declared once with argenv.
 - `doctor.rs`: `snapall doctor` at work: looking at the machine, and running the steps that install what is missing.
 - `generate.rs`: The shell completions and the man page.
