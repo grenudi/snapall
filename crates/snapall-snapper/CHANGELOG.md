@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.13]
+
+
+### Refactoring
+- No pattern jargon in any first sentence ([#186](https://github.com/grenudi/snapall/pull/186)) ([2d4dab9])
+
+
+
 ## [0.34.12]
 
 
