@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.32.1]
+
+
+### Refactoring
+- A scan for repeated code, and what it found ([#149](https://github.com/grenudi/snapall/pull/149)) ([9dd28b8])
+
+
+
 ## [0.32.0]
 
 
