@@ -78,7 +78,8 @@ CREATE
                                (env: SNAPALL_ONLY; commands: create; e.g. snapall create
                                --only root,home)
     --dry-run                  Show what would happen without changing anything.
-                               (commands: create, restore, restore-all, unprotect, setup)
+                               (commands: create, restore, restore-all, limits,
+                               unprotect, setup)
     --group <VALUE>            Take a snapshot of the areas of this group (see `snapall
                                groups`) instead of all of them. Not together with --only.
                                (commands: create; e.g. snapall create --group theming

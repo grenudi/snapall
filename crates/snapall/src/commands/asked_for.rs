@@ -101,6 +101,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             keep,
             min_age,
             cleanup,
+            dry_run,
             yes,
             destroy,
         } => {
@@ -109,7 +110,13 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
                 min_age: min_age.as_deref(),
                 cleanup: cleanup.as_deref(),
             };
-            keeping::limits(ctx, &area, wanted, Agreed::to(yes, destroy))
+            keeping::limits(
+                ctx,
+                &area,
+                wanted,
+                Mode::from_dry_run(dry_run),
+                Agreed::to(yes, destroy),
+            )
         }
         Request::Groups {
             action,

@@ -179,6 +179,7 @@ pub(super) fn build_request(
             keep: Contract::LIMITS_KEEP.get_from(resolution),
             min_age: Contract::LIMITS_MIN_AGE.get_from(resolution),
             cleanup: Contract::LIMITS_CLEANUP.get_from(resolution),
+            dry_run: flag(&Contract::DRY_RUN, resolution),
             yes: flag(&Contract::YES, resolution),
             destroy: flag(&Contract::DESTROY, resolution),
         },

@@ -142,6 +142,7 @@ commands! {
     Limits => Spec::new("limits", "Show or change how many snapshots an area keeps")
         .json()
         .logged()
+        .dry_run()
         .does(Act::ChangeLimits { removes: false })
         .does(Act::ChangeLimits { removes: true }),
     Unprotect => Spec::new("unprotect", "Stop protecting an area: deletes all its snapshots for good")
