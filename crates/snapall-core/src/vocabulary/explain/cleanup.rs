@@ -45,6 +45,10 @@ pub struct Limit {
 
 /// `1800` as `30 minutes`, `3600` as `1 hour`, `90` as `90 seconds`.
 pub fn seconds_words(seconds: u64) -> String {
+    // a length of time keeps its zero: it is a measure, not something there can be none of
+    if seconds == 0 {
+        return "0 seconds".to_owned();
+    }
     let (count, unit) = match seconds {
         s if s >= 86_400 && s % 86_400 == 0 => (s / 86_400, "day"),
         s if s >= 3_600 && s % 3_600 == 0 => (s / 3_600, "hour"),

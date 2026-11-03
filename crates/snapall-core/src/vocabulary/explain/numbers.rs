@@ -4,13 +4,16 @@
 
 //! Saying how many: a number with its noun, in the right plural.
 
-/// "1 snapshot" or "3 snapshots": the noun is given in the singular, and takes an `s` unless there is exactly one.
+/// "1 snapshot", "3 snapshots" or "no snapshots": the noun is given in the singular, and takes an `s` unless there is exactly
+/// one. Nothing is said the way a person says it, not as a zero.
 pub fn counted<N>(count: N, noun: &str) -> String
 where
     N: PartialEq + From<u8> + std::fmt::Display,
 {
     if count == N::from(1) {
         format!("1 {noun}")
+    } else if count == N::from(0) {
+        format!("no {noun}s")
     } else {
         format!("{count} {noun}s")
     }
@@ -35,7 +38,7 @@ mod tests {
     #[test]
     fn one_is_singular_and_everything_else_is_plural() {
         assert_eq!(counted(1, "snapshot"), "1 snapshot");
-        assert_eq!(counted(0, "snapshot"), "0 snapshots");
+        assert_eq!(counted(0, "snapshot"), "no snapshots");
         assert_eq!(counted(2, "area"), "2 areas");
         assert_eq!(counted(12, "path"), "12 paths");
     }
@@ -51,6 +54,6 @@ mod tests {
     fn a_count_of_any_whole_number_type_is_said_the_same() {
         assert_eq!(counted(1_u64, "day"), "1 day");
         assert_eq!(counted(90_u32, "minute"), "90 minutes");
-        assert_eq!(counted(0_usize, "path"), "0 paths");
+        assert_eq!(counted(0_usize, "path"), "no paths");
     }
 }
