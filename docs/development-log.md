@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-24: failures in one voice
+
+The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
+
 ## 2026-11-23: code of the same shape under different names
 
 The duplicate scan could only find identical code, and a rule gets copied and then renamed to fit. `--near` forgets names, numbers and strings and compares only how the code is built. Run on this project it is noisy where regularity is the point (the flag table, enums and their words, import lists), which says the code is regular where it should be, and it found one real thing: the delete question and the restore question both opened with "the chosen area, but only when the snapshots list is the one in use, otherwise tell the person how to get there". That is one small step now, `area_of_the_snapshots_in_use`, in its own tiny module. Two other families it showed are not worth a change: the four name types share the same few lines of plumbing (a macro would hide more than it removes), and the many "enum to its word" matches are a deliberate idiom.
