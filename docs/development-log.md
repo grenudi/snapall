@@ -2,27 +2,29 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
-## 2026-11-24: failures in one voice
+*Dates are the day each entry was committed, read from git. Until 2026-11-03 the headings carried dates I had counted forward, a day per entry, which was false: the work between 2026-10-26 and 2026-11-03 was done in about eight days. They were corrected from git history that day.*
+
+## 2026-11-03: failures in one voice
 
 The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
 
-## 2026-12-03: the tip that ignored its own switch
+## 2026-11-03: the tip that ignored its own switch
 
 Reading the man page, the `--hints` option said it shows "a one-line tip" about the boot menu and that `--no-hints` silences it. The line I had added a few days earlier after a first snapshot (what the restore point is called) did not look at that setting, so a person who had turned hints off would still get it, while the boot-menu tip beside it obeyed. It obeys now, and the option says what it governs: short tips after a snapshot, the restore point's name and the boot-menu one. Checked in a pseudo-terminal with hints on and off. The committed contract and the golden help moved by exactly that one description. The mistake was mine, from the previous round: a new thing that lives beside an existing switch has to be wired to it, and I found it only by reading the documentation of the switch.
 
-## 2026-12-02: the plural left to the reader
+## 2026-11-03: the plural left to the reader
 
 Reading the window's questions, the delete question said "Delete 1 snapshot(s) of home?". That is the other way of not saying a plural: leaving it to the reader. My plural guard looked for the `if n == 1` idiom and could not see it. Five sentences did it (the delete question twice, creating a snapshot, the dry run, an unexpected argument, and the core's unknown areas); they say it through the shared helpers now, and the guard also counts a parenthesised plural inside a string. It had to be inside a string: ordinary code is full of `Ok(s)` and `parse(s)`. Shown to bite by adding the hack and an innocent `Some(s)` to a clean file: it counted exactly one. Eight things pinned the old wording (four tests, the real-terminal script, two golden files), and I found them all by reading the whole result of the search, not the first ten lines.
 
-## 2026-12-01: groups, history and room counting as a newcomer, and one leaked word
+## 2026-11-03: groups, history and room counting as a newcomer, and one leaked word
 
 The group commands, a file's history and switching room counting on read well (a mistyped area is answered with the real ones). One word leaked: the file history's header said "(config snapall_it_a)", the word the project retired, in output meant for a person. It says "(in area snapall_it_a)" now. Before fixing only that one I listed every string mentioning the word in the crates that speak to a person, and nothing else is for a person: the rest are JSON keys (an output contract), a URL, a reference to snapper's own manual page, and test-support messages. One test pinned the old header and moved with it.
 
-## 2026-11-30: the risky actions as a newcomer, and one inconsistency
+## 2026-11-03: the risky actions as a newcomer, and one inconsistency
 
 Walking the actions that cannot all be undone (delete a snapshot, stop protecting an area, change the limits), the wording is what it should be: each says what goes, what is not touched and what cannot be undone, the grammar fixes show ("1 restore point includes it", "Its 2 snapshots"), and a refusal without a terminal says exactly what to pass. One inconsistency: `limits` showed what a change would do ("After: …", "Nothing would be removed…") and then refused `--dry-run`, which `create`, `restore`, `restore-all`, `unprotect` and `setup` all accept, so a person who had learned it there had no way to rehearse a limits change, and a script had none at all. `limits` accepts it now, in the same four places `unprotect` does (the contract, the request, the builder, the handler, which stops after showing the preview), and prints the same "Dry run: nothing was changed." Checked for real: it previews, changes nothing, and answers as JSON. The committed contract (`snapall.argenv.json`, which the program writes and a test compares) and the golden help moved with it, each by exactly the intended lines; the committed contract also still said it came from 0.21.0, which the test rightly ignores.
 
-## 2026-11-29: releases are batched
+## 2026-11-03: releases are batched
 
 **The question.** Is a release per merge worth it, or does it only slow the work down? I thought it through before answering. A release per merge cost about eight minutes of waiting, four workflows and a few dozen runner-minutes, and gave users a new patch version every few minutes for a tool they would update monthly. What it proved beyond what CI already proves on every pull request (the static packages, built and run on eleven distributions) was only the publishing step: signing and publishing the repositories, and the install snippets run from the published ones. That only changes when packaging or the release workflows change. It also multiplied the chances of a flaky release job (one failed on a GitHub server error this week).
 
@@ -32,61 +34,61 @@ Walking the actions that cannot all be undone (delete a snapshot, stop protectin
 
 **What it costs.** A bigger release when it comes, and a defect found by a release is found later. Both are small here: every change passes the whole of CI first, and the changelog says what is in the release. What it saves is most of the waiting: about four calls and eight minutes per change.
 
-## 2026-11-28: no pattern jargon in any first sentence
+## 2026-11-03: no pattern jargon in any first sentence
 
 Comparing the structure now against where this refactoring began (0.26.0) showed one measure that had not moved: two modules whose first sentence used architecture words ("an in-memory adapter", "the snapper adapter, driven through its public face"), and a third that said "the shell completions", which means the terminal and might make a newcomer pause. Each says the same thing in plain words now (a stand-in for the snapshot tool that keeps everything in memory; talking to snapper, tested through what it offers; tab completion for bash, zsh and fish). The measure is zero and the cold read still finds all 52 answers in the top three.
 
-## 2026-11-27: the setup conversation, and the idea page
+## 2026-11-03: the setup conversation, and the idea page
 
 The setup conversation could not be run here (this machine has no unprotected disk for it to find), so I read it the other honest way: every sentence it says, in order, as one conversation. It is coherent and plain, uses the same voice for a failure as the window now does, and ends every branch with what to run next, so nothing changed. The idea page was missing the practice that has found the most this week, using the program as a newcomer rather than reading its code, so it says so.
 
-## 2026-11-26: reading the window as a newcomer
+## 2026-11-03: reading the window as a newcomer
 
 Driving the real window in a pseudo-terminal and reading the first screen, the Health tab and the Activity tab: they explain themselves, and the earlier headline fix shows. One thing was ambiguous: an Activity entry from the command line ended with "(command)", the journal's stored word doing double duty as the displayed one, and the command line's own listing re-spelled the same mapping. The core owns both words now, the stored one (`command`, which older journals depend on and which a test pins) and the one for a person (`command line`), and the command line's listing uses the stored word instead of its own copy. The Type column still shows "single" for an ordinary snapshot, which is snapper's word, and I left it: it is plain English, and what stands out are the pairs, which now say `before` and `after #3`.
 
 **A search that lied by omission.** I looked for strings that pinned the old wording and cut the results off after ten lines, which unrelated matches had filled, so the real-terminal script that pins it never appeared; CI's real-snapper job found it. Searching for pins now means reading all of the results or narrowing the pattern until they are few.
 
-## 2026-11-25: the first run, as a newcomer lives it
+## 2026-11-03: the first run, as a newcomer lives it
 
 I walked the first run on a real fixture: take a snapshot, list the restore points, change a file, preview going back, go back, read the activity record. Going back is the strongest part: it previews, does it, and ends with the exact command that undoes it. Two things were not as good. A preview said "change 1 path: 0 reverted, 1 removed, 0 brought back", spending two of its three numbers on zeros; it is built in one place in the core now (`what_changes`) and says only what happens ("1 removed", or "no change"), where it was worded in four places, one of which still carried a `path(s)`. And after taking a first snapshot nothing said what to call the restore point it had made, the one thing a person needs next. A person at a terminal now gets one line saying the point's name and the command that puts every area back to it, in the same place and by the same rule as the existing boot-menu tip (stderr, never into what a script reads, checked once in a pseudo-terminal and once piped).
 
-## 2026-11-24: using the program as a person would
+## 2026-11-03: using the program as a person would
 
 Sampling modules had stopped finding new ones (a seed returned four I had already read), so I ran the program on a real fixture and read what it says: the list, the health report, the snapshots, the points, the groups, the doctor, the limits, the quotas and the help. They read well, with a next step wherever there is nothing yet. Two things did not. The health report said the same sentence twice for one finding: its headline for "could not find out whether old snapshots are cleaned up" was the body's first sentence in miniature, so the headline names the situation now ("It is not known whether old snapshots are cleaned up") and the body, which is also shown on its own in the setup conversation, is unchanged. And in the help, two command names (`restore-all`, `completions`) were longer than the fixed column and ran into their descriptions, so the column is as wide as the longest name.
 
 **A mistake caught by looking.** I re-recorded the golden output from a second working copy and it showed 1,096 deleted lines across all 20 files: the script runs the binary at `./target/debug/snapall`, which was not there, so it recorded nothing. I read the diff before committing, reverted, linked the build directory properly and recorded again: one file, the 21 lines of the commands column.
 
-## 2026-11-23: code of the same shape under different names
+## 2026-11-03: code of the same shape under different names
 
 The duplicate scan could only find identical code, and a rule gets copied and then renamed to fit. `--near` forgets names, numbers and strings and compares only how the code is built. Run on this project it is noisy where regularity is the point (the flag table, enums and their words, import lists), which says the code is regular where it should be, and it found one real thing: the delete question and the restore question both opened with "the chosen area, but only when the snapshots list is the one in use, otherwise tell the person how to get there". That is one small step now, `area_of_the_snapshots_in_use`, in its own tiny module. Two other families it showed are not worth a change: the four name types share the same few lines of plumbing (a macro would hide more than it removes), and the many "enum to its word" matches are a deliberate idiom.
 
-## 2026-11-22: "nothing here yet", said once
+## 2026-11-03: "nothing here yet", said once
 
 Reading the situations where there is nothing to show: "no restore points yet" was told three times in three layers, in different words, and the window's version was the only one that did not say what to do about it. It is one sentence in the core now (what a restore point is, and that `sudo snapall` makes one), used by the window, the listing and the restore-point command, so the window is as helpful as the command line. The two sentences about limits that could not be shown said "snapper did not say…", the tool's name in words meant for a person; they say "snapall could not find out…" now, once. Two tests and one golden file pinned the old wording and moved with it; the golden change was one line, the intended one.
 
-## 2026-11-21: a release that failed on GitHub's own error
+## 2026-11-03: a release that failed on GitHub's own error
 
 A release's package-repository job failed with `curl: (22) The requested URL returned error: 500` while downloading the release's own packages: GitHub's server answering with an error, not anything in the release. The failed job was re-run and completed the release. The script that downloads them gave up on the first error, which is the weakness, so both its downloads now retry (five times, five seconds apart, on any error): a flaky response from the thing we publish to should not fail a release that is otherwise fine.
 
-## 2026-11-20: the window's header
+## 2026-11-03: the window's header
 
 A read of two window screens. The Health tab's drawing already reads as its steps and needed nothing. The header drew three things in one function (the brand badge, the tabs, a spinner with its elapsed time), and found the list of tabs by laying them out on an imaginary screen 65,535 cells wide; the badge and the spinner are named now, and the tabs come from the list of tabs.
 
-## 2026-11-19: nothing is said as "no", not as a zero
+## 2026-11-03: nothing is said as "no", not as a zero
 
 The singular fix had a cousin. `counted` now says "no snapshots" for zero, the way a person does, instead of "0 snapshots". The one place it must not is a length of time, where "0 seconds" is right and "no seconds" is not (a failing test said so), so the duration words keep their zero by saying it themselves.
 
-## 2026-11-18: checking the page against the code, and the singular
+## 2026-11-03: checking the page against the code, and the singular
 
 The idea page says every command is a short story. I measured every command function: 42 of 43 are under 40 lines, the 43rd is the request table, which is meant to be a table, and one real exception, `unprotect` at 51 lines. It is its steps now (say what stopping would mean, stop here if only rehearsing, ask, begin, do it and write down there is no way back, show), like the others.
 
 Reading it found something the page could not have promised: the code did not read well for **one** of anything. "Delete its 1 snapshots", "taken in 1 areas", "of the 1 snapshots that cleanup looks after", and, in the text the journal records, "1 snapshots deleted", which the Activity tab would show. Six sentences spelled a count with a fixed plural or wrote their own agreement (has/have, it/them, was/were) in a form my plural guard's list of known idioms did not include. They say it through the shared helpers now, the guard recognises the idiom in any words instead of a list of the ones I had seen, and it was shown to catch the exact form that slipped through. The plural wordings are unchanged (the tests that pin them pass), the singular one is pinned.
 
-## 2026-11-17: the adapters, read from the top
+## 2026-11-03: the adapters, read from the top
 
 I expected the adapters to be the part least like the ideal, and said so on the idea page. Reading every adapter module by its opening line showed the opposite: each says what it is for, and the longest functions across all three adapter crates are short. Two stood out and were split: the reader of the journal file (66 lines, one match over four kinds of line) is a dispatcher over one small reader per kind, and the boot-menu detection (53 lines, three questions in one breath) is those three questions, which bootloaders are there, how the Limine tool stands and how grub-btrfs stands. Behaviour is the same; the adapters' tests, which read old-format lines and build fake machines on disk, agree. The idea page's account of how close the adapters are was corrected, because I had guessed and was wrong.
 
-## 2026-11-16: the flag table says what its sections are for
+## 2026-11-03: the flag table says what its sections are for
 
 The table of every flag is one `contract!` macro, so it cannot be split across files, and its order shows in help and completions, so it cannot be reshuffled. What could be made true is its sections. Several said the wrong thing: `--destroy` and `--dry-run` sat under "create" and `--yes` under "doctor" though many commands share them, one banner ("delete") held five commands' arguments, and a group flag that belongs to `create` sat under "groups". Each is labelled for what it is and which commands it serves, and the header says how to read the table.
 
@@ -96,13 +98,13 @@ The file also opened with a type that is not a flag, `LogFormat`, the value of t
 
 **Left alone on purpose.** The contract's key for the area argument is still `config`. It is the argument's identity in the published contract, which other tools read, so renaming it would break them for the sake of a word.
 
-## 2026-11-15: telling the reader the idea
+## 2026-11-03: telling the reader the idea
 
 Reading the project from the very top, as a newcomer, showed a gap that no amount of tidying inside the code would close: nowhere did the repository say, in plain words, what the code is trying to be. The idea (every layer is the top of the layers beneath it, with an upward face that says what it is for and a downward face written only in the words below) was in an architecture reading list as one line and in a canon page as a worked example, but not on a page a person would open first.
 
 `docs/the-idea.md` is that page: the idea, one request followed from the front door to the machine, the checks the repository runs on itself and what each one protects, and an honest account of how close each part is to the ideal and which parts are not close. The paths on it are checked by the same guard that keeps every document honest, and it is linked from the README and from the architecture page, the two places a newcomer lands.
 
-## 2026-11-14: a sixth read, and an item dropped
+## 2026-11-03: a sixth read, and an item dropped
 
 **The item dropped.** "Record each change's weight in the journal (changed, or lost for good)" has been on the plan since early on, and I had never checked what it would add. The journal records the weight of the *undo*, and an entry's rollback is either a real undo or advice saying it cannot be undone, so the Activity tab already tells a person whether a change can be put back. A second field would say that through another route. Not built, with the reason in the plan.
 
@@ -115,7 +117,7 @@ Reading the project from the very top, as a newcomer, showed a gap that no amoun
 
 **One tooling note.** To write `required` I had to find the library's generics rather than guess them; the crate depends on `argenv-resolve`, not `argenv`, so the first path I wrote did not resolve. Reading the library's source took one call; guessing would have taken several.
 
-## 2026-11-13: the last plurals
+## 2026-11-03: the last plurals
 
 **What.** The nine plurals `counted` did not fit were three shapes. **A plural with no number shown** (`the disk(s) holding …`): and reading them showed the sentence *"switch counting on for the disk(s) holding {areas}"* written three times across two layers, in the command's question and in both of the window's texts. It is `explain::disks_holding` now, one phrase in the core. **Agreement with a number** (`1 restore point includes it`, `3 restore points include it`; `The group names it`, `The groups name it … change them`): `by_number(n, one, many)`, the word that agrees with a number that is not itself shown, with `counted` for the one that is. **The general function itself**, `{count} {unit}s` for time units, which is just `counted`. Both helpers are generic over the number's type, since the counts are `usize` in some places and `u64` in others.
 
@@ -125,7 +127,7 @@ Reading the project from the very top, as a newcomer, showed a gap that no amoun
 
 **A slip.** I appended the disks test by removing "the last closing brace" of the file, assuming a `mod tests { }` wrapper, and `explain/tests.rs` is a file of top-level tests, so the brace I removed closed the last test. The compiler said "unclosed delimiter", I restored the file from git and appended without touching what was there. It is the same assumption as the export-list slips: a script that edits text by its shape should look at the shape first.
 
-## 2026-11-12: the group editor's pairs
+## 2026-11-03: the group editor's pairs
 
 **What.** The group editor held its areas as `Vec<(AreaName, bool)>`, read as `p.1` and `p.0.clone()`, toggled as `pick.1 = !pick.1`, and destructured in the drawing as `(area, ticked)`: a pair whose second half is "the group has this area", named three different ways or not at all. It is `Pick { area, included }`, and the five places say what they mean.
 
@@ -133,7 +135,7 @@ Reading the project from the very top, as a newcomer, showed a gap that no amoun
 
 **Slips, again about exports.** I first added the new type to the state front and not to the drawing file's explicit import list, and the compiler said so twice; the lesson from the last change (edit an export list by its contents, not by matching its text) held, and this one was a missing import, not a mis-match.
 
-## 2026-11-11: the plugin path belongs to the adapter
+## 2026-11-03: the plugin path belongs to the adapter
 
 **Why.** On the plan since the second read: the core's health facts asked the machine port `file_exists("/usr/lib/snapper/plugins/10-limine-snapper-sync")`, so the core knew where a snapper plugin lives on Linux, while the adapter's boot-menu detection already knew the same path from the other side.
 
@@ -141,7 +143,7 @@ Reading the project from the very top, as a newcomer, showed a gap that no amoun
 
 **Considered and not done: a guard that the core names no system path.** I counted the string literals that begin with a system directory outside the adapters: one in the test double, and `worth.rs`, which judges what a mount point is worth by the standard Linux layout (`/home` matters, `/tmp` does not). That is domain knowledge about the data the machine reports, not access to the machine, so a guard on the literals would be wrong there. The rule that matters, that the core asks the machine questions in its own words and does not know where things live, is held by the shape of the port.
 
-## 2026-11-10: `pre` and `post<-3`, in plain words
+## 2026-11-03: `pre` and `post<-3`, in plain words
 
 **Decision.** The Snapshots list showed snapper's words for a pair of snapshots taken around one command, unexplained, against the rule that person-readable text does not carry the tool's vocabulary. A person now reads `single`, **`before`** and **`after #3`** (the one taken after snapshot 3), and the pairing is explained once, in the help, in the existing entry for the list: "Newest first. `before` and `after #3` are a pair taken around one command." The machine-readable output keeps `"kind": "pre"`, because a script reads it; the words are in `SnapshotKind::label`, one place, which both the window and the command line use since the scan of repeated code.
 
@@ -149,7 +151,7 @@ Reading the project from the very top, as a newcomer, showed a gap that no amoun
 
 **Two slips in the making of it.** Twice my script matched an export list by its exact text, and rustfmt had rewrapped the list since: the first time the edit stopped half way, so the later edits did not apply and the build passed with a warning about an unused constant; the second time I re-ran it and it stopped the same way. Replacing the identifier alone is robust to the formatting. The partial first run is a reminder that a script which edits several files must either apply everything or nothing, and that "it compiled" was not evidence that it had done what I meant: the unused-constant warning was.
 
-## 2026-11-09: a scan for repeated code, instead of reading eight modules at a time
+## 2026-11-03: a scan for repeated code, instead of reading eight modules at a time
 
 **Why.** The fifth read's lesson was that the finds had become one smell, a distinction the code makes and does not name, and that finding it by sampling meant reading eight modules to fix four things. Repeated code is the part of that smell a program can find. `dev/find-duplicates.py` lists every run of N meaningful production lines (comments, braces, attributes and imports dropped; whitespace normalised) that appears in two places.
 
@@ -165,7 +167,7 @@ The rest are not worth naming: the same `SystemTime::now()` idiom in the command
 
 **One more thing I noticed, not fixed.** The Snapshots list shows `pre` and `post<-3`, which are snapper's words for a pair of snapshots taken around a command. Your rule is that person-readable text does not carry the tool's vocabulary unexplained. It needs a decision about what a person should see there, so it is in the plan.
 
-## 2026-11-08: a fifth read
+## 2026-11-03: a fifth read
 
 **What I read.** Eight sampled; three were modules I had already read and changed (`rollback.rs`, `arriving.rs`, `machine.rs`), so five were new: `putting_back.rs`, `restoring_a_point.rs`, `asked_for.rs`, `lock.rs`, `describing.rs`. Two needed nothing (`lock.rs`, whose doc says what it does and does not guard and gives a reason for every edge case, and `describing.rs`, two deliberately exhaustive matches with their reasons beside them).
 
@@ -177,7 +179,7 @@ The rest are not worth naming: the same `SystemTime::now()` idiom in the command
 
 **What it tells me.** Five modules, four things with a real fix. The rate has not fallen across five reads, so I will keep doing them, but the findings have changed in kind: the first reads found stale words and copied rules, this one found a repeated *classification* and unnamed two-way facts. Both are the same smell, a distinction made in the code but not named.
 
-## 2026-11-07: `on_areas_loaded` as steps, and a sentence told three times
+## 2026-11-03: `on_areas_loaded` as steps, and a sentence told three times
 
 **Why.** `on_areas_loaded` was on the plan since the second seeded read: a 35-line arm that rebuilt the list, kept the cursor on the same area, reset the snapshot cursor, settled which notice shows, and held the "nothing protected yet" sentence inline. I had noted it twice and fixed other things first.
 
@@ -185,7 +187,7 @@ The rest are not worth naming: the same `SystemTime::now()` idiom in the command
 
 **What reading it found.** That inline sentence told a person snapall "works with disks formatted as Btrfs", and the same fact was told in the setup conversation and in the advice for a file snapall cannot protect, in three slightly different sentences, none explaining what Btrfs is. You set the rule at the start that person-readable text never uses words like that unexplained. The word is needed (the person has to know what kind of disk), so it is explained once: `explain::WORKS_WITH` is "disks formatted as Btrfs, a disk format that can take snapshots", used by all three, and a guard says it is told nowhere else (shown to fail when a second telling appears). The boot-menu advice also says "on Btrfs", where it describes the system rather than a requirement, and is left as it is.
 
-## 2026-11-06: CI, measured first, then optimised
+## 2026-11-02: CI, measured first, then optimised
 
 **Why.** Asked to optimise CI with the best practices. I measured before changing anything (`dev/ci-timings.py`, new): a run took a median **193 s wall and 20.0 job-minutes**, and the cost was concentrated, not spread out. The release pipeline (Release, Verify release, then Install snippets and Package repositories) took 10 to 13 minutes in a strict chain.
 
@@ -227,7 +229,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **A bug in my own tooling, found by the narrowing.** `dev/ship.py` required at least 20 checks before it would merge, which was right while every pull request ran 24, and is wrong for a narrowed one (13). It waited forever on the first documents-only pull request, and I finished that one by running a patched copy in memory. (My first attempt at that patch did nothing, because `runpy.run_path` returns a copy of the module's globals, so the functions never saw it.) The floor is 10 now, below the narrowed count, with the reason in the file.
 
-## 2026-11-05: main's CI failed on the race I had measured away
+## 2026-11-02: main's CI failed on the race I had measured away
 
 **What happened.** After the retired-word change merged with all 24 PR checks green, main's own CI failed in one job at the Test step: `a_dry_run_restore_changes_nothing_and_a_restore_to_snapshot_zero_is_a_usage_error` panicked with `snapall: could not run snapper: Text file busy (os error 26)`. That is the `ETXTBSY` race: a test writes a fake `snapper` script, and a fork in another test thread holds a copy of the open file for an instant, so running the script fails. I had removed this from the plan a few days earlier because 740 local runs showed nothing. The runner is slower and has fewer cores, and found it at the first chance. The conclusion was wrong, and the plan said the opposite of the truth.
 
@@ -235,7 +237,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What I would do differently.** An absence in many runs on one machine is not evidence about a race on another. The rule is in `AGENTS.md`: remove the overlap by construction instead of arguing from a count.
 
-## 2026-11-05: the retired word, seventy-nine times, and a rename that went wrong twice
+## 2026-11-02: the retired word, seventy-nine times, and a rename that went wrong twice
 
 **Why.** A fourth seeded read found that `AreaFacts` still had a public field called `config`, which my tool-word guard cannot see because it checks names declared with `let`, `fn` and `struct`, not fields or parameters. Counting the word as an identifier token, outside strings and comments, in the four crates that speak for the program: **79 uses** (a public field in two structs, about twenty parameters, closure variables, a screen rectangle).
 
@@ -245,7 +247,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **The tool.** I did this rename three times in a day, so it is `dev/rename-identifier.py`: it renames identifier tokens only, follows inline `{name}` interpolations, and verifies no string literal changed, putting everything back if one did.
 
-## 2026-11-04: a third read, and the plural that was written twenty-four times
+## 2026-11-02: a third read, and the plural that was written twenty-four times
 
 **Why.** A third seeded read (seven modules; one was a repeat). Real findings again, in a different mix.
 
@@ -259,7 +261,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What I would do differently.** Search for a smell by its *type shape*, not only the names it had in the place I noticed it: `(bool)` in a tuple variant is the same fact as `turn_on: bool` in a field.
 
-## 2026-11-03: the second batch from the read
+## 2026-11-02: the second batch from the read
 
 **Why.** The same seeded read that found the bare on/off found four smaller things, each in a different layer.
 
@@ -271,7 +273,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What the guards said.** Two failed before this could ship. The canon's embedded example of `delete` was stale again (regenerated from the source). And the plumbing guard failed on `make_a_group`, which is worth recording because the cause was subtle: it counts closures *with* parameters and does not count a zero-argument `||`, so changing the way-back closure from `||` to `|_|` exposed plumbing that was already there: `made.set(..).map_err(|e| e.to_string()).and_then(|()| system.save_groups(&made))`. That chain is a verb waiting for a name (set it, then save it, and word either refusal the same way), so it is `set_and_save`, rather than the budget being raised or the closure hidden.
 
-## 2026-11-03: room counting is switched on or off, in every layer
+## 2026-11-02: room counting is switched on or off, in every layer
 
 **Why.** A second seeded read (eight more modules) found that `after_room_counting(turned_on: bool)` in the core passed the on/off as a bare bool, the same fact I had named only in the command layer the day before, which made a second, duplicate noun. Measuring it: about 35 sites in four layers carried the direction of room counting as a bool (`turn_on` in messages, effects, modals and handlers; `on` in the machine port and the core's rule), and the window wrote `if turn_on { "on" } else { "off" }` five separate times, the word for a direction written out by hand each time.
 
@@ -291,7 +293,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What the lesson is.** Each of these is a thing a guard could have been written for, after the fact. The cold read is how you find the next guard, not a substitute for the ones you have. `dev/sample-modules.py` makes it a routine.
 
-## 2026-10-31: the booleans that were nouns, and two that I had added
+## 2026-11-02: the booleans that were nouns, and two that I had added
 
 **Why.** Re-running the trend after the outline audit showed bare boolean parameters in the commands had gone from 8 to 10: two of my own refactors had added them (`json: bool` passed into two of the `setup` helpers when the context already knows). Looking at all ten sorted them into: two mine, one real duplication (`Context.json` kept a second copy of a fact `Show` already holds), three legitimate (the flag-to-noun conversion in `Mode::from_dry_run`, and the invocation facts `hints` and `no_dbus`), and five unnamed nouns.
 
@@ -299,7 +301,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What the lesson is.** A metric that goes the wrong way after a refactor is information, not noise. The two I added would have stayed unless I had measured after the change, not only before it.
 
-## 2026-10-30: the outline's sentences, audited as a set
+## 2026-11-02: the outline's sentences, audited as a set
 
 **Why.** With every guard at zero I needed a new way to find weak spots. The outline's sentences are what a stranger reads first, and I had checked them one question at a time but never as a set. Looking for the shortest, any used twice, and any that open with a generic noun.
 
@@ -307,7 +309,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What.** Distinct sentences for the ten fronts, fuller ones for the thin three, a consistent "Drawing the …" for the twelve question drawing files, and a guard that would have caught my mistake: no two modules may describe themselves in the same words. Rewording the fronts moved one ranking, and the cause was in the ranker, not the sentences: it did not know that "drawn" is a form of "draw", the same blind spot as "taken" and "delete" before; it now knows that and "chosen". 48 questions, all within the first three, 35 first (31 before).
 
-## 2026-10-30: measured instead of worried: the script tests do not race
+## 2026-11-02: measured instead of worried: the script tests do not race
 
 **Why.** The plan carried an item that three tests, which write a script and run it at once, might hit the `text file busy` race the background runner's test once had. Nothing had shown it. A fast test (0.4 seconds a run) can simply be run many times.
 
@@ -317,7 +319,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **A slip in shipping it.** The pull request had a merge conflict and so got no CI, and `ship.py` waited on the silence. The branch had been made from the old state because a line that failed to parse under `sh` skipped its own `git pull`. The script now says when a pull request conflicts with main and force-pushes only its own rebased branch; branching from `origin/main` explicitly is a trap in `AGENTS.md`.
 
-## 2026-10-30: the last guard debts are paid
+## 2026-11-02: the last guard debts are paid
 
 **Why.** After the huddled files, the guards' data file still held four kinds of debt besides the contract table: the window model's front at 140 lines, the `setup` handler over the branching budget, and seven names carrying a tool's word (`config`, `snapper`, `systemctl`) above the adapters. Reading each rather than shaving it:
 
@@ -325,7 +327,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **A milestone.** The guards' debt file now holds one entry, the contract's table of flags, which is one language and stays. Entry files, handler length, branching and plumbing, prints outside the presenter, tool words in names and the cold read's gaps are all empty. That does not mean the code is as it should be: the guards measure what I thought to measure.
 
-## 2026-10-30: the openSUSE flake was ours, and I had mislabelled it
+## 2026-11-02: the openSUSE flake was ours, and I had mislabelled it
 
 **Why.** The openSUSE container job had failed three times at the step named `A user's tools`. I had written down, in `ship.py`, in `AGENTS.md` and in the plan, that this was "the runner failing in its own setup, before any of our code ran", and had the script re-run it. Checking what the step actually is: it is in our workflows, and it runs `${{ matrix.setup }}`, a package install (`zypper --non-interactive install sudo gawk curl` on openSUSE) inside the container, over the network. A failure there is a mirror or network hiccup in our own step, not the runner.
 
@@ -333,7 +335,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The YAML parses, and CI runs these jobs on the pull request itself.
 
-## 2026-10-30: the huddled files, and a defect in my own tool that had been deleting documentation
+## 2026-11-02: the huddled files, and a defect in my own tool that had been deleting documentation
 
 **Why.** Fourteen files sat between 250 and 299 lines, just under my size limit: the sign that the limit was partly gamed. Rather than guess, I read them. Ten are one language near its natural size. Four showed the sign: two said "and" in their own purpose sentence, one held the events and the folding of events into history, one was three kinds of explanation.
 
@@ -343,7 +345,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **What I would do differently.** I checked that comments survived after the first report of a dropped comment, but only for plain comments. A fix for the symptom I could see was not a check for the property I cared about. The property (nothing is lost) is now enforced by the tool before it writes, and the history scan is how I found the rest.
 
-## 2026-10-29: the core understands its own way back
+## 2026-11-02: the core understands its own way back
 
 **Why.** The finding from the previous change: `check_the_way_back_still_exists` parsed the recorded command words back (`["restore", area, id, ..]`) to find out what a rollback would go back to, while each producer in the core assembled those words by hand. Two sides of one language with nothing tying them together: a change to either would silently break undo, and nobody would find out until someone needed it.
 
@@ -351,7 +353,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The core's tests and the fast gate; CI runs the consequences script, which undoes real changes on real snapper.
 
-## 2026-10-29: restore-all and undo read as the stories they are
+## 2026-11-02: restore-all and undo read as the stories they are
 
 **Why.** The stories are the layer I had judged weakest: the last measurement showed the handlers' length and branching budgets as the only debts left in the command line. `restore_all` was 79 lines and `undo` 61, each with its steps (find, preview, ask, begin, do, record, end, show) written inline, and `restore_all` with the *words* of two outcomes inside it.
 
@@ -359,7 +361,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **A finding, written into the plan, not tidied away.** The remaining plumbing debt, `check_the_way_back_still_exists`, parses the recorded command words back to find out what a rollback would go back to. The rollback is stringly typed, and the real fix is a typed step.
 
-## 2026-10-29: describing a change is its own language
+## 2026-11-02: describing a change is its own language
 
 **Why.** After a re-measurement (the trend was flat since 0.27.0, because the window's structure work is barely visible to those proxies), the biggest remaining file in the window was `changes.rs` (420 lines), holding three of the longest functions. It was three languages: what a change is called, the command that carries a change out in the background, and how it went with the way back from it.
 
@@ -369,7 +371,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Not changed.** The long functions in it (`how_it_went` 114 lines, `describe_now` and `describe_change` 81) are exhaustive matches over every kind of change, on purpose (a new kind must be given its words and its result, and the compiler says so), so the file got smaller and the function count did not.
 
-## 2026-10-29: the file history screen is one place
+## 2026-11-02: the file history screen is one place
 
 **Why.** The last window item in the plan: the screen shown when the window is opened on one file had its decisions in `model/file.rs` and its drawing in `view/file.rs`, while every tab and every question was already a folder.
 
@@ -379,7 +381,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The window's tests and the fast gate; CI runs the terminal journeys, which open the file screen.
 
-## 2026-10-29: each question is one place
+## 2026-11-02: each question is one place
 
 **Why.** The window's thirteen questions each had the same two halves in two parallel trees: `model/prompts/<q>.rs` (what opens it, what its keys do, what comes of the answer) and `view/prompts/<q>.rs` (how it is drawn). The tabs had already solved this with a folder each.
 
@@ -391,7 +393,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The window's 185 tests; CI runs the terminal journeys, which open every question.
 
-## 2026-10-29: the window's state is composed, and the Snapshots tab owns its own
+## 2026-11-02: the window's state is composed, and the Snapshots tab owns its own
 
 **Why.** The window's `State` was one 26-field struct. Rather than group by a guess, I counted which parts of the window use each field. Three clusters were clear: the fields for *what the window is waiting for* (`pending`, `spinner`, `doing`, `busy_ticks`, `watching`, `poll_ticks`, `after_reload`) are used only by the update loop and the spinner and by no screen; the mouse (`hover`, `pressed`); and the Snapshots tab's own five (`areas`, the two cursors, `marked`, `focus`), which was the one tab still keeping its state in the global struct while Health and Activity own theirs. `health_asked` was the Health tab's all along.
 
@@ -399,7 +401,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The window's tests and the fast gate; CI runs the terminal journeys, which drive the real window through every screen.
 
-## 2026-10-29: everything is said through the presenter
+## 2026-11-02: everything is said through the presenter
 
 **Why.** The plan's item was "outputs as values: handlers return what is to be said and the surface prints it", because fifteen prints bypassed the presenter. Looking at the fifteen showed the premise was wrong: all of them were lines spoken to the person on stderr (an error, a warning, "snapall will run, as root:", "To roll back:"), and several are said right before an answer is read, so speaking and listening interleave and a story cannot return its words as one value at the end.
 
@@ -407,7 +409,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The golden output of 20 commands and the consequences script (in CI) show the output unchanged, and the architecture test allows no print outside `output.rs` and the asker.
 
-## 2026-10-29: a change is written down in one place
+## 2026-11-02: a change is written down in one place
 
 **Why.** Item 2 of the plan said the command line and the window each had their own lifecycle for a change. Before building anything I checked that against the code, since the item came from an older design: it was true. The window's executor took the one-change-at-a-time lock, recorded *Started*, ran, recorded *Rollback* and *Finished* with the elapsed time (about 45 lines); the command line's `Change` did the same four events and added *Progress* and a *Failed* record for an early exit (about 170 lines).
 
@@ -417,7 +419,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The workspace tests and the fast gate; CI runs the fixture checks, which exercise both paths: the consequences script and the golden output for the command line, and the terminal journeys for the window (the Activity tab shows what the journal recorded). The cold-read test also moved: the new module is an acceptable answer to "where is a change started and recorded", and `contract/inputs.rs` now says it is the command line's flags, declared once.
 
-## 2026-10-29: the answer and the mode are nouns, and the weight decides what counts
+## 2026-11-02: the answer and the mode are nouns, and the weight decides what counts
 
 **Why.** Item 1 of the plan, from the measurement: 34 bare booleans in the commands. Looking at them showed three flags making up almost all of it (`yes` 24, `dry_run` 12, `destroy` 10), travelling together, and a design flaw behind the naming: each handler chose which flag to pass to `ask::before` (`if removes { destroy } else { yes }` in limits, the same choice in undo), which is a rule the act's weight already owns (`--yes` cannot answer a question about what is lost for good).
 
@@ -425,7 +427,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 
 **Evidence.** The fast gate; CI runs the fixture checks, including the consequences script that exercises `--yes` and `--destroy` against real snapper, and the golden output of 20 commands.
 
-## 2026-10-28: measure the real goal, and automate the loop
+## 2026-10-29: measure the real goal, and automate the loop
 
 **Why.** Progress toward "every layer is the top of the layers beneath it" had been judged by file sizes and ratchets, which are proxies. A measurement over the release tags (`dev/structure-metrics.py`) showed what the reports had hidden:
 
@@ -458,7 +460,7 @@ A full run is 8% faster and costs **22% less runner time**; a documents-only pul
 - PR 91, 90, 86: the three tabs are three folders named as the tab bar names them; the window's questions are a module; a question holds the answers that belong to it, so an answer for a closed question has nowhere to land.
 - PR 88: the refactoring tools and the plan moved into the repository; debts became data that can only be lowered.
 
-## 2026-10-27: the core by purpose, the program reads as itself (0.25)
+## 2026-10-29: the core by purpose, the program reads as itself (0.25)
 - PR 82: the core's 25 modules became folders for what snapall is for (protecting, taking, looking, going back, keeping, health, vocabulary, ports).
 - PR 84: `main.rs` became the story of the program and the table of requests calls each command through the name of its purpose; 21 module purposes rewritten, one of them false.
 
