@@ -20,6 +20,7 @@ use crate::looking::snapshots::{all_snapshots, SnapshotError};
 use crate::ports::snapshots::{BackendError, SnapshotBackend};
 use crate::protecting::coverage::describe;
 use crate::vocabulary::domain::AreaName;
+use crate::vocabulary::explain::{by_number, counted};
 
 /// What stopping the protection of one area would do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,20 +125,19 @@ impl Plan {
         )];
         if self.points > 0 {
             lines.push(format!(
-                "{} restore point{} include{} it and will no longer put it back.",
-                self.points,
-                if self.points == 1 { "" } else { "s" },
-                if self.points == 1 { "s" } else { "" }
+                "{} {} it and will no longer put it back.",
+                counted(self.points, "restore point"),
+                by_number(self.points, "includes", "include")
             ));
         }
         if !self.groups.is_empty() {
             let names: Vec<String> = self.groups.iter().map(ToString::to_string).collect();
             lines.push(format!(
-                "The group{} {} name{} it, and will say it is no longer protected until you change {}.",
-                if names.len() == 1 { "" } else { "s" },
+                "The {} {} {} it, and will say it is no longer protected until you change {}.",
+                by_number(names.len(), "group", "groups"),
                 names.join(", "),
-                if names.len() == 1 { "s" } else { "" },
-                if names.len() == 1 { "it" } else { "them" }
+                by_number(names.len(), "names", "name"),
+                by_number(names.len(), "it", "them")
             ));
         }
         lines.push(
@@ -300,5 +300,27 @@ mod tests {
             ..bytes
         };
         assert!(none.words()[0].contains("It has no snapshots to delete."));
+    }
+
+    #[test]
+    fn the_sentences_agree_with_how_many_restore_points_and_groups_it_touches() {
+        let theming = GroupName::parse("theming").unwrap();
+        let work = GroupName::parse("work").unwrap();
+        let plan_with = |points: usize, groups: Vec<GroupName>| Plan {
+            area: area("home"),
+            location: "/home".to_owned(),
+            snapshots: 0,
+            freed_bytes: None,
+            points,
+            groups,
+        };
+        let one = plan_with(1, vec![theming.clone()]).words().join("\n");
+        assert!(one.contains("1 restore point includes it"), "{one}");
+        assert!(one.contains("The group theming names it,"), "{one}");
+        assert!(one.contains("until you change it."), "{one}");
+        let many = plan_with(3, vec![theming, work]).words().join("\n");
+        assert!(many.contains("3 restore points include it"), "{many}");
+        assert!(many.contains("The groups theming, work name it,"), "{many}");
+        assert!(many.contains("until you change them."), "{many}");
     }
 }

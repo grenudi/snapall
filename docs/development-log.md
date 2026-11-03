@@ -2,6 +2,16 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-13: the last plurals
+
+**What.** The nine plurals `counted` did not fit were three shapes. **A plural with no number shown** (`the disk(s) holding …`): and reading them showed the sentence *"switch counting on for the disk(s) holding {areas}"* written three times across two layers, in the command's question and in both of the window's texts. It is `explain::disks_holding` now, one phrase in the core. **Agreement with a number** (`1 restore point includes it`, `3 restore points include it`; `The group names it`, `The groups name it … change them`): `by_number(n, one, many)`, the word that agrees with a number that is not itself shown, with `counted` for the one that is. **The general function itself**, `{count} {unit}s` for time units, which is just `counted`. Both helpers are generic over the number's type, since the counts are `usize` in some places and `u64` in others.
+
+**The ratchet is empty.** The debt for hand-spelled plurals was 23 at the start and is zero: no plural is spelled by hand anywhere, a new one fails the guard, and the debt data file is back to its single deliberate entry.
+
+**Tested, because grammar needs it.** The agreement in the unprotect sentences had no test, which is not how to refactor grammar. It is pinned for one and for several (`1 restore point includes it`, `3 restore points include it`, `The group theming names it`, `The groups theming, work name it … change them`), and shown to bite: swapping two verb forms in the code makes it fail with the ungrammatical sentence in the message. The disks phrase is pinned for one and for two.
+
+**A slip.** I appended the disks test by removing "the last closing brace" of the file, assuming a `mod tests { }` wrapper, and `explain/tests.rs` is a file of top-level tests, so the brace I removed closed the last test. The compiler said "unclosed delimiter", I restored the file from git and appended without touching what was there. It is the same assumption as the export-list slips: a script that edits text by its shape should look at the shape first.
+
 ## 2026-11-12: the group editor's pairs
 
 **What.** The group editor held its areas as `Vec<(AreaName, bool)>`, read as `p.1` and `p.0.clone()`, toggled as `pick.1 = !pick.1`, and destructured in the drawing as `(area, ticked)`: a pair whose second half is "the group has this area", named three different ways or not at all. It is `Pick { area, included }`, and the five places say what they mean.

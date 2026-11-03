@@ -87,10 +87,9 @@ fn ask_before_switching(
         .map(snapall_core::AreaFacts::title)
         .collect();
     let question = format!(
-        "Switch counting {} for the disk{} holding {}?",
+        "Switch counting {} for {}?",
         to.word(),
-        if areas.len() == 1 { "" } else { "s" },
-        areas.join(", ")
+        snapall_core::vocabulary::explain::disks_holding(&areas)
     );
     ask::before_showing(
         Act::RoomCounting,

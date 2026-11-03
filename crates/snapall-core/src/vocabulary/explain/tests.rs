@@ -304,3 +304,12 @@ fn room_counting_is_explained_with_what_it_gives_what_it_costs_and_when_to_leave
         assert_plain("room counting", &room_counting_text(mode));
     }
 }
+
+#[test]
+fn a_change_to_room_counting_names_the_disk_or_disks_that_hold_the_areas() {
+    assert_eq!(disks_holding(&["root".to_owned()]), "the disk holding root");
+    assert_eq!(
+        disks_holding(&["root".to_owned(), "home".to_owned()]),
+        "the disks holding root, home"
+    );
+}

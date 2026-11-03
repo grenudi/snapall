@@ -28,15 +28,13 @@ pub(crate) fn quotas_spec(to: Counting, state: &State) -> ModalSpec {
         .unwrap_or(QuotaMode::Unknown);
     let will = if to.is_on() {
         format!(
-            "snapall will switch counting on for the disk{} holding {}. The disk then builds its tally in the background; figures appear as it finishes. You can switch it off again here.",
-            if areas.len() == 1 { "" } else { "s" },
-            areas.join(", ")
+            "snapall will switch counting on for {}. The disk then builds its tally in the background; figures appear as it finishes. You can switch it off again here.",
+            snapall_core::vocabulary::explain::disks_holding(&areas)
         )
     } else {
         format!(
-            "snapall will switch counting off for the disk{} holding {}. The figures go; nothing else changes. You can switch it on again here.",
-            if areas.len() == 1 { "" } else { "s" },
-            areas.join(", ")
+            "snapall will switch counting off for {}. The figures go; nothing else changes. You can switch it on again here.",
+            snapall_core::vocabulary::explain::disks_holding(&areas)
         )
     };
     let lines = vec![

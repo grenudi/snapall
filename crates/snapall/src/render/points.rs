@@ -150,13 +150,11 @@ pub fn point_restored(
     for m in &done.members {
         let what = match &m.result {
             MemberResult::Restored(r) => format!(
-                "put back ({} path{}); the state before is snapshot #{}",
-                r.summary.created + r.summary.modified + r.summary.deleted,
-                if r.summary.created + r.summary.modified + r.summary.deleted == 1 {
-                    ""
-                } else {
-                    "s"
-                },
+                "put back ({}); the state before is snapshot #{}",
+                snapall_core::vocabulary::explain::counted(
+                    r.summary.created + r.summary.modified + r.summary.deleted,
+                    "path"
+                ),
                 r.safety_snapshot
             ),
             MemberResult::AlreadyThere => "already matched: left alone".to_owned(),
