@@ -279,7 +279,7 @@ fn missing_and_surplus_values_are_errors() {
 
 #[test]
 fn surplus_positionals_are_errors_derived_from_the_contract() {
-    assert!(err(&["list", "extra"]).contains("unexpected argument(s): `extra`"));
+    assert!(err(&["list", "extra"]).contains("unexpected argument: `extra`"));
     assert!(err(&["create", "a", "b"]).contains("`b`"));
     assert!(err(&["snapshots", "home", "root"]).contains("`root`"));
     assert!(err(&["delete", "home", "3", "4"]).contains("`4`"));

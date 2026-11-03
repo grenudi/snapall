@@ -180,7 +180,11 @@ pub(super) fn check(
     let extras: Vec<&String> = resolution.positionals().iter().skip(1 + declared).collect();
     if !extras.is_empty() {
         let list: Vec<String> = extras.iter().map(|e| format!("`{e}`")).collect();
-        errors.push(format!("unexpected argument(s): {}", list.join(", ")));
+        errors.push(format!(
+            "unexpected {}: {}",
+            snapall_core::vocabulary::explain::by_number(list.len(), "argument", "arguments"),
+            list.join(", ")
+        ));
     }
 
     (errors, warnings)

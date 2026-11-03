@@ -64,8 +64,8 @@ pub(super) fn kind_word(kind: ChangeKind) -> &'static str {
 
 pub fn dry_run(plan: &Plan, description: &Description) -> String {
     let mut out = format!(
-        "dry run: would snapshot {} area(s) with description \"{description}\"\n",
-        plan.targets().len()
+        "dry run: would snapshot {} with description \"{description}\"\n",
+        snapall_core::vocabulary::explain::counted(plan.targets().len(), "area")
     );
     for area in plan.targets() {
         out.push_str(&format!("  {area}\n"));

@@ -761,7 +761,7 @@ def main():
     tui.send("right")
     tui.send("down", " ", " ")  # cursor: seed two (marked), then seed one (marked)
     tui.send("d")
-    tui.wait_for("Delete 2 snapshot(s) of snapall_it_a")
+    tui.wait_for("Delete 2 snapshots of snapall_it_a")
     tui.send("y")
     tui.wait_for("Type destroy, then Enter, to go ahead")
     tui.answer("destroy")

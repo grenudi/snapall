@@ -6,6 +6,10 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 
 The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
 
+## 2026-12-02: the plural left to the reader
+
+Reading the window's questions, the delete question said "Delete 1 snapshot(s) of home?". That is the other way of not saying a plural: leaving it to the reader. My plural guard looked for the `if n == 1` idiom and could not see it. Five sentences did it (the delete question twice, creating a snapshot, the dry run, an unexpected argument, and the core's unknown areas); they say it through the shared helpers now, and the guard also counts a parenthesised plural inside a string. It had to be inside a string: ordinary code is full of `Ok(s)` and `parse(s)`. Shown to bite by adding the hack and an innocent `Some(s)` to a clean file: it counted exactly one. Eight things pinned the old wording (four tests, the real-terminal script, two golden files), and I found them all by reading the whole result of the search, not the first ten lines.
+
 ## 2026-12-01: groups, history and room counting as a newcomer, and one leaked word
 
 The group commands, a file's history and switching room counting on read well (a mistyped area is answered with the real ones). One word leaked: the file history's header said "(config snapall_it_a)", the word the project retired, in output meant for a person. It says "(in area snapall_it_a)" now. Before fixing only that one I listed every string mentioning the word in the crates that speak to a person, and nothing else is for a person: the rest are JSON keys (an output contract), a URL, a reference to snapper's own manual page, and test-support messages. One test pinned the old header and moved with it.

@@ -32,7 +32,8 @@ pub enum PlanError {
     #[error("an empty list of areas was requested")]
     NothingRequested,
     #[error(
-        "unknown area(s): {} (`snapall list` shows the ones that exist)",
+        "unknown {}: {} (`snapall list` shows the ones that exist)",
+        crate::vocabulary::explain::by_number(.0.len(), "area", "areas"),
         .0.iter().map(AreaName::as_str).collect::<Vec<_>>().join(", ")
     )]
     UnknownAreas(Vec<AreaName>),
