@@ -41,58 +41,74 @@ const SYSTEMD_BOOT: &[&str] = &[
     "boot/efi/loader/loader.conf",
 ];
 
-/// Gather the facts under `root` (the real `/` in production).
+/// Gather the facts under `root` (the real `/` in production): what the system boots with, and how each tool that puts
+/// snapshots in the boot menu stands.
 pub fn under(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> BootFacts {
-    let exists = |relative: &str| root.join(relative).exists();
-    let any = |paths: &[&str]| paths.iter().any(|p| exists(p));
-
-    let mut bootloaders = Vec::new();
-    if any(LIMINE) {
-        bootloaders.push(Bootloader::Limine);
-    }
-    if any(GRUB) {
-        bootloaders.push(Bootloader::Grub);
-    }
-    if any(SYSTEMD_BOOT) {
-        bootloaders.push(Bootloader::SystemdBoot);
-    }
-
-    let limine_sync = exists("usr/bin/limine-snapper-sync");
-    // The package installs a snapper plugin that runs the sync on every create, delete and modify
-    // of a root snapshot, so the menu is kept in step even with the daemon stopped.
-    let limine_plugin = exists(LIMINE_PLUGIN);
-    let grub_btrfs = exists("usr/bin/grub-btrfsd") || exists("etc/grub.d/41_snapshots-btrfs");
-    // grub-btrfs works from the generated menu even without its daemon: the script leaves a
-    // marker in grub.cfg when snapshot entries were generated.
-    let grub_menu_has_snapshots =
-        ["boot/grub/grub.cfg", "boot/grub2/grub.cfg"]
-            .iter()
-            .any(|path| {
-                std::fs::read_to_string(root.join(path))
-                    .is_ok_and(|text| text.contains("41_snapshots-btrfs"))
-            });
-
     BootFacts {
         root_fs: std::fs::read_to_string(root.join("proc/mounts"))
             .ok()
             .and_then(|mounts| root_fs_from_mounts(&mounts)),
-        bootloaders,
+        bootloaders: bootloaders_under(root),
         tools: vec![
-            ToolFacts {
-                tool: Tool::LimineSnapperSync,
-                installed: limine_sync,
-                service: limine_sync
-                    .then(|| service_state("limine-snapper-sync"))
-                    .flatten(),
-                hooked: limine_sync && limine_plugin,
-            },
-            ToolFacts {
-                tool: Tool::GrubBtrfs,
-                installed: grub_btrfs,
-                service: grub_btrfs.then(|| service_state("grub-btrfsd")).flatten(),
-                hooked: grub_btrfs && grub_menu_has_snapshots,
-            },
+            limine_snapper_sync(root, service_state),
+            grub_btrfs(root, service_state),
         ],
+    }
+}
+
+fn exists(root: &Path, relative: &str) -> bool {
+    root.join(relative).exists()
+}
+
+fn any_exists(root: &Path, relatives: &[&str]) -> bool {
+    relatives.iter().any(|relative| exists(root, relative))
+}
+
+fn bootloaders_under(root: &Path) -> Vec<Bootloader> {
+    let mut found = Vec::new();
+    if any_exists(root, LIMINE) {
+        found.push(Bootloader::Limine);
+    }
+    if any_exists(root, GRUB) {
+        found.push(Bootloader::Grub);
+    }
+    if any_exists(root, SYSTEMD_BOOT) {
+        found.push(Bootloader::SystemdBoot);
+    }
+    found
+}
+
+fn limine_snapper_sync(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> ToolFacts {
+    let installed = exists(root, "usr/bin/limine-snapper-sync");
+    // The package installs a snapper plugin that runs the sync on every create, delete and modify
+    // of a root snapshot, so the menu is kept in step even with the daemon stopped.
+    let plugin = exists(root, LIMINE_PLUGIN);
+    ToolFacts {
+        tool: Tool::LimineSnapperSync,
+        installed,
+        service: installed
+            .then(|| service_state("limine-snapper-sync"))
+            .flatten(),
+        hooked: installed && plugin,
+    }
+}
+
+fn grub_btrfs(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> ToolFacts {
+    let installed =
+        exists(root, "usr/bin/grub-btrfsd") || exists(root, "etc/grub.d/41_snapshots-btrfs");
+    // grub-btrfs works from the generated menu even without its daemon: the script leaves a
+    // marker in grub.cfg when snapshot entries were generated.
+    let menu_has_snapshots = ["boot/grub/grub.cfg", "boot/grub2/grub.cfg"]
+        .iter()
+        .any(|path| {
+            std::fs::read_to_string(root.join(path))
+                .is_ok_and(|text| text.contains("41_snapshots-btrfs"))
+        });
+    ToolFacts {
+        tool: Tool::GrubBtrfs,
+        installed,
+        service: installed.then(|| service_state("grub-btrfsd")).flatten(),
+        hooked: installed && menu_has_snapshots,
     }
 }
 

@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-17: the adapters, read from the top
+
+I expected the adapters to be the part least like the ideal, and said so on the idea page. Reading every adapter module by its opening line showed the opposite: each says what it is for, and the longest functions across all three adapter crates are short. Two stood out and were split: the reader of the journal file (66 lines, one match over four kinds of line) is a dispatcher over one small reader per kind, and the boot-menu detection (53 lines, three questions in one breath) is those three questions, which bootloaders are there, how the Limine tool stands and how grub-btrfs stands. Behaviour is the same; the adapters' tests, which read old-format lines and build fake machines on disk, agree. The idea page's account of how close the adapters are was corrected, because I had guessed and was wrong.
+
 ## 2026-11-16: the flag table says what its sections are for
 
 The table of every flag is one `contract!` macro, so it cannot be split across files, and its order shows in help and completions, so it cannot be reshuffled. What could be made true is its sections. Several said the wrong thing: `--destroy` and `--dry-run` sat under "create" and `--yes` under "doctor" though many commands share them, one banner ("delete") held five commands' arguments, and a group flag that belongs to `create` sat under "groups". Each is labelled for what it is and which commands it serves, and the header says how to read the table.
