@@ -48,7 +48,9 @@ Honestly: close in the middle, less close at the edges.
 
 **Close:** the window. It has been split into screens and questions that each own their state and their drawing, and it speaks through the same words as the command line.
 
-**Least close, and said plainly:** the table of every flag (`crates/snapall/src/contract/inputs.rs`) is long and reads as a table rather than a story, which is right for a table but not yet beautiful. The adapters are written for the tools they drive, so they read as careful engineering rather than as sentences. And the drawing code is long by nature.
+**Close too, which surprised me:** the adapters. Every one says what it is for in its first line ("Talking to snapper: our snapshot verbs, said to it one command at a time"), and their functions are short. The table of every flag (`crates/snapall/src/contract/inputs.rs`) is a table, so it reads as one, but its sections now say what they are for.
+
+**Least close, and said plainly:** the drawing code, which is long because drawing is. And the words of the tools themselves (snapper, `config`) still appear in a few places that other programs read, such as the published contract and the audit log, where renaming them would break those programs.
 
 The measure we use is simple: someone who has never seen the code should be able to say what a part is for from its first line, and be right.
 

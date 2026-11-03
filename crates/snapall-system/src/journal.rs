@@ -77,71 +77,104 @@ pub fn to_line(event: &Event) -> String {
     value.to_string()
 }
 
+/// One line of the file, as the event it records; `None` for anything that is not one (the module's note says why that is
+/// never fatal).
 pub fn parse_line(line: &str) -> Option<Event> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
-    let text = |key: &str| value.get(key)?.as_str().map(str::to_owned);
-    let id = text("id")?;
-    let at = text("at")?;
+    let id = text(&value, "id")?;
+    let at = text(&value, "at")?;
     match value.get("event")?.as_str()? {
-        "started" => Some(Event::Started {
+        "started" => started(id, at, &value),
+        "progress" => progressed(id, at, &value),
+        "rollback" => Some(Event::Rollback {
             id,
             at,
-            what: text("what")?,
-            source: Source::from_word(&text("source")?)?,
-            pid: u32::try_from(value.get("pid")?.as_u64()?).ok()?,
+            rollback: rollback_of(&value)?,
         }),
-        "rollback" => {
-            let rollback = match text("kind")?.as_str() {
-                "advice" => Rollback::Advice(text("text")?),
-                "undo" => Rollback::Undo(Undo {
-                    what: text("what")?,
-                    commands: value
-                        .get("commands")?
-                        .as_array()?
-                        .iter()
-                        .map(|command| {
-                            command
-                                .as_array()?
-                                .iter()
-                                .map(|word| word.as_str().map(str::to_owned))
-                                .collect()
-                        })
-                        .collect::<Option<Vec<Vec<String>>>>()?,
-                    weight: Weight::from_word(&text("weight")?)?,
-                }),
-                _ => return None,
-            };
-            Some(Event::Rollback { id, at, rollback })
-        }
-        "progress" => Some(Event::Progress {
-            id,
-            at,
-            done: u32::try_from(value.get("done")?.as_u64()?).ok()?,
-            of: u32::try_from(value.get("of")?.as_u64()?).ok()?,
-            area: text("area")?,
-        }),
-        "finished" => {
-            let detail = text("detail").unwrap_or_default();
-            // lines written before a change could be cancelled said only whether it was all right
-            let word = match (
-                text("result"),
-                value.get("ok").and_then(serde_json::Value::as_bool),
-            ) {
-                (Some(word), _) => word,
-                (None, Some(true)) => "done".to_owned(),
-                (None, Some(false)) => "failed".to_owned(),
-                (None, None) => return None,
-            };
-            let result = Outcome::from_word(&word, detail)?;
-            Some(Event::Finished {
-                id,
-                at,
-                outcome: result,
-                took_ms: value.get("took_ms")?.as_u64()?,
-            })
-        }
+        "finished" => finished(id, at, &value),
         _ => None,
     }
+}
+
+fn text(value: &serde_json::Value, key: &str) -> Option<String> {
+    value.get(key)?.as_str().map(str::to_owned)
+}
+
+fn whole_number(value: &serde_json::Value, key: &str) -> Option<u32> {
+    u32::try_from(value.get(key)?.as_u64()?).ok()
+}
+
+fn started(id: String, at: String, value: &serde_json::Value) -> Option<Event> {
+    Some(Event::Started {
+        id,
+        at,
+        what: text(value, "what")?,
+        source: Source::from_word(&text(value, "source")?)?,
+        pid: whole_number(value, "pid")?,
+    })
+}
+
+fn progressed(id: String, at: String, value: &serde_json::Value) -> Option<Event> {
+    Some(Event::Progress {
+        id,
+        at,
+        done: whole_number(value, "done")?,
+        of: whole_number(value, "of")?,
+        area: text(value, "area")?,
+    })
+}
+
+/// The way back a line records: a real undo, with the commands that do it, or advice that there is none.
+fn rollback_of(value: &serde_json::Value) -> Option<Rollback> {
+    match text(value, "kind")?.as_str() {
+        "advice" => Some(Rollback::Advice(text(value, "text")?)),
+        "undo" => Some(Rollback::Undo(Undo {
+            what: text(value, "what")?,
+            commands: commands_of(value)?,
+            weight: Weight::from_word(&text(value, "weight")?)?,
+        })),
+        _ => None,
+    }
+}
+
+/// Each command is a list of words.
+fn commands_of(value: &serde_json::Value) -> Option<Vec<Vec<String>>> {
+    value
+        .get("commands")?
+        .as_array()?
+        .iter()
+        .map(|command| {
+            command
+                .as_array()?
+                .iter()
+                .map(|word| word.as_str().map(str::to_owned))
+                .collect()
+        })
+        .collect()
+}
+
+fn finished(id: String, at: String, value: &serde_json::Value) -> Option<Event> {
+    Some(Event::Finished {
+        id,
+        at,
+        outcome: outcome_of(value)?,
+        took_ms: value.get("took_ms")?.as_u64()?,
+    })
+}
+
+/// How the change ended. Lines written before a change could be cancelled said only whether it was all right.
+fn outcome_of(value: &serde_json::Value) -> Option<Outcome> {
+    let detail = text(value, "detail").unwrap_or_default();
+    let word = match (
+        text(value, "result"),
+        value.get("ok").and_then(serde_json::Value::as_bool),
+    ) {
+        (Some(word), _) => word,
+        (None, Some(true)) => "done".to_owned(),
+        (None, Some(false)) => "failed".to_owned(),
+        (None, None) => return None,
+    };
+    Outcome::from_word(&word, detail)
 }
 
 /// Add an event to the journal at `path`. Any failure is ignored: see the module's note.
