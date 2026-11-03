@@ -22,10 +22,13 @@ pub(super) fn job_controlled(
             snapall_core::keeping::jobs::title_of(&unit),
             action.label().to_lowercase()
         )),
-        Err(why) => Notice::Error(format!(
-            "Could not do that to {}: {why}",
-            snapall_core::keeping::jobs::title_of(&unit)
-        )),
+        Err(why) => Notice::could_not(
+            format!(
+                "do that to {}",
+                snapall_core::keeping::jobs::title_of(&unit)
+            ),
+            &why,
+        ),
     });
     Vec::new()
 }
@@ -39,7 +42,7 @@ pub(super) fn quotas_set(
     state.notice = Some(match (to, result) {
                 (Counting::On, Ok(())) => Notice::Info("Counting is on: the disk is building its tally in the background, and figures appear as it finishes".into()),
                 (Counting::Off, Ok(())) => Notice::Info("Counting is off".into()),
-                (_, Err(why)) => Notice::Error(format!("Could not change how room is counted: {why}")),
+                (_, Err(why)) => Notice::could_not("change how room is counted", &why),
             });
     Vec::new()
 }
@@ -63,9 +66,7 @@ pub(super) fn protection_stopped(
             vec![Effect::LoadAreas]
         }
         Err(why) => {
-            state.notice = Some(Notice::Error(format!(
-                "Could not stop protecting {area}: {why}"
-            )));
+            state.notice = Some(Notice::could_not(format!("stop protecting {area}"), &why));
             Vec::new()
         }
     }
@@ -81,7 +82,7 @@ pub(super) fn limits_set(
         Ok(()) => Notice::Info(format!(
             "{area} now keeps what you set. It takes effect at the next cleanup."
         )),
-        Err(why) => Notice::Error(format!("Could not change the limits of {area}: {why}")),
+        Err(why) => Notice::could_not(format!("change the limits of {area}"), &why),
     });
     Vec::new()
 }
@@ -98,7 +99,7 @@ pub(super) fn groups_saved(
             state.groups_error = None;
             Notice::Info("The groups are saved.".into())
         }
-        Err(why) => Notice::Error(format!("The groups could not be saved: {why}")),
+        Err(why) => Notice::could_not("save the groups", &why),
     });
     Vec::new()
 }
@@ -120,7 +121,7 @@ pub(super) fn stop_asked(state: &mut State, result: Result<(), String>) -> Vec<E
                     "Asked it to stop: it finishes the area it is on, then stops. Nothing is left half-done."
                         .into(),
                 ),
-                Err(why) => Notice::Error(format!("Could not ask it to stop: {why}")),
+                Err(why) => Notice::could_not("ask it to stop", &why),
             });
     vec![Effect::LoadHistory]
 }
@@ -133,9 +134,7 @@ pub(super) fn cleanup_switched(state: &mut State, result: Result<(), String>) ->
             vec![Effect::LoadHealth]
         }
         Err(why) => {
-            state.notice = Some(Notice::Error(format!(
-                "Could not switch automatic cleanup on: {why}"
-            )));
+            state.notice = Some(Notice::could_not("switch automatic cleanup on", &why));
             Vec::new()
         }
     }

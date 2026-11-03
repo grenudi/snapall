@@ -14,6 +14,13 @@ pub enum Notice {
     Error(String),
 }
 
+impl Notice {
+    /// A failure, said the one way: `Could not change the limits of home: Access denied`. `what` completes "could not".
+    pub fn could_not(what: impl std::fmt::Display, why: impl std::fmt::Display) -> Notice {
+        Notice::Error(format!("Could not {what}: {why}"))
+    }
+}
+
 /// A change this window handed to the background: its name, and how many times the journal was read
 /// without it appearing there (a change that never reports is eventually let go of).
 #[derive(Debug, Clone, PartialEq, Eq)]
