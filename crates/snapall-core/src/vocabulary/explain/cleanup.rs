@@ -51,7 +51,7 @@ pub fn seconds_words(seconds: u64) -> String {
         s if s >= 60 && s % 60 == 0 => (s / 60, "minute"),
         s => (s, "second"),
     };
-    format!("{count} {unit}{}", if count == 1 { "" } else { "s" })
+    super::counted(count, unit)
 }
 
 /// When the job runs, as its unit file says; if that is not known, it says so rather than guess.
@@ -131,4 +131,14 @@ pub fn room_counting_text(mode: QuotaMode) -> String {
         QuotaMode::Simple => "The disk counts room the simple way, a newer and cheaper kind. It charges room to whichever area first wrote the data, so what a snapshot holds on to cannot be told from it, and snapall shows no figure per snapshot. Counting fully would show it, at the cost of a slower disk when snapshots are deleted; switching from one kind to the other is not something snapall can do in place.".to_owned(),
         QuotaMode::Unknown => "snapall could not find out how this disk counts room.".to_owned(),
     }
+}
+
+/// "the disk holding root" or "the disks holding root, home": which disks a change to room counting reaches. Counting
+/// is a property of the disk, and several areas can be on one, so the areas are named by what holds them.
+pub fn disks_holding(areas: &[String]) -> String {
+    format!(
+        "the {} holding {}",
+        super::by_number(areas.len(), "disk", "disks"),
+        areas.join(", ")
+    )
 }

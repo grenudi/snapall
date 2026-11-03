@@ -25,6 +25,7 @@ pub use basics::{
     WHAT_IS_AN_AREA, WHAT_IS_A_SNAPSHOT, WORKS_WITH,
 };
 pub use cleanup::{
-    cleanup_from, cleanup_offer, cleanup_text, room_counting_text, seconds_words, Cleanup, Limit,
+    cleanup_from, cleanup_offer, cleanup_text, disks_holding, room_counting_text, seconds_words,
+    Cleanup, Limit,
 };
-pub use numbers::counted;
+pub use numbers::{by_number, counted};
