@@ -5,6 +5,7 @@
 //! Deleting snapshots: asking first, and what comes of it.
 
 use crate::model::*;
+use crate::questions::chosen::area_of_the_snapshots_in_use;
 use snapall_core::Act;
 use snapall_core::{AreaName, SnapshotId};
 
@@ -35,15 +36,9 @@ pub(crate) fn confirming_delete(
 }
 
 pub(crate) fn open_delete(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.snapshots.selected_area_name() else {
+    let Some(area) = area_of_the_snapshots_in_use(state, "to choose what to delete") else {
         return Vec::new();
     };
-    if state.snapshots.focus != Pane::Snapshots {
-        state.notice = Some(Notice::Info(
-            "move to the snapshots pane (right arrow) to choose what to delete".into(),
-        ));
-        return Vec::new();
-    }
     let ids: Vec<SnapshotId> = if state.snapshots.marked.is_empty() {
         state
             .snapshots

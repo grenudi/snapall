@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-23: code of the same shape under different names
+
+The duplicate scan could only find identical code, and a rule gets copied and then renamed to fit. `--near` forgets names, numbers and strings and compares only how the code is built. Run on this project it is noisy where regularity is the point (the flag table, enums and their words, import lists), which says the code is regular where it should be, and it found one real thing: the delete question and the restore question both opened with "the chosen area, but only when the snapshots list is the one in use, otherwise tell the person how to get there". That is one small step now, `area_of_the_snapshots_in_use`, in its own tiny module. Two other families it showed are not worth a change: the four name types share the same few lines of plumbing (a macro would hide more than it removes), and the many "enum to its word" matches are a deliberate idiom.
+
 ## 2026-11-22: "nothing here yet", said once
 
 Reading the situations where there is nothing to show: "no restore points yet" was told three times in three layers, in different words, and the window's version was the only one that did not say what to do about it. It is one sentence in the core now (what a restore point is, and that `sudo snapall` makes one), used by the window, the listing and the restore-point command, so the window is as helpful as the command line. The two sentences about limits that could not be shown said "snapper did not say…", the tool's name in words meant for a person; they say "snapall could not find out…" now, once. Two tests and one golden file pinned the old wording and moved with it; the golden change was one line, the intended one.

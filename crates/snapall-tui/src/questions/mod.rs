@@ -5,6 +5,7 @@
 //! The questions the window asks. Each is a folder of its own: what opens it, what its keys do and what comes of the
 //! answer (`asking`), and how it is drawn (`drawing`), so a question is read in one place.
 
+mod chosen;
 pub(crate) mod confirm;
 pub(crate) mod delete;
 pub(crate) mod describe;
