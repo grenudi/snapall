@@ -18,7 +18,7 @@ auth=(); [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_T
 # by date, so "the newest releases" are chosen here, by version.
 releases_json() {
   if [ -n "${RELEASES_JSON_FILE:-}" ]; then cat "$RELEASES_JSON_FILE"
-  else curl -fsS "${auth[@]}" "https://api.github.com/repos/$repo/releases?per_page=100"; fi
+  else curl -fsS --retry 5 --retry-delay 5 --retry-all-errors "${auth[@]}" "https://api.github.com/repos/$repo/releases?per_page=100"; fi
 }
 newest_tags() { # newest_tags COUNT: the COUNT highest versions among the tags on stdin, highest first
   grep -o '"tag_name": *"snapall-v[0-9.]*"' | grep -o 'snapall-v[0-9.]*' | sed 's/^snapall-v//' \
@@ -31,6 +31,6 @@ pattern="$(printf '%s\n' "$json" | newest_tags "$count" | paste -sd'|' -)"
 printf '%s\n' "$json" | grep -oE "https://[^\"]*/download/($pattern)/[^\"]*\.(deb|rpm)" | sort -u > urls
 [ -s urls ] || { echo "no packages found in the newest $count releases" >&2; exit 1; }
 [ -z "${LIST_ONLY:-}" ] || { cat urls; rm -f urls; exit 0; }
-while read -r url; do curl -fsSLO "${auth[@]}" "$url"; done < urls
+while read -r url; do curl -fsSLO --retry 5 --retry-delay 5 --retry-all-errors "${auth[@]}" "$url"; done < urls
 rm -f urls
 ls

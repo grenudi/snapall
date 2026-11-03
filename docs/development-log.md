@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-21: a release that failed on GitHub's own error
+
+A release's package-repository job failed with `curl: (22) The requested URL returned error: 500` while downloading the release's own packages: GitHub's server answering with an error, not anything in the release. The failed job was re-run and completed the release. The script that downloads them gave up on the first error, which is the weakness, so both its downloads now retry (five times, five seconds apart, on any error): a flaky response from the thing we publish to should not fail a release that is otherwise fine.
+
 ## 2026-11-20: the window's header
 
 A read of two window screens. The Health tab's drawing already reads as its steps and needed nothing. The header drew three things in one function (the brand badge, the tabs, a spinner with its elapsed time), and found the list of tabs by laying them out on an imaginary screen 65,535 cells wide; the badge and the spinner are named now, and the tabs come from the list of tabs.
