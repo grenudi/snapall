@@ -38,6 +38,7 @@ These are not rules to memorise. They are checks the repository runs on itself, 
 - **One thing has one word.** A person-readable sentence is written once, in the core, and the guards in `crates/snapall/tests/architecture.rs` stop a plural, a rule, or a stretch of code from being copied into a second place.
 - **No tool talk.** The words of the tools underneath (snapper, config, subvolume) stay in the adapters that drive them. Above them, an area is an area.
 - **Parts are small enough to take in.** A file is one thing short enough to read whole; a command reads as a handful of named steps, not a page of plumbing.
+- **It reads well when it is used.** Reading code finds what is wrong with code; only using the program finds what is wrong with what it says. So now and then the program is run on a real disk, from the first snapshot to going back, and every word is read as a newcomer would. That is how a sentence that said "0 reverted, 1 removed, 0 brought back" was found, and a first snapshot that never said what its restore point was called.
 - **A mistake in the structure fails loudly.** Each of these checks has been shown to fail when the thing it guards is broken on purpose.
 
 ## How close are we?
