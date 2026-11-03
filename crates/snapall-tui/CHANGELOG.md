@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.8]
+
+
+### Refactoring
+- The same shape under different names ([#175](https://github.com/grenudi/snapall/pull/175)) ([e084040])
+
+
+
 ## [0.34.7]
 
 
