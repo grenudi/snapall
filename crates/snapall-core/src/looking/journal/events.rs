@@ -21,6 +21,14 @@ impl Source {
         }
     }
 
+    /// Where it came from, to a person: the stored word is for the journal file, which older entries depend on.
+    pub fn label(self) -> &'static str {
+        match self {
+            Source::Window => "window",
+            Source::Command => "command line",
+        }
+    }
+
     pub fn from_word(word: &str) -> Option<Source> {
         match word {
             "window" => Some(Source::Window),

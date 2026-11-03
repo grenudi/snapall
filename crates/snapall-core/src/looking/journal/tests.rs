@@ -194,3 +194,15 @@ fn an_outcome_is_stored_as_a_word_and_read_back_and_an_unknown_word_is_refused()
     }
     assert_eq!(Outcome::from_word("exploded", String::new()), None);
 }
+
+#[test]
+fn a_source_is_stored_in_one_word_and_read_by_a_person_in_another() {
+    // the stored words are in journals already written, so they must not change; the label is for people
+    assert_eq!(Source::Command.word(), "command");
+    assert_eq!(Source::Command.label(), "command line");
+    assert_eq!(Source::Window.word(), "window");
+    assert_eq!(
+        Source::from_word(Source::Command.word()),
+        Some(Source::Command)
+    );
+}

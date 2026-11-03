@@ -90,7 +90,7 @@ fn changes_from_earlier_sessions_and_from_commands_are_shown_with_their_day() {
     session.press(Key::Char('3'));
     let text = screen(&session);
     assert!(
-        text.contains("done Took a snapshot of home, root (command)"),
+        text.contains("done Took a snapshot of home, root (command line)"),
         "{text}"
     );
     assert!(
@@ -208,7 +208,7 @@ fn what_another_snapall_did_while_this_window_was_open_appears_when_the_tab_is_o
     system.record(&ended("other", "2026-10-25", Ok("")));
     session.press(Key::Char('1'));
     session.press(Key::Char('3'));
-    assert!(screen(&session).contains("done Deleted 1 snapshot of home (command)"));
+    assert!(screen(&session).contains("done Deleted 1 snapshot of home (command line)"));
 }
 
 #[test]

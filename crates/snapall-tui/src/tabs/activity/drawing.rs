@@ -125,8 +125,8 @@ pub(super) fn entry_line(entry: &Activity, chosen: bool, several_days: bool) -> 
         JournalStatus::Failed | JournalStatus::Interrupted => Color::Red,
     };
     let origin = match entry.source {
-        Some(Source::Command) => " (command)",
-        _ => "",
+        Some(source @ Source::Command) => format!(" ({})", source.label()),
+        _ => String::new(),
     };
     let mut spans = vec![
         Span::styled(if chosen { " > " } else { "   " }, body),
