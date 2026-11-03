@@ -18,7 +18,10 @@ pub(super) fn areas_of(point: &snapall_core::RestorePoint) -> String {
 /// The restore points, newest first, each with what to type to go back to it.
 pub fn points(points: &[snapall_core::RestorePoint]) -> String {
     if points.is_empty() {
-        return "No restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is a restore point.\n".to_owned();
+        return format!(
+            "{}\n",
+            snapall_core::vocabulary::explain::NO_RESTORE_POINTS_YET
+        );
     }
     let mut out = String::from(
         "Restore points: the snapshots that one action took together, one in every area.\nPut every area back to one with `sudo snapall restore-all POINT`.\n\n",

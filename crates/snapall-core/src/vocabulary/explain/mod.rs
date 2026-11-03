@@ -21,8 +21,8 @@ pub use areas::{
     area_detail, area_line, failure_text, protect_offer, protect_summary, protected_text,
 };
 pub use basics::{
-    DELETE_ADVICE, NOT_A_BACKUP, RESTORE_CAUTION, RESTORING, SNAPSHOT_LIST, UNPROTECT_ADVICE,
-    WHAT_IS_AN_AREA, WHAT_IS_A_SNAPSHOT, WORKS_WITH,
+    DELETE_ADVICE, LIMITS_UNKNOWN, NOT_A_BACKUP, NO_RESTORE_POINTS_YET, RESTORE_CAUTION, RESTORING,
+    SNAPSHOT_LIST, UNPROTECT_ADVICE, WHAT_IS_AN_AREA, WHAT_IS_A_SNAPSHOT, WORKS_WITH,
 };
 pub use cleanup::{
     cleanup_from, cleanup_offer, cleanup_text, disks_holding, room_counting_text, seconds_words,

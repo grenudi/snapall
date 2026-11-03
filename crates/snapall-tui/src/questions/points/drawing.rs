@@ -35,7 +35,7 @@ pub(crate) fn points_spec(
     if points.is_empty() {
         return simple(
             vec![
-                Line::from("There are no restore points yet."),
+                Line::from(snapall_core::vocabulary::explain::NO_RESTORE_POINTS_YET),
                 Line::from(""),
                 Line::from("Taking a snapshot of every area at once (press a, or run sudo snapall) makes one: the snapshots one action takes together, so that everything can be put back to that moment in one step."),
             ],

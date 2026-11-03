@@ -31,7 +31,7 @@ pub(crate) fn open_limits(state: &mut State, area: AreaName) -> Vec<Effect> {
         .and_then(Limits::from_retention);
     let Some(before) = before else {
         state.notice = Some(Notice::Error(
-            "snapper did not say how many this area keeps, so there is nothing to change".into(),
+            snapall_core::vocabulary::explain::LIMITS_UNKNOWN.into(),
         ));
         return Vec::new();
     };

@@ -130,7 +130,7 @@ fn points_fixture() -> (
 fn no_restore_points_says_what_makes_one() {
     let text = points(&[]);
     assert!(
-        text.contains("No restore points yet") && text.contains("sudo snapall"),
+        text.contains("There are no restore points yet") && text.contains("sudo snapall"),
         "{text}"
     );
     assert_eq!(points_json(&[]), json!({"points": []}));

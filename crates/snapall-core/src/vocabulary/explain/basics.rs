@@ -19,6 +19,12 @@ pub const WHAT_IS_AN_AREA: &str = "Snapshots are kept for one part of your disk 
 pub const SNAPSHOT_LIST: &str =
     "Newest first. `before` and `after #3` are a pair taken around one command.";
 
+/// Said wherever a list of restore points would be, when there is none: what a restore point is, and how to make one.
+pub const NO_RESTORE_POINTS_YET: &str = "There are no restore points yet. `sudo snapall` takes a snapshot of every area at once, and that is a restore point.";
+
+/// Said when the limits of an area cannot be shown or changed because the tool did not say what they are now.
+pub const LIMITS_UNKNOWN: &str = "snapall could not find out how many snapshots this area keeps, so there is nothing to show or change.";
+
 /// What a snapshot is not.
 pub const NOT_A_BACKUP: &str = "Snapshots live on the same disk as your files. They protect you from mistakes and bad changes, not from the disk failing or being lost: for that you still need a copy somewhere else.";
 

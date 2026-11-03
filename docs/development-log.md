@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-22: "nothing here yet", said once
+
+Reading the situations where there is nothing to show: "no restore points yet" was told three times in three layers, in different words, and the window's version was the only one that did not say what to do about it. It is one sentence in the core now (what a restore point is, and that `sudo snapall` makes one), used by the window, the listing and the restore-point command, so the window is as helpful as the command line. The two sentences about limits that could not be shown said "snapper did not say…", the tool's name in words meant for a person; they say "snapall could not find out…" now, once. Two tests and one golden file pinned the old wording and moved with it; the golden change was one line, the intended one.
+
 ## 2026-11-21: a release that failed on GitHub's own error
 
 A release's package-repository job failed with `curl: (22) The requested URL returned error: 500` while downloading the release's own packages: GitHub's server answering with an error, not anything in the release. The failed job was re-run and completed the release. The script that downloads them gave up on the first error, which is the weakness, so both its downloads now retry (five times, five seconds apart, on any error): a flaky response from the thing we publish to should not fail a release that is otherwise fine.
