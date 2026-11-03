@@ -2,6 +2,10 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-19: nothing is said as "no", not as a zero
+
+The singular fix had a cousin. `counted` now says "no snapshots" for zero, the way a person does, instead of "0 snapshots". The one place it must not is a length of time, where "0 seconds" is right and "no seconds" is not (a failing test said so), so the duration words keep their zero by saying it themselves.
+
 ## 2026-11-18: checking the page against the code, and the singular
 
 The idea page says every command is a short story. I measured every command function: 42 of 43 are under 40 lines, the 43rd is the request table, which is meant to be a table, and one real exception, `unprotect` at 51 lines. It is its steps now (say what stopping would mean, stop here if only rehearsing, ask, begin, do it and write down there is no way back, show), like the others.
