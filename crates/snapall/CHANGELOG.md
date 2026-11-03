@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.1]
+
+
+### Refactoring
+- A sixth read, and the journal weight dropped ([#159](https://github.com/grenudi/snapall/pull/159)) ([723372e])
+
+
+
 ## [0.34.0]
 
 
