@@ -230,7 +230,7 @@ pub(crate) fn render_snapshots(state: &State, frame: &mut Frame, area: Rect) {
                 [
                     Constraint::Length(1),
                     Constraint::Length(6),
-                    Constraint::Length(9),
+                    Constraint::Length(10),
                     Constraint::Length(19),
                     Constraint::Length(8),
                     Constraint::Min(10),

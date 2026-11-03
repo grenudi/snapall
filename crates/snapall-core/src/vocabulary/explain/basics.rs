@@ -14,6 +14,11 @@ pub const WHAT_IS_A_SNAPSHOT: &str = "A snapshot is a saved moment of your compu
 /// What an area is, and why it matters which ones are protected.
 pub const WHAT_IS_AN_AREA: &str = "Snapshots are kept for one part of your disk at a time, called an area. A snapshot of one area does not contain the others: the System and your Home files are separate areas, so each needs protecting. snapall can only help with an area once it is protected.";
 
+/// What the list of snapshots shows, in one line of the help: the order, and what `before` and `after #3` mean (a pair
+/// taken around one command). It has to stay on one row of the help page, which fits a small terminal exactly.
+pub const SNAPSHOT_LIST: &str =
+    "Newest first. `before` and `after #3` are a pair taken around one command.";
+
 /// What a snapshot is not.
 pub const NOT_A_BACKUP: &str = "Snapshots live on the same disk as your files. They protect you from mistakes and bad changes, not from the disk failing or being lost: for that you still need a copy somewhere else.";
 

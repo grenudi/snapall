@@ -15,12 +15,13 @@ pub enum SnapshotKind {
 }
 
 impl SnapshotKind {
-    /// The kind as a short label in a list: `single`, `pre`, or `post<-3` for the one that follows snapshot 3.
+    /// The kind in the words a person reads in a list: `single`, `before`, or `after #3` for the one taken after
+    /// snapshot 3. (The tool calls the pair `pre` and `post`; those stay in the machine-readable output.)
     pub fn label(self) -> String {
         match self {
             SnapshotKind::Single => "single".to_owned(),
-            SnapshotKind::Pre => "pre".to_owned(),
-            SnapshotKind::Post { pre } => format!("post<-{pre}"),
+            SnapshotKind::Pre => "before".to_owned(),
+            SnapshotKind::Post { pre } => format!("after #{pre}"),
         }
     }
 }
@@ -52,7 +53,7 @@ mod tests {
     fn a_kind_is_labelled_the_way_a_list_shows_it() {
         let three = SnapshotId::new(3).unwrap();
         assert_eq!(SnapshotKind::Single.label(), "single");
-        assert_eq!(SnapshotKind::Pre.label(), "pre");
-        assert_eq!(SnapshotKind::Post { pre: three }.label(), "post<-3");
+        assert_eq!(SnapshotKind::Pre.label(), "before");
+        assert_eq!(SnapshotKind::Post { pre: three }.label(), "after #3");
     }
 }

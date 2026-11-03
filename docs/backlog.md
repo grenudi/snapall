@@ -25,7 +25,6 @@ Where the code still does not say what snapall is for. Each iteration is a branc
 | 3 | Nine plurals are still spelled by hand in five files (the debt list `hand_spelled_plurals`): the shapes `counted` does not fit, such as a plural with no number ("the disks holding"), verb agreement, and the unit helper that is itself the general function. Say them through a second small helper, or leave each with its reason | open |
 | 4 | The group editor's `Vec<(AreaName, bool)>` is a pair whose second half is unnamed (whether the area is in the group): a small noun | open |
 | 5 | The core hard-codes a Linux path to a snapper plugin (`/usr/lib/snapper/plugins/10-limine-snapper-sync`) and asks the generic `file_exists`; the machine port should be asked whether the boot menu plugin is there, and the path belongs to the adapter (`boot_menu.rs` already knows it) | open |
-| 6 | The Snapshots list shows `pre` and `post<-3` (snapper's words for a pair of snapshots taken around one command) with no explanation. Decide what a person should see there: the pair as one thing, a plain word, or nothing | open |
 
 Decided, so not open: `setup` is a conversation that explains and then asks about each part, so it is the one change that begins without a single leave (`begin_asking_along`, kept to one place by a test). Asking once up front would make the wizard worse, and it already takes its facts and its way of talking as inputs, so every branch is tested as a conversation with a scripted person. Revisit only if each of its changes should be journaled separately.
 
