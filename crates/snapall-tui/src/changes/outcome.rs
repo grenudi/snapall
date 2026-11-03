@@ -87,9 +87,12 @@ pub(crate) fn how_it_went(msg: &Msg) -> Result<String, String> {
         Msg::JobControlled { result, .. } => result.clone().map(|()| String::new()),
         Msg::GroupsSaved { result, .. } => result.clone().map(|()| String::new()),
         Msg::LimitsSet { result, .. } => result.clone().map(|()| String::new()),
-        Msg::ProtectionStopped { result, .. } => {
-            result.clone().map(|n| format!("{n} snapshots deleted"))
-        }
+        Msg::ProtectionStopped { result, .. } => result.clone().map(|n| {
+            format!(
+                "{} deleted",
+                snapall_core::vocabulary::explain::counted(n, "snapshot")
+            )
+        }),
         Msg::QuotasSet {
             to: Counting::On,
             result,

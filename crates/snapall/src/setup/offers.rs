@@ -42,10 +42,10 @@ pub fn hint_for(offers: &[snapall_tui::Offer]) -> Option<String> {
     if titles.is_empty() {
         return None;
     }
-    let verb = if titles.len() == 1 { "has" } else { "have" };
+    let verb = snapall_core::vocabulary::explain::by_number(titles.len(), "has", "have");
     Some(format!(
         "{} {verb} no snapshots yet. Press p to see what that means and protect {}.",
         titles.join(" and "),
-        if titles.len() == 1 { "it" } else { "them" }
+        snapall_core::vocabulary::explain::by_number(titles.len(), "it", "them")
     ))
 }

@@ -87,7 +87,7 @@ pub enum GroupsError {
     Empty,
     #[error("there is no group called `{name}`{}", which_exist(.known))]
     Unknown { name: String, known: Vec<String> },
-    #[error("the group `{group}` names {}, which {} no longer protected: put {} back with `snapall setup`, or change the group with `snapall groups`", .missing.join(", "), if .missing.len() == 1 { "is" } else { "are" }, if .missing.len() == 1 { "it" } else { "them" })]
+    #[error("the group `{group}` names {}, which {} no longer protected: put {} back with `snapall setup`, or change the group with `snapall groups`", .missing.join(", "), crate::vocabulary::explain::by_number(.missing.len(), "is", "are"), crate::vocabulary::explain::by_number(.missing.len(), "it", "them"))]
     Missing { group: String, missing: Vec<String> },
     #[error("line {line}: {why}")]
     Syntax { line: usize, why: String },
