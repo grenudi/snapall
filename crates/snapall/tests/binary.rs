@@ -594,7 +594,7 @@ fn history_says_how_the_file_stood_in_each_snapshot() {
     let output = v.run(&v.root, &["--no-dbus", "history", file.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     let text = stdout(&output);
-    assert!(text.contains("(config vol)"), "{text}");
+    assert!(text.contains("(in area vol)"), "{text}");
     let line = |id: &str| {
         text.lines()
             .find(|l| l.trim_start().starts_with(id))
