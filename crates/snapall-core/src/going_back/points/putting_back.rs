@@ -35,19 +35,36 @@ pub fn preview_point(backend: &dyn SnapshotBackend, point: &RestorePoint) -> Vec
     point
         .members
         .iter()
-        .map(|member| {
-            let view = match preview_restore(backend, &member.area, member.id, None) {
-                Ok(preview) if preview.is_system_root => MemberView::SystemRoot,
-                Ok(preview) => MemberView::Changes(preview),
-                Err(error) => MemberView::Failed(error.to_string()),
-            };
-            MemberPreview {
-                area: member.area.clone(),
-                id: member.id,
-                view,
-            }
+        .map(|member| MemberPreview {
+            area: member.area.clone(),
+            id: member.id,
+            view: look_at(backend, member),
         })
         .collect()
+}
+
+/// What restoring one area of a point would do: the one answer that both looking at a point and putting it back start from.
+fn look_at(backend: &dyn SnapshotBackend, member: &Member) -> MemberView {
+    match preview_restore(backend, &member.area, member.id, None) {
+        Ok(preview) if preview.is_system_root => MemberView::SystemRoot,
+        Ok(preview) => MemberView::Changes(preview),
+        Err(error) => MemberView::Failed(error.to_string()),
+    }
+}
+
+impl MemberPreview {
+    /// Whether putting this area back would change anything.
+    pub fn would_change(&self) -> bool {
+        matches!(&self.view, MemberView::Changes(preview) if !preview.changes.is_empty())
+    }
+}
+
+/// How many of the areas of a point would change if it were put back.
+pub fn areas_that_would_change(previews: &[MemberPreview]) -> usize {
+    previews
+        .iter()
+        .filter(|preview| preview.would_change())
+        .count()
 }
 
 #[derive(Debug)]
@@ -127,11 +144,13 @@ pub fn restore_point_along(
             stopped = true;
             break;
         }
-        let result = match preview_restore(backend, &member.area, member.id, None) {
-            Err(error) => MemberResult::Failed(error.to_string()),
-            Ok(preview) if preview.is_system_root => MemberResult::SystemRoot,
-            Ok(preview) if preview.changes.is_empty() => MemberResult::AlreadyThere,
-            Ok(_) => {
+        let result = match look_at(backend, member) {
+            MemberView::Failed(error) => MemberResult::Failed(error),
+            MemberView::SystemRoot => MemberResult::SystemRoot,
+            MemberView::Changes(preview) if preview.changes.is_empty() => {
+                MemberResult::AlreadyThere
+            }
+            MemberView::Changes(_) => {
                 match restore_snapshot_with(backend, &member.area, member.id, None, Some(&tagging))
                 {
                     Ok(restored) => MemberResult::Restored(restored),

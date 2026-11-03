@@ -48,12 +48,7 @@ pub struct PointOffer {
 impl PointOffer {
     /// How many areas would change.
     pub fn areas_to_change(&self) -> usize {
-        self.views
-            .iter()
-            .filter(|v| {
-                matches!(&v.view, snapall_core::MemberView::Changes(p) if !p.changes.is_empty())
-            })
-            .count()
+        snapall_core::areas_that_would_change(&self.views)
     }
 }
 

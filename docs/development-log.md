@@ -2,6 +2,18 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-08: a fifth read
+
+**What I read.** Eight sampled; three were modules I had already read and changed (`rollback.rs`, `arriving.rs`, `machine.rs`), so five were new: `putting_back.rs`, `restoring_a_point.rs`, `asked_for.rs`, `lock.rs`, `describing.rs`. Two needed nothing (`lock.rs`, whose doc says what it does and does not guard and gives a reason for every edge case, and `describing.rs`, two deliberately exhaustive matches with their reasons beside them).
+
+**What I found.**
+- **One rule, three copies.** "An area of a restore point would change" was written in the window (as a method on one of its state types) and twice in the command line. It is `MemberPreview::would_change` and `areas_that_would_change` in the core, with a test over all four kinds of member view (changes, no changes, the running system, could not look).
+- **`restore_point_along` repeated `preview_point`'s classification** (an error is a failure, the system root is left alone) on a type, `MemberView`, that already held exactly those outcomes. Both start from one `look_at` now.
+- **`RestorePoint.tagged: bool`**, with a doc comment doing the job a name should do, built with a literal `true` and a literal `false`. It is `Found::ByTag` or `Found::ByGuess`, with `is_certain()`; the JSON key `"tagged"` stays a boolean, since it is output.
+- **`Agreed::to(yes, false)` and `Agreed::to(false, destroy)`, eight times** in the request table: a literal whose meaning cannot be seen at the call site. Each command offers `--yes`, `--destroy` or both, and the call now says which (`by_yes`, `by_destroy`, `to`).
+
+**What it tells me.** Five modules, four things with a real fix. The rate has not fallen across five reads, so I will keep doing them, but the findings have changed in kind: the first reads found stale words and copied rules, this one found a repeated *classification* and unnamed two-way facts. Both are the same smell, a distinction made in the code but not named.
+
 ## 2026-11-07: `on_areas_loaded` as steps, and a sentence told three times
 
 **Why.** `on_areas_loaded` was on the plan since the second seeded read: a 35-line arm that rebuilt the list, kept the cursor on the same area, reset the snapshot cursor, settled which notice shows, and held the "nothing protected yet" sentence inline. I had noted it twice and fixed other things first.

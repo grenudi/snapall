@@ -503,7 +503,7 @@ fn a_restore_point_puts_two_real_areas_back_with_one_action_and_that_is_undoable
         .iter()
         .find(|p| p.point == point)
         .expect("the point is found by its tag, in real snapper's listing");
-    assert!(ours.tagged);
+    assert!(ours.found.is_certain());
     let areas: Vec<&str> = ours.members.iter().map(|m| m.area.as_str()).collect();
     assert!(
         areas.contains(&"snapall_it_a") && areas.contains(&"snapall_it_b"),
