@@ -49,7 +49,7 @@ cargo run -q -p snapall -- contract > snapall.argenv.json
 
 ## Releases
 
-Pull requests are squash-merged and the **PR title** must be a Conventional Commit (above); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum.
+Pull requests are squash-merged and the **PR title** must be a Conventional Commit (above); it becomes the commit on `main`. [release-plz](https://release-plz.dev/) keeps a release PR (version bump plus changelog, via git-cliff) up to date. Merging it tags `snapall-vX.Y.Z`, creates the GitHub release and attaches static `x86_64` and `aarch64` Linux binaries, `.deb` and `.rpm` packages, checksums, and a `PKGBUILD` with the real version and source checksum. Releases are batched, not one per merge: the release PR waits until about ten changes have piled up, or the oldest has waited a week, or a change touches packaging or the release workflows (which only a release proves), and is then merged by hand or by `dev/ship.py`.
 
 ## Licensing of contributions
 

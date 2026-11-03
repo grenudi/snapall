@@ -63,6 +63,8 @@ jobs:
 
       - name: Documentation links point at files that exist
         run: python3 dev/check-links.py
+      - name: The release policy decides when a merge releases
+        run: python3 dev/test_ship.py
 
       - name: The README's install snippets exist for every system and parse
         run: ./dev/check-snippets.sh

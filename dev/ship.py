@@ -5,7 +5,7 @@
 
 """Ship the current branch: push, open the pull request, wait for CI, merge, wait for main, release, verify the release.
 
-    GITHUB_TOKEN=... dev/ship.py "refactor: what changed" [--body-file FILE] [--no-release]
+    GITHUB_TOKEN=... dev/ship.py "refactor: what changed" [--body-file FILE] [--no-release | --release]
     GITHUB_TOKEN=... dev/ship.py --check            only verify the token and the repository
 
 It keeps no state of its own: every step reads GitHub, so it can be stopped and run again, from any session, and carries on
@@ -23,6 +23,41 @@ import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 # steps whose failure is the network or the runner, not our code: a package install inside a container, and the runner starting one
 KNOWN_RUNNER_FLAKES = ("A user's tools", "Set up job", "Initialize containers", "Initialize job")
 RELEASE_WORKFLOWS = ("Release", "Verify release", "Package repositories", "Install snippets")
+
+# A release per merge costs minutes of waiting and a version number nobody asked for, and proves little that CI does not
+# prove on every pull request. The release pull request already collects changes by itself, so a change does not release
+# unless: enough have piled up, the oldest has waited too long, it touches how releases are published (the one thing CI
+# cannot prove), or a release was asked for.
+RELEASE_AFTER = int(os.environ.get("SHIP_RELEASE_AFTER", "10"))
+RELEASE_AFTER_DAYS = 7
+PUBLISHING = ("packaging/", ".github/workflows/release", ".github/workflows/repos.yml", ".github/workflows/install-snippets.yml")
+
+
+def why_release(entries, oldest_age_days, files, flags):
+    """The reason to release now, or None to let the change wait with the others."""
+    if "--release" in flags:
+        return "a release was asked for"
+    if any(name.startswith(PUBLISHING) for name in files):
+        return "it touches how releases are published, which only a release proves"
+    if entries >= RELEASE_AFTER:
+        return f"{entries} changes are waiting"
+    if entries and oldest_age_days >= RELEASE_AFTER_DAYS:
+        return f"the oldest waiting change is {oldest_age_days:.0f} days old"
+    return None
+
+
+def unreleased():
+    """The changes on main since the last release that make a changelog entry, and when the oldest was made."""
+    entries, oldest = 0, None
+    for commit in api("commits?sha=main&per_page=100"):
+        title = commit["commit"]["message"].split("\n")[0]
+        if title.startswith("chore: release"):
+            break
+        if title.startswith(("chore", "docs")):
+            continue
+        entries += 1
+        oldest = commit["commit"]["committer"]["date"]
+    return entries, oldest
 # Fewer than this is a pull request whose CI has not started (or conflicts). A pull request of documents only is narrowed by the
 # `changes` job to 13 checks, and a full one has 24, so the floor is below the narrowed count: the wait for no pending check
 # that stays so for two looks is what says the rest have arrived.
@@ -223,6 +258,17 @@ def main(argv):
     say("main is green")
     if "--no-release" in flags:
         return
+    entries, oldest = unreleased()
+    age = (time.time() - time.mktime(time.strptime(oldest, "%Y-%m-%dT%H:%M:%SZ"))) / 86400 if oldest else 0
+    listed = api(f"pulls/{number}/files?per_page=100")
+    files = [f["filename"] for f in listed] if isinstance(listed, list) else []
+    reason = why_release(entries, age, files, flags)
+    if not reason:
+        say(f"release deferred: {entries} of {RELEASE_AFTER} changes are waiting; the release pull request keeps collecting them (--release to release now)")
+        return
+    say(f"releasing: {reason}")
+    # the release pull request is updated by the Release workflow after each push to main: wait for it to hold this change
+    wait_for_workflow_run(merge_sha, "Release")
     # a release may already be done (merged in an earlier run) or still to be merged: GitHub says which
     def release_commit_after(sha):
         for commit in api("commits?sha=main&per_page=20"):
