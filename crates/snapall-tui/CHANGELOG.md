@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.6]
+
+
+### Refactoring
+- The window's header says what it draws ([#170](https://github.com/grenudi/snapall/pull/170)) ([211fa5d])
+
+
+
 ## [0.34.5]
 
 
