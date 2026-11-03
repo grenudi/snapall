@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.33.0]
+
+
+### Refactoring
+- The plugin path belongs to the adapter ([#153](https://github.com/grenudi/snapall/pull/153)) ([6dcfa56])
+
+
+
 ## [0.32.2]
 
 
