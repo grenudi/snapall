@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.12]
+
+
+### Refactoring
+- The window, read as a newcomer ([#183](https://github.com/grenudi/snapall/pull/183)) ([4b00859])
+
+
+
 ## [0.34.11]
 
 
