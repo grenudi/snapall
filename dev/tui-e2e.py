@@ -562,8 +562,8 @@ def journal_scenario():
     tui.wait_for("Snapshots of snapall_it_a (")
     tui.wait_gone("working", timeout=6)
     tui.send("3")
-    tui.wait_for("(command)")
-    check("Took a snapshot of snapall_it_a, snapall_it_b (command)" in tui.text(),
+    tui.wait_for("(command line)")
+    check("Took a snapshot of snapall_it_a, snapall_it_b (command line)" in tui.text(),
           "the window shows what a command did, and says it was a command")
     tui.send("1")
     tui.send("a")
