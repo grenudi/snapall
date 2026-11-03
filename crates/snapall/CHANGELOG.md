@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.4]
+
+
+### Refactoring
+- Unprotect as steps, and the singular says one ([#166](https://github.com/grenudi/snapall/pull/166)) ([2b9dd5f])
+
+
+
 ## [0.34.3]
 
 
