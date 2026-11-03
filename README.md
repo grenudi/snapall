@@ -396,6 +396,8 @@ Early. Scope today is **snapper-backed snapshots**, which in practice means Btrf
 
 ## Architecture
 
+**New here? Start with [the idea](docs/the-idea.md)**: one page, in plain words, on how the code is meant to be read and how close it is to that.
+
 Hexagonal, with a functional core and an imperative shell, enforced by crate boundaries and a fitness test. See [ARCHITECTURE.md](ARCHITECTURE.md), which maps each decision back to the [software-engineering-canon](https://github.com/creation-guidelines/software-engineering-canon), and the [ADRs](docs/adr/).
 
 ## Contributing

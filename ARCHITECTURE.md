@@ -1,5 +1,7 @@
 # Architecture
 
+New to the code? [docs/the-idea.md](docs/the-idea.md) is the one-page plain-language version of the idea this page's reading order comes from.
+
 snapall follows the [software-engineering-canon](https://github.com/creation-guidelines/software-engineering-canon/blob/main/README.md). This page records which canon entries it applies and where to find them in the code. Decisions and their reasoning live in [docs/adr/](docs/adr/).
 
 | Canon entry | How snapall applies it | Where |
