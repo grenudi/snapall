@@ -1076,21 +1076,26 @@ fn no_two_modules_describe_themselves_in_the_same_words() {
 /// `if n == 1 { "" } else { "s" }`, is a rule written again, and so a chance for it to come out differently.
 #[test]
 fn a_plural_is_said_by_the_core_and_not_spelled_by_hand_and_the_debt_only_shrinks() {
-    let idioms = [
-        r#"== 1 { "" } else { "s" }"#,
-        r#"== 1 { "s" } else { "" }"#,
-        r#"== 1 { "path" } else { "paths" }"#,
-    ];
+    // the idiom in any words: `if n == 1 { "" } else { "s" }`, `{ " was" } else { "s were" }`, `{ "it" } else { "them" }`
     let mut observed = BTreeMap::new();
     for (path, code) in all_sources() {
         let flat = code.split_whitespace().collect::<Vec<_>>().join(" ");
-        let spelled: usize = idioms.iter().map(|idiom| flat.matches(idiom).count()).sum();
+        let mut spelled = 0;
+        let mut from = 0;
+        while let Some(at) = flat[from..].find("== 1 { \"") {
+            let start = from + at;
+            let near: String = flat[start..].chars().take(80).collect();
+            if near.contains("} else { \"") {
+                spelled += 1;
+            }
+            from = start + 1;
+        }
         if spelled > 0 {
             observed.insert(path, spelled);
         }
     }
     ratchet(
-        "Files that spell a plural by hand instead of saying it with `counted`:",
+        "Files that spell a plural or an agreement by hand instead of saying it with `counted` or `by_number`:",
         "hand_spelled_plurals",
         &observed,
         0,

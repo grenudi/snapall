@@ -173,8 +173,9 @@ pub fn preview_words(preview: &Preview, limits: &Limits) -> String {
         String::new()
     };
     format!(
-        "At the next cleanup {at_most}{} of the {} snapshots that cleanup looks after would be removed, the oldest first{spared}. A removed snapshot cannot be brought back.",
-        preview.would_remove, preview.looked_after
+        "At the next cleanup {at_most}{} of the {} that cleanup looks after would be removed, the oldest first{spared}. A removed snapshot cannot be brought back.",
+        preview.would_remove,
+        crate::vocabulary::explain::counted(preview.looked_after, "snapshot")
     )
 }
 
@@ -355,5 +356,26 @@ mod tests {
             ),
             "{spared}"
         );
+    }
+
+    #[test]
+    fn the_preview_says_one_snapshot_in_the_singular() {
+        let limits = Limits {
+            keep: 0,
+            min_age_seconds: 0,
+            cleanup: true,
+        };
+        let one = Preview {
+            looked_after: 1,
+            would_remove: 1,
+            spared_by_age: 0,
+            exact: true,
+        };
+        let words = preview_words(&one, &limits);
+        assert!(
+            words.contains("of the 1 snapshot that cleanup looks after"),
+            "{words}"
+        );
+        assert!(!words.contains("1 snapshots"), "{words}");
     }
 }

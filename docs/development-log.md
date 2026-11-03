@@ -2,6 +2,12 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-18: checking the page against the code, and the singular
+
+The idea page says every command is a short story. I measured every command function: 42 of 43 are under 40 lines, the 43rd is the request table, which is meant to be a table, and one real exception, `unprotect` at 51 lines. It is its steps now (say what stopping would mean, stop here if only rehearsing, ask, begin, do it and write down there is no way back, show), like the others.
+
+Reading it found something the page could not have promised: the code did not read well for **one** of anything. "Delete its 1 snapshots", "taken in 1 areas", "of the 1 snapshots that cleanup looks after", and, in the text the journal records, "1 snapshots deleted", which the Activity tab would show. Six sentences spelled a count with a fixed plural or wrote their own agreement (has/have, it/them, was/were) in a form my plural guard's list of known idioms did not include. They say it through the shared helpers now, the guard recognises the idiom in any words instead of a list of the ones I had seen, and it was shown to catch the exact form that slipped through. The plural wordings are unchanged (the tests that pin them pass), the singular one is pinned.
+
 ## 2026-11-17: the adapters, read from the top
 
 I expected the adapters to be the part least like the ideal, and said so on the idea page. Reading every adapter module by its opening line showed the opposite: each says what it is for, and the longest functions across all three adapter crates are short. Two stood out and were split: the reader of the journal file (66 lines, one match over four kinds of line) is a dispatcher over one small reader per kind, and the boot-menu detection (53 lines, three questions in one breath) is those three questions, which bootloaders are there, how the Limine tool stands and how grub-btrfs stands. Behaviour is the same; the adapters' tests, which read old-format lines and build fake machines on disk, agree. The idea page's account of how close the adapters are was corrected, because I had guessed and was wrong.

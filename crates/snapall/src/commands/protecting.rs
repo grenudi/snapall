@@ -16,32 +16,15 @@ use std::process::ExitCode;
 /// always says what that means first; on a terminal it needs the area's name typed out, in a script `--yes`;
 /// `--dry-run` only says. The system area is refused.
 pub fn unprotect(ctx: &Context, area: &str, mode: Mode, agreed: Agreed) -> Outcome {
-    use snapall_core::protecting::unprotect::{plan, stop_protecting};
-    use snapall_core::SystemProbe;
     let area_name = AreaName::parse(area)?;
-    let system = snapall_system::LinuxSystem::new();
-    let groups = system.groups()?;
-    let plan = plan(ctx.backend, &groups, &area_name)?;
-    output::note(&format!("{}\n", plan.words().join("\n")));
+    let plan = say_what_stopping_would_mean(ctx, &area_name)?;
     if mode.shows_only() {
         return ctx.show.result(
-            "Dry run: nothing was changed.
-"
-            .to_owned(),
+            "Dry run: nothing was changed.\n".to_owned(),
             serde_json::json!({ "area": area, "snapshots": plan.snapshots, "changed": false }),
         );
     }
-    // the word and the area's name: the word says it is understood, the name that it is this one
-    let question = format!(
-        "Stop protecting {area} and delete its {} snapshots for good?",
-        plan.snapshots
-    );
-    let approved = ask::gate(
-        Act::StopProtecting,
-        agreed,
-        &question,
-        Some(area_name.as_str()),
-    )?;
+    let approved = ask_before_stopping(agreed, &area_name, &plan)?;
     let title = snapall_core::protecting::coverage::describe(&plan.location).title;
     let change = Change::begin(
         approved,
@@ -49,22 +32,63 @@ pub fn unprotect(ctx: &Context, area: &str, mode: Mode, agreed: Agreed) -> Outco
         &format!("Stopped protecting {title}"),
         None,
     )?;
-    let result = stop_protecting(ctx.backend, &plan).map_err(|e| e.to_string());
+    let deleted = stop_and_record(ctx, change, &plan)?;
+    ctx.show.result(
+        format!(
+            "{title} is no longer protected. {} {} deleted; its files are untouched.\n",
+            snapall_core::vocabulary::explain::counted(deleted, "snapshot"),
+            snapall_core::vocabulary::explain::by_number(deleted, "was", "were")
+        ),
+        serde_json::json!({ "area": area, "snapshots_deleted": deleted, "changed": true }),
+    )
+}
+
+/// What stopping would do, worked out and said before anything is asked: which snapshots go, which restore points and
+/// groups it touches.
+fn say_what_stopping_would_mean(
+    ctx: &Context,
+    area: &AreaName,
+) -> Result<snapall_core::protecting::unprotect::Plan, Box<dyn Error>> {
+    use snapall_core::SystemProbe;
+    let groups = snapall_system::LinuxSystem::new().groups()?;
+    let plan = snapall_core::protecting::unprotect::plan(ctx.backend, &groups, area)?;
+    output::note(&format!("{}\n", plan.words().join("\n")));
+    Ok(plan)
+}
+
+/// The word and the area's name: the word says it is understood, the name that it is this one.
+fn ask_before_stopping(
+    agreed: Agreed,
+    area: &AreaName,
+    plan: &snapall_core::protecting::unprotect::Plan,
+) -> Result<ask::Approved, Box<dyn Error>> {
+    let question = format!(
+        "Stop protecting {area} and delete its {} for good?",
+        snapall_core::vocabulary::explain::counted(plan.snapshots, "snapshot")
+    );
+    ask::gate(Act::StopProtecting, agreed, &question, Some(area.as_str()))
+}
+
+/// Do it; if it went through, write down that there is no way back (the snapshots are gone), and end the change either way.
+fn stop_and_record(
+    ctx: &Context,
+    change: Change,
+    plan: &snapall_core::protecting::unprotect::Plan,
+) -> Result<usize, String> {
+    let result = snapall_core::protecting::unprotect::stop_protecting(ctx.backend, plan)
+        .map_err(|e| e.to_string());
     if result.is_ok() {
         change.rollback(snapall_core::Rollback::Advice(
             snapall_core::vocabulary::explain::UNPROTECT_ADVICE.to_owned(),
         ));
     }
-    change.end(result.clone().map(|n| format!("{n} snapshots deleted")));
-    let deleted = result?;
-    ctx.show.result(
+    change.end(result.clone().map(|n| {
         format!(
-            "{title} is no longer protected. {deleted} snapshot{} deleted; its files are untouched.
-",
-            if deleted == 1 { " was" } else { "s were" }
-        ),
-        serde_json::json!({ "area": area, "snapshots_deleted": deleted, "changed": true }),
-    )
+            "{} deleted",
+            snapall_core::vocabulary::explain::counted(n, "snapshot")
+        )
+    }));
+    result
 }
 
 /// Protect the parts of the disk that snapshots do not cover yet: explain, ask, and do it. With

@@ -43,10 +43,10 @@ pub(crate) fn with_point(mut spec: ModalSpec, offer: &crate::model::PointOffer) 
     let k = offer.areas_to_change();
     spec.lines.push(Line::from(""));
     spec.lines.push(Line::from(format!(
-        "This snapshot is part of restore point {} ({}), taken in {} areas: {}.",
+        "This snapshot is part of restore point {} ({}), taken in {}: {}.",
         offer.point.point,
         offer.point.description,
-        areas.len(),
+        snapall_core::vocabulary::explain::counted(areas.len(), "area"),
         areas.join(", ")
     )));
     spec.lines.push(Line::styled(
