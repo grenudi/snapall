@@ -106,9 +106,9 @@ fn pick(state: &State, name: GroupName) -> Modal {
         .snapshots
         .area_names()
         .into_iter()
-        .map(|area| {
-            let ticked = already.contains(&area);
-            (area, ticked)
+        .map(|area| Pick {
+            included: already.contains(&area),
+            area,
         })
         .collect();
     Modal::Groups(GroupsScreen::Pick {
@@ -146,20 +146,19 @@ fn on_pick(
     state: &mut State,
     key: Key,
     name: GroupName,
-    mut picks: Vec<(AreaName, bool)>,
+    mut picks: Vec<Pick>,
     cursor: usize,
     error: Option<String>,
 ) -> Reaction {
     let last = picks.len().saturating_sub(1);
-    let screen =
-        |name: GroupName, picks: Vec<(AreaName, bool)>, cursor: usize, error: Option<String>| {
-            Modal::Groups(GroupsScreen::Pick {
-                name,
-                picks,
-                cursor,
-                error,
-            })
-        };
+    let screen = |name: GroupName, picks: Vec<Pick>, cursor: usize, error: Option<String>| {
+        Modal::Groups(GroupsScreen::Pick {
+            name,
+            picks,
+            cursor,
+            error,
+        })
+    };
     match key {
         Key::Esc | Key::CtrlC => Reaction::stays(list(0)),
         Key::Up | Key::Char('k') => {
@@ -170,12 +169,16 @@ fn on_pick(
         }
         Key::Char(' ') => {
             if let Some(pick) = picks.get_mut(cursor) {
-                pick.1 = !pick.1;
+                pick.included = !pick.included;
             }
             Reaction::stays(screen(name, picks, cursor, None))
         }
         Key::Enter => {
-            let chosen: Vec<AreaName> = picks.iter().filter(|p| p.1).map(|p| p.0.clone()).collect();
+            let chosen: Vec<AreaName> = picks
+                .iter()
+                .filter(|p| p.included)
+                .map(|p| p.area.clone())
+                .collect();
             if chosen.is_empty() {
                 let why = "Choose at least one area (Space includes or leaves out the one under the cursor)".to_owned();
                 return Reaction::stays(screen(name, picks, cursor, Some(why)));
