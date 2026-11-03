@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.2]
+
+
+### Documentation
+- The idea, on one page, in plain words ([#161](https://github.com/grenudi/snapall/pull/161)) ([44a216a])
+
+
+### Refactoring
+- The flag table says what its sections are for ([#163](https://github.com/grenudi/snapall/pull/163)) ([3b52ea4])
+
+
+
 ## [0.34.1]
 
 
