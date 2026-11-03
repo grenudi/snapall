@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "generated": "2026-11-03T20:00:28Z",
+  "generated": "2026-11-03T22:47:14Z",
   "inputs": [
     {
       "allowed": [],
@@ -75,7 +75,7 @@
         "create",
         "tui"
       ],
-      "summary": "Show a one-line tip when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences it.",
+      "summary": "Show short tips after a snapshot: what the restore point is called, and when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences them.",
       "type": "bool"
     },
     {

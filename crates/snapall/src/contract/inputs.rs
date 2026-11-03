@@ -57,7 +57,7 @@ contract! {
         env:         Some(Env::new("SNAPALL_HINTS")),
         arg:         Some(Arg { negatable: true, ..Arg::long("hints") }),
         group:       "output",
-        summary:     "Show a one-line tip when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences it.",
+        summary:     "Show short tips after a snapshot: what the restore point is called, and when snapshots cannot be booted from the boot menu. --no-hints (or SNAPALL_HINTS=off) silences them.",
         ..Input::EMPTY
     };
 
