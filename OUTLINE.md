@@ -88,7 +88,7 @@ What each part of snapall says it is for, read from the first line of each modul
 
 ## snapall-observe
 
-- `clock.rs`: A UTC timestamp, without a date library: a log line needs only this much.
+- `clock.rs`: The time of a line of the log: the clock is read here, and the calendar that turns it into text is the core's.
 - `lib.rs`: Reporting what snapall did: every call to the backend timed and written as a line of text or JSON.
 - `lines.rs`: One line per event, as text for people or JSON for machines.
 

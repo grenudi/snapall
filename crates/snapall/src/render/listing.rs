@@ -65,14 +65,6 @@ pub fn areas_json(areas: &[AreaName]) -> Value {
     json!({ "configs": sorted })
 }
 
-pub(super) fn kind_label(info: &SnapshotInfo) -> String {
-    match info.kind {
-        SnapshotKind::Single => "single".to_owned(),
-        SnapshotKind::Pre => "pre".to_owned(),
-        SnapshotKind::Post { pre } => format!("post<-{pre}"),
-    }
-}
-
 /// One block per area: a header, then an aligned table, newest snapshot last.
 pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
     let mut blocks = Vec::new();
@@ -86,7 +78,7 @@ pub fn snapshots(all: &[(AreaName, Vec<SnapshotInfo>)]) -> String {
                 .map(|s| {
                     [
                         s.id.to_string(),
-                        kind_label(s),
+                        s.kind.label(),
                         s.date.clone().unwrap_or_default(),
                         s.cleanup.clone().unwrap_or_default(),
                         s.description.clone(),

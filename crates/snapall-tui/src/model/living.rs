@@ -8,10 +8,7 @@ use super::*;
 
 pub(super) fn start(state: &mut State) -> Vec<Effect> {
     match &state.file {
-        Some(view) => vec![Effect::LoadFileVersions {
-            area: view.target.area.clone(),
-            path: view.target.path.clone(),
-        }],
+        Some(view) => vec![view.reload()],
         None => vec![Effect::LoadAreas],
     }
 }

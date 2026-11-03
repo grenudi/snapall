@@ -1216,3 +1216,67 @@ fn what_snapall_works_with_is_told_in_one_place() {
         "the disk requirement is said by `explain::WORKS_WITH`, and nowhere else"
     );
 }
+
+// ---- the same code is not written twice ------------------------------------------------------------------------
+
+/// A rule copied by hand can come out differently in each copy: the date algorithm was in two crates, and "an area would
+/// change" was a `matches!` written three times. This finds the blunt case: four meaningful lines in a row, of some length,
+/// that appear in two places. `dev/find-duplicates.py` looks for the subtler ones, at shorter lengths, for a person to judge.
+#[test]
+fn no_run_of_four_lines_is_written_in_two_places() {
+    let trivial = |line: &str| {
+        line.is_empty()
+            || line.starts_with("//")
+            || line.starts_with("#[")
+            || line.starts_with("use ")
+            || line.starts_with("pub use ")
+            || line.starts_with("mod ")
+            || line.starts_with("pub mod ")
+            || matches!(
+                line,
+                "}" | "{" | ")" | "};" | ");" | "}," | "))" | ")?;" | "else {"
+            )
+    };
+    let mut seen: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (path, code) in all_sources() {
+        let lines: Vec<(usize, String)> = code
+            .lines()
+            .enumerate()
+            .map(|(at, line)| {
+                (
+                    at + 1,
+                    line.split_whitespace().collect::<Vec<_>>().join(" "),
+                )
+            })
+            .filter(|(_, line)| !trivial(line))
+            .collect();
+        for window in lines.windows(4) {
+            let body = window
+                .iter()
+                .map(|(_, line)| line.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            if body.len() >= 170 {
+                seen.entry(body)
+                    .or_default()
+                    .push(format!("{path}:{}-{}", window[0].0, window[3].0));
+            }
+        }
+    }
+    let repeated: Vec<String> = seen
+        .iter()
+        .filter(|(_, places)| places.len() > 1)
+        .map(|(body, places)| {
+            format!(
+                "{}\n      {}",
+                places.join("\n      "),
+                body.lines().next().unwrap_or("")
+            )
+        })
+        .collect();
+    assert!(
+        repeated.is_empty(),
+        "code written in more than one place (name the rule once):\n  {}",
+        repeated.join("\n  ")
+    );
+}

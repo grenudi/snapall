@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! A UTC timestamp, without a date library: a log line needs only this much.
+//! The time of a line of the log: the clock is read here, and the calendar that turns it into text is the core's.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -13,38 +13,7 @@ pub fn rfc3339_utc(time: SystemTime) -> String {
         .duration_since(UNIX_EPOCH)
         .map(|since| since.as_secs())
         .unwrap_or(0);
-    let (days, rest) = (seconds / 86_400, seconds % 86_400);
-    let (year, month, day) = civil_from_days(i64::try_from(days).unwrap_or(0));
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
-        rest / 3600,
-        rest % 3600 / 60,
-        rest % 60
-    )
-}
-
-/// Days since 1970-01-01 to a proleptic Gregorian (year, month, day).
-/// After Howard Hinnant's `civil_from_days`.
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let day_of_era = z.rem_euclid(146_097);
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_part = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_part + 2) / 5 + 1;
-    let month = if month_part < 10 {
-        month_part + 3
-    } else {
-        month_part - 9
-    };
-    (
-        if month <= 2 { year + 1 } else { year },
-        u32::try_from(month).unwrap_or(1),
-        u32::try_from(day).unwrap_or(1),
-    )
+    snapall_core::vocabulary::calendar::rfc3339_utc(seconds)
 }
 
 #[cfg(test)]

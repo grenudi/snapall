@@ -76,7 +76,7 @@ pub(crate) fn confirming_restore(
 }
 
 pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.snapshots.selected_area().map(|c| c.name.clone()) else {
+    let Some(area) = state.snapshots.selected_area_name() else {
         return Vec::new();
     };
     if state.snapshots.focus != Pane::Snapshots {
@@ -152,10 +152,7 @@ pub(crate) fn on_restored(
     state.snapshots.marked.clear();
     // Reload either way: a safety snapshot may exist even when the restore itself failed.
     match &state.file {
-        Some(view) => vec![Effect::LoadFileVersions {
-            area: view.target.area.clone(),
-            path: view.target.path.clone(),
-        }],
+        Some(view) => vec![view.reload()],
         None => vec![Effect::LoadSnapshots(area.clone())],
     }
 }

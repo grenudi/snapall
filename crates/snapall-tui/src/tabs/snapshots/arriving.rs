@@ -33,7 +33,7 @@ fn areas_could_not_be_read(state: &mut State, error: String) -> Vec<Effect> {
 /// The areas, in order, with the cursor still on the one it was on if that one is still there. Nothing of theirs is
 /// loaded yet, and nothing is marked: the old marks belonged to the old lists.
 fn show_the_areas(state: &mut State, mut names: Vec<AreaName>) {
-    let previous = state.snapshots.selected_area().map(|c| c.name.clone());
+    let previous = state.snapshots.selected_area_name();
     names.sort();
     names.dedup();
     state.snapshots.area_cursor = previous
@@ -83,7 +83,7 @@ pub(crate) fn on_snapshots_loaded(
     area: &AreaName,
     result: Result<Vec<SnapshotInfo>, String>,
 ) -> Vec<Effect> {
-    let selected = state.snapshots.selected_area().map(|c| c.name.clone());
+    let selected = state.snapshots.selected_area_name();
     let Some(entry) = state.snapshots.entry_mut(area) else {
         return Vec::new();
     };

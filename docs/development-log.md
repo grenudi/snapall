@@ -2,6 +2,22 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-09: a scan for repeated code, instead of reading eight modules at a time
+
+**Why.** The fifth read's lesson was that the finds had become one smell, a distinction the code makes and does not name, and that finding it by sampling meant reading eight modules to fix four things. Repeated code is the part of that smell a program can find. `dev/find-duplicates.py` lists every run of N meaningful production lines (comments, braces, attributes and imports dropped; whitespace normalised) that appears in two places.
+
+**What it found.** At four lines and 170 characters, one run, and it was real: **the date algorithm (days since 1970 to year, month, day) written in two crates**, in the core's calendar and the observer's clock, which already depends on the core. The observer reads the clock and never fails a log line; the calendar that turns seconds into text is the core's now, with a test over the epoch, a century that is a leap year, one that is not, and a known date. (My first expected value for that test was an hour off, from arithmetic I did not check; the code was right, and Python's standard library settled it.) At three lines and 95 characters, 20 runs; reading each, ten were real:
+- the snapshot kind's words (`single`, `pre`, `post<-3`) in the window and the command line: `SnapshotKind::label`, with a test;
+- the chosen row's style (filled while active, underlined while a prompt is open) three times in two drawing files: `theme::chosen_row`;
+- `Worth`'s three words, in two offer texts of one file: `Worth::verdict`;
+- "reload the open file's versions" built three times: `FileView::reload`;
+- "the chosen area's name", four times: `SnapshotsTab::selected_area_name`.
+The rest are not worth naming: the same `SystemTime::now()` idiom in the command line and the window (the core has no clock by design, so it cannot live there, and the units differ), test doubles, the exhaustive effect lists that are exhaustive on purpose.
+
+**A guard.** The blunt case, four lines of 170 characters in two places, is an architecture test now (shown to bite by pasting the date algorithm into an unrelated file: it named both places). The loose scan stays a tool, because at three lines it is a list for a person to judge, and at 10 runs it is mostly judgment.
+
+**One more thing I noticed, not fixed.** The Snapshots list shows `pre` and `post<-3`, which are snapper's words for a pair of snapshots taken around a command. Your rule is that person-readable text does not carry the tool's vocabulary unexplained. It needs a decision about what a person should see there, so it is in the plan.
+
 ## 2026-11-08: a fifth read
 
 **What I read.** Eight sampled; three were modules I had already read and changed (`rollback.rs`, `arriving.rs`, `machine.rs`), so five were new: `putting_back.rs`, `restoring_a_point.rs`, `asked_for.rs`, `lock.rs`, `describing.rs`. Two needed nothing (`lock.rs`, whose doc says what it does and does not guard and gives a reason for every edge case, and `describing.rs`, two deliberately exhaustive matches with their reasons beside them).

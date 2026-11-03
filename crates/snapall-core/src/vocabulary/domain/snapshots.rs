@@ -14,6 +14,17 @@ pub enum SnapshotKind {
     Post { pre: SnapshotId },
 }
 
+impl SnapshotKind {
+    /// The kind as a short label in a list: `single`, `pre`, or `post<-3` for the one that follows snapshot 3.
+    pub fn label(self) -> String {
+        match self {
+            SnapshotKind::Single => "single".to_owned(),
+            SnapshotKind::Pre => "pre".to_owned(),
+            SnapshotKind::Post { pre } => format!("post<-{pre}"),
+        }
+    }
+}
+
 /// One existing snapshot, as the backend reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotInfo {
@@ -31,4 +42,17 @@ pub struct SnapshotInfo {
     pub point: Option<Point>,
     /// The bytes only this snapshot holds, when Btrfs quotas make that knowable; `None` otherwise.
     pub used_bytes: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_kind_is_labelled_the_way_a_list_shows_it() {
+        let three = SnapshotId::new(3).unwrap();
+        assert_eq!(SnapshotKind::Single.label(), "single");
+        assert_eq!(SnapshotKind::Pre.label(), "pre");
+        assert_eq!(SnapshotKind::Post { pre: three }.label(), "post<-3");
+    }
 }

@@ -18,6 +18,17 @@ pub enum Worth {
     NotUseful,
 }
 
+impl Worth {
+    /// What it is called when a person is offered the choice.
+    pub fn verdict(self) -> &'static str {
+        match self {
+            Worth::Recommended => "Recommended",
+            Worth::Optional => "Up to you",
+            Worth::NotUseful => "Not recommended",
+        }
+    }
+}
+
 /// What to tell a person about an area, in plain words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Info {
