@@ -32,8 +32,15 @@ pub fn render(records: &[Record], version: &str) -> String {
          USAGE\n    snapall [OPTIONS] [DESCRIPTION]    shorthand for `snapall create`\n    \
          snapall <COMMAND> [OPTIONS]\n\nCOMMANDS\n"
     );
-    for (token, summary) in cli::commands() {
-        out.push_str(&format!("    {token:<10} {summary}\n"));
+    // the column is as wide as the longest command's name, so a long one does not run into its description
+    let commands: Vec<_> = cli::commands().collect();
+    let width = commands
+        .iter()
+        .map(|(token, _)| token.len())
+        .max()
+        .unwrap_or(0);
+    for (token, summary) in commands {
+        out.push_str(&format!("    {token:<width$} {summary}\n"));
     }
 
     // Groups in the order the contract first mentions them.

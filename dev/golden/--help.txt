@@ -6,29 +6,29 @@ USAGE
     snapall <COMMAND> [OPTIONS]
 
 COMMANDS
-    create     Take one snapshot of every protected area (the default command)
-    list       List the protected areas snapall can see
-    snapshots  List the snapshots of one protected area, or of all of them
-    delete     Delete one snapshot of a protected area
-    changes    Show what restoring a snapshot would change
-    restore    Put a protected area, or one path of it, back to how a snapshot had it
+    create      Take one snapshot of every protected area (the default command)
+    list        List the protected areas snapall can see
+    snapshots   List the snapshots of one protected area, or of all of them
+    delete      Delete one snapshot of a protected area
+    changes     Show what restoring a snapshot would change
+    restore     Put a protected area, or one path of it, back to how a snapshot had it
     restore-all Put every protected area back to one restore point, in one action
-    points     List the restore points: the snapshots one action took together
-    history    Show how one file stood in each snapshot
-    health     Show whether protection is working, and how much room it takes
-    activity   Show what snapall has done, including earlier sessions, newest first
-    groups     Name sets of areas, such as theming, to take snapshots of together
-    limits     Show or change how many snapshots an area keeps
-    unprotect  Stop protecting an area: deletes all its snapshots for good
-    undo       Roll a change back, to the state it recorded, after showing what that is
-    cancel     Ask a running change to stop after the area it is on
-    quotas     Show how the disk counts the room snapshots take, and switch it on or off
-    setup      Protect what has no snapshots yet, explaining each step
-    doctor     Check that snapper works, and install it if it is missing
+    points      List the restore points: the snapshots one action took together
+    history     Show how one file stood in each snapshot
+    health      Show whether protection is working, and how much room it takes
+    activity    Show what snapall has done, including earlier sessions, newest first
+    groups      Name sets of areas, such as theming, to take snapshots of together
+    limits      Show or change how many snapshots an area keeps
+    unprotect   Stop protecting an area: deletes all its snapshots for good
+    undo        Roll a change back, to the state it recorded, after showing what that is
+    cancel      Ask a running change to stop after the area it is on
+    quotas      Show how the disk counts the room snapshots take, and switch it on or off
+    setup       Protect what has no snapshots yet, explaining each step
+    doctor      Check that snapper works, and install it if it is missing
     completions Print shell completions (bash, zsh, fish, nushell)
-    man        Print the manual page
-    tui        Open the interactive terminal UI
-    contract   Print this program's invocation contract as argenv JSON
+    man         Print the manual page
+    tui         Open the interactive terminal UI
+    contract    Print this program's invocation contract as argenv JSON
 
 GENERAL
     -h, --help                 Show this help and exit.
