@@ -6,6 +6,16 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 
 The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
 
+## 2026-11-29: releases are batched
+
+**The question.** Is a release per merge worth it, or does it only slow the work down? I thought it through before answering. A release per merge cost about eight minutes of waiting, four workflows and a few dozen runner-minutes, and gave users a new patch version every few minutes for a tool they would update monthly. What it proved beyond what CI already proves on every pull request (the static packages, built and run on eleven distributions) was only the publishing step: signing and publishing the repositories, and the install snippets run from the published ones. That only changes when packaging or the release workflows change. It also multiplied the chances of a flaky release job (one failed on a GitHub server error this week).
+
+**The decision.** Batch, and make the policy a small pure function so it is tested. `release-plz` already keeps one release pull request and updates it with every merge, so nothing new was needed except that `dev/ship.py` stops merging it each time. It releases when ten changes that make a changelog entry are waiting (chores and documents do not count), or the oldest has waited seven days, or the change touches `packaging/` or the release workflows, or `--release` is given. Otherwise it says "release deferred" and finishes. When it does release, it first waits for the Release workflow of the merge to finish, because that is what puts the newest change into the release pull request, so a batched release cannot leave the latest change out.
+
+**Evidence.** Ten decisions are tested (a few waiting, ten waiting, one short of ten, a week old, just under a week, packaging, a release workflow, an ordinary workflow, nothing waiting however old, asked for), and I confirmed the test fails when the threshold is off by one. It runs in the gate and in CI.
+
+**What it costs.** A bigger release when it comes, and a defect found by a release is found later. Both are small here: every change passes the whole of CI first, and the changelog says what is in the release. What it saves is most of the waiting: about four calls and eight minutes per change.
+
 ## 2026-11-28: no pattern jargon in any first sentence
 
 Comparing the structure now against where this refactoring began (0.26.0) showed one measure that had not moved: two modules whose first sentence used architecture words ("an in-memory adapter", "the snapper adapter, driven through its public face"), and a third that said "the shell completions", which means the terminal and might make a newcomer pause. Each says the same thing in plain words now (a stand-in for the snapshot tool that keeps everything in memory; talking to snapper, tested through what it offers; tab completion for bash, zsh and fish). The measure is zero and the cold read still finds all 52 answers in the top three.

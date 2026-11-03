@@ -43,6 +43,7 @@ step format        cargo fmt --all -- --check
 step clippy        cargo clippy --workspace --all-targets --all-features -- -D warnings
 step docs          env RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --locked
 step links         python3 dev/check-links.py
+step ship-policy   python3 dev/test_ship.py
 step licences      reuse lint
 step snippets      ./dev/check-snippets.sh
 step tests         cargo test --workspace --all-features --locked
