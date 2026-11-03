@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.10]
+
+
+### Refactoring
+- Using the program as a person would ([#179](https://github.com/grenudi/snapall/pull/179)) ([f9cae1b])
+
+
+
 ## [0.34.9]
 
 
