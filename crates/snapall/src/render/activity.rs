@@ -28,11 +28,7 @@ pub fn activity(entries: &[snapall_core::JournalEntry]) -> String {
             .as_deref()
             .or(entry.started_at.as_deref())
             .unwrap_or("-");
-        let origin = match entry.source {
-            Some(Source::Window) => "window",
-            Some(Source::Command) => "command",
-            None => "-",
-        };
+        let origin = entry.source.map_or("-", Source::word);
         let step = match (&entry.status, &entry.progress) {
             (JournalStatus::Running, Some(p)) => {
                 format!(" (step {} of {}: {})", p.done + 1, p.of, p.area)
