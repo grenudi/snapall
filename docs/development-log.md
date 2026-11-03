@@ -6,6 +6,10 @@ What was done to this code, and why, newest first. The plan is `docs/backlog.md`
 
 The window worded a failure seven times, six in the shape "Could not {what}: {why}" and one as "The groups could not be saved: {why}". `Notice::could_not(what, why)` says it the one way, and the odd one reads "Could not save the groups: {why}" like the others. A person meets one voice when something goes wrong, and a new failure cannot be worded differently by accident.
 
+## 2026-11-28: no pattern jargon in any first sentence
+
+Comparing the structure now against where this refactoring began (0.26.0) showed one measure that had not moved: two modules whose first sentence used architecture words ("an in-memory adapter", "the snapper adapter, driven through its public face"), and a third that said "the shell completions", which means the terminal and might make a newcomer pause. Each says the same thing in plain words now (a stand-in for the snapshot tool that keeps everything in memory; talking to snapper, tested through what it offers; tab completion for bash, zsh and fish). The measure is zero and the cold read still finds all 52 answers in the top three.
+
 ## 2026-11-27: the setup conversation, and the idea page
 
 The setup conversation could not be run here (this machine has no unprotected disk for it to find), so I read it the other honest way: every sentence it says, in order, as one conversation. It is coherent and plain, uses the same voice for a failure as the window now does, and ends every branch with what to run next, so nothing changed. The idea page was missing the practice that has found the most this week, using the program as a newcomer rather than reading its code, so it says so.

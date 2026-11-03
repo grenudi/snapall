@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The snapper adapter, driven through its public face with a scripted runner.
+//! Talking to snapper, tested through what it offers, with a scripted stand-in for the real tool.
 
 #![cfg(test)]
 

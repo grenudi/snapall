@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The shell completions and the man page. Neither is written by hand: both come from the contract,
+//! Tab completion for bash, zsh and fish, and the man page. Neither is written by hand: both come from the contract,
 //! so they cannot disagree with what the program accepts.
 
 use argenv_resolve::generate::{self, Command, Program, Shell};
