@@ -181,3 +181,16 @@ fn a_way_back_is_worded_once_for_whoever_shows_it() {
         ["It cannot be undone. Deleted snapshots are gone."]
     );
 }
+
+#[test]
+fn an_outcome_is_stored_as_a_word_and_read_back_and_an_unknown_word_is_refused() {
+    for outcome in [
+        Outcome::Done("took 2 snapshots".to_owned()),
+        Outcome::Failed("no room".to_owned()),
+        Outcome::Cancelled("stopped after 1 of 3".to_owned()),
+    ] {
+        let again = Outcome::from_word(outcome.word(), outcome.detail().to_owned());
+        assert_eq!(again, Some(outcome));
+    }
+    assert_eq!(Outcome::from_word("exploded", String::new()), None);
+}

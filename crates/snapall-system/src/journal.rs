@@ -68,14 +68,9 @@ pub fn to_line(event: &Event) -> String {
             outcome,
             took_ms,
         } => {
-            let (result, detail) = match outcome {
-                Outcome::Done(text) => ("done", text),
-                Outcome::Failed(text) => ("failed", text),
-                Outcome::Cancelled(text) => ("cancelled", text),
-            };
             serde_json::json!({
                 "event": "finished", "id": id, "at": at, "took_ms": took_ms,
-                "result": result, "detail": shortened(detail),
+                "result": outcome.word(), "detail": shortened(outcome.detail()),
             })
         }
     };
@@ -128,15 +123,16 @@ pub fn parse_line(line: &str) -> Option<Event> {
         "finished" => {
             let detail = text("detail").unwrap_or_default();
             // lines written before a change could be cancelled said only whether it was all right
-            let result = match (
-                text("result").as_deref(),
+            let word = match (
+                text("result"),
                 value.get("ok").and_then(serde_json::Value::as_bool),
             ) {
-                (Some("done"), _) | (None, Some(true)) => Outcome::Done(detail),
-                (Some("failed"), _) | (None, Some(false)) => Outcome::Failed(detail),
-                (Some("cancelled"), _) => Outcome::Cancelled(detail),
-                _ => return None,
+                (Some(word), _) => word,
+                (None, Some(true)) => "done".to_owned(),
+                (None, Some(false)) => "failed".to_owned(),
+                (None, None) => return None,
             };
+            let result = Outcome::from_word(&word, detail)?;
             Some(Event::Finished {
                 id,
                 at,

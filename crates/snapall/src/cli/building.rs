@@ -10,6 +10,39 @@ use argenv_resolve::generate::Shell;
 use argenv_resolve::{InputResolveExt, Resolution};
 use snapall_core::{AreaName, Description, Point, SnapshotId};
 
+/// A required argument that was not given, worded from the contract's own record, so that the message and the usage line
+/// cannot say different things.
+fn required<T, C>(
+    input: &argenv_resolve::Input<T, C>,
+    resolution: &Resolution,
+) -> Result<T, UsageError>
+where
+    T: 'static + serde::Serialize,
+    C: 'static + serde::Serialize,
+    argenv_resolve::Input<T, C>: InputResolveExt<T>,
+{
+    input.get_from(resolution).ok_or_else(|| {
+        usage_error(format!(
+            "missing required argument {}",
+            input.to_record().usage()
+        ))
+    })
+}
+
+/// [`required`], and what the argument is, for one whose name alone does not say.
+fn required_meaning<T, C>(
+    input: &argenv_resolve::Input<T, C>,
+    resolution: &Resolution,
+    meaning: &str,
+) -> Result<T, UsageError>
+where
+    T: 'static + serde::Serialize,
+    C: 'static + serde::Serialize,
+    argenv_resolve::Input<T, C>: InputResolveExt<T>,
+{
+    required(input, resolution).map_err(|error| usage_error(format!("{error}: {meaning}")))
+}
+
 /// The area and snapshot a command acts on (`delete`, `changes`, `restore`).
 pub(super) fn target(resolution: &Resolution) -> Result<(AreaName, SnapshotId), UsageError> {
     let missing = |record: argenv_resolve::Record| {
@@ -37,16 +70,11 @@ pub(super) fn utf8(path: &std::path::Path) -> Result<String, UsageError> {
         .ok_or_else(|| usage_error("a path must be valid UTF-8"))
 }
 
-/// The optional PATH argument, as text. Paths that are not valid UTF-8 are refused up front,
-/// because everything downstream (snapper's output, the audit log, JSON) is text.
+/// The optional PATH argument, as text (see [`utf8`]).
 pub(super) fn path_argument(resolution: &Resolution) -> Result<Option<String>, UsageError> {
     Contract::PATH
         .get_from(resolution)
-        .map(|path| {
-            path.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| usage_error("PATH must be valid UTF-8"))
-        })
+        .map(|path| utf8(&path))
         .transpose()
 }
 
@@ -112,9 +140,7 @@ pub(super) fn build_request(
             Request::Doctor { install, yes }
         }
         Command::Completions => {
-            let raw = Contract::SHELL
-                .get_from(resolution)
-                .ok_or_else(|| usage_error("missing required argument <SHELL>"))?;
+            let raw = required(&Contract::SHELL, resolution)?;
             Request::Completions {
                 shell: Shell::parse(&raw)
                     .ok_or_else(|| usage_error(format!("unknown shell `{raw}`")))?,
@@ -124,34 +150,32 @@ pub(super) fn build_request(
             source_date_epoch: Contract::SOURCE_DATE_EPOCH.get_from(resolution),
         },
         Command::History => {
-            let path = Contract::HISTORY_FILE
-                .get_from(resolution)
-                .ok_or_else(|| usage_error("missing required argument <FILE>"))?;
+            let path = required(&Contract::HISTORY_FILE, resolution)?;
             Request::History { path: utf8(&path)? }
         }
         Command::Points => Request::Points,
         Command::Health => Request::Health,
         Command::Activity => Request::Activity,
         Command::Undo => Request::Undo {
-            change: Contract::UNDO_CHANGE.get_from(resolution).ok_or_else(|| {
-                usage_error("CHANGE is required: the name of the change to roll back".to_owned())
-            })?,
+            change: required_meaning(
+                &Contract::UNDO_CHANGE,
+                resolution,
+                "the name of the change to roll back",
+            )?,
             yes: flag(&Contract::YES, resolution),
             destroy: flag(&Contract::DESTROY, resolution),
         },
         Command::Unprotect => Request::Unprotect {
-            area: Contract::UNPROTECT_AREA
-                .get_from(resolution)
-                .ok_or_else(|| {
-                    usage_error("AREA is required: which area to stop protecting".to_owned())
-                })?,
+            area: required_meaning(
+                &Contract::UNPROTECT_AREA,
+                resolution,
+                "which area to stop protecting",
+            )?,
             dry_run: flag(&Contract::DRY_RUN, resolution),
             destroy: flag(&Contract::DESTROY, resolution),
         },
         Command::Limits => Request::Limits {
-            area: Contract::LIMITS_AREA
-                .get_from(resolution)
-                .ok_or_else(|| usage_error("AREA is required: which area".to_owned()))?,
+            area: required_meaning(&Contract::LIMITS_AREA, resolution, "which area")?,
             keep: Contract::LIMITS_KEEP.get_from(resolution),
             min_age: Contract::LIMITS_MIN_AGE.get_from(resolution),
             cleanup: Contract::LIMITS_CLEANUP.get_from(resolution),
@@ -165,9 +189,11 @@ pub(super) fn build_request(
             yes: flag(&Contract::YES, resolution),
         },
         Command::Cancel => Request::Cancel {
-            job: Contract::CANCEL_JOB.get_from(resolution).ok_or_else(|| {
-                usage_error("CHANGE is required: the name of the change to stop".to_owned())
-            })?,
+            job: required_meaning(
+                &Contract::CANCEL_JOB,
+                resolution,
+                "the name of the change to stop",
+            )?,
             yes: flag(&Contract::YES, resolution),
         },
         Command::Quotas => Request::Quotas {
@@ -176,9 +202,7 @@ pub(super) fn build_request(
         },
         Command::RestoreAll => Request::RestoreAll {
             point: {
-                let raw = Contract::RESTORE_POINT
-                    .get_from(resolution)
-                    .ok_or_else(|| usage_error("missing required argument <POINT>"))?;
+                let raw = required(&Contract::RESTORE_POINT, resolution)?;
                 Point::parse(&raw).map_err(|e| usage_error(format!("POINT: {e}")))?
             },
             yes: flag(&Contract::YES, resolution),
