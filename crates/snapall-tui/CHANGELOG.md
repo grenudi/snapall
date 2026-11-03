@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.32.0]
+
+
+### Refactoring
+- A fifth read ([#147](https://github.com/grenudi/snapall/pull/147)) ([5c53de0])
+
+
+
 ## [0.31.1]
 
 
