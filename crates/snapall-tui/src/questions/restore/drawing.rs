@@ -142,8 +142,9 @@ pub(crate) fn restore_summary(
     let (changed, added, removed) = restore_counts(changes);
     let mut lines = vec![
         Line::from(format!(
-            "Put {} back to how #{id} had it: {changed} reverted, {added} removed, {removed} brought back.",
-            path.unwrap_or(area.as_str())
+            "Put {} back to how #{id} had it: {}.",
+            path.unwrap_or(area.as_str()),
+            snapall_core::vocabulary::explain::what_changes(changed, added, removed)
         )),
         Line::from(""),
     ];

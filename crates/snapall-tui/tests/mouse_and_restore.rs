@@ -385,10 +385,7 @@ fn restore_asks_first_showing_what_would_change_and_changes_nothing_until_confir
     assert_eq!(area, &name("home"));
     assert_eq!(preview.changes.len(), 2, "a.txt reverted, b.txt removed");
     let screen = rows(&session.state, 100, 24).join("\n");
-    assert!(
-        screen.contains("1 reverted, 1 removed, 0 brought back"),
-        "{screen}"
-    );
+    assert!(screen.contains("1 reverted, 1 removed"), "{screen}");
     assert!(
         screen.contains("/mnt/home/a.txt") && screen.contains("snapshotted first"),
         "{screen}"

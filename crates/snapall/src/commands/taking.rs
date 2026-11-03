@@ -52,7 +52,7 @@ pub fn create(
         change.rollback(way_back);
     }
     record_how_taking_went(change, &plan, &report);
-    say_what_was_taken(ctx, &plan, &report)
+    say_what_was_taken(ctx, &plan, &report, &point)
 }
 
 /// A group is a name for a set of areas: it is what `--only` would have been.
@@ -103,7 +103,12 @@ fn what_failed(report: &Report) -> String {
     failures.join("; ")
 }
 
-fn say_what_was_taken(ctx: &Context, plan: &Plan, report: &Report) -> Outcome {
+fn say_what_was_taken(
+    ctx: &Context,
+    plan: &Plan,
+    report: &Report,
+    point: &snapall_core::Point,
+) -> Outcome {
     if report.stopped {
         let (taken, total) = (report.outcomes.len(), plan.targets().len());
         output::note(&format!(
@@ -115,15 +120,31 @@ fn say_what_was_taken(ctx: &Context, plan: &Plan, report: &Report) -> Outcome {
     if report.stopped || !report.is_success() {
         return Ok(ExitCode::FAILURE);
     }
+    say_what_to_call_it(ctx, point);
     suggest_the_boot_menu(ctx);
     Ok(ExitCode::SUCCESS)
+}
+
+/// Whether what is said now is read by a person at a terminal: a hint goes to stderr only then, so what a script reads
+/// from stdout stays what it was.
+fn to_a_person(ctx: &Context) -> bool {
+    std::io::stderr().is_terminal() && !ctx.show.is_json()
+}
+
+/// After a snapshot: what the restore point it made is called, and how to go back to it. The next thing a person wants is
+/// the name, and they would otherwise have to ask for the list to find it.
+fn say_what_to_call_it(ctx: &Context, point: &snapall_core::Point) {
+    if to_a_person(ctx) {
+        output::note(&format!(
+            "That is restore point {point}: `sudo snapall restore-all {point}` puts every area back to it."
+        ));
+    }
 }
 
 /// After a snapshot: a nudge to a person, on stderr (stdout stays parseable), and only when a
 /// boot-menu tool would help.
 pub(super) fn suggest_the_boot_menu(ctx: &Context) {
-    let to_a_person = std::io::stderr().is_terminal() && !ctx.show.is_json();
-    if !ctx.hints || !to_a_person {
+    if !ctx.hints || !to_a_person(ctx) {
         return;
     }
     if let Some(tip) = boot::hint(&boot::assess(&boot_menu::on_this_machine())) {

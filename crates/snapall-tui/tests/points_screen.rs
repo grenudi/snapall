@@ -111,7 +111,7 @@ fn r_lists_the_points_newest_first_and_says_what_the_chosen_one_would_change_in_
         "second moment",
         "20261025T100000Z",
         "Putting every area back would:",
-        "docs change 1 path(s): 1 reverted, 0 removed, 0 brought back",
+        "docs change 1 path: 1 reverted",
         "root left alone: the running system is not put back",
         "[ Enter: Restore all 2 ]",
     ] {
@@ -168,7 +168,7 @@ fn choosing_an_older_point_looks_up_and_restores_that_one_not_the_newest() {
         "{text}"
     );
     assert!(
-        text.contains("docs change 1 path(s)"),
+        text.contains("docs change 1 path"),
         "the preview is for the point chosen:\n{text}"
     );
     session.press(Key::Enter);

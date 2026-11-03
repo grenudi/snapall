@@ -14,6 +14,7 @@ mod areas;
 mod basics;
 mod cleanup;
 mod numbers;
+mod paths;
 #[cfg(test)]
 mod tests;
 
@@ -29,3 +30,4 @@ pub use cleanup::{
     Cleanup, Limit,
 };
 pub use numbers::{by_number, counted};
+pub use paths::what_changes;
