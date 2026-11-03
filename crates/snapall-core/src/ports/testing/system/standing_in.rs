@@ -18,7 +18,7 @@ pub struct FakeSystem {
     pub(super) services: std::sync::Mutex<BTreeMap<String, ServiceState>>,
     pub(super) details: BTreeMap<String, UnitDetails>,
     pub(super) time: Option<String>,
-    pub(super) files: Vec<String>,
+    pub(super) boot_menu_plugin: bool,
     pub(super) refuse_jobs: bool,
     pub(super) actions: std::sync::Mutex<Vec<(String, JobAction)>>,
     pub(super) quotas: std::sync::Mutex<Option<QuotaMode>>,
@@ -155,8 +155,9 @@ impl FakeSystem {
             .collect()
     }
 
-    pub fn with_file(mut self, path: &str) -> Self {
-        self.files.push(path.to_owned());
+    /// The plugin that keeps the boot menu in step with the snapshots is installed.
+    pub fn with_boot_menu_plugin(mut self) -> Self {
+        self.boot_menu_plugin = true;
         self
     }
 }

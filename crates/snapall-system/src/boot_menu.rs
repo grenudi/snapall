@@ -13,6 +13,10 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+/// Where the plugin that keeps the Limine menu in step with the snapshots is installed, relative to the root: it runs the
+/// sync on every create, delete and modify of a root snapshot.
+pub(crate) const LIMINE_PLUGIN: &str = "usr/lib/snapper/plugins/10-limine-snapper-sync";
+
 use snapall_core::going_back::boot::{root_fs_from_mounts, BootFacts, Bootloader, Tool, ToolFacts};
 
 /// Where Limine's configuration (or its helper tools' configuration) may be found.
@@ -56,7 +60,7 @@ pub fn under(root: &Path, service_state: &dyn Fn(&str) -> Option<String>) -> Boo
     let limine_sync = exists("usr/bin/limine-snapper-sync");
     // The package installs a snapper plugin that runs the sync on every create, delete and modify
     // of a root snapshot, so the menu is kept in step even with the daemon stopped.
-    let limine_plugin = exists("usr/lib/snapper/plugins/10-limine-snapper-sync");
+    let limine_plugin = exists(LIMINE_PLUGIN);
     let grub_btrfs = exists("usr/bin/grub-btrfsd") || exists("etc/grub.d/41_snapshots-btrfs");
     // grub-btrfs works from the generated menu even without its daemon: the script leaves a
     // marker in grub.cfg when snapshot entries were generated.

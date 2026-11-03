@@ -33,8 +33,8 @@ impl SystemProbe for FakeSystem {
         self.time.clone()
     }
 
-    fn file_exists(&self, path: &str) -> bool {
-        self.files.iter().any(|f| f == path)
+    fn boot_menu_plugin_installed(&self) -> bool {
+        self.boot_menu_plugin
     }
 
     fn unit_details(&self, unit: &str) -> Option<UnitDetails> {
