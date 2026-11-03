@@ -391,7 +391,7 @@ fn gathering_reads_each_area_through_the_ports_and_skips_nothing_that_can_be_rea
         .with_disk(1000, 300)
         .at("2026-01-02 00:00:00")
         .with_service("snapper-cleanup.timer", "enabled", "active")
-        .with_file("/usr/lib/snapper/plugins/10-limine-snapper-sync");
+        .with_boot_menu_plugin();
     let facts = gather(&backend, &system).unwrap();
     assert_eq!(facts.areas.len(), 2);
     let home = facts

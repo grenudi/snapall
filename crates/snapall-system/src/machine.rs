@@ -119,8 +119,10 @@ impl SystemProbe for LinuxSystem {
         Some(text.trim().to_owned())
     }
 
-    fn file_exists(&self, path: &str) -> bool {
-        Path::new(path).exists()
+    fn boot_menu_plugin_installed(&self) -> bool {
+        Path::new("/")
+            .join(crate::boot_menu::LIMINE_PLUGIN)
+            .exists()
     }
 
     fn unit_details(&self, unit: &str) -> Option<UnitDetails> {
@@ -250,12 +252,6 @@ mod tests {
             assert!(details.description.is_some(), "{details:?}");
             assert!(!details.schedule().is_empty(), "{details:?}");
         }
-    }
-
-    #[test]
-    fn files_are_found_or_not() {
-        assert!(LinuxSystem::new().file_exists("/proc"));
-        assert!(!LinuxSystem::new().file_exists("/no/such/file"));
     }
 
     #[test]

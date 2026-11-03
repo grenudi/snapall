@@ -119,7 +119,7 @@ pub fn gather(
                 details: system.unit_details(job.unit),
             })
             .collect(),
-        boot_menu_plugin: system.file_exists("/usr/lib/snapper/plugins/10-limine-snapper-sync"),
+        boot_menu_plugin: system.boot_menu_plugin_installed(),
     })
 }
 

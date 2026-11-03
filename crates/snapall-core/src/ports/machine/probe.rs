@@ -17,7 +17,9 @@ pub trait SystemProbe {
     /// in, so the two can be compared.
     fn local_time(&self) -> Option<String>;
 
-    fn file_exists(&self, path: &str) -> bool;
+    /// Whether the plugin that keeps the boot menu in step with the snapshots is installed. Where it is, and what it
+    /// is called, is the machine's to know.
+    fn boot_menu_plugin_installed(&self) -> bool;
 
     /// What a job's unit file says about it, if it can be found.
     fn unit_details(&self, unit: &str) -> Option<UnitDetails>;
@@ -104,7 +106,7 @@ impl SystemProbe for NoSystem {
         None
     }
 
-    fn file_exists(&self, _path: &str) -> bool {
+    fn boot_menu_plugin_installed(&self) -> bool {
         false
     }
 

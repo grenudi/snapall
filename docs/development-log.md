@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-11: the plugin path belongs to the adapter
+
+**Why.** On the plan since the second read: the core's health facts asked the machine port `file_exists("/usr/lib/snapper/plugins/10-limine-snapper-sync")`, so the core knew where a snapper plugin lives on Linux, while the adapter's boot-menu detection already knew the same path from the other side.
+
+**What.** The generic `file_exists(path)` had one caller in the core, asking one question. The port asks that question now, `boot_menu_plugin_installed()`, and the path is a constant in the adapter (`LIMINE_PLUGIN`) used by both the detection and the answer. The test double holds a plain flag (`with_boot_menu_plugin()`) instead of a list of fake files nobody else used. The adapter's own test of `file_exists` is gone: it tested the standard library's `Path::exists`.
+
+**Considered and not done: a guard that the core names no system path.** I counted the string literals that begin with a system directory outside the adapters: one in the test double, and `worth.rs`, which judges what a mount point is worth by the standard Linux layout (`/home` matters, `/tmp` does not). That is domain knowledge about the data the machine reports, not access to the machine, so a guard on the literals would be wrong there. The rule that matters, that the core asks the machine questions in its own words and does not know where things live, is held by the shape of the port.
+
 ## 2026-11-10: `pre` and `post<-3`, in plain words
 
 **Decision.** The Snapshots list showed snapper's words for a pair of snapshots taken around one command, unexplained, against the rule that person-readable text does not carry the tool's vocabulary. A person now reads `single`, **`before`** and **`after #3`** (the one taken after snapshot 3), and the pairing is explained once, in the help, in the existing entry for the list: "Newest first. `before` and `after #3` are a pair taken around one command." The machine-readable output keeps `"kind": "pre"`, because a script reads it; the words are in `SnapshotKind::label`, one place, which both the window and the command line use since the scan of repeated code.
