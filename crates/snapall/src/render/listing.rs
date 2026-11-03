@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use snapall_core::{AreaName, FileHistory, SnapshotInfo, SnapshotKind};
 
 pub fn history(history: &FileHistory) -> String {
-    let mut out = format!("{}  (config {})\n", history.path, history.area);
+    let mut out = format!("{}  (in area {})\n", history.path, history.area);
     if history.versions.is_empty() {
         out.push_str("no snapshots of this area yet\n");
         return out;
