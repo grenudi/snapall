@@ -134,7 +134,7 @@ fn to_a_person(ctx: &Context) -> bool {
 /// After a snapshot: what the restore point it made is called, and how to go back to it. The next thing a person wants is
 /// the name, and they would otherwise have to ask for the list to find it.
 fn say_what_to_call_it(ctx: &Context, point: &snapall_core::Point) {
-    if to_a_person(ctx) {
+    if ctx.hints && to_a_person(ctx) {
         output::note(&format!(
             "That is restore point {point}: `sudo snapall restore-all {point}` puts every area back to it."
         ));
