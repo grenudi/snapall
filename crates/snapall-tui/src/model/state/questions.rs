@@ -9,6 +9,13 @@ use crate::model::*;
 use snapall_core::Counting;
 
 /// Where a restore prompt is: looking at what would change, ready, or unable to.
+/// One area offered to the group being edited, and whether the group has it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pick {
+    pub area: AreaName,
+    pub included: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RestoreStage {
     Loading,
@@ -82,7 +89,7 @@ pub enum GroupsScreen {
     /// Choosing which areas are in the group.
     Pick {
         name: snapall_core::GroupName,
-        picks: Vec<(AreaName, bool)>,
+        picks: Vec<Pick>,
         cursor: usize,
         error: Option<String>,
     },

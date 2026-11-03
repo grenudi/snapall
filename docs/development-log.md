@@ -2,6 +2,14 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-12: the group editor's pairs
+
+**What.** The group editor held its areas as `Vec<(AreaName, bool)>`, read as `p.1` and `p.0.clone()`, toggled as `pick.1 = !pick.1`, and destructured in the drawing as `(area, ticked)`: a pair whose second half is "the group has this area", named three different ways or not at all. It is `Pick { area, included }`, and the five places say what they mean.
+
+**Searched by shape, as the lesson says.** A sweep for any other bare bool carried in a tuple, a vector, an option or a return in production code found nothing else; the one hit is inside a test module. The remaining bare booleans are option values that are honestly on or off (`TimelineCreate(bool)`, `CleanupOfSnapshots(bool)`), where a plain bool is the right type.
+
+**Slips, again about exports.** I first added the new type to the state front and not to the drawing file's explicit import list, and the compiler said so twice; the lesson from the last change (edit an export list by its contents, not by matching its text) held, and this one was a missing import, not a mis-match.
+
 ## 2026-11-11: the plugin path belongs to the adapter
 
 **Why.** On the plan since the second read: the core's health facts asked the machine port `file_exists("/usr/lib/snapper/plugins/10-limine-snapper-sync")`, so the core knew where a snapper plugin lives on Linux, while the adapter's boot-menu detection already knew the same path from the other side.

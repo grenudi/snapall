@@ -6,7 +6,7 @@
 //! on it said on the screen.
 
 use crate::model::State;
-use crate::model::{rows, GroupsScreen};
+use crate::model::{rows, GroupsScreen, Pick};
 use crate::theme::{ACCENT, DIM};
 use crate::view::*;
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -124,17 +124,12 @@ fn name_lines(input: &str, error: Option<&str>) -> Vec<Line<'static>> {
     lines
 }
 
-fn pick_spec(
-    name: &str,
-    picks: &[(snapall_core::AreaName, bool)],
-    cursor: usize,
-    error: Option<&str>,
-) -> ModalSpec {
+fn pick_spec(name: &str, picks: &[Pick], cursor: usize, error: Option<&str>) -> ModalSpec {
     let mut lines = vec![
         Line::from(format!("Which areas are in {name}?")),
         Line::from(""),
     ];
-    for (index, (area, ticked)) in picks.iter().enumerate() {
+    for (index, Pick { area, included }) in picks.iter().enumerate() {
         let style = if index == cursor {
             Style::new().add_modifier(Modifier::REVERSED)
         } else {
@@ -143,7 +138,7 @@ fn pick_spec(
         lines.push(Line::from(vec![
             Span::styled(if index == cursor { " > " } else { "   " }, style),
             Span::styled(
-                if *ticked { "[x] " } else { "[ ] " },
+                if *included { "[x] " } else { "[ ] " },
                 style.fg(Color::Green),
             ),
             Span::styled(area.to_string(), style),

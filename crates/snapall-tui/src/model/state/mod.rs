@@ -14,7 +14,7 @@ mod window;
 pub use looked_up::{AreaEntry, FileTarget, FileView, Load, PointOffer, PointOutcome};
 pub use pointer::{Pointer, PRESSED_TICKS};
 pub use questions::{
-    Confirm, GroupsScreen, LimitsEditor, Modal, RestoreStage, StopProtecting, Target,
+    Confirm, GroupsScreen, LimitsEditor, Modal, Pick, RestoreStage, StopProtecting, Target,
 };
 pub use told::{Offer, UiContext};
 pub use waiting::Waiting;
