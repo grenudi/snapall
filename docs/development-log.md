@@ -2,6 +2,19 @@
 
 What was done to this code, and why, newest first. The plan is `docs/backlog.md`; how an iteration goes is in `AGENTS.md`. An entry says what changed, why it was chosen, and the evidence, so that a session that remembers nothing can carry on.
 
+## 2026-11-14: a sixth read, and an item dropped
+
+**The item dropped.** "Record each change's weight in the journal (changed, or lost for good)" has been on the plan since early on, and I had never checked what it would add. The journal records the weight of the *undo*, and an entry's rollback is either a real undo or advice saying it cannot be undone, so the Activity tab already tells a person whether a change can be put back. A second field would say that through another route. Not built, with the reason in the plan.
+
+**What I read.** Eight sampled; four were new to me (`names.rs`, `cli/building.rs`, the adapter's `journal.rs`, and `taking.rs` partly). `names.rs` needed nothing: it parses once at the boundary, says why in plain words, and its doc names the single place where "area" is snapper's "config".
+
+**What I found.**
+- **`utf8` and `path_argument` were the same rule twice**, with the same doc comment pasted. `path_argument` is `utf8` on the optional argument now.
+- **A missing required argument was worded seven different ways by hand**: `missing required argument <SHELL>` in three commands, which the parser also produces from the contract's own record, and `CHANGE is required: the name of the change to roll back` in four. There is one source of truth for the wording already, `record.usage()`, and the builder ignored it. One function, `required`, words it from the contract, and `required_meaning` keeps the helpful hint where there was one. The three that were already in this form are byte-identical; the four others now read `missing required argument <CHANGE>: the name of the change to roll back`. I ran the real binary on all seven before and after, and the golden output (20 commands on a real fixture) is identical.
+- **`Outcome`'s stored words (`done`, `failed`, `cancelled`)** were spelled inline in the adapter in both directions, while `Source` and `Weight` own theirs in the core. They are `Outcome::word`, `detail` and `from_word` now, tested round trip, and the handling of old lines that stored only an `ok` flag stays in the adapter, where the file format lives.
+
+**One tooling note.** To write `required` I had to find the library's generics rather than guess them; the crate depends on `argenv-resolve`, not `argenv`, so the first path I wrote did not resolve. Reading the library's source took one call; guessing would have taken several.
+
 ## 2026-11-13: the last plurals
 
 **What.** The nine plurals `counted` did not fit were three shapes. **A plural with no number shown** (`the disk(s) holding …`): and reading them showed the sentence *"switch counting on for the disk(s) holding {areas}"* written three times across two layers, in the command's question and in both of the window's texts. It is `explain::disks_holding` now, one phrase in the core. **Agreement with a number** (`1 restore point includes it`, `3 restore points include it`; `The group names it`, `The groups name it … change them`): `by_number(n, one, many)`, the word that agrees with a number that is not itself shown, with `counted` for the one that is. **The general function itself**, `{count} {unit}s` for time units, which is just `counted`. Both helpers are generic over the number's type, since the counts are `usize` in some places and `u64` in others.

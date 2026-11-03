@@ -41,6 +41,34 @@ pub enum Outcome {
     Cancelled(String),
 }
 
+impl Outcome {
+    /// How it ended, in the word the journal stores.
+    pub fn word(&self) -> &'static str {
+        match self {
+            Outcome::Done(_) => "done",
+            Outcome::Failed(_) => "failed",
+            Outcome::Cancelled(_) => "cancelled",
+        }
+    }
+
+    /// What came of it, or why it did not, or how far it had got.
+    pub fn detail(&self) -> &str {
+        match self {
+            Outcome::Done(text) | Outcome::Failed(text) | Outcome::Cancelled(text) => text,
+        }
+    }
+
+    /// The outcome a stored word and detail say, or `None` for a word this does not know.
+    pub fn from_word(word: &str, detail: String) -> Option<Outcome> {
+        match word {
+            "done" => Some(Outcome::Done(detail)),
+            "failed" => Some(Outcome::Failed(detail)),
+            "cancelled" => Some(Outcome::Cancelled(detail)),
+            _ => None,
+        }
+    }
+}
+
 impl From<Result<String, String>> for Outcome {
     fn from(result: Result<String, String>) -> Self {
         match result {
