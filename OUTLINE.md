@@ -147,6 +147,7 @@ What each part of snapall says it is for, read from the first line of each modul
     - `model/state/waiting.rs`: What the window is waiting for: work in flight, the changes it handed to the background, and for how long.
     - `model/state/window.rs`: The window at one moment: its lists, cursor, open question, message, and what it is waiting for.
   - `model/updating.rs`: What the window does with each message that arrives: it decides, changes its state, and says what it wants done in return; one table says which step answers which message.
+  - `questions/chosen.rs`: What a question about snapshots acts on first: the chosen area, in the snapshots list the person is working in.
     - `questions/confirm/asking.rs`: The question before a change: what it will do, and the answer that goes with its weight.
     - `questions/confirm/drawing.rs`: Drawing the question before a change, in the colour of its weight: yellow for what can be put back, red for what cannot.
     - `questions/confirm/mod.rs`: The confirmation before a change: what it says, the answer its weight asks for, and how it looks.

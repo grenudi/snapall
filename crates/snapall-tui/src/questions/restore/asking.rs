@@ -8,6 +8,7 @@ use super::super::putting_back::{
     areas_in_words, EACH_AREA_IS_SAVED_FIRST, THE_AREA_IS_SAVED_FIRST,
 };
 use crate::model::*;
+use crate::questions::chosen::area_of_the_snapshots_in_use;
 use snapall_core::Act;
 use snapall_core::{AreaName, Preview, Restored, SnapshotId};
 
@@ -76,15 +77,10 @@ pub(crate) fn confirming_restore(
 }
 
 pub(crate) fn open_restore(state: &mut State) -> Vec<Effect> {
-    let Some(area) = state.snapshots.selected_area_name() else {
+    let Some(area) = area_of_the_snapshots_in_use(state, "to choose the snapshot to restore")
+    else {
         return Vec::new();
     };
-    if state.snapshots.focus != Pane::Snapshots {
-        state.notice = Some(Notice::Info(
-            "move to the snapshots pane (right arrow) to choose the snapshot to restore".into(),
-        ));
-        return Vec::new();
-    }
     let Some(id) = state.snapshots.selected_snapshot().map(|s| s.id) else {
         state.notice = Some(Notice::Error("no snapshot to restore".into()));
         return Vec::new();
