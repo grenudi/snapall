@@ -41,7 +41,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
         ),
 
         Request::Delete { area, id, destroy } => {
-            deleting::delete(ctx, &area, id, Agreed::to(false, destroy))
+            deleting::delete(ctx, &area, id, Agreed::by_destroy(destroy))
         }
 
         Request::Restore {
@@ -56,7 +56,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             id,
             path.as_deref(),
             Mode::from_dry_run(dry_run),
-            Agreed::to(yes, false),
+            Agreed::by_yes(yes),
         ),
         Request::RestoreAll {
             point,
@@ -67,7 +67,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             ctx,
             &point,
             Mode::from_dry_run(dry_run),
-            Agreed::to(yes, false),
+            Agreed::by_yes(yes),
             job.as_deref(),
         ),
         Request::Undo {
@@ -79,7 +79,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
         Request::Setup { area, yes, dry_run } => protecting::setup(
             ctx,
             area.as_deref(),
-            Agreed::to(yes, false),
+            Agreed::by_yes(yes),
             Mode::from_dry_run(dry_run),
         ),
         Request::Unprotect {
@@ -90,7 +90,7 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             ctx,
             &area,
             Mode::from_dry_run(dry_run),
-            Agreed::to(false, destroy),
+            Agreed::by_destroy(destroy),
         ),
         Request::Doctor { install, yes } => {
             doctor::run(ctx.backend, ctx.observer, install, yes, ctx.show.is_json())
@@ -121,13 +121,13 @@ pub fn carry_out(ctx: &Context, request: Request) -> Outcome {
             action.as_deref(),
             name.as_deref(),
             areas.as_deref(),
-            Agreed::to(yes, false),
+            Agreed::by_yes(yes),
         ),
         Request::Quotas { state, yes } => {
-            keeping::quotas(ctx, state.as_deref(), Agreed::to(yes, false))
+            keeping::quotas(ctx, state.as_deref(), Agreed::by_yes(yes))
         }
 
-        Request::Cancel { job, yes } => running::cancel(ctx, &job, Agreed::to(yes, false)),
+        Request::Cancel { job, yes } => running::cancel(ctx, &job, Agreed::by_yes(yes)),
         Request::Tui { file } => window::tui(ctx, file.as_deref()),
     }
 }

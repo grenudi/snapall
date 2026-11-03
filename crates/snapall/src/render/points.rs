@@ -33,7 +33,7 @@ pub fn points(points: &[snapall_core::RestorePoint]) -> String {
         "POINT", "WHEN", "AREAS"
     ));
     for p in points {
-        let note = if p.tagged {
+        let note = if p.found.is_certain() {
             ""
         } else {
             "   (older: matched by name and time)"
@@ -54,7 +54,7 @@ pub fn points_json(points: &[snapall_core::RestorePoint]) -> Value {
         "point": p.point.as_str(),
         "description": p.description,
         "date": p.date,
-        "tagged": p.tagged,
+        "tagged": p.found.is_certain(),
         "areas": p.members.iter().map(|m| json!({"area": m.area.as_str(), "snapshot": m.id.get()})).collect::<Vec<_>>(),
     })).collect::<Vec<_>>() })
 }

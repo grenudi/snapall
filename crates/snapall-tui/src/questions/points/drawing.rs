@@ -50,7 +50,7 @@ pub(crate) fn points_spec(
     let first = index.saturating_sub(5);
     for (at, point) in points.iter().enumerate().skip(first).take(6) {
         let marker = if at == index { "> " } else { "  " };
-        let note = if point.tagged {
+        let note = if point.found.is_certain() {
             ""
         } else {
             " (older: matched by name and time)"

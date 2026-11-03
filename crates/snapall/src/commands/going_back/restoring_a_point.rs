@@ -11,8 +11,8 @@ use crate::{ask, render};
 use snapall_core::going_back::boot;
 use snapall_core::Act;
 use snapall_core::{
-    all_snapshots, preview_point, restore_point_along, restore_points, MemberView, Point,
-    RestorePoint,
+    all_snapshots, areas_that_would_change, preview_point, restore_point_along, restore_points,
+    Point, RestorePoint,
 };
 use snapall_system::boot_menu;
 use std::error::Error;
@@ -32,7 +32,7 @@ pub fn restore_all(
     let point = the_point_named(&found, wanted)?;
     let previews = preview_point(ctx.backend, point);
     let route = boot::restore_route(&boot::assess(&boot_menu::on_this_machine()));
-    if mode.shows_only() || !anything_to_change(&previews) {
+    if mode.shows_only() || areas_that_would_change(&previews) == 0 {
         return ctx.show.result(
             render::point_preview(point, &previews, &route),
             render::point_preview_json(point, &previews),
@@ -56,12 +56,6 @@ pub fn restore_all(
     } else {
         ExitCode::FAILURE
     })
-}
-
-fn anything_to_change(previews: &[snapall_core::MemberPreview]) -> bool {
-    previews
-        .iter()
-        .any(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
 }
 
 /// Area by area, each after its own safety snapshot; the way back is written down as soon as there is one.
@@ -112,10 +106,7 @@ fn restore_point_question(
     point: &RestorePoint,
     previews: &[snapall_core::MemberPreview],
 ) -> String {
-    let areas = previews
-        .iter()
-        .filter(|p| matches!(&p.view, MemberView::Changes(c) if !c.changes.is_empty()))
-        .count();
+    let areas = areas_that_would_change(previews);
     format!(
         "Put {} back to restore point {}? Each one's current state is snapshotted first, so this can be undone.",
         snapall_core::vocabulary::explain::counted(areas, "area"),

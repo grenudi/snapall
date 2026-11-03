@@ -170,7 +170,7 @@ fn restore_points_are_a_table_with_the_command_that_uses_them() {
 #[test]
 fn a_matched_point_is_marked_as_older_and_a_guess() {
     let (_, mut point) = points_fixture();
-    point.tagged = false;
+    point.found = snapall_core::Found::ByGuess;
     assert!(points(&[point]).contains("older: matched by name and time"));
 }
 

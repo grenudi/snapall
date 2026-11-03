@@ -18,8 +18,8 @@ mod saying;
 #[cfg(test)]
 mod tests;
 
-pub use finding::{fresh_point, point_of, restore_points, Member, RestorePoint};
+pub use finding::{fresh_point, point_of, restore_points, Found, Member, RestorePoint};
 pub use putting_back::{
-    preview_point, restore_point, restore_point_along, MemberPreview, MemberReport, MemberResult,
-    MemberView, PointRestore,
+    areas_that_would_change, preview_point, restore_point, restore_point_along, MemberPreview,
+    MemberReport, MemberResult, MemberView, PointRestore,
 };

@@ -51,8 +51,19 @@ pub struct Agreed {
 }
 
 impl Agreed {
+    /// A command that offers both `--yes` and `--destroy`.
     pub fn to(yes: bool, destroy: bool) -> Agreed {
         Agreed { yes, destroy }
+    }
+
+    /// A command that offers only `--yes`: it changes things, and never destroys what cannot be put back.
+    pub fn by_yes(yes: bool) -> Agreed {
+        Agreed::to(yes, false)
+    }
+
+    /// A command that offers only `--destroy`: what it does cannot be put back, so `--yes` would mean nothing.
+    pub fn by_destroy(destroy: bool) -> Agreed {
+        Agreed::to(false, destroy)
     }
 
     /// Whether this already answers a question about something of this weight.
@@ -204,13 +215,13 @@ mod tests {
         );
         assert!(!nothing.covers(Weight::Changes));
         assert!(!nothing.covers(Weight::Destroys));
-        let yes = Agreed::to(true, false);
+        let yes = Agreed::by_yes(true);
         assert!(yes.covers(Weight::Changes));
         assert!(
             !yes.covers(Weight::Destroys),
             "--yes cannot answer a question about what is lost for good"
         );
-        let destroy = Agreed::to(false, true);
+        let destroy = Agreed::by_destroy(true);
         assert!(destroy.covers(Weight::Destroys));
         assert!(
             !destroy.covers(Weight::Changes),
@@ -220,8 +231,8 @@ mod tests {
 
     #[test]
     fn a_flag_that_already_said_it_gives_leave_without_asking_anyone() {
-        assert!(before(Act::DeleteSnapshots, Agreed::to(false, true), "Delete it?").is_ok());
-        assert!(before(Act::Restore, Agreed::to(true, false), "Restore it?").is_ok());
+        assert!(before(Act::DeleteSnapshots, Agreed::by_destroy(true), "Delete it?").is_ok());
+        assert!(before(Act::Restore, Agreed::by_yes(true), "Restore it?").is_ok());
     }
 
     #[test]

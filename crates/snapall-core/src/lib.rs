@@ -25,8 +25,9 @@ mod journeys;
 
 pub use changing::in_progress::InProgress;
 pub use going_back::points::{
-    fresh_point, point_of, preview_point, restore_point, restore_point_along, restore_points,
-    Member, MemberPreview, MemberReport, MemberResult, MemberView, PointRestore, RestorePoint,
+    areas_that_would_change, fresh_point, point_of, preview_point, restore_point,
+    restore_point_along, restore_points, Found, Member, MemberPreview, MemberReport, MemberResult,
+    MemberView, PointRestore, RestorePoint,
 };
 pub use going_back::restoring::{
     preview_restore, restore_snapshot, restore_snapshot_with, Preview, RestoreError, Restored,

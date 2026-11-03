@@ -50,8 +50,23 @@ pub struct RestorePoint {
     pub date: Option<String>,
     /// One snapshot per area, in the order of the areas' names.
     pub members: Vec<Member>,
-    /// `true` if found by its tag, `false` if matched by description and time.
-    pub tagged: bool,
+    /// How it was found.
+    pub found: Found,
+}
+
+/// How a restore point was found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Found {
+    /// By the tag its snapshots were given when they were taken together: certain.
+    ByTag,
+    /// A guess, from matching their description and time: older snapshots carry no tag.
+    ByGuess,
+}
+
+impl Found {
+    pub fn is_certain(self) -> bool {
+        self == Found::ByTag
+    }
 }
 
 pub(super) type Listing<'a> = &'a [(AreaName, Vec<SnapshotInfo>)];
@@ -88,7 +103,7 @@ pub(super) fn tagged_points(all: Listing<'_>) -> Vec<RestorePoint> {
     by_tag
         .into_iter()
         .filter(|(_, rows)| distinct_areas(rows) >= 2)
-        .map(|(point, rows)| build(point.clone(), &rows, true))
+        .map(|(point, rows)| build(point.clone(), &rows, Found::ByTag))
         .collect()
 }
 
@@ -135,7 +150,7 @@ pub(super) fn matched_points(all: Listing<'_>) -> Vec<RestorePoint> {
                 if let Ok(point) = Point::parse(&name) {
                     let rows: Vec<(&AreaName, &SnapshotInfo)> =
                         cluster.iter().map(|(_, c, s)| (*c, *s)).collect();
-                    points.push(build(point, &rows, false));
+                    points.push(build(point, &rows, Found::ByGuess));
                 }
             }
             cluster.clear();
@@ -157,7 +172,7 @@ pub(super) fn distinct_areas(rows: &[(&AreaName, &SnapshotInfo)]) -> usize {
 pub(super) fn build(
     point: Point,
     rows: &[(&AreaName, &SnapshotInfo)],
-    tagged: bool,
+    found: Found,
 ) -> RestorePoint {
     let mut members: Vec<Member> = rows
         .iter()
@@ -175,6 +190,6 @@ pub(super) fn build(
             .unwrap_or_default(),
         date: rows.iter().filter_map(|(_, s)| s.date.clone()).min(),
         members,
-        tagged,
+        found,
     }
 }

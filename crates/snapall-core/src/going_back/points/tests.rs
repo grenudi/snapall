@@ -51,7 +51,11 @@ fn snapshots_with_the_same_tag_in_different_areas_are_one_point_with_one_snapsho
     let points = restore_points(&all);
     assert_eq!(points.len(), 1);
     let point = &points[0];
-    assert!(point.tagged && point.point.as_str() == "p1" && point.description == "before theming");
+    assert!(
+        point.found == Found::ByTag
+            && point.point.as_str() == "p1"
+            && point.description == "before theming"
+    );
     assert_eq!(
         point.date.as_deref(),
         Some("2026-10-25 18:00:01"),
@@ -95,7 +99,7 @@ fn older_untagged_snapshots_are_matched_by_description_and_time_and_marked_as_a_
     ];
     let points = restore_points(&all);
     assert_eq!(points.len(), 1);
-    assert!(!points[0].tagged, "matched, not tagged");
+    assert!(points[0].found == Found::ByGuess, "matched, not tagged");
     assert!(
         points[0].point.as_str().starts_with("matched-2026"),
         "{}",
@@ -427,4 +431,36 @@ fn a_restore_stopped_between_areas_says_how_far_it_got_and_how_to_undo_that() {
         "{}",
         words.record
     );
+}
+
+#[test]
+fn an_area_would_change_only_when_putting_it_back_would_touch_a_path() {
+    use crate::going_back::restoring::Preview;
+    use crate::vocabulary::domain::{Change, ChangeKind};
+    let one = |view| MemberPreview {
+        area: AreaName::parse("home").unwrap(),
+        id: SnapshotId::new(1).unwrap(),
+        view,
+    };
+    let preview = |changes| Preview {
+        location: "/home".to_owned(),
+        is_system_root: false,
+        changes,
+    };
+    let touches = vec![Change {
+        kind: ChangeKind::Changed,
+        path: "/home/me/a".to_owned(),
+    }];
+    let looks = [
+        one(MemberView::Changes(preview(touches))),
+        one(MemberView::Changes(preview(vec![]))),
+        one(MemberView::SystemRoot),
+        one(MemberView::Failed("could not look".to_owned())),
+    ];
+    let would = looks
+        .iter()
+        .map(MemberPreview::would_change)
+        .collect::<Vec<_>>();
+    assert_eq!(would, [true, false, false, false]);
+    assert_eq!(areas_that_would_change(&looks), 1);
 }
