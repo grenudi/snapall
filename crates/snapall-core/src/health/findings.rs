@@ -70,7 +70,7 @@ pub(super) fn automatic_cleanup(facts: &Facts) -> Option<Finding> {
         ),
         Cleanup::Unavailable => (
             Level::Note,
-            "snapall could not find out whether old snapshots are cleaned up",
+            "It is not known whether old snapshots are cleaned up",
             None,
         ),
     };
