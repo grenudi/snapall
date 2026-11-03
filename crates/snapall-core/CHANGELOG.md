@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.0]
+
+
+### Refactoring
+- The last plurals ([#157](https://github.com/grenudi/snapall/pull/157)) ([f673b5b])
+
+
+
 ## [0.33.1]
 
 
