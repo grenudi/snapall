@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to snapall are documented here.
+## [0.34.14]
+
+
+### Refactoring
+- The plural left to the reader ([#192](https://github.com/grenudi/snapall/pull/192)) ([c6aacbe])
+
+
+
 ## [0.34.13]
 
 
