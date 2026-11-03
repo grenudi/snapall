@@ -334,7 +334,7 @@ fn the_question_fits_eighty_by_twenty_four_and_leaves_the_bars_and_uses_no_untol
     let text = flat(&session);
     for must in [
         "Delete for good",
-        "Delete 1 snapshot(s) of home for good",
+        "Delete 1 snapshot of home for good",
         "Go ahead",
     ] {
         assert!(text.contains(must), "`{must}` missing:\n{text}");

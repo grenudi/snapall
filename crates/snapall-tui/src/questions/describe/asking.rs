@@ -87,8 +87,8 @@ pub(crate) fn create_with(state: &mut State, target: Target, input: String) -> R
                 }
             };
             state.notice = Some(Notice::Info(format!(
-                "creating {} snapshot(s)",
-                targets.len()
+                "creating {}",
+                snapall_core::vocabulary::explain::counted(targets.len(), "snapshot")
             )));
             Reaction::closes_and_starts(vec![Effect::Create {
                 targets,

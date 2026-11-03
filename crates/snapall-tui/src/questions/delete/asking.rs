@@ -20,7 +20,11 @@ pub(crate) fn confirming_delete(
         Key::Char('y' | 'Y') | Key::Enter => {
             let list: Vec<String> = ids.iter().map(|id| format!("#{id}")).collect();
             let lines = vec![
-                format!("Delete {} snapshot(s) of {area} for good: {}.", ids.len(), list.join(", ")),
+                format!(
+                    "Delete {} of {area} for good: {}.",
+                    snapall_core::vocabulary::explain::counted(ids.len(), "snapshot"),
+                    list.join(", ")
+                ),
                 "Only these saved moments go: the files are not touched. A deleted snapshot cannot be brought back.".to_owned(),
             ];
             ask_first(

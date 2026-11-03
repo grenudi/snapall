@@ -37,7 +37,7 @@ fn dry_run_names_every_target_in_both_formats() {
     let plan = plan_snapshots(&backend, None).unwrap();
     let description = Description::parse("x").unwrap();
     let text = dry_run(&plan, &description);
-    assert!(text.contains("would snapshot 2 area(s)"));
+    assert!(text.contains("would snapshot 2 areas"));
     assert!(text.contains("  home\n") && text.contains("  root\n"));
     let value = dry_run_json(&plan, &description);
     assert_eq!(value["would_snapshot"], json!(["home", "root"]));

@@ -1081,6 +1081,23 @@ fn a_plural_is_said_by_the_core_and_not_spelled_by_hand_and_the_debt_only_shrink
     for (path, code) in all_sources() {
         let flat = code.split_whitespace().collect::<Vec<_>>().join(" ");
         let mut spelled = 0;
+        // the other way to avoid saying it: `snapshot(s)`, `area(s)`: a plural left to the reader, inside a sentence
+        for hack in ["(s)", "(es)"] {
+            let mut from = 0;
+            while let Some(at) = flat[from..].find(hack) {
+                let start = from + at;
+                let quotes_before =
+                    flat[..start].matches('"').count() - flat[..start].matches("\\\"").count();
+                let after_a_letter = flat[..start]
+                    .chars()
+                    .last()
+                    .is_some_and(char::is_alphabetic);
+                if quotes_before % 2 == 1 && after_a_letter {
+                    spelled += 1;
+                }
+                from = start + 1;
+            }
+        }
         let mut from = 0;
         while let Some(at) = flat[from..].find("== 1 { \"") {
             let start = from + at;

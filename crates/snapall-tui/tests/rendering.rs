@@ -125,7 +125,7 @@ fn the_delete_confirmation_names_what_will_go() {
     session.press(Key::Right);
     session.press(Key::Char('d'));
     let text = screen(&session, 100, 20);
-    assert!(text.contains("Delete 1 snapshot(s) of home?"), "{text}");
+    assert!(text.contains("Delete 1 snapshot of home?"), "{text}");
     assert!(text.contains("#2"), "{text}");
     assert!(text.contains("cannot be undone"), "{text}");
 }
