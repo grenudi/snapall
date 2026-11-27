@@ -445,7 +445,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@v32
       # --no-update-lock-file: the build must use the committed flake.lock exactly. A missing or
       # outdated lock fails here instead of being quietly regenerated to whatever nixpkgs is today.
       - run: nix build .#snapall --no-update-lock-file --print-build-logs
